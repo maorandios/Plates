@@ -1,0 +1,180 @@
+import type { DxfPartGeometry, ExcelRow, Part, MatchStatus } from "@/types";
+import type { Client, UploadedFile } from "@/types";
+import { nanoid } from "@/lib/utils/nanoid";
+
+// ─── Name normalization ───────────────────────────────────────────────────────
+
+export function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[_\-\s]+/g, " ")       // unify separators
+    .replace(/[^a-z0-9 ]/g, "")      // remove special chars
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function similarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (a.length === 0 || b.length === 0) return 0;
+
+  // Jaccard similarity on character bigrams
+  const bigrams = (s: string): Set<string> => {
+    const set = new Set<string>();
+    for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+    return set;
+  };
+
+  const setA = bigrams(a);
+  const setB = bigrams(b);
+  const intersection = new Set([...setA].filter((g) => setB.has(g)));
+  const union = new Set([...setA, ...setB]);
+  return union.size === 0 ? 0 : intersection.size / union.size;
+}
+
+const MATCH_THRESHOLD = 0.7;
+const REVIEW_THRESHOLD = 0.4;
+
+function computeMatchStatus(score: number): MatchStatus {
+  if (score >= MATCH_THRESHOLD) return "matched";
+  if (score >= REVIEW_THRESHOLD) return "needs_review";
+  return "unmatched";
+}
+
+// ─── Main matcher ─────────────────────────────────────────────────────────────
+
+export interface MatcherInput {
+  batchId: string;
+  clients: Client[];
+  files: UploadedFile[];
+  excelRows: ExcelRow[];
+  dxfGeometries: DxfPartGeometry[];
+}
+
+export function buildUnifiedParts({
+  batchId,
+  clients,
+  files,
+  excelRows,
+  dxfGeometries,
+}: MatcherInput): Part[] {
+  const parts: Part[] = [];
+
+  for (const client of clients) {
+    const clientFiles = files.filter((f) => f.clientId === client.id);
+    const clientDxfs = dxfGeometries.filter((g) => g.clientId === client.id);
+    const clientExcelRows = excelRows.filter((r) => r.clientId === client.id);
+
+    const usedExcelRowIds = new Set<string>();
+    const usedDxfFileIds = new Set<string>();
+
+    // ── Pass 1: Match DXF files to Excel rows ────────────────────────────────
+    for (const dxf of clientDxfs) {
+      const dxfNorm = normalizeName(dxf.guessedPartName);
+
+      let bestScore = 0;
+      let bestRow: ExcelRow | null = null;
+
+      for (const row of clientExcelRows) {
+        if (usedExcelRowIds.has(row.id)) continue;
+        const rowNorm = normalizeName(row.partName);
+        const score = similarity(dxfNorm, rowNorm);
+        if (score > bestScore) {
+          bestScore = score;
+          bestRow = row;
+        }
+      }
+
+      const matchStatus = computeMatchStatus(bestScore);
+      const dxfFile = clientFiles.find((f) => f.id === dxf.fileId);
+
+      // Extract geometry metrics from processed DXF
+      const geo = dxf.processedGeometry;
+      const geomFields = geo
+        ? {
+            dxfArea: geo.area > 0 ? geo.area : undefined,
+            dxfPerimeter: geo.perimeter > 0 ? geo.perimeter : undefined,
+            geometryStatus: geo.status,
+            dxfWidthMm:
+              geo.boundingBox.width > 0 ? geo.boundingBox.width : undefined,
+            dxfLengthMm:
+              geo.boundingBox.height > 0 ? geo.boundingBox.height : undefined,
+          }
+        : {};
+
+      if (bestRow && matchStatus !== "unmatched") {
+        usedExcelRowIds.add(bestRow.id);
+        usedDxfFileIds.add(dxf.fileId);
+
+        parts.push({
+          id: nanoid(),
+          batchId,
+          clientId: client.id,
+          clientCode: client.code,
+          clientName: client.fullName,
+          partName: bestRow.partName || dxf.guessedPartName,
+          quantity: bestRow.quantity,
+          thickness: bestRow.thickness,
+          material: bestRow.material,
+          width: bestRow.width,
+          length: bestRow.length,
+          area: bestRow.area,
+          weight: bestRow.weight,
+          totalWeight: bestRow.totalWeight,
+          dxfFileId: dxf.fileId,
+          dxfFileName: dxfFile?.name,
+          dxfStatus: "present",
+          excelRowId: bestRow.id,
+          excelStatus: "present",
+          matchStatus,
+          ...geomFields,
+        });
+      } else {
+        // DXF with no Excel match
+        usedDxfFileIds.add(dxf.fileId);
+        parts.push({
+          id: nanoid(),
+          batchId,
+          clientId: client.id,
+          clientCode: client.code,
+          clientName: client.fullName,
+          partName: dxf.guessedPartName,
+          dxfFileId: dxf.fileId,
+          dxfFileName: dxfFile?.name,
+          dxfStatus: "present",
+          excelStatus: "missing",
+          matchStatus: "unmatched",
+          ...geomFields,
+        });
+      }
+    }
+
+    // ── Pass 2: Remaining Excel rows with no DXF match ───────────────────────
+    for (const row of clientExcelRows) {
+      if (usedExcelRowIds.has(row.id)) continue;
+
+      parts.push({
+        id: nanoid(),
+        batchId,
+        clientId: client.id,
+        clientCode: client.code,
+        clientName: client.fullName,
+        partName: row.partName,
+        quantity: row.quantity,
+        thickness: row.thickness,
+        material: row.material,
+        width: row.width,
+        length: row.length,
+        area: row.area,
+        weight: row.weight,
+        totalWeight: row.totalWeight,
+        excelRowId: row.id,
+        dxfStatus: "missing",
+        excelStatus: "present",
+        matchStatus: "unmatched",
+      });
+    }
+  }
+
+  return parts;
+}
