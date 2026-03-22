@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
   RefreshCw,
   TableProperties,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
   Bug,
   ChevronDown,
   ChevronUp,
@@ -21,16 +18,24 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { PartsTable } from "@/features/parts/PartsTable";
 import {
   getBatchById,
-  getClientsByBatch,
-  getFilesByBatch,
-  getExcelRowsByBatch,
-  getDxfGeometriesByBatch,
+  getBatchMatchInputs,
   saveDxfGeometriesBatch,
   saveParts,
   getPartsByBatch,
+  deletePartUploadSources,
 } from "@/lib/store";
 import { buildUnifiedParts } from "@/lib/matching/matcher";
 import { reprocessDxfGeometry } from "@/lib/geometry";
+import { estimateDxfTotalWeightKg } from "@/lib/parts/excelDxfValidation";
+import { plateTypeDedupeKey } from "@/lib/parts/plateTypeKey";
+import { useAppPreferences } from "@/features/settings/useAppPreferences";
+import {
+  formatAreaValueOnly,
+  formatLengthValueOnly,
+  formatWeightValueOnly,
+  summaryTotalAreaLabel,
+  summaryTotalWeightLabel,
+} from "@/lib/settings/unitSystem";
 import type { Batch, DxfPartGeometry, Part, UploadedFile, ExcelRow } from "@/types";
 
 interface GeomDiag {
@@ -50,9 +55,17 @@ interface DiagData {
   geom: GeomDiag;
 }
 
+function useBatchIdParam(): string {
+  const params = useParams();
+  const raw = params?.id;
+  return typeof raw === "string" ? raw : Array.isArray(raw) ? (raw[0] ?? "") : "";
+}
+
 export default function PartsReviewPage() {
-  const { id } = useParams<{ id: string }>();
+  const batchId = useBatchIdParam();
   const router = useRouter();
+  const { preferences } = useAppPreferences();
+  const unitSystem = preferences.unitSystem;
 
   const [batch, setBatch] = useState<Batch | null>(null);
   const [parts, setParts] = useState<Part[]>([]);
@@ -61,18 +74,21 @@ export default function PartsReviewPage() {
   const [showDiag, setShowDiag] = useState(false);
 
   const loadBatch = useCallback(() => {
-    const b = getBatchById(id);
-    if (!b) { router.push("/batches"); return; }
+    if (!batchId) return;
+    const b = getBatchById(batchId);
+    if (!b) {
+      router.push("/batches");
+      return;
+    }
     setBatch(b);
-  }, [id, router]);
+  }, [batchId, router]);
 
   const buildParts = useCallback(() => {
+    if (!batchId) return;
     setIsBuilding(true);
     try {
-      const clients = getClientsByBatch(id);
-      const files = getFilesByBatch(id);
-      const excelRows = getExcelRowsByBatch(id);
-      const rawDxfGeometries = getDxfGeometriesByBatch(id);
+      const { clients, files, excelRows, dxfGeometries: rawDxfGeometries } =
+        getBatchMatchInputs(batchId);
 
       // ── Re-run geometry pipeline on every rebuild ──────────────────────
       // This ensures pipeline improvements take effect without re-uploading.
@@ -121,24 +137,46 @@ export default function PartsReviewPage() {
         geom: geomDiag,
       });
 
-      const built = buildUnifiedParts({ batchId: id, clients, files, excelRows, dxfGeometries });
-      saveParts(id, built);
+      const built = buildUnifiedParts({
+        batchId,
+        clients,
+        files,
+        excelRows,
+        dxfGeometries,
+      });
+      saveParts(batchId, built);
       setParts(built);
+    } catch (e) {
+      console.error("[PartsReview] Rebuild failed:", e);
     } finally {
       setIsBuilding(false);
     }
-  }, [id]);
+  }, [batchId]);
+
+  const handleRemoveParts = useCallback(
+    (toRemove: Part[]) => {
+      if (toRemove.length === 0) return;
+      const removeIds = new Set(toRemove.map((p) => p.id));
+      for (const p of toRemove) {
+        deletePartUploadSources(p);
+      }
+      setParts((prev) => {
+        const next = prev.filter((x) => !removeIds.has(x.id));
+        saveParts(batchId, next);
+        return next;
+      });
+    },
+    [batchId]
+  );
 
   useEffect(() => {
+    if (!batchId) return;
     loadBatch();
-    const cached = getPartsByBatch(id);
+    const cached = getPartsByBatch(batchId);
     if (cached.length > 0) {
       setParts(cached);
       // Load diag from cached data — geometry will refresh on next Rebuild
-      const clients = getClientsByBatch(id);
-      const files = getFilesByBatch(id);
-      const excelRows = getExcelRowsByBatch(id);
-      const dxfGeometries = getDxfGeometriesByBatch(id);
+      const { clients, files, excelRows, dxfGeometries } = getBatchMatchInputs(batchId);
       const geomCounts = dxfGeometries.reduce(
         (acc, g) => {
           const s = g.processedGeometry?.status;
@@ -160,11 +198,32 @@ export default function PartsReviewPage() {
     } else {
       buildParts();
     }
-  }, [id, loadBatch, buildParts]);
+  }, [batchId, loadBatch, buildParts]);
 
-  const matched = parts.filter((p) => p.matchStatus === "matched").length;
-  const needsReview = parts.filter((p) => p.matchStatus === "needs_review").length;
-  const unmatched = parts.filter((p) => p.matchStatus === "unmatched").length;
+  /** Aggregates from the current parts list (DXF area × qty; DXF-estimated weight). */
+  const plateSummary = useMemo(() => {
+    const plateTypes = new Set(parts.map(plateTypeDedupeKey)).size;
+    const platesQuantity = parts.reduce((s, p) => s + (p.quantity ?? 1), 0);
+    let platesAreaM2 = 0;
+    let totalWeightKg = 0;
+    const thicknessSet = new Set<number>();
+    for (const p of parts) {
+      if (p.thickness != null && p.thickness > 0) thicknessSet.add(p.thickness);
+      const q = p.quantity ?? 1;
+      if (p.dxfArea != null && p.dxfArea > 0) {
+        platesAreaM2 += (p.dxfArea / 1_000_000) * q;
+      }
+      const w = estimateDxfTotalWeightKg(p);
+      if (w != null) totalWeightKg += w;
+    }
+    return {
+      plateTypes,
+      platesQuantity,
+      platesAreaM2,
+      thicknessTypes: thicknessSet.size,
+      totalWeightKg,
+    };
+  }, [parts]);
 
   const hasExcelProblem =
     diag &&
@@ -175,7 +234,7 @@ export default function PartsReviewPage() {
     <PageContainer>
       <div className="mb-4">
         <Button variant="ghost" size="sm" asChild className="-ml-2">
-          <Link href={`/batches/${id}`}>
+          <Link href={`/batches/${batchId}`}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             Batch Details
           </Link>
@@ -272,12 +331,14 @@ export default function PartsReviewPage() {
                       </span>
                       {s.area > 0 && (
                         <span className="text-muted-foreground">
-                          area: {(s.area / 1_000_000).toFixed(4)} m²
+                          {unitSystem === "metric" ? "area (m²)" : "area (ft²)"}:{" "}
+                          {formatAreaValueOnly(s.area / 1_000_000, unitSystem)}
                         </span>
                       )}
                       {s.perimeter > 0 && (
                         <span className="text-muted-foreground">
-                          perim: {s.perimeter.toFixed(1)} mm
+                          {unitSystem === "metric" ? "perim (mm)" : "perim (in)"}:{" "}
+                          {formatLengthValueOnly(s.perimeter, unitSystem)}
                         </span>
                       )}
                       {s.message && (
@@ -384,24 +445,32 @@ export default function PartsReviewPage() {
       {/* ── Summary chips ──────────────────────────────────────────────────── */}
       {parts.length > 0 && (
         <div className="flex flex-wrap gap-3 mb-6">
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-sm"
+            title="Distinct plates: same part name can count multiple times when DXF, thickness, material, or stock W×L×area differ."
+          >
+            <span className="font-semibold text-foreground">{plateSummary.plateTypes}</span>
+            <span className="text-muted-foreground">plate types</span>
+          </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-sm">
-            <span className="font-semibold text-foreground">{parts.length}</span>
-            <span className="text-muted-foreground">total parts</span>
+            <span className="font-semibold text-foreground">{plateSummary.platesQuantity}</span>
+            <span className="text-muted-foreground">plates quantity</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 text-sm border border-emerald-100">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-            <span className="font-semibold text-emerald-700">{matched}</span>
-            <span className="text-emerald-600">matched</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-sm">
+            <span className="font-semibold text-foreground tabular-nums">
+              {formatAreaValueOnly(plateSummary.platesAreaM2, unitSystem)}
+            </span>
+            <span className="text-muted-foreground">{summaryTotalAreaLabel(unitSystem)}</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 text-sm border border-amber-100">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-            <span className="font-semibold text-amber-700">{needsReview}</span>
-            <span className="text-amber-600">needs review</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-sm">
+            <span className="font-semibold text-foreground">{plateSummary.thicknessTypes}</span>
+            <span className="text-muted-foreground">thickness types</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 text-sm border border-red-100">
-            <XCircle className="h-3.5 w-3.5 text-red-400" />
-            <span className="font-semibold text-red-700">{unmatched}</span>
-            <span className="text-red-600">unmatched</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-sm">
+            <span className="font-semibold text-foreground tabular-nums">
+              {formatWeightValueOnly(plateSummary.totalWeightKg, unitSystem)}
+            </span>
+            <span className="text-muted-foreground">{summaryTotalWeightLabel(unitSystem)}</span>
           </div>
         </div>
       )}
@@ -413,12 +482,12 @@ export default function PartsReviewPage() {
           description="Add clients and upload DXF or Excel files in the batch details page to populate this table."
           action={
             <Button asChild>
-              <Link href={`/batches/${id}`}>Go to Batch Details</Link>
+              <Link href={`/batches/${batchId}`}>Go to Batch Details</Link>
             </Button>
           }
         />
       ) : (
-        <PartsTable parts={parts} />
+        <PartsTable parts={parts} onRemoveParts={handleRemoveParts} />
       )}
     </PageContainer>
   );

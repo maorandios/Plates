@@ -8,6 +8,7 @@ import {
   PlusCircle,
   ChevronRight,
   Scissors,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,11 @@ const navItems = [
     label: "New Batch",
     href: "/batches/new",
     icon: PlusCircle,
+  },
+  {
+    label: "Preferences",
+    href: "/settings",
+    icon: Settings,
   },
 ];
 

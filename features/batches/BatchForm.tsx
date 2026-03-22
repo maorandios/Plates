@@ -19,6 +19,7 @@ import { createBatchSchema, type CreateBatchFormValues } from "@/lib/utils/schem
 import { saveBatch } from "@/lib/store";
 import { nanoid } from "@/lib/utils/nanoid";
 import type { Batch } from "@/types";
+import { CuttingMethodField } from "@/features/batches/components/CuttingMethodField";
 
 export function BatchForm() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export function BatchForm() {
     defaultValues: {
       name: "",
       notes: "",
+      cuttingMethod: "laser" as const,
     },
   });
 
@@ -39,6 +41,7 @@ export function BatchForm() {
       notes: values.notes?.trim() || undefined,
       status: "draft",
       clientIds: [],
+      cuttingMethod: values.cuttingMethod,
       createdAt: now,
       updatedAt: now,
     };
@@ -70,6 +73,8 @@ export function BatchForm() {
             </FormItem>
           )}
         />
+
+        <CuttingMethodField control={form.control} name="cuttingMethod" />
 
         <FormField
           control={form.control}

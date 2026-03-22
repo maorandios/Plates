@@ -1,11 +1,16 @@
 import { z } from "zod";
 
+const cuttingMethodEnum = z.enum(["laser", "plasma", "oxy_fuel"], {
+  message: "Cutting method is required",
+});
+
 export const createBatchSchema = z.object({
   name: z
     .string()
     .min(1, "Batch name is required")
     .max(100, "Batch name is too long"),
   notes: z.string().max(500, "Notes are too long").optional(),
+  cuttingMethod: cuttingMethodEnum,
 });
 
 export type CreateBatchFormValues = z.infer<typeof createBatchSchema>;

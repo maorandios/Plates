@@ -8,10 +8,21 @@ import type { DxfPartGeometry } from "@/types";
 import { nanoid } from "@/lib/utils/nanoid";
 import { processPartGeometry } from "@/lib/geometry";
 import { mapRawEntitiesToDxfEntities } from "@/lib/parsers/dxfEntityExtract";
+import {
+  detectDxfDrawingUnits,
+  type DxfHeaderRecord,
+  type DxfUnitDetectionResult,
+} from "@/lib/parsers/dxfUnitDetection";
+import {
+  extractMaterialGradeFromParsedDxf,
+  type ParsedDxfLike,
+} from "@/lib/parsers/dxfMaterialGrade";
 
 export interface DxfParseResult {
   geometry: Omit<DxfPartGeometry, "id">;
   warnings: string[];
+  /** Drawing unit hint from DXF header — internal geometry pipeline unchanged. */
+  unitDetection: DxfUnitDetectionResult;
 }
 
 export function parseDxfFile(
@@ -52,8 +63,14 @@ export function parseDxfFile(
         processedGeometry: null,
       },
       warnings,
+      unitDetection: detectDxfDrawingUnits(undefined, content),
     };
   }
+
+  const unitDetection = detectDxfDrawingUnits(
+    parsedDxf.header as DxfHeaderRecord,
+    content
+  );
 
   const rawEntities = parsedDxf.entities ?? [];
   const layerSet = new Set<string>();
@@ -122,12 +139,17 @@ export function parseDxfFile(
     );
   }
 
+  const materialGrade = extractMaterialGradeFromParsedDxf(
+    parsedDxf as unknown as ParsedDxfLike
+  );
+
   return {
     geometry: {
       fileId,
       clientId,
       batchId,
       guessedPartName,
+      materialGrade,
       entityCount: entities.length,
       layers: Array.from(layerSet),
       entities,
@@ -135,5 +157,6 @@ export function parseDxfFile(
       processedGeometry,
     },
     warnings,
+    unitDetection,
   };
 }

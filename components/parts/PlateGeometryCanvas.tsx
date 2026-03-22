@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Stage, Layer, Line, Text, Group, Circle, Rect } from "react-konva";
 import type { ProcessedGeometry } from "@/types";
+import type { UnitSystem } from "@/types/settings";
 import type { Point } from "@/lib/geometry/extract";
 import { calculateViewTransform, transformContour, transformPoint } from "@/lib/geometry/viewTransform";
 import { openPolygonVertices } from "@/lib/geometry/dimensions";
+import { formatLength } from "@/lib/settings/unitSystem";
 
 /** Max distance (px) from pointer to vertex to snap */
 const SNAP_PX = 16;
@@ -56,6 +58,8 @@ interface PlateGeometryCanvasProps {
   measureMode?: boolean;
   /** Increment to clear the current measurement from parent */
   clearMeasurementKey?: number;
+  /** Display units for labels (geometry stays mm internally) */
+  unitSystem?: UnitSystem;
 }
 
 export function PlateGeometryCanvas({
@@ -64,6 +68,7 @@ export function PlateGeometryCanvas({
   height = 500,
   measureMode = false,
   clearMeasurementKey = 0,
+  unitSystem = "metric",
 }: PlateGeometryCanvasProps) {
   const transform = useMemo(() => {
     return calculateViewTransform(geometry.boundingBox, width, height, 50);
@@ -157,6 +162,20 @@ export function PlateGeometryCanvas({
     return Math.hypot(p2Mm[0] - p1Mm[0], p2Mm[1] - p1Mm[1]);
   }, [p1Mm, p2Mm]);
 
+  const measurementLabel = useMemo(() => {
+    if (measurementMm == null) return "";
+    return formatLength(measurementMm, unitSystem);
+  }, [measurementMm, unitSystem]);
+
+  const bboxLabelW = useMemo(
+    () => formatLength(geometry.boundingBox.width, unitSystem),
+    [geometry.boundingBox.width, unitSystem]
+  );
+  const bboxLabelH = useMemo(
+    () => formatLength(geometry.boundingBox.height, unitSystem),
+    [geometry.boundingBox.height, unitSystem]
+  );
+
   const p1Screen = p1Mm ? (transformPoint(p1Mm, transform) as [number, number]) : null;
   const p2Screen = p2Mm ? (transformPoint(p2Mm, transform) as [number, number]) : null;
 
@@ -245,7 +264,7 @@ export function PlateGeometryCanvas({
             />
           )}
 
-          {measureMode && p1Screen && p2Screen && measurementMm != null && (
+          {measureMode && p1Screen && p2Screen && measurementLabel && (
             <Group listening={false}>
               <Line
                 points={[p1Screen[0], p1Screen[1], p2Screen[0], p2Screen[1]]}
@@ -261,15 +280,15 @@ export function PlateGeometryCanvas({
                 <Text
                   x={0}
                   y={0}
-                  text={`${measurementMm.toFixed(2)} mm`}
+                  text={measurementLabel}
                   fontSize={12}
                   fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
                   fill="#0f172a"
                   align="center"
                   verticalAlign="middle"
-                  width={Math.max(88, `${measurementMm.toFixed(2)} mm`.length * 7)}
+                  width={Math.max(88, measurementLabel.length * 7)}
                   height={18}
-                  offsetX={Math.max(88, `${measurementMm.toFixed(2)} mm`.length * 7) / 2}
+                  offsetX={Math.max(88, measurementLabel.length * 7) / 2}
                   offsetY={9}
                   listening={false}
                 />
@@ -291,9 +310,9 @@ export function PlateGeometryCanvas({
       </Stage>
 
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-center gap-4 text-xs text-muted-foreground font-mono bg-white/90 backdrop-blur-sm rounded px-2 py-1 border border-border">
-        <span>W: {geometry.boundingBox.width.toFixed(1)} mm</span>
+        <span>W: {bboxLabelW}</span>
         <span>×</span>
-        <span>H: {geometry.boundingBox.height.toFixed(1)} mm</span>
+        <span>H: {bboxLabelH}</span>
         {geometry.holes.length > 0 && (
           <>
             <span className="text-muted-foreground/50">·</span>

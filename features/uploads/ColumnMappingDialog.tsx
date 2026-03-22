@@ -33,7 +33,19 @@ interface ColumnMappingDialogProps {
 }
 
 interface MappingField {
-  key: keyof Pick<ColumnMapping, "partNameCol" | "qtyCol" | "thkCol" | "matCol" | "widthCol" | "lengthCol" | "areaCol" | "weightCol" | "totalWeightCol">;
+  key: keyof Pick<
+    ColumnMapping,
+    | "partNameCol"
+    | "qtyCol"
+    | "thkCol"
+    | "matCol"
+    | "widthCol"
+    | "lengthCol"
+    | "areaCol"
+    | "weightCol"
+    | "totalWeightCol"
+    | "dxfFileCol"
+  >;
   label: string;
   required: boolean;
   description: string;
@@ -41,6 +53,7 @@ interface MappingField {
 
 const FIELDS: MappingField[] = [
   { key: "partNameCol",    label: "Part Name",     required: true,  description: "Unique identifier for each part" },
+  { key: "dxfFileCol",     label: "DXF file",      required: false, description: "Drawing filename — links this row to the correct DXF when part names repeat across files" },
   { key: "qtyCol",         label: "Quantity",      required: false, description: "Number of pieces — defaults to 1" },
   { key: "thkCol",         label: "Thickness",     required: false, description: "Plate thickness (numeric, mm)" },
   { key: "matCol",         label: "Material",      required: false, description: "Steel grade or material type" },

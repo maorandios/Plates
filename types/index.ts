@@ -1,3 +1,5 @@
+import type { CuttingMethod } from "./production";
+
 // ─── Core Domain Types ──────────────────────────────────────────────────────
 
 export type BatchStatus = "draft" | "active" | "completed" | "archived";
@@ -8,6 +10,8 @@ export interface Batch {
   notes?: string;
   status: BatchStatus;
   clientIds: string[];
+  /** Required for production rules; legacy batches default to laser on load. */
+  cuttingMethod: CuttingMethod;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +34,16 @@ export type FileType = "dxf" | "excel";
 
 export type FileParseStatus = "pending" | "parsing" | "parsed" | "error";
 
+/** DXF drawing unit hint from header (INSUNITS etc.) — internal geometry stays mm. */
+export type DxfDetectedDrawingUnit =
+  | "mm"
+  | "in"
+  | "cm"
+  | "m"
+  | "ft"
+  | "unitless"
+  | "unknown";
+
 export interface UploadedFile {
   id: string;
   clientId: string;
@@ -46,6 +60,10 @@ export interface UploadedFile {
   uploadedAt: string;
   /** Raw file content as base64 or ArrayBuffer reference — stored separately */
   dataKey: string;
+  /** DXF only: from `dxfUnitDetection` */
+  detectedUnit?: DxfDetectedDrawingUnit;
+  detectedUnitLabel?: string;
+  detectedUnitSource?: "header" | "inferred" | "unknown";
 }
 
 // ─── Excel Parsing ───────────────────────────────────────────────────────────
@@ -56,6 +74,11 @@ export interface ExcelRow {
   clientId: string;
   batchId: string;
   partName: string;
+  /**
+   * When the BOM maps a column to the DXF/drawing filename, we store the same
+   * normalization used for matching (basename without .dxf/.dwg, then name rules).
+   */
+  dxfFileHintNormalized?: string;
   quantity: number;
   thickness?: number;
   material?: string;
@@ -112,6 +135,8 @@ export interface DxfPartGeometry {
   batchId: string;
   /** Filename without extension, used as guessed part name */
   guessedPartName: string;
+  /** Steel grade parsed from TEXT/MTEXT/blocks/layers (e.g. S355, ST-52) */
+  materialGrade?: string;
   entityCount: number;
   layers: string[];
   /**
@@ -193,6 +218,10 @@ export interface ColumnMapping {
   weightCol: number | null;
   /** Index of the total weight column (kg) */
   totalWeightCol: number | null;
+  /**
+   * Optional: column with DXF/drawing filename (or stem) — disambiguates duplicate part names across files.
+   */
+  dxfFileCol: number | null;
   /** Which row the headers were found on (0-based) */
   headerRowIdx: number;
 }
@@ -202,7 +231,19 @@ export interface ColumnMapping {
 export type CreateBatchInput = {
   name: string;
   notes?: string;
+  cuttingMethod: CuttingMethod;
 };
+
+// Re-exports for feature modules
+export type { AppPreferences, UnitSystem } from "./settings";
+export { DEFAULT_APP_PREFERENCES } from "./settings";
+export type { CuttingMethodProductionDefaults } from "./production";
+export {
+  CUTTING_METHOD_DEFAULTS,
+  CUTTING_METHOD_LABELS,
+  CUTTING_METHOD_OPTIONS,
+} from "./production";
+export type { CuttingMethod } from "./production";
 
 export type AddClientInput = {
   fullName: string;

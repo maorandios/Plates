@@ -11,7 +11,15 @@ import type {
   ExcelRow,
   DxfPartGeometry,
   Part,
+  ProcessedGeometry,
 } from "@/types";
+function normalizeBatch(b: Batch): Batch {
+  const cm = b.cuttingMethod;
+  if (cm === "laser" || cm === "plasma" || cm === "oxy_fuel") {
+    return { ...b, cuttingMethod: cm };
+  }
+  return { ...b, cuttingMethod: "laser" };
+}
 
 const STORAGE_KEYS = {
   batches: "plate_batches",
@@ -51,15 +59,30 @@ function saveToStorage<T>(key: string, data: T[]): void {
   }
 }
 
-/** DXF entities are re-parsed from uploaded file text on rebuild — do not persist them. */
+/**
+ * Vertex arrays (outer + holes) dominate JSON size for plates with many holes.
+ * Metrics stay for matching / table / diagnostics; preview rebuilds via `reprocessDxfGeometry`.
+ */
+function slimProcessedGeometryForStorage(
+  pg: ProcessedGeometry | null
+): ProcessedGeometry | null {
+  if (!pg) return null;
+  return { ...pg, outer: [], holes: [] };
+}
+
+/** DXF entities + mesh vertices are re-parsed from file text — do not persist them. */
 function stripDxfGeometryForStorage(g: DxfPartGeometry): DxfPartGeometry {
-  return { ...g, entities: [] };
+  return {
+    ...g,
+    entities: [],
+    processedGeometry: slimProcessedGeometryForStorage(g.processedGeometry),
+  };
 }
 
 // ─── Batches ─────────────────────────────────────────────────────────────────
 
 export function getBatches(): Batch[] {
-  return loadFromStorage<Batch>(STORAGE_KEYS.batches);
+  return loadFromStorage<Batch>(STORAGE_KEYS.batches).map(normalizeBatch);
 }
 
 export function getBatchById(id: string): Batch | undefined {
@@ -92,6 +115,40 @@ export function getClients(): Client[] {
 
 export function getClientsByBatch(batchId: string): Client[] {
   return getClients().filter((c) => c.batchId === batchId);
+}
+
+/**
+ * Clients tied to a batch: `client.batchId` match, plus any IDs on `batch.clientIds`
+ * (recovers rows missing from the first filter if `batchId` on the client is wrong/stale).
+ */
+export function getMergedClientsForBatch(batchId: string): Client[] {
+  const fromBatchField = getClients().filter((c) => c.batchId === batchId);
+  const batch = getBatchById(batchId);
+  const map = new Map(fromBatchField.map((c) => [c.id, c] as const));
+  for (const cid of batch?.clientIds ?? []) {
+    if (map.has(cid)) continue;
+    const c = getClientById(cid);
+    if (c) map.set(cid, c);
+  }
+  return Array.from(map.values());
+}
+
+/**
+ * Inputs for rebuilding the unified parts table: join files / Excel / DXF by `clientId`
+ * for every merged client, so uploads are not dropped when `batchId` on a file/row/geo mismatches.
+ */
+export function getBatchMatchInputs(batchId: string): {
+  clients: Client[];
+  files: UploadedFile[];
+  excelRows: ExcelRow[];
+  dxfGeometries: DxfPartGeometry[];
+} {
+  const clients = getMergedClientsForBatch(batchId);
+  const clientIds = new Set(clients.map((c) => c.id));
+  const files = getFiles().filter((f) => clientIds.has(f.clientId));
+  const excelRows = getExcelRows().filter((r) => clientIds.has(r.clientId));
+  const dxfGeometries = getDxfGeometries().filter((g) => clientIds.has(g.clientId));
+  return { clients, files, excelRows, dxfGeometries };
 }
 
 export function getClientById(id: string): Client | undefined {
@@ -146,9 +203,25 @@ export function saveFile(file: UploadedFile): void {
 }
 
 export function deleteFile(id: string): void {
+  const file = getFileById(id);
+  if (file?.dataKey && typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(`${STORAGE_KEYS.fileData}_${file.dataKey}`);
+    } catch {
+      /* ignore */
+    }
+  }
   saveToStorage(
     STORAGE_KEYS.files,
     getFiles().filter((f) => f.id !== id)
+  );
+  saveToStorage(
+    STORAGE_KEYS.dxfGeometries,
+    getDxfGeometries().filter((g) => g.fileId !== id)
+  );
+  saveToStorage(
+    STORAGE_KEYS.excelRows,
+    getExcelRows().filter((r) => r.fileId !== id)
   );
 }
 
@@ -189,13 +262,49 @@ export function saveExcelRows(rows: ExcelRow[]): void {
   const withoutThisFile = fileId
     ? existing.filter((r) => r.fileId !== fileId)
     : existing;
-  saveToStorage(STORAGE_KEYS.excelRows, [...withoutThisFile, ...rows]);
+  const slim = rows.map((r) => ({ ...r, rawRow: {} as ExcelRow["rawRow"] }));
+  saveToStorage(STORAGE_KEYS.excelRows, [...withoutThisFile, ...slim]);
+}
+
+export function deleteExcelRowById(rowId: string): void {
+  saveToStorage(
+    STORAGE_KEYS.excelRows,
+    getExcelRows().filter((r) => r.id !== rowId)
+  );
+}
+
+/**
+ * Deletes stored uploads behind a unified part: DXF file (and geometry + blob) and/or one Excel row.
+ * Safe when only one side exists (DXF-only or Excel-only).
+ */
+export function deletePartUploadSources(part: Part): void {
+  if (part.dxfFileId) {
+    deleteFile(part.dxfFileId);
+  }
+  if (part.excelRowId) {
+    deleteExcelRowById(part.excelRowId);
+  }
 }
 
 // ─── DXF Geometries ───────────────────────────────────────────────────────────
 
+let dxfVertexStripMigrationDone = false;
+
 export function getDxfGeometries(): DxfPartGeometry[] {
-  return loadFromStorage<DxfPartGeometry>(STORAGE_KEYS.dxfGeometries);
+  const list = loadFromStorage<DxfPartGeometry>(STORAGE_KEYS.dxfGeometries);
+  if (typeof window === "undefined" || dxfVertexStripMigrationDone) {
+    return list;
+  }
+  dxfVertexStripMigrationDone = true;
+  const bulky = list.some(
+    (g) =>
+      (g.processedGeometry?.outer?.length ?? 0) > 0 ||
+      (g.processedGeometry?.holes?.some((h) => h.length > 0) ?? false)
+  );
+  if (!bulky) return list;
+  const slim = list.map(stripDxfGeometryForStorage);
+  saveToStorage(STORAGE_KEYS.dxfGeometries, slim);
+  return slim;
 }
 
 export function getDxfGeometryByFile(fileId: string): DxfPartGeometry | undefined {
@@ -212,7 +321,7 @@ export function saveDxfGeometry(geometry: DxfPartGeometry): void {
 
 /**
  * Update several DXF geometry records in one localStorage write (faster rebuilds).
- * Always strips `entities` — they are large; re-parse from stored file via `reprocessDxfGeometry`.
+ * Strips `entities` and vertex arrays from `processedGeometry`; re-parse from file when needed.
  */
 export function saveDxfGeometriesBatch(updated: DxfPartGeometry[]): void {
   if (updated.length === 0) return;

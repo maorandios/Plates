@@ -14,6 +14,18 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
+/**
+ * Normalize an Excel cell or upload filename that refers to a DXF/drawing file
+ * (basename, optional .dxf/.dwg) for comparison with {@link normalizeName}.
+ */
+export function normalizeDxfFileHint(value: string): string {
+  const s = String(value ?? "").trim();
+  if (!s) return "";
+  const base = s.split(/[/\\]/).pop() ?? s;
+  const noExt = base.replace(/\.(dxf|dwg)$/i, "");
+  return normalizeName(noExt);
+}
+
 function similarity(a: string, b: string): number {
   if (a === b) return 1;
   if (a.length === 0 || b.length === 0) return 0;
@@ -34,6 +46,10 @@ function similarity(a: string, b: string): number {
 
 const MATCH_THRESHOLD = 0.7;
 const REVIEW_THRESHOLD = 0.4;
+/** Same name-similarity score for two rows → ambiguous pairing */
+const SCORE_TIE_EPS = 0.001;
+/** Extra weight when Excel DXF-filename column matches this upload (breaks ties, never stored as “score”) */
+const DXF_HINT_BONUS = 0.22;
 
 function computeMatchStatus(score: number): MatchStatus {
   if (score >= MATCH_THRESHOLD) return "matched";
@@ -71,22 +87,54 @@ export function buildUnifiedParts({
     // ── Pass 1: Match DXF files to Excel rows ────────────────────────────────
     for (const dxf of clientDxfs) {
       const dxfNorm = normalizeName(dxf.guessedPartName);
+      const dxfFile = clientFiles.find((f) => f.id === dxf.fileId);
+      const dxfStemNorm = dxfFile
+        ? normalizeDxfFileHint(dxfFile.name)
+        : "";
 
-      let bestScore = 0;
+      const availableRows = clientExcelRows.filter(
+        (r) => !usedExcelRowIds.has(r.id)
+      );
+
+      let bestAug = -1;
+      let secondAug = -1;
+      let bestNameScore = 0;
+      let secondNameScore = 0;
       let bestRow: ExcelRow | null = null;
+      let secondRow: ExcelRow | null = null;
 
-      for (const row of clientExcelRows) {
-        if (usedExcelRowIds.has(row.id)) continue;
+      for (const row of availableRows) {
         const rowNorm = normalizeName(row.partName);
-        const score = similarity(dxfNorm, rowNorm);
-        if (score > bestScore) {
-          bestScore = score;
+        const nameScore = similarity(dxfNorm, rowNorm);
+        const hintOk =
+          dxfStemNorm.length > 0 &&
+          row.dxfFileHintNormalized === dxfStemNorm;
+        const aug = hintOk ? nameScore + DXF_HINT_BONUS : nameScore;
+
+        if (aug > bestAug) {
+          secondAug = bestAug;
+          secondNameScore = bestNameScore;
+          secondRow = bestRow;
+          bestAug = aug;
+          bestNameScore = nameScore;
           bestRow = row;
+        } else if (aug > secondAug) {
+          secondAug = aug;
+          secondNameScore = nameScore;
+          secondRow = row;
         }
       }
 
-      const matchStatus = computeMatchStatus(bestScore);
-      const dxfFile = clientFiles.find((f) => f.id === dxf.fileId);
+      let matchStatus = computeMatchStatus(bestNameScore);
+      if (
+        bestRow &&
+        secondRow &&
+        secondNameScore >= REVIEW_THRESHOLD &&
+        Math.abs(bestNameScore - secondNameScore) < SCORE_TIE_EPS &&
+        normalizeName(bestRow.partName) === normalizeName(secondRow.partName)
+      ) {
+        matchStatus = "needs_review";
+      }
 
       // Extract geometry metrics from processed DXF
       const geo = dxf.processedGeometry;
@@ -115,7 +163,8 @@ export function buildUnifiedParts({
           partName: bestRow.partName || dxf.guessedPartName,
           quantity: bestRow.quantity,
           thickness: bestRow.thickness,
-          material: bestRow.material,
+          material:
+            dxf.materialGrade?.trim() || bestRow.material?.trim() || undefined,
           width: bestRow.width,
           length: bestRow.length,
           area: bestRow.area,
@@ -139,6 +188,7 @@ export function buildUnifiedParts({
           clientCode: client.code,
           clientName: client.fullName,
           partName: dxf.guessedPartName,
+          material: dxf.materialGrade?.trim() || undefined,
           dxfFileId: dxf.fileId,
           dxfFileName: dxfFile?.name,
           dxfStatus: "present",

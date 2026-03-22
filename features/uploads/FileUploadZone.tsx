@@ -24,10 +24,13 @@ import type { ColumnMapping, UploadedFile, FileType } from "@/types";
 interface FileUploadZoneProps {
   clientId: string;
   batchId: string;
-  onFilesUploaded?: (files: UploadedFile[]) => void;
+  /** Called after files are saved so the parent can refresh the file list. Args optional. */
+  onFilesUploaded?: (uploaded?: UploadedFile[]) => void;
 }
 
 interface PendingFile {
+  /** Stable key — never use list index after async (indices shift when other uploads finish). */
+  localId: string;
   file: File;
   type: FileType;
   status: "pending" | "parsing" | "done" | "error";
@@ -36,6 +39,7 @@ interface PendingFile {
 
 /** Queued Excel file waiting for the user to confirm column mapping */
 interface PendingExcelMapping {
+  localId: string;
   file: File;
   arrayBuffer: ArrayBuffer;
   headersResult: ExcelHeadersResult;
@@ -57,21 +61,18 @@ export function FileUploadZone({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Excel mapping dialog state
   const [mappingQueue, setMappingQueue] = useState<PendingExcelMapping[]>([]);
   const currentMapping = mappingQueue[0] ?? null;
 
-  // ── DXF processing (unchanged) ──────────────────────────────────────────
   const processDxfFile = useCallback(
-    async (
-      file: File,
-      queueIdx: number,
-      totalInBatch: number
-    ): Promise<UploadedFile | null> => {
+    async (file: File, localId: string): Promise<UploadedFile | null> => {
       let currentFileId = "";
       try {
+        if (!clientId || !batchId) {
+          throw new Error("Missing client or batch — refresh the page and try again.");
+        }
+
         const fileId = nanoid();
         currentFileId = fileId;
         const dataKey = `${clientId}_${fileId}`;
@@ -97,30 +98,28 @@ export function FileUploadZone({
         const result = parseDxfFile(text, fileId, file.name, clientId, batchId);
         saveDxfGeometry({ ...result.geometry, id: nanoid() });
 
+        const u = result.unitDetection;
         const updated: UploadedFile = {
           ...uploadedFile,
           parseStatus: "parsed",
           parsedRowCount: result.geometry.entityCount,
           parseWarnings: result.warnings.length > 0 ? result.warnings : undefined,
+          detectedUnit: u.detectedUnit,
+          detectedUnitLabel: u.displayLabel,
+          detectedUnitSource: u.source,
         };
         saveFile(updated);
 
         setPendingFiles((prev) =>
-          prev.map((f, idx) =>
-            idx === prev.length - totalInBatch + queueIdx
-              ? { ...f, status: "done" }
-              : f
-          )
+          prev.map((f) => (f.localId === localId ? { ...f, status: "done" } : f))
         );
 
         return updated;
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         setPendingFiles((prev) =>
-          prev.map((f, idx) =>
-            idx === prev.length - totalInBatch + queueIdx
-              ? { ...f, status: "error", error: errMsg }
-              : f
+          prev.map((f) =>
+            f.localId === localId ? { ...f, status: "error", error: errMsg } : f
           )
         );
         if (currentFileId) {
@@ -134,7 +133,6 @@ export function FileUploadZone({
     [clientId, batchId]
   );
 
-  // ── Excel processing (called after mapping confirmed) ──────────────────
   const processExcelWithMapping = useCallback(
     async (
       file: File,
@@ -143,6 +141,10 @@ export function FileUploadZone({
     ): Promise<UploadedFile | null> => {
       let currentFileId = "";
       try {
+        if (!clientId || !batchId) {
+          throw new Error("Missing client or batch — refresh the page and try again.");
+        }
+
         const fileId = nanoid();
         currentFileId = fileId;
         const dataKey = `${clientId}_${fileId}`;
@@ -192,67 +194,63 @@ export function FileUploadZone({
     [clientId, batchId]
   );
 
-  // ── Main drop / file-select handler ────────────────────────────────────
   const handleFiles = useCallback(
     async (rawFiles: FileList | File[]) => {
       const files = Array.from(rawFiles);
-      const valid: PendingFile[] = [];
-      const excelQueue: { file: File; arrayBuffer: ArrayBuffer }[] = [];
+      const newItems: PendingFile[] = [];
 
       for (const file of files) {
         const type = detectFileType(file);
         if (!type) continue;
-        valid.push({ file, type, status: "pending" });
+        newItems.push({
+          localId: nanoid(),
+          file,
+          type,
+          status: "pending",
+        });
       }
 
-      if (valid.length === 0) return;
+      if (newItems.length === 0) return;
 
-      setPendingFiles((prev) => [...prev, ...valid]);
-      setIsProcessing(true);
+      setPendingFiles((prev) => [...prev, ...newItems]);
 
       const uploaded: UploadedFile[] = [];
 
-      // Process DXFs immediately; collect Excel files for the mapping dialog
-      for (let i = 0; i < valid.length; i++) {
-        const item = valid[i];
-
+      for (const item of newItems) {
         setPendingFiles((prev) =>
-          prev.map((f, idx) =>
-            idx === prev.length - valid.length + i
-              ? { ...f, status: "parsing" }
-              : f
+          prev.map((f) =>
+            f.localId === item.localId ? { ...f, status: "parsing" } : f
           )
         );
 
         if (item.type === "dxf") {
-          const result = await processDxfFile(item.file, i, valid.length);
+          const result = await processDxfFile(item.file, item.localId);
           if (result) uploaded.push(result);
         } else {
-          // Read headers for the mapping dialog, then queue
           try {
             const arrayBuffer = await item.file.arrayBuffer();
             const headersResult = readExcelHeaders(arrayBuffer);
-            excelQueue.push({ file: item.file, arrayBuffer });
 
-            // Mark as "pending" in queue (not done yet — waiting for user)
             setPendingFiles((prev) =>
-              prev.map((f, idx) =>
-                idx === prev.length - valid.length + i
-                  ? { ...f, status: "pending" }
-                  : f
+              prev.map((f) =>
+                f.localId === item.localId ? { ...f, status: "pending" } : f
               )
             );
 
-            // Open mapping dialog — push to queue (dialogs shown one at a time)
             setMappingQueue((prev) => [
               ...prev,
-              { file: item.file, arrayBuffer, headersResult },
+              {
+                localId: item.localId,
+                file: item.file,
+                arrayBuffer,
+                headersResult,
+              },
             ]);
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
             setPendingFiles((prev) =>
-              prev.map((f, idx) =>
-                idx === prev.length - valid.length + i
+              prev.map((f) =>
+                f.localId === item.localId
                   ? { ...f, status: "error", error: errMsg }
                   : f
               )
@@ -261,64 +259,49 @@ export function FileUploadZone({
         }
       }
 
-      setIsProcessing(false);
       if (uploaded.length > 0) onFilesUploaded?.(uploaded);
-
-      // Clear DXF done items after 3s
-      setTimeout(() => {
-        setPendingFiles((prev) => prev.filter((f) => f.status !== "done"));
-      }, 3000);
     },
-    [clientId, batchId, processDxfFile, onFilesUploaded]
+    [processDxfFile, onFilesUploaded]
   );
 
-  // ── Mapping dialog callbacks ────────────────────────────────────────────
   const handleMappingConfirm = useCallback(
     async (mapping: ColumnMapping) => {
       if (!currentMapping) return;
 
-      // Show "parsing" in queue for this file
+      const { localId, file, arrayBuffer } = currentMapping;
+
       setPendingFiles((prev) =>
         prev.map((f) =>
-          f.file === currentMapping.file && f.status === "pending"
-            ? { ...f, status: "parsing" }
+          f.localId === localId ? { ...f, status: "parsing" } : f
+        )
+      );
+
+      const result = await processExcelWithMapping(file, arrayBuffer, mapping);
+
+      setPendingFiles((prev) =>
+        prev.map((f) =>
+          f.localId === localId
+            ? {
+                ...f,
+                status: result ? "done" : "error",
+                error: result ? undefined : "Excel import failed — check mapping and file format.",
+              }
             : f
         )
       );
 
-      const result = await processExcelWithMapping(
-        currentMapping.file,
-        currentMapping.arrayBuffer,
-        mapping
-      );
-
-      setPendingFiles((prev) =>
-        prev.map((f) =>
-          f.file === currentMapping.file && f.status === "parsing"
-            ? { ...f, status: result ? "done" : "error" }
-            : f
-        )
-      );
-
-      // Remove from queue — next Excel in queue (if any) will show automatically
       setMappingQueue((prev) => prev.slice(1));
 
-      if (result) {
-        onFilesUploaded?.([result]);
-        setTimeout(() => {
-          setPendingFiles((prev) => prev.filter((f) => f.status !== "done"));
-        }, 3000);
-      }
+      // Always refresh parent file list (DXF + Excel live in the store; list was easy to miss after dialog closed).
+      onFilesUploaded?.(result ? [result] : undefined);
     },
     [currentMapping, processExcelWithMapping, onFilesUploaded]
   );
 
   const handleMappingCancel = useCallback(() => {
     if (!currentMapping) return;
-    // Remove the file row from the pending list
-    setPendingFiles((prev) =>
-      prev.filter((f) => f.file !== currentMapping.file)
-    );
+    const { localId } = currentMapping;
+    setPendingFiles((prev) => prev.filter((f) => f.localId !== localId));
     setMappingQueue((prev) => prev.slice(1));
   }, [currentMapping]);
 
@@ -331,9 +314,17 @@ export function FileUploadZone({
     [handleFiles]
   );
 
+  const onInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const list = e.target.files;
+      if (list?.length) handleFiles(list);
+      e.target.value = "";
+    },
+    [handleFiles]
+  );
+
   return (
     <>
-      {/* ── Column mapping dialog ─────────────────────────────────────── */}
       {currentMapping && (
         <ColumnMappingDialog
           open={true}
@@ -345,7 +336,6 @@ export function FileUploadZone({
       )}
 
       <div className="space-y-3">
-        {/* ── Drop zone ─────────────────────────────────────────────────── */}
         <div
           className={cn(
             "relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all",
@@ -353,7 +343,10 @@ export function FileUploadZone({
               ? "border-primary bg-primary/5"
               : "border-border hover:border-muted-foreground/40 hover:bg-muted/30"
           )}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={onDrop}
           onClick={() => inputRef.current?.click()}
@@ -364,7 +357,7 @@ export function FileUploadZone({
             multiple
             accept=".dxf,.xlsx,.xls,.csv"
             className="hidden"
-            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+            onChange={onInputChange}
           />
           <div className="flex flex-col items-center gap-2">
             <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
@@ -384,19 +377,18 @@ export function FileUploadZone({
           </div>
         </div>
 
-        {/* ── Processing queue ───────────────────────────────────────────── */}
         {pendingFiles.length > 0 && (
           <div className="space-y-1.5">
-            {pendingFiles.map((item, i) => (
-              <div key={i} className="space-y-1">
+            {pendingFiles.map((item) => (
+              <div key={item.localId} className="space-y-1">
                 <div
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm",
                     item.status === "error"
                       ? "bg-red-50 border border-red-200"
                       : item.status === "pending" && item.type === "excel"
-                      ? "bg-blue-50 border border-blue-200"
-                      : "bg-muted/50"
+                        ? "bg-blue-50 border border-blue-200"
+                        : "bg-muted/50"
                   )}
                 >
                   <FileTypeBadge type={item.type} />

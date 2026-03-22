@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { ColumnMapping, ExcelRow } from "@/types";
+import { normalizeDxfFileHint } from "@/lib/matching/matcher";
 
 // ─── Column name aliases (all lowercase, no diacritics) ──────────────────────
 
@@ -70,6 +71,14 @@ const TOTAL_WEIGHT_KEYS = [
   "total weight", "total weight (kg)", "total weight(kg)",
   "peso total", "wieght t (kg)", "wieght t(kg)", "weight t",
   "total kg", "total mass", "gesamtgewicht",
+];
+
+/** Column headers that identify a DXF / drawing filename for row↔file linking */
+const DXF_FILE_KEYS = [
+  "dxf file", "dxf name", "dxf filename", "dxf", "cad file", "cad drawing",
+  "drawing file", "drawing name", "drawing no", "drawing number", "dwg file",
+  "filename", "file name", "nc file", "plate dxf", "ficheiro dxf", "arquivo dxf",
+  "desenho", "zeichnung",
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -320,7 +329,11 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
   if (!sheetName) {
     return {
       rawHeaders: [], headerRowIdx: 0, sheetName: "", previewRows: [],
-      autoDetected: { partNameCol: 0, qtyCol: null, thkCol: null, matCol: null, widthCol: null, lengthCol: null, areaCol: null, weightCol: null, totalWeightCol: null, headerRowIdx: 0 },
+      autoDetected: {
+        partNameCol: 0, qtyCol: null, thkCol: null, matCol: null,
+        widthCol: null, lengthCol: null, areaCol: null, weightCol: null,
+        totalWeightCol: null, dxfFileCol: null, headerRowIdx: 0,
+      },
     };
   }
 
@@ -355,6 +368,7 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
   const areaColIdx        = findColumn(norm, AREA_KEYS);
   const weightColIdx      = findColumn(norm, WEIGHT_KEYS);
   const totalWeightColIdx = findColumn(norm, TOTAL_WEIGHT_KEYS);
+  const dxfFileColIdx     = findColumn(norm, DXF_FILE_KEYS);
 
   const autoDetected: ColumnMapping = {
     partNameCol:    partColIdx        >= 0 ? partColIdx        : 0,
@@ -366,6 +380,7 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
     areaCol:        areaColIdx        >= 0 ? areaColIdx        : null,
     weightCol:      weightColIdx      >= 0 ? weightColIdx      : null,
     totalWeightCol: totalWeightColIdx >= 0 ? totalWeightColIdx : null,
+    dxfFileCol:     dxfFileColIdx     >= 0 ? dxfFileColIdx     : null,
     headerRowIdx,
   };
 
@@ -439,12 +454,22 @@ export async function parseExcelFileWithMapping(
     const weight      = mapping.weightCol      != null ? parseNumber(cells[mapping.weightCol])      : undefined;
     const totalWeight = mapping.totalWeightCol != null ? parseNumber(cells[mapping.totalWeightCol]) : undefined;
 
+    let dxfFileHintNormalized: string | undefined;
+    if (mapping.dxfFileCol != null) {
+      const rawHint = cells[mapping.dxfFileCol];
+      const hintNorm = normalizeDxfFileHint(
+        rawHint === null || rawHint === undefined ? "" : String(rawHint)
+      );
+      if (hintNorm) dxfFileHintNormalized = hintNorm;
+    }
+
     const rawRecord: Record<string, unknown> = {};
     rawHeaders.forEach((h, i) => { if (h) rawRecord[h] = cells[i]; });
 
     rows.push({
       fileId, clientId, batchId,
       partName,
+      ...(dxfFileHintNormalized ? { dxfFileHintNormalized } : {}),
       quantity: quantity ?? 1,
       thickness,
       material,

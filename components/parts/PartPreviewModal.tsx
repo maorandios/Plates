@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X, AlertCircle, Ruler } from "lucide-react";
 import {
   Dialog,
@@ -14,10 +14,10 @@ import { Badge } from "@/components/ui/badge";
 import type { Part } from "@/types";
 import { PlateGeometryCanvas } from "./PlateGeometryCanvas";
 import { getDxfGeometryByFile } from "@/lib/store";
-import {
-  estimateHoleDiameterMm,
-  formatHoleDiameterLabel,
-} from "@/lib/geometry/dimensions";
+import { reprocessDxfGeometry } from "@/lib/geometry";
+import { estimateHoleDiameterMm } from "@/lib/geometry/dimensions";
+import { useAppPreferences } from "@/features/settings/useAppPreferences";
+import { formatArea, formatHoleDiameter, formatLength } from "@/lib/settings/unitSystem";
 
 interface PartPreviewModalProps {
   part: Part;
@@ -26,12 +26,19 @@ interface PartPreviewModalProps {
 }
 
 export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps) {
+  const { preferences } = useAppPreferences();
+  const unitSystem = preferences.unitSystem;
+
   const [measureMode, setMeasureMode] = useState(false);
   const [clearMeasurementKey, setClearMeasurementKey] = useState(0);
 
-  const geometry = part.dxfFileId
-    ? getDxfGeometryByFile(part.dxfFileId)?.processedGeometry
-    : null;
+  /** Stored geometry omits vertices; rebuild from DXF file text when preview opens. */
+  const geometry = useMemo(() => {
+    if (!open || !part.dxfFileId) return null;
+    const stored = getDxfGeometryByFile(part.dxfFileId);
+    if (!stored) return null;
+    return reprocessDxfGeometry(stored).processedGeometry;
+  }, [open, part.dxfFileId]);
 
   const hasValidGeometry = geometry && geometry.isValid && geometry.outer.length > 0;
 
@@ -80,19 +87,19 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
             <MetaItem label="Quantity" value={part.quantity.toString()} />
           )}
           {part.thickness != null && (
-            <MetaItem label="Thickness" value={`${part.thickness} mm`} />
+            <MetaItem label="Thickness" value={formatLength(part.thickness, unitSystem)} />
           )}
           {part.material && <MetaItem label="Material" value={part.material} />}
           {part.dxfArea != null && (
             <MetaItem
               label="DXF Area"
-              value={`${(part.dxfArea / 1_000_000).toFixed(4)} m²`}
+              value={formatArea(part.dxfArea / 1_000_000, unitSystem)}
             />
           )}
           {part.dxfPerimeter != null && (
             <MetaItem
               label="Perimeter"
-              value={`${part.dxfPerimeter.toFixed(1)} mm`}
+              value={formatLength(part.dxfPerimeter, unitSystem)}
             />
           )}
           {part.geometryStatus && (
@@ -173,6 +180,7 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
                 height={500}
                 measureMode={measureMode}
                 clearMeasurementKey={clearMeasurementKey}
+                unitSystem={unitSystem}
               />
               {geometry.holes.length > 0 && (
                 <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
@@ -189,7 +197,7 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
                         >
                           <span className="text-muted-foreground">Hole {i + 1}</span>
                           <span className="font-mono font-medium text-foreground tabular-nums">
-                            {formatHoleDiameterLabel(d)}
+                            {formatHoleDiameter(d, unitSystem)}
                           </span>
                         </li>
                       );

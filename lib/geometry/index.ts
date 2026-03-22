@@ -128,15 +128,40 @@ export type { GeometryStatus } from "./validate";
 
 import { getFileById, getFileData } from "@/lib/store";
 import { extractDxfEntitiesFromText } from "@/lib/parsers/dxfEntityExtract";
+import {
+  extractMaterialGradeFromDxfText,
+  extractMaterialGradeFromEntities,
+} from "@/lib/parsers/dxfMaterialGrade";
+
+function resolveDxfFileText(stored: DxfPartGeometry): string | null {
+  const file = getFileById(stored.fileId);
+  const text = file?.dataKey ? getFileData(file.dataKey) : null;
+  return text ?? null;
+}
 
 function resolveEntitiesForReprocess(stored: DxfPartGeometry): DxfEntity[] {
   if (stored.entities?.length) {
     return stored.entities;
   }
-  const file = getFileById(stored.fileId);
-  const text = file?.dataKey ? getFileData(file.dataKey) : null;
+  const text = resolveDxfFileText(stored);
   if (!text) return [];
   return extractDxfEntitiesFromText(text);
+}
+
+function resolveMaterialGrade(
+  stored: DxfPartGeometry,
+  entities: DxfEntity[]
+): string | undefined {
+  const text = resolveDxfFileText(stored);
+  if (text) {
+    const g = extractMaterialGradeFromDxfText(text);
+    if (g) return g;
+  }
+  if (entities.length) {
+    const g = extractMaterialGradeFromEntities(entities as unknown[]);
+    if (g) return g;
+  }
+  return stored.materialGrade;
 }
 
 /**
@@ -153,13 +178,15 @@ export function reprocessDxfGeometry(
   stored: DxfPartGeometry
 ): DxfPartGeometry {
   const entities = resolveEntitiesForReprocess(stored);
+  const materialGrade = resolveMaterialGrade(stored, entities);
+
   if (!entities.length) {
-    return { ...stored, processedGeometry: null };
+    return { ...stored, processedGeometry: null, materialGrade };
   }
   try {
     const processedGeometry = processPartGeometry(entities);
-    return { ...stored, processedGeometry };
+    return { ...stored, processedGeometry, materialGrade };
   } catch {
-    return stored;
+    return { ...stored, materialGrade };
   }
 }

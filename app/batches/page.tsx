@@ -16,7 +16,9 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { BatchStatusBadge } from "@/components/shared/StatusBadge";
 import { getBatches, getClientsByBatch } from "@/lib/store";
+import { Badge } from "@/components/ui/badge";
 import type { Batch } from "@/types";
+import { CUTTING_METHOD_LABELS } from "@/types/production";
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -78,11 +80,16 @@ function BatchCard({ batch }: { batch: Batch }) {
     <Link href={`/batches/${batch.id}`}>
       <Card className="border border-border shadow-none hover:shadow-md hover:border-primary/20 transition-all cursor-pointer group h-full">
         <CardContent className="p-5">
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between mb-3 gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted shrink-0">
               <Layers className="h-5 w-5 text-muted-foreground" />
             </div>
-            <BatchStatusBadge status={batch.status} />
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
+              <BatchStatusBadge status={batch.status} />
+              <Badge variant="outline" className="text-[10px] font-medium">
+                {CUTTING_METHOD_LABELS[batch.cuttingMethod]}
+              </Badge>
+            </div>
           </div>
 
           <h3 className="font-semibold text-foreground mb-1 truncate">

@@ -12,6 +12,13 @@ import {
   ChevronUp,
   Trash2,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,9 +38,20 @@ import {
   saveBatch,
 } from "@/lib/store";
 import type { Batch, Client, UploadedFile } from "@/types";
+import {
+  CUTTING_METHOD_LABELS,
+  CUTTING_METHOD_OPTIONS,
+} from "@/types/production";
+import type { CuttingMethod } from "@/types/production";
+
+function useBatchIdParam(): string {
+  const params = useParams();
+  const raw = params?.id;
+  return typeof raw === "string" ? raw : Array.isArray(raw) ? (raw[0] ?? "") : "";
+}
 
 export default function BatchDetailsPage() {
-  const { id } = useParams<{ id: string }>();
+  const batchId = useBatchIdParam();
   const router = useRouter();
 
   const [batch, setBatch] = useState<Batch | null>(null);
@@ -42,14 +60,15 @@ export default function BatchDetailsPage() {
   const [fileRefreshKey, setFileRefreshKey] = useState(0);
 
   const reload = useCallback(() => {
-    const b = getBatchById(id);
+    if (!batchId) return;
+    const b = getBatchById(batchId);
     if (!b) {
       router.push("/batches");
       return;
     }
     setBatch(b);
-    setClients(getClientsByBatch(id));
-  }, [id, router]);
+    setClients(getClientsByBatch(batchId));
+  }, [batchId, router]);
 
   useEffect(() => {
     reload();
@@ -63,7 +82,7 @@ export default function BatchDetailsPage() {
   function handleDeleteClient(clientId: string) {
     deleteClient(clientId);
     // Update batch
-    const b = getBatchById(id);
+    const b = getBatchById(batchId);
     if (b) {
       saveBatch({
         ...b,
@@ -81,6 +100,17 @@ export default function BatchDetailsPage() {
 
   function handleToggleExpand(clientId: string) {
     setExpandedClientId((prev) => (prev === clientId ? null : clientId));
+  }
+
+  function handleCuttingMethodChange(method: CuttingMethod) {
+    if (!batch) return;
+    const next = {
+      ...batch,
+      cuttingMethod: method,
+      updatedAt: new Date().toISOString(),
+    };
+    saveBatch(next);
+    setBatch(next);
   }
 
   if (!batch) return null;
@@ -108,7 +138,7 @@ export default function BatchDetailsPage() {
           <div className="flex items-center gap-2">
             <BatchStatusBadge status={batch.status} />
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/batches/${id}/parts`}>
+              <Link href={`/batches/${batchId}/parts`}>
                 <TableProperties className="h-4 w-4 mr-2" />
                 Parts Review
               </Link>
@@ -133,6 +163,25 @@ export default function BatchDetailsPage() {
           </span>
         </div>
         <div className="h-4 w-px bg-border" />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="shrink-0">Cutting</span>
+          <Select
+            value={batch.cuttingMethod}
+            onValueChange={(v) => handleCuttingMethodChange(v as CuttingMethod)}
+          >
+            <SelectTrigger className="h-8 w-[132px] text-xs bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CUTTING_METHOD_OPTIONS.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {CUTTING_METHOD_LABELS[m]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="h-4 w-px bg-border" />
         <div className="text-xs text-muted-foreground">
           Created {new Date(batch.createdAt).toLocaleDateString()}
         </div>
@@ -148,7 +197,7 @@ export default function BatchDetailsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <AddClientForm batchId={id} onClientAdded={handleClientAdded} />
+            <AddClientForm batchId={batchId} onClientAdded={handleClientAdded} />
           </CardContent>
         </Card>
 
@@ -164,7 +213,7 @@ export default function BatchDetailsPage() {
               <ClientExpandable
                 key={client.id}
                 client={client}
-                batchId={id}
+                batchId={batchId}
                 isExpanded={expandedClientId === client.id}
                 onToggle={() => handleToggleExpand(client.id)}
                 onDelete={handleDeleteClient}
@@ -279,9 +328,13 @@ function ClientExpandable({
 
           {files.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
                 Uploaded Files
               </h4>
+              <p className="text-[11px] text-muted-foreground mb-2 leading-snug">
+                DXF entries show parse status, detected drawing units (header / inferred), and
+                upload time. Unknown units do not block upload.
+              </p>
               <FileList
                 files={files}
                 onFileDeleted={() => {
