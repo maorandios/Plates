@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft,
   RefreshCw,
   TableProperties,
   Bug,
@@ -13,7 +12,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
-import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PartsTable } from "@/features/parts/PartsTable";
 import {
@@ -231,43 +229,46 @@ export default function PartsReviewPage() {
     diag.excelRows.length === 0;
 
   return (
-    <PageContainer>
-      <div className="mb-4">
-        <Button variant="ghost" size="sm" asChild className="-ml-2">
-          <Link href={`/batches/${batchId}`}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Batch Details
-          </Link>
-        </Button>
+    <PageContainer embedded>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">
+            Validation
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {batch
+              ? `Review and rebuild the unified parts table for ${batch.name}.`
+              : "Review the unified parts table for this batch."}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDiag((v) => !v)}
+            className="text-muted-foreground"
+          >
+            <Bug className="h-4 w-4 mr-1" />
+            Diagnostics
+            {showDiag ? (
+              <ChevronUp className="h-3 w-3 ml-1" />
+            ) : (
+              <ChevronDown className="h-3 w-3 ml-1" />
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={buildParts}
+            disabled={isBuilding}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isBuilding ? "animate-spin" : ""}`}
+            />
+            Rebuild Table
+          </Button>
+        </div>
       </div>
-
-      <PageHeader
-        title="Parts Review"
-        description={batch ? `Unified parts table for: ${batch.name}` : ""}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDiag((v) => !v)}
-              className="text-muted-foreground"
-            >
-              <Bug className="h-4 w-4 mr-1" />
-              Diagnostics
-              {showDiag ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={buildParts}
-              disabled={isBuilding}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isBuilding ? "animate-spin" : ""}`} />
-              Rebuild Table
-            </Button>
-          </div>
-        }
-      />
 
       {/* ── Diagnostics panel ─────────────────────────────────────────────── */}
       {showDiag && diag && (
@@ -479,10 +480,10 @@ export default function PartsReviewPage() {
         <EmptyState
           icon={TableProperties}
           title="No parts found"
-          description="Add clients and upload DXF or Excel files in the batch details page to populate this table."
+          description="Add clients and upload DXF or Excel files in Import data (step 1) to populate this table."
           action={
             <Button asChild>
-              <Link href={`/batches/${batchId}`}>Go to Batch Details</Link>
+              <Link href={`/batches/${batchId}`}>Go to Import data</Link>
             </Button>
           }
         />

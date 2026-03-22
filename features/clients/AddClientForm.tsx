@@ -21,9 +21,15 @@ import type { Client } from "@/types";
 interface AddClientFormProps {
   batchId: string;
   onClientAdded: (client: Client) => void;
+  /** `stacked`: full-width field + button (e.g. dialog). Default: inline row. */
+  layout?: "inline" | "stacked";
 }
 
-export function AddClientForm({ batchId, onClientAdded }: AddClientFormProps) {
+export function AddClientForm({
+  batchId,
+  onClientAdded,
+  layout = "inline",
+}: AddClientFormProps) {
   const form = useForm<AddClientFormValues>({
     resolver: zodResolver(addClientSchema),
     defaultValues: { fullName: "" },
@@ -61,17 +67,23 @@ export function AddClientForm({ batchId, onClientAdded }: AddClientFormProps) {
     onClientAdded(client);
   }
 
+  const isStacked = layout === "stacked";
+
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="flex items-end gap-3"
+        className={
+          isStacked
+            ? "flex flex-col gap-4"
+            : "flex items-end gap-3"
+        }
       >
         <FormField
           control={form.control}
           name="fullName"
           render={({ field }) => (
-            <FormItem className="flex-1">
+            <FormItem className={isStacked ? "w-full" : "flex-1"}>
               <FormLabel>Client Name</FormLabel>
               <FormControl>
                 <Input placeholder="e.g. Acme Steel Works" {...field} />
@@ -80,7 +92,7 @@ export function AddClientForm({ batchId, onClientAdded }: AddClientFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" className="mb-0.5">
+        <Button type="submit" className={isStacked ? "w-full" : "mb-0.5"}>
           Add Client
         </Button>
       </form>

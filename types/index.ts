@@ -248,3 +248,5 @@ export type { CuttingMethod } from "./production";
 export type AddClientInput = {
   fullName: string;
 };
+
+export type { StockSheetEntry, StockSheetType } from "./nesting";

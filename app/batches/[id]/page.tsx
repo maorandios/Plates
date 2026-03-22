@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
 import {
-  ArrowLeft,
   Users,
   FileText,
-  TableProperties,
   ChevronDown,
   ChevronUp,
   Trash2,
+  UserPlus,
+  LayoutGrid,
+  Package,
+  ScanSearch,
+  Weight,
+  Upload,
 } from "lucide-react";
 import {
   Select,
@@ -20,23 +25,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
-import { PageHeader } from "@/components/shared/PageHeader";
-import { BatchStatusBadge } from "@/components/shared/StatusBadge";
 import { AddClientForm } from "@/features/clients/AddClientForm";
 import { ClientList } from "@/features/clients/ClientList";
-import { FileUploadZone } from "@/features/uploads/FileUploadZone";
 import { FileList } from "@/features/uploads/FileList";
+import { ClientImportWizardModal } from "@/features/uploads/ClientImportWizardModal";
+import { ClientDxfTable } from "@/features/uploads/ClientDxfTable";
 import {
   getBatchById,
   getClientsByBatch,
   getFilesByClient,
+  getPartsByBatch,
   deleteClient,
   saveBatch,
 } from "@/lib/store";
+import { plateTypeDedupeKey } from "@/lib/parts/plateTypeKey";
+import { estimateDxfTotalWeightKg } from "@/lib/parts/excelDxfValidation";
 import type { Batch, Client, UploadedFile } from "@/types";
 import {
   CUTTING_METHOD_LABELS,
@@ -58,6 +70,7 @@ export default function BatchDetailsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [fileRefreshKey, setFileRefreshKey] = useState(0);
+  const [addClientOpen, setAddClientOpen] = useState(false);
 
   const reload = useCallback(() => {
     if (!batchId) return;
@@ -75,6 +88,7 @@ export default function BatchDetailsPage() {
   }, [reload]);
 
   function handleClientAdded(client: Client) {
+    setAddClientOpen(false);
     reload();
     setExpandedClientId(client.id);
   }
@@ -113,6 +127,28 @@ export default function BatchDetailsPage() {
     setBatch(next);
   }
 
+  const batchStats = useMemo(() => {
+    const parts = getPartsByBatch(batchId);
+    const plateTypes = new Set(parts.map(plateTypeDedupeKey)).size;
+    const platesQuantity = parts.reduce((s, p) => s + (p.quantity ?? 1), 0);
+    let platesAreaM2 = 0;
+    let totalWeightKg = 0;
+    for (const p of parts) {
+      const q = p.quantity ?? 1;
+      if (p.dxfArea != null && p.dxfArea > 0) {
+        platesAreaM2 += (p.dxfArea / 1_000_000) * q;
+      }
+      const w = estimateDxfTotalWeightKg(p);
+      if (w != null) totalWeightKg += w;
+    }
+    return {
+      plateTypes,
+      platesQuantity,
+      platesAreaM2,
+      totalWeightT: totalWeightKg / 1000,
+    };
+  }, [batchId, fileRefreshKey, clients.length]);
+
   if (!batch) return null;
 
   const totalFiles = clients.reduce(
@@ -121,31 +157,70 @@ export default function BatchDetailsPage() {
   );
 
   return (
-    <PageContainer>
-      <div className="mb-4">
-        <Button variant="ghost" size="sm" asChild className="-ml-2">
-          <Link href="/batches">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            All Batches
-          </Link>
-        </Button>
+    <PageContainer embedded>
+      <Dialog open={addClientOpen} onOpenChange={setAddClientOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add client</DialogTitle>
+            <DialogDescription>
+              Each client gets a unique 3-character code for plate marking. You can upload DXF and
+              Excel files per client after adding them.
+            </DialogDescription>
+          </DialogHeader>
+          <AddClientForm
+            batchId={batchId}
+            layout="stacked"
+            onClientAdded={handleClientAdded}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <div className="mb-6">
+        <h1 className="text-lg font-semibold text-foreground tracking-tight">
+          Import data
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Add clients, import DXF and Excel files, then continue to validation.
+        </p>
       </div>
 
-      <PageHeader
-        title={batch.name}
-        description={batch.notes}
-        actions={
-          <div className="flex items-center gap-2">
-            <BatchStatusBadge status={batch.status} />
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/batches/${batchId}/parts`}>
-                <TableProperties className="h-4 w-4 mr-2" />
-                Parts Review
-              </Link>
-            </Button>
-          </div>
-        }
-      />
+      {/* Batch totals — from last saved Parts Review table */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+        <BatchStatCard
+          title="Clients"
+          value={clients.length}
+          icon={Users}
+        />
+        <BatchStatCard
+          title="Plate types"
+          value={batchStats.plateTypes}
+          icon={LayoutGrid}
+        />
+        <BatchStatCard
+          title="Plates quantity"
+          value={batchStats.platesQuantity}
+          icon={Package}
+        />
+        <BatchStatCard
+          title="Total area (m²)"
+          value={batchStats.platesAreaM2.toFixed(2)}
+          icon={ScanSearch}
+        />
+        <BatchStatCard
+          title="Total weight (t)"
+          value={batchStats.totalWeightT.toFixed(3)}
+          icon={Weight}
+          className="col-span-2 sm:col-span-1 lg:col-span-1"
+        />
+      </div>
+      <p className="text-[11px] text-muted-foreground mb-6">
+        Plate totals use the saved parts table. Go to{" "}
+        <Link href={`/batches/${batchId}/parts`} className="underline hover:text-foreground">
+          Validation
+        </Link>{" "}
+        (step 2) and click Rebuild Table to refresh after new uploads, or use{" "}
+        <span className="font-medium text-foreground">Continue</span> above.
+      </p>
 
       {/* Summary chips */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -188,25 +263,18 @@ export default function BatchDetailsPage() {
       </div>
 
       <div className="space-y-6">
-        {/* Add Client */}
-        <Card className="border border-border shadow-none">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base">Add Client</CardTitle>
-            <CardDescription>
-              Each client gets a unique 3-character code for plate marking
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AddClientForm batchId={batchId} onClientAdded={handleClientAdded} />
-          </CardContent>
-        </Card>
-
         {/* Clients */}
         <div>
-          <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            Clients ({clients.length})
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              Clients ({clients.length})
+            </h2>
+            <Button type="button" size="sm" onClick={() => setAddClientOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add client
+            </Button>
+          </div>
 
           <div className="space-y-2">
             {clients.map((client) => (
@@ -229,7 +297,7 @@ export default function BatchDetailsPage() {
                   No clients yet
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Add clients above to start uploading files
+                  Use &quot;Add client&quot; to create a client, then upload files.
                 </p>
               </div>
             )}
@@ -237,6 +305,36 @@ export default function BatchDetailsPage() {
         </div>
       </div>
     </PageContainer>
+  );
+}
+
+function BatchStatCard({
+  title,
+  value,
+  icon: Icon,
+  className,
+}: {
+  title: string;
+  value: string | number;
+  icon: LucideIcon;
+  className?: string;
+}) {
+  return (
+    <Card className={`border border-border shadow-none ${className ?? ""}`}>
+      <CardContent className="pt-5 pb-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+              {title}
+            </p>
+            <p className="text-2xl font-bold tabular-nums text-foreground mt-1 leading-none">
+              {value}
+            </p>
+          </div>
+          <Icon className="h-5 w-5 text-muted-foreground/50 shrink-0 mt-0.5" strokeWidth={1.75} />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -262,6 +360,7 @@ function ClientExpandable({
   fileRefreshKey,
 }: ClientExpandableProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   useEffect(() => {
     setFiles(getFilesByClient(client.id));
@@ -269,9 +368,23 @@ function ClientExpandable({
 
   const dxfCount = files.filter((f) => f.type === "dxf").length;
   const excelCount = files.filter((f) => f.type === "excel").length;
+  const excelFiles = files.filter((f) => f.type === "excel");
+
+  function refreshClientFiles() {
+    setFiles(getFilesByClient(client.id));
+    onFilesUploaded();
+  }
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <ClientImportWizardModal
+        open={importWizardOpen}
+        onOpenChange={setImportWizardOpen}
+        clientId={client.id}
+        batchId={batchId}
+        onFinished={onFilesUploaded}
+      />
+
       {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-muted/30 transition-colors select-none"
@@ -285,11 +398,29 @@ function ClientExpandable({
           <p className="text-sm font-semibold text-foreground">
             {client.fullName}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {files.length === 0
-              ? "No files uploaded"
-              : `${files.length} file${files.length !== 1 ? "s" : ""} · ${dxfCount} DXF · ${excelCount} Excel`}
-          </p>
+          <div
+            className="flex flex-wrap items-center gap-2 mt-1.5"
+            role="group"
+            aria-label="File counts by type"
+          >
+            <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/35 px-2 py-0.5 text-[11px]">
+              <span className="text-muted-foreground font-medium">DXF</span>
+              <span className="tabular-nums font-semibold text-foreground">
+                {dxfCount}
+              </span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/35 px-2 py-0.5 text-[11px]">
+              <span className="text-muted-foreground font-medium">Excel</span>
+              <span className="tabular-nums font-semibold text-foreground">
+                {excelCount}
+              </span>
+            </div>
+            {files.length > 0 && (
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                {files.length} file{files.length !== 1 ? "s" : ""} total
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -314,34 +445,50 @@ function ClientExpandable({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-4 pb-4 pt-1 border-t border-border bg-muted/20">
-          <div className="mb-3">
+        <div className="px-4 pb-4 pt-1 border-t border-border bg-muted/20 space-y-4">
+          <div>
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Upload Files
+              Import
             </h4>
-            <FileUploadZone
-              clientId={client.id}
-              batchId={batchId}
-              onFilesUploaded={onFilesUploaded}
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="gap-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                setImportWizardOpen(true);
+              }}
+            >
+              <Upload className="h-4 w-4" />
+              Import files
+            </Button>
+            <p className="text-[11px] text-muted-foreground mt-2 leading-snug">
+              Multi-step import: DXF parse, optional Excel with column mapping, then review DXF
+              plates in the table below.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              DXF plates
+            </h4>
+            <ClientDxfTable
+              files={files}
+              onFileDeleted={refreshClientFiles}
+              emptyHint="No DXF files yet. Click Import files to add drawings."
             />
           </div>
 
-          {files.length > 0 && (
+          {excelFiles.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                Uploaded Files
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                Excel files
               </h4>
               <p className="text-[11px] text-muted-foreground mb-2 leading-snug">
-                DXF entries show parse status, detected drawing units (header / inferred), and
-                upload time. Unknown units do not block upload.
+                Spreadsheet rows linked to this client after mapping in the import wizard.
               </p>
-              <FileList
-                files={files}
-                onFileDeleted={() => {
-                  setFiles(getFilesByClient(client.id));
-                  onFilesUploaded();
-                }}
-              />
+              <FileList files={excelFiles} onFileDeleted={refreshClientFiles} />
             </div>
           )}
         </div>

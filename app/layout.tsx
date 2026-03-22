@@ -31,7 +31,7 @@ export default function RootLayout({
       >
         <div className="flex min-h-screen bg-background">
           <Sidebar />
-          <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex flex-col flex-1 min-w-0 min-h-0">
             <TopHeader />
             {children}
           </div>

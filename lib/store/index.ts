@@ -12,6 +12,7 @@ import type {
   DxfPartGeometry,
   Part,
   ProcessedGeometry,
+  StockSheetEntry,
 } from "@/types";
 function normalizeBatch(b: Batch): Batch {
   const cm = b.cuttingMethod;
@@ -29,6 +30,7 @@ const STORAGE_KEYS = {
   dxfGeometries: "plate_dxf_geometries",
   parts: "plate_parts",
   fileData: "plate_file_data",
+  stockSheets: "plate_stock_sheets",
 } as const;
 
 // ─── Generic helpers ──────────────────────────────────────────────────────────
@@ -346,4 +348,30 @@ export function getPartsByBatch(batchId: string): Part[] {
 export function saveParts(batchId: string, parts: Part[]): void {
   const existing = getParts().filter((p) => p.batchId !== batchId);
   saveToStorage(STORAGE_KEYS.parts, [...existing, ...parts]);
+}
+
+// ─── Stock sheets (per batch, per thickness) ─────────────────────────────────
+
+export function getStockSheets(): StockSheetEntry[] {
+  return loadFromStorage<StockSheetEntry>(STORAGE_KEYS.stockSheets);
+}
+
+export function getStockSheetsByBatch(batchId: string): StockSheetEntry[] {
+  return getStockSheets().filter((s) => s.batchId === batchId);
+}
+
+/** Replace all persisted rows for this batch with `entries` (full list for the batch). */
+export function saveStockSheetsForBatch(
+  batchId: string,
+  entries: StockSheetEntry[]
+): void {
+  const others = getStockSheets().filter((s) => s.batchId !== batchId);
+  saveToStorage(STORAGE_KEYS.stockSheets, [...others, ...entries]);
+}
+
+export function deleteStockSheet(id: string): void {
+  saveToStorage(
+    STORAGE_KEYS.stockSheets,
+    getStockSheets().filter((s) => s.id !== id)
+  );
 }
