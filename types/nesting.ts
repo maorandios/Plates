@@ -1,6 +1,26 @@
+import type { ProfileRotationMode } from "./production";
+
 /** Stock assignment for nesting / cutting workflows (per batch, per thickness). */
 
 export type StockSheetType = "purchase" | "leftover";
+
+/**
+ * Batch-only cutting/nesting defaults for a specific plate thickness group.
+ * Does not change company Settings profiles.
+ */
+export interface BatchThicknessOverride {
+  id: string;
+  batchId: string;
+  /** Same semantics as part/stock grouping: null = “thickness not set” band */
+  thicknessMm: number | null;
+  spacingMm: number;
+  edgeMarginMm: number;
+  allowRotation: boolean;
+  rotationMode: ProfileRotationMode;
+  defaultMarkPartName: boolean;
+  defaultIncludeClientCode: boolean;
+  updatedAt: string;
+}
 
 export interface StockSheetEntry {
   id: string;

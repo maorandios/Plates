@@ -7,13 +7,18 @@
 import type {
   Batch,
   Client,
+  ClientStatus,
+  BatchClientLink,
   UploadedFile,
   ExcelRow,
   DxfPartGeometry,
   Part,
   ProcessedGeometry,
   StockSheetEntry,
+  BatchThicknessOverride,
 } from "@/types";
+import { deriveClientCode, generateClientCode, isSafeClientCode } from "@/lib/codegen/clientCode";
+import { nanoid } from "@/lib/utils/nanoid";
 function normalizeBatch(b: Batch): Batch {
   const cm = b.cuttingMethod;
   if (cm === "laser" || cm === "plasma" || cm === "oxy_fuel") {
@@ -31,7 +36,14 @@ const STORAGE_KEYS = {
   parts: "plate_parts",
   fileData: "plate_file_data",
   stockSheets: "plate_stock_sheets",
+  batchThicknessOverrides: "plate_batch_thickness_overrides",
+  batchClientLinks: "plate_batch_client_links",
 } as const;
+
+function thicknessStorageKey(thicknessMm: number | null): string {
+  if (thicknessMm == null || !Number.isFinite(thicknessMm)) return "__none__";
+  return String(thicknessMm);
+}
 
 // ─── Generic helpers ──────────────────────────────────────────────────────────
 
@@ -107,28 +119,158 @@ export function deleteBatch(id: string): void {
     STORAGE_KEYS.batches,
     getBatches().filter((b) => b.id !== id)
   );
+  saveToStorage(
+    STORAGE_KEYS.batchClientLinks,
+    loadFromStorage<BatchClientLink>(STORAGE_KEYS.batchClientLinks).filter(
+      (l) => l.batchId !== id
+    )
+  );
 }
 
-// ─── Clients ─────────────────────────────────────────────────────────────────
+// ─── Clients (global directory) ───────────────────────────────────────────────
+
+let clientsMigrationRan = false;
+
+function loadClientsRaw(): unknown[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.clients);
+    return raw ? (JSON.parse(raw) as unknown[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeClientFromStorage(raw: unknown): Client {
+  const r = raw as Record<string, unknown>;
+  const createdAt = String(r.createdAt ?? new Date().toISOString());
+  const updatedAt = String(r.updatedAt ?? createdAt);
+  const status: ClientStatus =
+    r.status === "inactive" ? "inactive" : "active";
+  const fullName = String(r.fullName ?? "").trim() || "Unnamed client";
+  const shortRaw =
+    typeof r.shortCode === "string"
+      ? r.shortCode
+      : typeof r.code === "string"
+        ? r.code
+        : "";
+  const shortCode = shortRaw.toUpperCase().slice(0, 3) || "TMP";
+  const uploadedFileIds = Array.isArray(r.uploadedFileIds)
+    ? (r.uploadedFileIds as string[])
+    : [];
+  return {
+    id: String(r.id),
+    fullName,
+    shortCode,
+    contactName:
+      typeof r.contactName === "string" ? r.contactName : undefined,
+    email: typeof r.email === "string" ? r.email : undefined,
+    phone: typeof r.phone === "string" ? r.phone : undefined,
+    notes: typeof r.notes === "string" ? r.notes : undefined,
+    status,
+    uploadedFileIds,
+    createdAt,
+    updatedAt,
+  };
+}
+
+function ensureClientsMigrated(): void {
+  if (clientsMigrationRan || typeof window === "undefined") return;
+  clientsMigrationRan = true;
+  const raw = loadClientsRaw();
+  if (raw.length === 0) return;
+
+  let needsWrite = false;
+  for (const row of raw) {
+    const o = row as Record<string, unknown>;
+    if ("batchId" in o && o.batchId != null) needsWrite = true;
+    if (typeof o.shortCode !== "string" && typeof o.code !== "string") {
+      needsWrite = true;
+    }
+    if (o.status !== "active" && o.status !== "inactive") needsWrite = true;
+    if (typeof o.updatedAt !== "string") needsWrite = true;
+  }
+
+  const list = raw.map((row) => normalizeClientFromStorage(row));
+  const taken = new Set<string>();
+  const fixed: Client[] = [];
+  for (const c of list) {
+    let code = c.shortCode;
+    if (!isSafeClientCode(code) || taken.has(code)) {
+      code = generateClientCode([...taken]);
+      needsWrite = true;
+    }
+    taken.add(code);
+    if (code !== c.shortCode) {
+      fixed.push({ ...c, shortCode: code });
+    } else {
+      fixed.push(c);
+    }
+  }
+
+  if (needsWrite) {
+    saveToStorage(STORAGE_KEYS.clients, fixed);
+  }
+}
+
+let batchClientLinksMigrationRan = false;
+
+function ensureBatchClientLinksMigrated(): void {
+  if (batchClientLinksMigrationRan || typeof window === "undefined") return;
+  batchClientLinksMigrationRan = true;
+  const existing = loadFromStorage<BatchClientLink>(
+    STORAGE_KEYS.batchClientLinks
+  );
+  if (existing.length > 0) return;
+  const batches = loadFromStorage<Batch>(STORAGE_KEYS.batches).map(
+    normalizeBatch
+  );
+  const built: BatchClientLink[] = [];
+  for (const b of batches) {
+    for (const clientId of b.clientIds ?? []) {
+      built.push({
+        id: nanoid(),
+        batchId: b.id,
+        clientId,
+        assignedAt: b.createdAt,
+      });
+    }
+  }
+  if (built.length > 0) {
+    saveToStorage(STORAGE_KEYS.batchClientLinks, built);
+  }
+}
+
+function persistBatchClientLinks(links: BatchClientLink[]): void {
+  saveToStorage(STORAGE_KEYS.batchClientLinks, links);
+}
+
+export function getBatchClientLinks(): BatchClientLink[] {
+  ensureBatchClientLinksMigrated();
+  return loadFromStorage<BatchClientLink>(STORAGE_KEYS.batchClientLinks);
+}
+
+export function getBatchClientLinksForBatch(
+  batchId: string
+): BatchClientLink[] {
+  return getBatchClientLinks().filter((l) => l.batchId === batchId);
+}
 
 export function getClients(): Client[] {
+  ensureClientsMigrated();
   return loadFromStorage<Client>(STORAGE_KEYS.clients);
 }
 
+/** @deprecated Use getMergedClientsForBatch — kept for call-site compatibility */
 export function getClientsByBatch(batchId: string): Client[] {
-  return getClients().filter((c) => c.batchId === batchId);
+  return getMergedClientsForBatch(batchId);
 }
 
-/**
- * Clients tied to a batch: `client.batchId` match, plus any IDs on `batch.clientIds`
- * (recovers rows missing from the first filter if `batchId` on the client is wrong/stale).
- */
 export function getMergedClientsForBatch(batchId: string): Client[] {
-  const fromBatchField = getClients().filter((c) => c.batchId === batchId);
   const batch = getBatchById(batchId);
-  const map = new Map(fromBatchField.map((c) => [c.id, c] as const));
-  for (const cid of batch?.clientIds ?? []) {
-    if (map.has(cid)) continue;
+  if (!batch) return [];
+  const map = new Map<string, Client>();
+  for (const cid of batch.clientIds) {
     const c = getClientById(cid);
     if (c) map.set(cid, c);
   }
@@ -136,8 +278,8 @@ export function getMergedClientsForBatch(batchId: string): Client[] {
 }
 
 /**
- * Inputs for rebuilding the unified parts table: join files / Excel / DXF by `clientId`
- * for every merged client, so uploads are not dropped when `batchId` on a file/row/geo mismatches.
+ * Inputs for rebuilding the unified parts table: scoped to this batch so global
+ * clients’ uploads in other jobs are excluded.
  */
 export function getBatchMatchInputs(batchId: string): {
   clients: Client[];
@@ -147,9 +289,15 @@ export function getBatchMatchInputs(batchId: string): {
 } {
   const clients = getMergedClientsForBatch(batchId);
   const clientIds = new Set(clients.map((c) => c.id));
-  const files = getFiles().filter((f) => clientIds.has(f.clientId));
-  const excelRows = getExcelRows().filter((r) => clientIds.has(r.clientId));
-  const dxfGeometries = getDxfGeometries().filter((g) => clientIds.has(g.clientId));
+  const files = getFiles().filter(
+    (f) => f.batchId === batchId && clientIds.has(f.clientId)
+  );
+  const excelRows = getExcelRows().filter(
+    (r) => r.batchId === batchId && clientIds.has(r.clientId)
+  );
+  const dxfGeometries = getDxfGeometries().filter(
+    (g) => g.batchId === batchId && clientIds.has(g.clientId)
+  );
   return { clients, files, excelRows, dxfGeometries };
 }
 
@@ -168,11 +316,108 @@ export function saveClient(client: Client): void {
   saveToStorage(STORAGE_KEYS.clients, clients);
 }
 
-export function deleteClient(id: string): void {
+export function linkClientToBatch(batchId: string, clientId: string): void {
+  const batch = getBatchById(batchId);
+  if (!batch) return;
+  const now = new Date().toISOString();
+  if (!batch.clientIds.includes(clientId)) {
+    saveBatch({
+      ...batch,
+      clientIds: [...batch.clientIds, clientId],
+      status: batch.status === "draft" ? "active" : batch.status,
+      updatedAt: now,
+    });
+  }
+  const links = getBatchClientLinks();
+  if (links.some((l) => l.batchId === batchId && l.clientId === clientId)) {
+    return;
+  }
+  persistBatchClientLinks([
+    ...links,
+    { id: nanoid(), batchId, clientId, assignedAt: now },
+  ]);
+}
+
+export function linkClientsToBatch(batchId: string, clientIds: string[]): void {
+  for (const id of clientIds) linkClientToBatch(batchId, id);
+}
+
+export function unlinkClientFromBatch(batchId: string, clientId: string): void {
+  const batch = getBatchById(batchId);
+  if (batch) {
+    saveBatch({
+      ...batch,
+      clientIds: batch.clientIds.filter((id) => id !== clientId),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  persistBatchClientLinks(
+    getBatchClientLinks().filter(
+      (l) => !(l.batchId === batchId && l.clientId === clientId)
+    )
+  );
+}
+
+export type CreateGlobalClientInput = {
+  fullName: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  status?: ClientStatus;
+};
+
+export function createGlobalClient(input: CreateGlobalClientInput): Client {
+  const clients = getClients();
+  const codes = clients.map((c) => c.shortCode);
+  const shortCode = deriveClientCode(input.fullName.trim(), codes);
+  const now = new Date().toISOString();
+  const client: Client = {
+    id: nanoid(),
+    fullName: input.fullName.trim(),
+    shortCode,
+    contactName: input.contactName?.trim() || undefined,
+    email: input.email?.trim() || undefined,
+    phone: input.phone?.trim() || undefined,
+    notes: input.notes?.trim() || undefined,
+    status: input.status === "inactive" ? "inactive" : "active",
+    uploadedFileIds: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+  saveClient(client);
+  return client;
+}
+
+/** Removes the client everywhere (files, parts links, batch assignments). */
+export function deleteGlobalClient(clientId: string): void {
+  for (const f of getFiles().filter((x) => x.clientId === clientId)) {
+    deleteFile(f.id);
+  }
+  for (const b of getBatches()) {
+    if (!b.clientIds.includes(clientId)) continue;
+    saveBatch({
+      ...b,
+      clientIds: b.clientIds.filter((id) => id !== clientId),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  persistBatchClientLinks(
+    getBatchClientLinks().filter((l) => l.clientId !== clientId)
+  );
+  saveToStorage(
+    STORAGE_KEYS.parts,
+    getParts().filter((p) => p.clientId !== clientId)
+  );
   saveToStorage(
     STORAGE_KEYS.clients,
-    getClients().filter((c) => c.id !== id)
+    getClients().filter((c) => c.id !== clientId)
   );
+}
+
+/** @deprecated Prefer deleteGlobalClient or unlinkClientFromBatch */
+export function deleteClient(id: string): void {
+  deleteGlobalClient(id);
 }
 
 // ─── Uploaded Files ───────────────────────────────────────────────────────────
@@ -183,6 +428,15 @@ export function getFiles(): UploadedFile[] {
 
 export function getFilesByClient(clientId: string): UploadedFile[] {
   return getFiles().filter((f) => f.clientId === clientId);
+}
+
+export function getFilesByClientAndBatch(
+  clientId: string,
+  batchId: string
+): UploadedFile[] {
+  return getFiles().filter(
+    (f) => f.clientId === clientId && f.batchId === batchId
+  );
 }
 
 export function getFilesByBatch(batchId: string): UploadedFile[] {
@@ -373,5 +627,47 @@ export function deleteStockSheet(id: string): void {
   saveToStorage(
     STORAGE_KEYS.stockSheets,
     getStockSheets().filter((s) => s.id !== id)
+  );
+}
+
+// ─── Batch thickness cutting overrides (per batch, per thickness band) ───────
+
+export function getBatchThicknessOverrideRecords(): BatchThicknessOverride[] {
+  return loadFromStorage<BatchThicknessOverride>(
+    STORAGE_KEYS.batchThicknessOverrides
+  );
+}
+
+export function getBatchThicknessOverrideRecordsForBatch(
+  batchId: string
+): BatchThicknessOverride[] {
+  return getBatchThicknessOverrideRecords().filter((o) => o.batchId === batchId);
+}
+
+export function upsertBatchThicknessOverrideRecord(
+  entry: BatchThicknessOverride
+): void {
+  const all = getBatchThicknessOverrideRecords().filter(
+    (o) =>
+      !(
+        o.batchId === entry.batchId &&
+        thicknessStorageKey(o.thicknessMm) ===
+          thicknessStorageKey(entry.thicknessMm)
+      )
+  );
+  saveToStorage(STORAGE_KEYS.batchThicknessOverrides, [...all, entry]);
+}
+
+export function removeBatchThicknessOverrideRecord(
+  batchId: string,
+  thicknessMm: number | null
+): void {
+  const key = thicknessStorageKey(thicknessMm);
+  saveToStorage(
+    STORAGE_KEYS.batchThicknessOverrides,
+    getBatchThicknessOverrideRecords().filter(
+      (o) =>
+        !(o.batchId === batchId && thicknessStorageKey(o.thicknessMm) === key)
+    )
   );
 }

@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Scissors,
   Settings,
+  ContactRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,11 @@ const navItems = [
     label: "Batches",
     href: "/batches",
     icon: Layers,
+  },
+  {
+    label: "Clients",
+    href: "/clients",
+    icon: ContactRound,
   },
   {
     label: "New Batch",

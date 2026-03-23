@@ -36,6 +36,7 @@ export default function StockConfigurationPage() {
   const unitSystem = preferences.unitSystem;
 
   const [rows, setRows] = useState<StockSheetEntry[]>([]);
+  const [cuttingOverridesRefreshKey, setCuttingOverridesRefreshKey] = useState(0);
 
   const batch = useMemo(
     () => (batchId ? getBatchById(batchId) : undefined),
@@ -160,9 +161,14 @@ export default function StockConfigurationPage() {
         </header>
 
         <ThicknessStockAccordion
+          batch={batch}
           groups={groups}
           stockRows={rows}
           unitSystem={unitSystem}
+          cuttingOverridesRefreshKey={cuttingOverridesRefreshKey}
+          onThicknessCuttingMutate={() =>
+            setCuttingOverridesRefreshKey((k) => k + 1)
+          }
           onAddRow={addRow}
           onPatchRow={patchRow}
           onDeleteRow={deleteRow}

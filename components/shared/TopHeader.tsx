@@ -9,6 +9,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/": "Dashboard",
   "/batches": "Batches",
   "/batches/new": "New Batch",
+  "/settings": "Preferences",
 };
 
 function getPageLabel(pathname: string): string {

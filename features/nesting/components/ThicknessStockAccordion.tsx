@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatLength } from "@/lib/settings/unitSystem";
 import type { UnitSystem } from "@/types/settings";
+import type { Batch } from "@/types";
 import type { StockSheetEntry } from "@/types/nesting";
 import {
   type PartThicknessGroup,
@@ -15,20 +16,27 @@ import {
   totalQuantityInGroup,
 } from "@/lib/nesting/stockConfiguration";
 import { ThicknessStockTable } from "./ThicknessStockTable";
+import { ThicknessCuttingSettingsSummary } from "./ThicknessCuttingSettingsSummary";
 
 interface ThicknessStockAccordionProps {
+  batch: Batch;
   groups: PartThicknessGroup[];
   stockRows: StockSheetEntry[];
   unitSystem: UnitSystem;
+  cuttingOverridesRefreshKey: number;
+  onThicknessCuttingMutate: () => void;
   onAddRow: (thicknessMm: number | null) => void;
   onPatchRow: (id: string, patch: Partial<StockSheetEntry>) => void;
   onDeleteRow: (id: string) => void;
 }
 
 export function ThicknessStockAccordion({
+  batch,
   groups,
   stockRows,
   unitSystem,
+  cuttingOverridesRefreshKey,
+  onThicknessCuttingMutate,
   onAddRow,
   onPatchRow,
   onDeleteRow,
@@ -126,6 +134,13 @@ export function ThicknessStockAccordion({
             {expanded ? (
               <div className="px-4 pb-4 pt-0 border-t border-border/80 bg-muted/15">
                 <div className="pt-4">
+                  <ThicknessCuttingSettingsSummary
+                    batch={batch}
+                    thicknessMm={group.thicknessMm}
+                    unitSystem={unitSystem}
+                    refreshKey={cuttingOverridesRefreshKey}
+                    onMutate={onThicknessCuttingMutate}
+                  />
                   <ThicknessStockTable
                     groupThicknessMm={group.thicknessMm}
                     rows={rows}

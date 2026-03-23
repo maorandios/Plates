@@ -25,26 +25,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
-import { AddClientForm } from "@/features/clients/AddClientForm";
-import { ClientList } from "@/features/clients/ClientList";
+import { ClientPicker } from "@/features/clients/components/ClientPicker";
 import { FileList } from "@/features/uploads/FileList";
 import { ClientImportWizardModal } from "@/features/uploads/ClientImportWizardModal";
 import { ClientDxfTable } from "@/features/uploads/ClientDxfTable";
 import {
   getBatchById,
   getClientsByBatch,
-  getFilesByClient,
+  getFilesByClientAndBatch,
   getPartsByBatch,
-  deleteClient,
+  unlinkClientFromBatch,
   saveBatch,
 } from "@/lib/store";
 import { plateTypeDedupeKey } from "@/lib/parts/plateTypeKey";
@@ -87,23 +79,8 @@ export default function BatchDetailsPage() {
     reload();
   }, [reload]);
 
-  function handleClientAdded(client: Client) {
-    setAddClientOpen(false);
-    reload();
-    setExpandedClientId(client.id);
-  }
-
-  function handleDeleteClient(clientId: string) {
-    deleteClient(clientId);
-    // Update batch
-    const b = getBatchById(batchId);
-    if (b) {
-      saveBatch({
-        ...b,
-        clientIds: b.clientIds.filter((cid) => cid !== clientId),
-        updatedAt: new Date().toISOString(),
-      });
-    }
+  function handleRemoveClientFromBatch(clientId: string) {
+    unlinkClientFromBatch(batchId, clientId);
     reload();
   }
 
@@ -152,35 +129,27 @@ export default function BatchDetailsPage() {
   if (!batch) return null;
 
   const totalFiles = clients.reduce(
-    (sum, c) => sum + getFilesByClient(c.id).length,
+    (sum, c) => sum + getFilesByClientAndBatch(c.id, batchId).length,
     0
   );
 
   return (
     <PageContainer embedded>
-      <Dialog open={addClientOpen} onOpenChange={setAddClientOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add client</DialogTitle>
-            <DialogDescription>
-              Each client gets a unique 3-character code for plate marking. You can upload DXF and
-              Excel files per client after adding them.
-            </DialogDescription>
-          </DialogHeader>
-          <AddClientForm
-            batchId={batchId}
-            layout="stacked"
-            onClientAdded={handleClientAdded}
-          />
-        </DialogContent>
-      </Dialog>
+      <ClientPicker
+        open={addClientOpen}
+        onOpenChange={setAddClientOpen}
+        batchId={batchId}
+        linkedClientIds={batch.clientIds}
+        onLinked={reload}
+      />
 
       <div className="mb-6">
         <h1 className="text-lg font-semibold text-foreground tracking-tight">
           Import data
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Add clients, import DXF and Excel files, then continue to validation.
+          Link clients from your global directory, import DXF and Excel per client for this batch,
+          then continue to validation.
         </p>
       </div>
 
@@ -272,7 +241,7 @@ export default function BatchDetailsPage() {
             </h2>
             <Button type="button" size="sm" onClick={() => setAddClientOpen(true)}>
               <UserPlus className="h-4 w-4 mr-2" />
-              Add client
+              Add clients
             </Button>
           </div>
 
@@ -284,7 +253,7 @@ export default function BatchDetailsPage() {
                 batchId={batchId}
                 isExpanded={expandedClientId === client.id}
                 onToggle={() => handleToggleExpand(client.id)}
-                onDelete={handleDeleteClient}
+                onRemoveFromBatch={handleRemoveClientFromBatch}
                 onFilesUploaded={handleFilesUploaded}
                 fileRefreshKey={fileRefreshKey}
               />
@@ -297,7 +266,8 @@ export default function BatchDetailsPage() {
                   No clients yet
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Use &quot;Add client&quot; to create a client, then upload files.
+                  Add clients from your directory or create one with quick create, then upload files
+                  for this batch.
                 </p>
               </div>
             )}
@@ -345,7 +315,7 @@ interface ClientExpandableProps {
   batchId: string;
   isExpanded: boolean;
   onToggle: () => void;
-  onDelete: (id: string) => void;
+  onRemoveFromBatch: (id: string) => void;
   onFilesUploaded: () => void;
   fileRefreshKey: number;
 }
@@ -355,7 +325,7 @@ function ClientExpandable({
   batchId,
   isExpanded,
   onToggle,
-  onDelete,
+  onRemoveFromBatch,
   onFilesUploaded,
   fileRefreshKey,
 }: ClientExpandableProps) {
@@ -363,15 +333,15 @@ function ClientExpandable({
   const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   useEffect(() => {
-    setFiles(getFilesByClient(client.id));
-  }, [client.id, fileRefreshKey]);
+    setFiles(getFilesByClientAndBatch(client.id, batchId));
+  }, [client.id, batchId, fileRefreshKey]);
 
   const dxfCount = files.filter((f) => f.type === "dxf").length;
   const excelCount = files.filter((f) => f.type === "excel").length;
   const excelFiles = files.filter((f) => f.type === "excel");
 
   function refreshClientFiles() {
-    setFiles(getFilesByClient(client.id));
+    setFiles(getFilesByClientAndBatch(client.id, batchId));
     onFilesUploaded();
   }
 
@@ -391,7 +361,7 @@ function ClientExpandable({
         onClick={onToggle}
       >
         <span className="inline-flex items-center justify-center h-8 w-12 rounded-md bg-primary text-primary-foreground text-xs font-bold font-mono tracking-wider shrink-0">
-          {client.code}
+          {client.shortCode}
         </span>
 
         <div className="flex-1 min-w-0">
@@ -428,9 +398,10 @@ function ClientExpandable({
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            title="Remove from this batch"
             onClick={(e) => {
               e.stopPropagation();
-              onDelete(client.id);
+              onRemoveFromBatch(client.id);
             }}
           >
             <Trash2 className="h-3.5 w-3.5" />

@@ -26,7 +26,7 @@ import {
   saveExcelRows,
   saveDxfGeometry,
   getFileById,
-  getFilesByClient,
+  getFilesByClientAndBatch,
 } from "@/lib/store";
 import { nanoid } from "@/lib/utils/nanoid";
 import {
@@ -575,7 +575,7 @@ export function ClientImportWizardModal({
               </p>
               <ClientDxfTable
                 key={tableRefresh}
-                files={getFilesByClient(clientId)}
+                files={getFilesByClientAndBatch(clientId, batchId)}
                 onFileDeleted={() => setTableRefresh((k) => k + 1)}
               />
             </div>

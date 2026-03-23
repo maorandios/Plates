@@ -16,17 +16,15 @@ export interface Batch {
   updatedAt: string;
 }
 
-// ─── Client ─────────────────────────────────────────────────────────────────
+// ─── Client (global directory) ───────────────────────────────────────────────
 
-export interface Client {
-  id: string;
-  batchId: string;
-  fullName: string;
-  /** Auto-generated unique 3-char uppercase code within this batch */
-  code: string;
-  uploadedFileIds: string[];
-  createdAt: string;
-}
+export type {
+  Client,
+  ClientStatus,
+  ClientMetrics,
+  BatchClientLink,
+  ClientBatchHistoryRow,
+} from "./clients";
 
 // ─── Uploaded File ───────────────────────────────────────────────────────────
 
@@ -237,11 +235,17 @@ export type CreateBatchInput = {
 // Re-exports for feature modules
 export type { AppPreferences, UnitSystem } from "./settings";
 export { DEFAULT_APP_PREFERENCES } from "./settings";
-export type { CuttingMethodProductionDefaults } from "./production";
+export type {
+  CuttingMethodProductionDefaults,
+  CuttingProfileRange,
+  ProfileRotationMode,
+} from "./production";
 export {
   CUTTING_METHOD_DEFAULTS,
   CUTTING_METHOD_LABELS,
   CUTTING_METHOD_OPTIONS,
+  DEFAULT_CUTTING_PROFILE_RANGES,
+  PROFILE_ROTATION_MODE_LABELS,
 } from "./production";
 export type { CuttingMethod } from "./production";
 
@@ -249,4 +253,8 @@ export type AddClientInput = {
   fullName: string;
 };
 
-export type { StockSheetEntry, StockSheetType } from "./nesting";
+export type {
+  BatchThicknessOverride,
+  StockSheetEntry,
+  StockSheetType,
+} from "./nesting";

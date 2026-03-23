@@ -23,3 +23,24 @@ export const addClientSchema = z.object({
 });
 
 export type AddClientFormValues = z.infer<typeof addClientSchema>;
+
+export const clientFormSchema = z.object({
+  fullName: z
+    .string()
+    .min(2, "Client name must be at least 2 characters")
+    .max(100, "Client name is too long"),
+  contactName: z.string().max(120).optional(),
+  email: z
+    .string()
+    .max(120)
+    .optional()
+    .refine(
+      (s) => !s?.trim() || z.string().email().safeParse(s.trim()).success,
+      "Invalid email"
+    ),
+  phone: z.string().max(40).optional(),
+  notes: z.string().max(2000).optional(),
+  status: z.enum(["active", "inactive"]),
+});
+
+export type ClientFormValues = z.infer<typeof clientFormSchema>;
