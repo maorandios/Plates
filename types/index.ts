@@ -284,6 +284,7 @@ export type {
 export type {
   GeneratedSheet,
   NestingEngineDebugMeta,
+  NestingPlacementModeUsed,
   NestingRun,
   NestingThicknessResult,
   SheetPlacement,

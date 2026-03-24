@@ -6,6 +6,7 @@
 import type { NestingEngineDebugMeta } from "@/types";
 import type { ProfileRotationMode } from "@/types/production";
 import type { NormalizedNestShape } from "./convertGeometryToSvgNest";
+import { buildSvgnestPartInputs } from "./buildSvgnestPartInputs";
 import { runSvgNest } from "./runSvgNest";
 import { compareSheetMetrics, metricsFromPlacements } from "./scoreNestingResult";
 import type { EnginePlacement } from "./shelfNestEngine";
@@ -103,8 +104,13 @@ export function svgnestRotationsFromRules(
   return 24;
 }
 
-/** Two passes balance quality vs total wait time (each run waits for its own SVGNest budget). */
-const DEFAULT_CANDIDATES: NestCandidateLabel[] = ["area-desc", "max-side-desc"];
+/**
+ * Single SVGNest pass for smoke-testing / fast feedback. Pass `candidateLabels` to run more orderings.
+ */
+const DEFAULT_CANDIDATES: NestCandidateLabel[] = ["area-desc"];
+
+/** Second SVGNest run when the first places nothing — off while validating SVGNest end-to-end. */
+const SVGNEST_RECOVERY_PASS = false;
 
 /** If splitting the budget would give less than this per candidate, run a single ordering instead. */
 const MIN_MS_PER_CANDIDATE_SLICE = 4500;
@@ -126,6 +132,12 @@ export interface RunNestingCandidatesResult {
   placed: EnginePlacement[];
   debugPatch: Partial<NestingEngineDebugMeta>;
   candidateSummaries: string[];
+  /** SVGNest SVG input footprint stats (same for all orderings of the same instance set). */
+  svgnestInputFootprint: {
+    polygonCount: number;
+    bboxFallbackCount: number;
+    bboxFallbackInstanceIds: string[];
+  };
 }
 
 export async function runNestingCandidates(
@@ -158,6 +170,14 @@ export async function runNestingCandidates(
 
   const shapeById = shapeMap(options.normalizedParts);
 
+  const svgnestFootprint = buildSvgnestPartInputs(
+    options.normalizedParts,
+    options.spacingMm
+  );
+  const partInputByInstanceId = new Map(
+    svgnestFootprint.parts.map((p) => [p.shape.partInstanceId, p])
+  );
+
   let bestPlaced: EnginePlacement[] = [];
   let bestMetrics = metricsFromPlacements(
     [],
@@ -169,12 +189,16 @@ export async function runNestingCandidates(
   const candidateSummaries: string[] = [];
 
   for (const label of labelsToRun) {
+    await new Promise((r) => window.setTimeout(r, 0));
     const ordered = orderForLabel(label, options.normalizedParts);
+    const partsForNest = ordered
+      .map((s) => partInputByInstanceId.get(s.partInstanceId))
+      .filter((p): p is NonNullable<typeof p> => p != null);
     const run = await runSvgNest({
-      normalizedParts: ordered,
+      parts: partsForNest,
       innerBinWidthMm: options.innerBinWidthMm,
       innerBinLengthMm: options.innerBinLengthMm,
-      spacingMm: options.spacingMm,
+      spacingMm: 0,
       rotations,
       timeBudgetMs: perMs,
       workerUrl: options.workerUrl,
@@ -202,20 +226,25 @@ export async function runNestingCandidates(
 
   let recoveryRan = false;
   if (
+    SVGNEST_RECOVERY_PASS &&
     bestPlaced.length === 0 &&
     options.normalizedParts.length > 0
   ) {
+    await new Promise((r) => window.setTimeout(r, 0));
     recoveryRan = true;
     const recoveryBudget = Math.min(
       22_000,
       Math.max(12_000, Math.floor(totalBudgetMs * 0.75))
     );
     const ordered = orderForLabel("area-desc", options.normalizedParts);
+    const partsForNest = ordered
+      .map((s) => partInputByInstanceId.get(s.partInstanceId))
+      .filter((p): p is NonNullable<typeof p> => p != null);
     const run = await runSvgNest({
-      normalizedParts: ordered,
+      parts: partsForNest,
       innerBinWidthMm: options.innerBinWidthMm,
       innerBinLengthMm: options.innerBinLengthMm,
-      spacingMm: options.spacingMm,
+      spacingMm: 0,
       rotations,
       timeBudgetMs: recoveryBudget,
       workerUrl: options.workerUrl,
@@ -242,6 +271,11 @@ export async function runNestingCandidates(
   return {
     placed: bestPlaced,
     candidateSummaries,
+    svgnestInputFootprint: {
+      polygonCount: svgnestFootprint.polygonCount,
+      bboxFallbackCount: svgnestFootprint.bboxFallbackCount,
+      bboxFallbackInstanceIds: svgnestFootprint.bboxFallbackInstanceIds,
+    },
     debugPatch: {
       primaryAlgorithm: "svgnest-polygon",
       fullPolygonNesting: true,
@@ -256,6 +290,10 @@ export async function runNestingCandidates(
       allowRotationApplied: options.allowRotation,
       shelfFallbackCount: 0,
       shelfFallbackReasons: [],
+      svgnestSpacingInConfigMm: 0,
+      svgnestInputPolygonCount: svgnestFootprint.polygonCount,
+      svgnestInputBboxFallbackCount: svgnestFootprint.bboxFallbackCount,
+      svgnestBboxFallbackInstanceIds: svgnestFootprint.bboxFallbackInstanceIds,
     },
   };
 }

@@ -1,6 +1,12 @@
 import type { StockSheetType } from "./nesting";
 import type { ProfileRotationMode } from "./production";
 
+/** How part footprints were represented during placement (for debugging). */
+export type NestingPlacementModeUsed =
+  | "polygon-aware"
+  | "svgnest-polygon"
+  | "bounding-box";
+
 /** Dev / trace metadata for one thickness group within a nesting run. */
 export interface NestingEngineDebugMeta {
   /** Primary engine used for this thickness (shelf only if SVGNest failed). */
@@ -24,6 +30,26 @@ export interface NestingEngineDebugMeta {
   /** How many physical sheets in this thickness used shelf fallback. */
   shelfFallbackCount: number;
   shelfFallbackReasons: string[];
+
+  /** Polygon-aware shelf / footprint trace (optional on older persisted runs). */
+  placementModeUsed?: NestingPlacementModeUsed;
+  /** Parts nested with a true offset outer contour (per busiest shelf adapt pass). */
+  polygonPartsCount?: number;
+  /** Parts that used axis-aligned bbox footprint only (conversion/offset failure). */
+  bboxFallbackPartsCount?: number;
+  fallbackPartIds?: string[];
+  /** Same as `spacingMmApplied` — duplicated for footprint-debug clarity. */
+  spacingAppliedMm?: number;
+  /** Same as `edgeMarginMmApplied` — duplicated for footprint-debug clarity. */
+  edgeMarginAppliedMm?: number;
+  /** Same as `rotationModeApplied` — duplicated for footprint-debug clarity. */
+  rotationModeUsed?: ProfileRotationMode | "locked";
+
+  /** SVGNest input: parts sent as offset polygon geometry (not raw bbox). */
+  svgnestSpacingInConfigMm?: number;
+  svgnestInputPolygonCount?: number;
+  svgnestInputBboxFallbackCount?: number;
+  svgnestBboxFallbackInstanceIds?: string[];
 }
 
 /** Degrees counter-clockwise in bin coordinates (any-nest / SVGNest-style). */

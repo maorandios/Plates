@@ -19,6 +19,8 @@ function slimEngineDebug(
     ...d,
     shelfFallbackReasons: d.shelfFallbackReasons.slice(0, 25),
     lastCandidateSummaries: d.lastCandidateSummaries?.slice(0, 12),
+    fallbackPartIds: d.fallbackPartIds?.slice(0, 60),
+    svgnestBboxFallbackInstanceIds: d.svgnestBboxFallbackInstanceIds?.slice(0, 60),
   };
 }
 

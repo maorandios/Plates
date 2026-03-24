@@ -1,10 +1,8 @@
 /**
- * Auto nesting — thickness-first. **Default: shelf / row packing** on each part’s outer contour
- * AABB (`packShelfSingleSheet`) — reliable in the browser, no workers.
- *
- * **Optional:** `usePolygonNesting: true` tries SVGNest polygon/NFP first (`runNestingCandidates`),
- * then falls back to shelf if the worker fails or places nothing. Enable from the UI via
- * `NEXT_PUBLIC_PLATE_POLYGON_NESTING=1` in `.env.local` (experimental).
+ * Auto nesting — thickness-first. **Default: SVGNest** (`runNestingCandidates`): true polygon
+ * footprints (cleaned outer + outward spacing offset in SVG), inner bin from stock minus edge
+ * margin, multi-candidate passes. Placements map to **original** `outer`/`holes` for the viewer.
+ * **Shelf** runs only when the worker is unavailable or SVGNest places nothing.
  *
  * Stock strategy (MVP, documented):
  * - Stock rows are individual physical sheets (no quantity field).
@@ -29,24 +27,31 @@ import type {
 import type { UnitSystem } from "@/types/settings";
 import { nanoid } from "@/lib/utils/nanoid";
 import { getBatchById, getStockSheetsByBatch } from "@/lib/store";
-import { applyPlacementToRing } from "./applyPlacementTransform";
 import { sheetInnerMetrics } from "./calculateNestingMetrics";
+import { buildPolygonPlacementDebugFields } from "./debugPlacementMetadata";
 import {
   normalizeShapeForNest,
   type NormalizedNestShape,
 } from "./convertGeometryToSvgNest";
 import type { NestablePartInstance } from "./expandPartInstances";
+import { sheetPlacementFromEnginePlacement } from "./mapPlacementResults";
 import {
-  packShelfSingleSheetBestWithOrientation,
-  rotationAnglesDeg,
-  type EnginePlacement,
-} from "./shelfNestEngine";
+  adaptNormalizedShapesForPolygonPlacement,
+  packPolygonAwareShelfSingleSheetBestWithOrientation,
+} from "./runPolygonAwarePlacement";
+import { rotationAnglesDeg, type EnginePlacement } from "./shelfNestEngine";
 import { prepareNestingInputs } from "./prepareNestingInputs";
 import { resolveNestRulesForThickness } from "./resolveBatchThicknessRules";
 import { runNestingCandidates } from "./runNestingCandidates";
 import { resolveSvgnestWorkerUrlClient } from "./resolveSvgnestWorkerUrl";
 import { innerBinDimensionsMm } from "./resolveBinGeometry";
 import { thicknessGroupKey } from "./stockConfiguration";
+
+/** Lets the browser paint loading state and stay responsive between heavy steps. */
+async function yieldToUi(): Promise<void> {
+  if (typeof window === "undefined") return;
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+}
 
 export interface RunAutoNestingOptions {
   batchId: string;
@@ -57,7 +62,7 @@ export interface RunAutoNestingOptions {
    */
   nestDurationMs?: number;
   /**
-   * Try SVGNest polygon nesting before shelf. Default false — shelf packing only (recommended).
+   * When true (default), run SVGNest in the browser when the worker loads; otherwise shelf only.
    */
   usePolygonNesting?: boolean;
 }
@@ -109,33 +114,6 @@ function shapeMapFromNormalized(
   return m;
 }
 
-function buildSheetPlacement(
-  pl: EnginePlacement,
-  shape: NormalizedNestShape
-): SheetPlacement {
-  const rot = pl.rotate;
-  const tx = pl.translate.x;
-  const ty = pl.translate.y;
-  const outerContour = applyPlacementToRing(shape.outer, rot, tx, ty);
-  const innerContours = shape.holes.map((h) =>
-    applyPlacementToRing(h, rot, tx, ty)
-  );
-  return {
-    partInstanceId: shape.partInstanceId,
-    partId: shape.partId,
-    partName: shape.partName,
-    clientId: shape.clientId,
-    clientCode: shape.clientCode,
-    x: tx,
-    y: ty,
-    rotation: rot,
-    outerContour,
-    innerContours,
-    markingText: shape.markingText,
-    partNetAreaMm2: shape.netAreaMm2,
-  };
-}
-
 function generatedSheetFromBin(
   stock: StockSheetEntry,
   thicknessMm: number | null,
@@ -149,7 +127,12 @@ function generatedSheetFromBin(
     if (!pl) continue;
     const sh = shapeById.get(pl.id);
     if (!sh) continue;
-    placements.push(buildSheetPlacement(pl, sh));
+    placements.push(
+      sheetPlacementFromEnginePlacement(pl, sh, {
+        innerWidthMm: innerW,
+        innerLengthMm: innerL,
+      })
+    );
   }
   const m = sheetInnerMetrics(innerW, innerL, placements);
   return {
@@ -229,6 +212,8 @@ async function nestThicknessGroup(
 
   const stockGroups = stockGroupsForThickness(batch.id, thicknessMm);
 
+  await yieldToUi();
+
   let effectiveSvgnestWorkerUrl = "";
   if (usePolygonNesting && typeof window !== "undefined") {
     effectiveSvgnestWorkerUrl = (await resolveSvgnestWorkerUrlClient()) ?? "";
@@ -269,6 +254,10 @@ async function nestThicknessGroup(
 
   const MAX_IMPLICIT_SHEETS_PER_SIZE = 500;
   let implicitSheetsThisThickness = 0;
+  let shelfAdaptMaxPolygon = 0;
+  let shelfAdaptMaxBbox = 0;
+  const shelfPolygonFallbackIds = new Set<string>();
+  let maxSvgnestPlannedParts = 0;
 
   for (const sg of stockGroups) {
     const pool = [...sg.entries];
@@ -283,6 +272,7 @@ async function nestThicknessGroup(
     let implicitForThisGroup = 0;
 
     while (unplaced.length > 0) {
+      await yieldToUi();
       const hasRealSheet = pool.length > 0;
       const canUseImplicit =
         !hasRealSheet &&
@@ -340,26 +330,39 @@ async function nestThicknessGroup(
           engineDebug.lastCandidateSummaries =
             candidates.debugPatch.lastCandidateSummaries;
           engineDebug.rotationsSetting = candidates.debugPatch.rotationsSetting;
+          engineDebug.svgnestSpacingInConfigMm =
+            candidates.debugPatch.svgnestSpacingInConfigMm;
+          engineDebug.svgnestInputPolygonCount =
+            candidates.debugPatch.svgnestInputPolygonCount;
+          engineDebug.svgnestInputBboxFallbackCount =
+            candidates.debugPatch.svgnestInputBboxFallbackCount;
+          engineDebug.svgnestBboxFallbackInstanceIds =
+            candidates.debugPatch.svgnestBboxFallbackInstanceIds;
 
           if (candidates.placed.length > 0) {
             packPlaced = candidates.placed;
             usedPolygonPath = true;
             anySvgNestSheet = true;
+            maxSvgnestPlannedParts = Math.max(
+              maxSvgnestPlannedParts,
+              normalized.length
+            );
           }
         } catch (e) {
           warnings.push(
             `SVGNest error (${e instanceof Error ? e.message : "unknown"}) — shelf packing this sheet.`
           );
         }
+        await yieldToUi();
       }
 
       if (!usedPolygonPath || packPlaced.length === 0) {
         if (usePolygonNesting) {
           const fbReason = !effectiveSvgnestWorkerUrl
-            ? `Shelf rectangle packing (stock ${sg.widthMm}×${sg.lengthMm} mm) — polygon worker unavailable.`
+            ? `Polygon-aware shelf packing (stock ${sg.widthMm}×${sg.lengthMm} mm) — SVGNest worker unavailable.`
             : normalized.length > 0
-              ? `SVGNest placed no parts on stock ${sg.widthMm}×${sg.lengthMm} mm — shelf fallback.`
-              : `Shelf rectangle packing (stock ${sg.widthMm}×${sg.lengthMm} mm).`;
+              ? `SVGNest placed no parts on stock ${sg.widthMm}×${sg.lengthMm} mm — polygon-aware shelf fallback.`
+              : `Polygon-aware shelf packing (stock ${sg.widthMm}×${sg.lengthMm} mm).`;
           warnings.push(fbReason);
           engineDebug.shelfFallbackCount += 1;
           engineDebug.shelfFallbackReasons.push(fbReason);
@@ -372,14 +375,40 @@ async function nestThicknessGroup(
           rules.allowRotation,
           rules.rotationMode
         );
-        const shelfPack = packShelfSingleSheetBestWithOrientation({
-          normalizedParts: normalized,
+        const adapted = adaptNormalizedShapesForPolygonPlacement(
+          normalized,
+          spacing,
+          (msg) => {
+            if (process.env.NODE_ENV === "development") {
+              console.warn(msg);
+            }
+          }
+        );
+        shelfAdaptMaxPolygon = Math.max(
+          shelfAdaptMaxPolygon,
+          adapted.polygonPartsCount
+        );
+        shelfAdaptMaxBbox = Math.max(
+          shelfAdaptMaxBbox,
+          adapted.bboxFallbackPartsCount
+        );
+        for (const id of adapted.fallbackPartIds) {
+          shelfPolygonFallbackIds.add(id);
+        }
+        if (adapted.bboxFallbackPartsCount * 2 > normalized.length) {
+          warnings.push(
+            `More than half of parts (${adapted.bboxFallbackPartsCount}/${normalized.length}) used rectangular footprint fallback for nesting — check outer contours and spacing.`
+          );
+        }
+
+        const shelfPack = packPolygonAwareShelfSingleSheetBestWithOrientation({
+          parts: adapted.parts,
           innerBinWidth: innerW,
           innerBinLength: innerL,
-          spacingMm: spacing,
           angles,
         });
         packPlaced = shelfPack.placed;
+        await yieldToUi();
       }
 
       if (packPlaced.length === 0) {
@@ -462,6 +491,29 @@ async function nestThicknessGroup(
     engineDebug.fullPolygonNesting = false;
   }
 
+  const placementModeUsed =
+    usePolygonNesting &&
+    anySvgNestSheet &&
+    engineDebug.shelfFallbackCount === 0
+      ? "svgnest-polygon"
+      : "polygon-aware";
+
+  Object.assign(
+    engineDebug,
+    buildPolygonPlacementDebugFields({
+      placementModeUsed,
+      polygonPartsCount: Math.max(
+        shelfAdaptMaxPolygon,
+        maxSvgnestPlannedParts
+      ),
+      bboxFallbackPartsCount: shelfAdaptMaxBbox,
+      fallbackPartIds: [...shelfPolygonFallbackIds],
+      spacingAppliedMm: spacing,
+      edgeMarginAppliedMm: margin,
+      rotationModeUsed: engineDebug.rotationModeApplied,
+    })
+  );
+
   return {
     thicknessMm,
     stockSheetsUsed: generatedSheets.length,
@@ -482,8 +534,8 @@ export async function runAutoNesting(
   const {
     batchId,
     unitSystem,
-    nestDurationMs = 28_000,
-    usePolygonNesting = false,
+    nestDurationMs = 24_000,
+    usePolygonNesting = true,
   } = options;
   const batch = getBatchById(batchId);
   if (!batch) {

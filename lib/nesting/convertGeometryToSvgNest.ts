@@ -20,6 +20,21 @@ export interface NormalizedNestShape {
   holes: NestPoint[][];
 }
 
+/** Same metadata as `NormalizedNestShape` with a collision footprint (offset outer or bbox fallback). */
+export interface PolygonAwareNestShape extends NormalizedNestShape {
+  nestingFootprintLocal: NestPoint[];
+  placementFootprintSource: "polygon" | "bbox_fallback";
+}
+
+/** SVGNest: original part + polygon sent to the worker (offset outer or bbox fallback). */
+export type SvgnestGeometrySource = "polygon" | "bbox_fallback";
+
+export interface SvgnestPartInput {
+  shape: NormalizedNestShape;
+  nestingOuter: NestPoint[];
+  geometrySource: SvgnestGeometrySource;
+}
+
 function formatSvgCoord(n: number): string {
   if (!Number.isFinite(n)) return "0";
   const t = Math.round(n * 1e6) / 1e6;
@@ -31,28 +46,77 @@ export function ringToSvgPointsAttr(ring: NestPoint[]): string {
   return ring.map((p) => `${formatSvgCoord(p.x)},${formatSvgCoord(p.y)}`).join(" ");
 }
 
+function ringWidthHeightMm(ring: NestPoint[]): { minX: number; maxX: number; minY: number; maxY: number } {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const pt of ring) {
+    minX = Math.min(minX, pt.x);
+    maxX = Math.max(maxX, pt.x);
+    minY = Math.min(minY, pt.y);
+    maxY = Math.max(maxY, pt.y);
+  }
+  return { minX, maxX, minY, maxY };
+}
+
+export interface BuildSvgnestInputSvgResult {
+  svg: string;
+  /**
+   * X shift applied to each part’s `nestingOuter` in the SVGNest input only.
+   * svgnest-mjs builds a parent/child tree when one part’s first vertex lies strictly inside
+   * another part’s polygon; stacking normalized parts at the origin triggers that and drops
+   * “child” parts from nesting. Strip layout avoids overlap; add R·(dx,0) to SVGNest’s
+   * placement translate when mapping back (same rotation convention as `applyPlacementToRing`).
+   */
+  stripDxByInstanceId: Record<string, number>;
+}
+
 /**
  * Builds a minimal SVG document: one bin polygon (inner usable rectangle, mm) and one
- * `<polygon>` per part (true outer contour). Part elements carry `data-instance-id` so
- * SVGNest output can be mapped back to `partInstanceId`.
+ * `<polygon>` per part using **nestingOuter** (spacing-offset true shape or bbox fallback).
+ * `shape.partInstanceId` identifies the part for SVGNest output → `EnginePlacement.id`.
+ *
+ * Parts are laid out on non-overlapping X strips so the library does not treat smaller parts
+ * as holes inside larger ones (see `stripDxByInstanceId`).
+ *
+ * @see lib/nesting/SVGNEST_PIPELINE.md
  */
 export function buildSvgnestInputSvg(options: {
   innerBinWidthMm: number;
   innerBinLengthMm: number;
-  partsInOrder: NormalizedNestShape[];
-}): string {
-  const { innerBinWidthMm: w, innerBinLengthMm: h, partsInOrder } = options;
+  parts: SvgnestPartInput[];
+}): BuildSvgnestInputSvgResult {
+  const { innerBinWidthMm: w, innerBinLengthMm: h, parts } = options;
   const binPoints = `0,0 ${formatSvgCoord(w)},0 ${formatSvgCoord(w)},${formatSvgCoord(h)} 0,${formatSvgCoord(h)}`;
   const fragments: string[] = [
     `<polygon id="svgnest-bin" class="bin" points="${binPoints}" fill="none" stroke="#1a1a1a" stroke-width="0.1" />`,
   ];
-  for (const p of partsInOrder) {
-    const pts = ringToSvgPointsAttr(p.outer);
+  const stripDxByInstanceId: Record<string, number> = {};
+  const gap = Math.max(0.5, Math.min(2, w * 0.001));
+  let cursorX = 0;
+  let maxX = w;
+  let maxY = h;
+  for (const p of parts) {
+    const ring = p.nestingOuter;
+    const b = ringWidthHeightMm(ring);
+    const width = Number.isFinite(b.maxX - b.minX) ? Math.max(0, b.maxX - b.minX) : 0;
+    const stripDx = cursorX - b.minX;
+    stripDxByInstanceId[p.shape.partInstanceId] = stripDx;
+    const shifted = ring.map((pt) => ({
+      x: pt.x + stripDx,
+      y: pt.y,
+    }));
+    const pts = ringToSvgPointsAttr(shifted);
     fragments.push(
-      `<polygon data-instance-id="${escapeXmlAttr(p.partInstanceId)}" points="${pts}" fill="#c8c8c8" fill-opacity="0.35" stroke="#333" stroke-width="0.1" />`
+      `<polygon data-instance-id="${escapeXmlAttr(p.shape.partInstanceId)}" data-geometry-source="${escapeXmlAttr(p.geometrySource)}" points="${pts}" fill="#c8c8c8" fill-opacity="0.35" stroke="#333" stroke-width="0.1" />`
     );
+    cursorX += width + gap;
+    maxX = Math.max(maxX, b.maxX + stripDx);
+    maxY = Math.max(maxY, b.maxY);
   }
-  return `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" id="svgnest-svg-root" viewBox="0 0 ${formatSvgCoord(w)} ${formatSvgCoord(h)}">${fragments.join("")}</svg>`;
+  const svg = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" id="svgnest-svg-root" viewBox="0 0 ${formatSvgCoord(maxX)} ${formatSvgCoord(maxY)}">${fragments.join("")}</svg>`;
+  return { svg, stripDxByInstanceId };
 }
 
 function escapeXmlAttr(s: string): string {

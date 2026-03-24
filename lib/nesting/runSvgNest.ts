@@ -1,17 +1,26 @@
 /**
- * Browser-only SVGNest (polygon / NFP) runner. Uses `svgnest-mjs` with a public worker URL
- * (`/nesting/nestWorker.js`). Spacing is applied inside SVGNest (Clipper offset); do not
- * pad bounding boxes for spacing.
+ * Browser-only SVGNest (polygon / NFP) runner. Input SVG uses **nestingOuter** per part
+ * (typically spacing-offset geometry from `buildSvgnestPartInputs`); set `spacingMm: 0` in
+ * options so SVGNest does not apply a second offset. Placements map back to **original**
+ * `shape.outer` via `sheetPlacementFromEnginePlacement`.
+ *
+ * @see lib/nesting/SVGNEST_PIPELINE.md
  */
 
 import { buildSvgnestInputSvg } from "./convertGeometryToSvgNest";
-import type { NormalizedNestShape } from "./convertGeometryToSvgNest";
+import type { SvgnestPartInput } from "./convertGeometryToSvgNest";
+import { SvgNest } from "./loadSvgNest";
 import type { EnginePlacement } from "./shelfNestEngine";
 
 export interface RunSvgNestOptions {
-  normalizedParts: NormalizedNestShape[];
+  /** Pre-built nesting polygons (offset outers / bbox fallback) + original shapes for metrics. */
+  parts: SvgnestPartInput[];
   innerBinWidthMm: number;
   innerBinLengthMm: number;
+  /**
+   * Passed to SVGNest config. Use **0** when spacing is already baked into `parts[].nestingOuter`
+   * (avoids double ½-spacing offset inside svgnest-mjs).
+   */
   spacingMm: number;
   /** SvgNest setting: number of rotation steps over 360° (1 = 0° only, 4 = 90° steps). */
   rotations: number;
@@ -52,6 +61,25 @@ function findInstanceId(group: Element): string | null {
   return tagged?.getAttribute("data-instance-id")?.trim() || null;
 }
 
+/** Undo per-part X strip in `buildSvgnestInputSvg` (see svgnest-mjs getParts / toTree). */
+function applySvgnestStripDxToPlacements(
+  placed: EnginePlacement[],
+  stripDxByInstanceId: Record<string, number>
+): EnginePlacement[] {
+  return placed.map((p) => {
+    const dx = stripDxByInstanceId[p.id];
+    if (dx === undefined || dx === 0) return p;
+    const rad = (p.rotate * Math.PI) / 180;
+    return {
+      ...p,
+      translate: {
+        x: p.translate.x + dx * Math.cos(rad),
+        y: p.translate.y + dx * Math.sin(rad),
+      },
+    };
+  });
+}
+
 /**
  * Extracts placements from SVGNest `applyPlacement` output: one `<svg>` with a `g.bin` and
  * part groups `translate(x y) rotate(r)` + nested polygon carrying `data-instance-id`.
@@ -75,7 +103,6 @@ export function parsePlacementsFromSvgnestSvg(svgRoot: SVGElement): EnginePlacem
   return out;
 }
 
-const IMPORT_TIMEOUT_MS = 15_000;
 const WAIT_GRACE_MS = 5_000;
 
 function clampBudgetMs(ms: number): number {
@@ -93,13 +120,13 @@ export async function runSvgNest(
       placed: [],
       efficiency: 0,
       numPlaced: 0,
-      numTotal: options.normalizedParts.length,
+      numTotal: options.parts?.length ?? 0,
       parseWarnings: ["SVGNest requires a browser environment (skip on server)."],
     };
   }
 
   const {
-    normalizedParts,
+    parts: svgnestParts,
     innerBinWidthMm,
     innerBinLengthMm,
     spacingMm,
@@ -110,7 +137,7 @@ export async function runSvgNest(
   } = options;
   const timeBudgetMs = clampBudgetMs(rawBudget);
 
-  if (normalizedParts.length === 0) {
+  if (svgnestParts.length === 0) {
     return {
       placed: [],
       efficiency: 0,
@@ -120,10 +147,10 @@ export async function runSvgNest(
     };
   }
 
-  const svgStr = buildSvgnestInputSvg({
+  const { svg: svgStr, stripDxByInstanceId } = buildSvgnestInputSvg({
     innerBinWidthMm,
     innerBinLengthMm,
-    partsInOrder: normalizedParts,
+    parts: svgnestParts,
   });
 
   let best: {
@@ -135,29 +162,11 @@ export async function runSvgNest(
     placed: [],
     efficiency: 0,
     numPlaced: 0,
-    numTotal: normalizedParts.length,
+    numTotal: svgnestParts.length,
   };
 
   try {
-    const SvgNestCtor = await Promise.race([
-      import("svgnest-mjs").then((m) => m.default),
-      new Promise<undefined>((resolve) =>
-        window.setTimeout(() => resolve(undefined), IMPORT_TIMEOUT_MS)
-      ),
-    ]);
-    if (SvgNestCtor === undefined) {
-      parseWarnings.push(
-        `svgnest-mjs failed to load within ${IMPORT_TIMEOUT_MS / 1000}s (bundler/network).`
-      );
-      return {
-        placed: [],
-        efficiency: 0,
-        numPlaced: 0,
-        numTotal: normalizedParts.length,
-        parseWarnings,
-      };
-    }
-    const nest = new SvgNestCtor();
+    const nest = new SvgNest();
     const svgRoot = nest.parseSvg(svgStr);
     const bin = svgRoot.querySelector("#svgnest-bin");
     if (!bin || !(bin instanceof SVGElement)) {
@@ -166,7 +175,7 @@ export async function runSvgNest(
         placed: [],
         efficiency: 0,
         numPlaced: 0,
-        numTotal: normalizedParts.length,
+        numTotal: svgnestParts.length,
         parseWarnings,
       };
     }
@@ -198,7 +207,7 @@ export async function runSvgNest(
           placed,
           efficiency: efficiency ?? 0,
           numPlaced: numPlaced ?? placed.length,
-          numTotal: numTotal ?? normalizedParts.length,
+          numTotal: numTotal ?? svgnestParts.length,
         };
       }
     );
@@ -210,7 +219,7 @@ export async function runSvgNest(
         placed: [],
         efficiency: 0,
         numPlaced: 0,
-        numTotal: normalizedParts.length,
+        numTotal: svgnestParts.length,
         parseWarnings,
       };
     }
@@ -258,13 +267,18 @@ export async function runSvgNest(
     );
   }
 
-  const ids = new Set(best.placed.map((p) => p.id));
-  if (ids.size !== best.placed.length) {
+  const placedCorrected = applySvgnestStripDxToPlacements(
+    best.placed,
+    stripDxByInstanceId
+  );
+
+  const ids = new Set(placedCorrected.map((p) => p.id));
+  if (ids.size !== placedCorrected.length) {
     parseWarnings.push("Duplicate part instance ids in SVGNest SVG output.");
   }
 
   return {
-    placed: best.placed,
+    placed: placedCorrected,
     efficiency: best.efficiency,
     numPlaced: best.numPlaced,
     numTotal: best.numTotal,
