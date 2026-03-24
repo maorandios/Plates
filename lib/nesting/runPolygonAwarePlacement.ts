@@ -11,8 +11,11 @@ import type {
   NestPoint,
   PolygonAwareNestShape,
 } from "./convertGeometryToSvgNest";
-import { createSpacingFootprint } from "./createSpacingFootprint";
-import { preparePolygonFootprint } from "./preparePolygonFootprint";
+import {
+  nestingFootprintCacheKey,
+  type NestingFootprintGeometryCache,
+} from "./cacheNestingGeometry";
+import { prepareNestingFootprintForPlacement } from "./prepareNestingFootprint";
 import { intersectionAreaMm2 } from "./clipperFootprintOps";
 import {
   remapShelfPlacementsSwapBinAxes,
@@ -301,31 +304,72 @@ function transformFootprintRing(
   }));
 }
 
+export interface AdaptFootprintOptions {
+  /** 0 = no simplification after spacing offset. */
+  simplifyToleranceMm?: number;
+  footprintCache?: NestingFootprintGeometryCache;
+}
+
 /**
  * Step A/B: build per-part nesting footprints (offset outer) with bbox fallback per part.
+ * Optional simplification and cross-instance cache (same outer + spacing + tolerance).
  */
 export function adaptNormalizedShapesForPolygonPlacement(
   normalized: NormalizedNestShape[],
   spacingMm: number,
-  logIssue?: (message: string) => void
+  logIssue?: (message: string) => void,
+  adaptOpts?: AdaptFootprintOptions
 ): {
   parts: PolygonAwareNestShape[];
   polygonPartsCount: number;
   bboxFallbackPartsCount: number;
   fallbackPartIds: string[];
   conversionMessages: string[];
+  footprintStats: {
+    simplifyOriginalPointsTotal: number;
+    simplifySimplifiedPointsTotal: number;
+    reusedInstanceCount: number;
+  };
 } {
   const half = Math.max(0, spacingMm) / 2;
+  const simplifyTol = adaptOpts?.simplifyToleranceMm ?? 0;
+  const cache = adaptOpts?.footprintCache;
   const parts: PolygonAwareNestShape[] = [];
   let polygonPartsCount = 0;
   let bboxFallbackPartsCount = 0;
   const fallbackPartIds: string[] = [];
   const conversionMessages: string[] = [];
+  let simplifyOriginalPointsTotal = 0;
+  let simplifySimplifiedPointsTotal = 0;
+  let reusedInstanceCount = 0;
 
   for (const shape of normalized) {
-    const prep = preparePolygonFootprint(shape.outer);
-    if (!prep.ok) {
-      const msg = `[nesting] Polygon footprint fallback (bbox) for ${shape.partInstanceId} (${shape.partName}): ${prep.reason}`;
+    const cacheKey = cache
+      ? nestingFootprintCacheKey(shape.outer, half, simplifyTol)
+      : "";
+    const hit = cache && cacheKey ? cache.peek(cacheKey) : undefined;
+    if (hit && hit.placementFootprintSource === "polygon") {
+      cache!.onHit();
+      reusedInstanceCount += 1;
+      simplifyOriginalPointsTotal += hit.originalPointCountForSimplify;
+      simplifySimplifiedPointsTotal += hit.simplifiedPointCount;
+      polygonPartsCount += 1;
+      parts.push({
+        ...shape,
+        nestingFootprintLocal: cache!.cloneEntry(hit).nestingFootprintLocal,
+        placementFootprintSource: "polygon",
+      });
+      continue;
+    }
+    if (cache && cacheKey) cache.onMiss();
+
+    const prepared = prepareNestingFootprintForPlacement(
+      shape.outer,
+      half,
+      simplifyTol
+    );
+    if (!prepared.ok) {
+      const msg = `[nesting] Polygon footprint fallback (bbox) for ${shape.partInstanceId} (${shape.partName}): ${prepared.reason}`;
       conversionMessages.push(msg);
       logIssue?.(msg);
       bboxFallbackPartsCount += 1;
@@ -338,27 +382,32 @@ export function adaptNormalizedShapesForPolygonPlacement(
       continue;
     }
 
-    const spaced = createSpacingFootprint(prep.ring, half);
-    if (!spaced || spaced.length < 3) {
-      const msg = `[nesting] Spacing offset failed — bbox footprint for ${shape.partInstanceId} (${shape.partName})`;
-      conversionMessages.push(msg);
-      logIssue?.(msg);
-      bboxFallbackPartsCount += 1;
-      fallbackPartIds.push(shape.partInstanceId);
-      parts.push({
-        ...shape,
-        nestingFootprintLocal: axisAlignedBBoxRectangle(shape.outer),
-        placementFootprintSource: "bbox_fallback",
-      });
-      continue;
-    }
+    const fp = prepared.nestingFootprintLocal;
+    const origPts =
+      prepared.simplify?.originalPointCount ??
+      prepared.spacedPointCountBeforeSimplify;
+    const simPts =
+      prepared.simplify?.simplifiedPointCount ??
+      prepared.spacedPointCountBeforeSimplify;
+    simplifyOriginalPointsTotal += origPts;
+    simplifySimplifiedPointsTotal += simPts;
 
     polygonPartsCount += 1;
     parts.push({
       ...shape,
-      nestingFootprintLocal: spaced,
+      nestingFootprintLocal: fp,
       placementFootprintSource: "polygon",
     });
+
+    if (cache && cacheKey) {
+      cache.put(cacheKey, {
+        nestingFootprintLocal: fp.map((p) => ({ x: p.x, y: p.y })),
+        placementFootprintSource: "polygon",
+        spacedPointCountBeforeSimplify: prepared.spacedPointCountBeforeSimplify,
+        originalPointCountForSimplify: origPts,
+        simplifiedPointCount: simPts,
+      });
+    }
   }
 
   return {
@@ -367,6 +416,11 @@ export function adaptNormalizedShapesForPolygonPlacement(
     bboxFallbackPartsCount,
     fallbackPartIds,
     conversionMessages,
+    footprintStats: {
+      simplifyOriginalPointsTotal,
+      simplifySimplifiedPointsTotal,
+      reusedInstanceCount,
+    },
   };
 }
 

@@ -286,6 +286,7 @@ export type {
   NestingEngineDebugMeta,
   NestingPlacementModeUsed,
   NestingRun,
+  NestingRunMode,
   NestingThicknessResult,
   SheetPlacement,
   UnplacedPart,

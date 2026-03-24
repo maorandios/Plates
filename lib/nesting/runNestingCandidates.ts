@@ -1,15 +1,31 @@
 /**
- * Multi-pass automatic nesting: several part orderings / shuffles, each run through SVGNest
- * with a time slice; best sheet by placed count, utilization, then waste.
+ * Multi-pass SVGNest: several sort orders × rotation settings; best sheet by layout quality
+ * (utilization + compact bbox / skyline); bottom-left compaction after each pass.
  */
 
-import type { NestingEngineDebugMeta } from "@/types";
+import type {
+  NestingEngineDebugMeta,
+  NestingRunMode,
+} from "@/types";
 import type { ProfileRotationMode } from "@/types/production";
+import type { NestingFootprintGeometryCache } from "./cacheNestingGeometry";
 import type { NormalizedNestShape } from "./convertGeometryToSvgNest";
 import { buildSvgnestPartInputs } from "./buildSvgnestPartInputs";
+import type { NestCandidateLabel } from "./nestingCandidateLabels";
 import { runSvgNest } from "./runSvgNest";
-import { compareSheetMetrics, metricsFromPlacements } from "./scoreNestingResult";
+import {
+  compareSheetLayoutQuality,
+  layoutQualityFromPlacements,
+  scoreLayoutQuality,
+} from "./scoreNestingCandidate";
+import type { SheetLayoutQuality } from "./scoreNestingResult";
 import type { EnginePlacement } from "./shelfNestEngine";
+import type { NestingModeRuntimeParams, SvgnestPlacementAttempt } from "./runNestingMode";
+import {
+  clampAttemptRotations,
+  effectiveSvgnestRotations,
+} from "./runNestingMode";
+import { postProcessSvgnestPlacements } from "./refineSvgnestPlacements";
 
 function shapeMap(list: NormalizedNestShape[]) {
   return new Map(list.map((s) => [s.partInstanceId, s]));
@@ -45,14 +61,7 @@ function perimeterMm(s: NormalizedNestShape) {
   return p;
 }
 
-export type NestCandidateLabel =
-  | "area-desc"
-  | "area-asc"
-  | "max-side-desc"
-  | "perimeter-desc"
-  | "reverse-input"
-  | "shuffle-1"
-  | "shuffle-2";
+export type { NestCandidateLabel } from "./nestingCandidateLabels";
 
 function mulberryShuffle<T>(arr: T[], seed: number): T[] {
   let s = seed >>> 0;
@@ -89,6 +98,8 @@ function orderForLabel(
       return mulberryShuffle(copy, 0x9e3779b1);
     case "shuffle-2":
       return mulberryShuffle(copy, 0x6a09e667);
+    case "shuffle-3":
+      return mulberryShuffle(copy, 0x243f6a88);
     default:
       return copy;
   }
@@ -101,19 +112,18 @@ export function svgnestRotationsFromRules(
 ): number {
   if (!allowRotation) return 1;
   if (rotationMode === "ninetyOnly") return 4;
-  return 24;
+  return 4;
 }
 
-/**
- * Single SVGNest pass for smoke-testing / fast feedback. Pass `candidateLabels` to run more orderings.
- */
-const DEFAULT_CANDIDATES: NestCandidateLabel[] = ["area-desc"];
+const DEFAULT_ATTEMPTS: SvgnestPlacementAttempt[] = [
+  { label: "area-desc", svgnestRotations: 1 },
+  { label: "area-desc", svgnestRotations: 4 },
+];
 
-/** Second SVGNest run when the first places nothing — off while validating SVGNest end-to-end. */
 const SVGNEST_RECOVERY_PASS = false;
 
-/** If splitting the budget would give less than this per candidate, run a single ordering instead. */
-const MIN_MS_PER_CANDIDATE_SLICE = 4500;
+const MIN_MS_PER_ATTEMPT = 2200;
+const MAX_POST_PROCESS_PARTS = 20;
 
 export interface RunNestingCandidatesOptions {
   normalizedParts: NormalizedNestShape[];
@@ -125,19 +135,41 @@ export interface RunNestingCandidatesOptions {
   rotationMode: ProfileRotationMode;
   totalBudgetMs: number;
   workerUrl: string;
-  candidateLabels?: NestCandidateLabel[];
+  nestingRunMode: NestingRunMode;
+  modeParams: NestingModeRuntimeParams;
+  footprintCache?: NestingFootprintGeometryCache;
 }
 
 export interface RunNestingCandidatesResult {
   placed: EnginePlacement[];
   debugPatch: Partial<NestingEngineDebugMeta>;
   candidateSummaries: string[];
-  /** SVGNest SVG input footprint stats (same for all orderings of the same instance set). */
+  svgnestWallTimeMs: number;
   svgnestInputFootprint: {
     polygonCount: number;
     bboxFallbackCount: number;
     bboxFallbackInstanceIds: string[];
   };
+  footprintStats: {
+    simplifyOriginalPointsTotal: number;
+    simplifySimplifiedPointsTotal: number;
+    reusedInstanceCount: number;
+  };
+}
+
+function resolveAttempts(
+  mp: NestingModeRuntimeParams,
+  allowRotation: boolean
+): SvgnestPlacementAttempt[] {
+  const raw =
+    mp.placementAttempts?.length > 0 ? mp.placementAttempts : DEFAULT_ATTEMPTS;
+  if (!allowRotation) {
+    return raw.map((a) => ({ ...a, svgnestRotations: 1 }));
+  }
+  return raw.map((a) => ({
+    ...a,
+    svgnestRotations: clampAttemptRotations(a.svgnestRotations, true),
+  }));
 }
 
 export async function runNestingCandidates(
@@ -146,85 +178,138 @@ export async function runNestingCandidates(
   const rawTotal = options.totalBudgetMs;
   const totalBudgetMs =
     Number.isFinite(rawTotal) && rawTotal > 0
-      ? Math.min(120_000, Math.max(5_000, rawTotal))
-      : 24_000;
+      ? Math.min(120_000, Math.max(2_000, rawTotal))
+      : 8_000;
 
-  const labels = options.candidateLabels ?? DEFAULT_CANDIDATES;
-  const uniq = [...new Set(labels)] as NestCandidateLabel[];
-  let labelsToRun = uniq;
-  const nAll = Math.max(1, uniq.length);
+  const mp = options.modeParams;
+  let attemptsToRun = resolveAttempts(mp, options.allowRotation);
+  const nAll = Math.max(1, attemptsToRun.length);
   let perMs = Math.floor(totalBudgetMs / nAll);
-  if (nAll > 1 && perMs < MIN_MS_PER_CANDIDATE_SLICE) {
-    labelsToRun = uniq.includes("area-desc")
-      ? ["area-desc"]
-      : [uniq[0]!];
-    perMs = Math.max(2000, totalBudgetMs);
+  if (nAll > 1 && perMs < MIN_MS_PER_ATTEMPT) {
+    attemptsToRun = attemptsToRun.slice(0, 1);
+    if (attemptsToRun[0]!.label !== "area-desc") {
+      attemptsToRun = [{ label: "area-desc", svgnestRotations: 4 }];
+    } else {
+      attemptsToRun = [{ ...attemptsToRun[0]! }];
+    }
+    perMs = Math.max(MIN_MS_PER_ATTEMPT, totalBudgetMs);
   } else {
-    perMs = Math.max(2000, perMs);
+    perMs = Math.max(MIN_MS_PER_ATTEMPT, perMs);
   }
 
-  const rotations = svgnestRotationsFromRules(
-    options.allowRotation,
-    options.rotationMode
+  const normalizedSorted = [...options.normalizedParts].sort(
+    (a, b) => areaAbs(b) - areaAbs(a)
   );
 
   const shapeById = shapeMap(options.normalizedParts);
 
   const svgnestFootprint = buildSvgnestPartInputs(
-    options.normalizedParts,
-    options.spacingMm
+    normalizedSorted,
+    options.spacingMm,
+    undefined,
+    {
+      simplifyToleranceMm: mp.simplifyToleranceMm,
+      footprintCache: options.footprintCache,
+    }
   );
   const partInputByInstanceId = new Map(
     svgnestFootprint.parts.map((p) => [p.shape.partInstanceId, p])
   );
 
   let bestPlaced: EnginePlacement[] = [];
-  let bestMetrics = metricsFromPlacements(
+  let bestLayout = layoutQualityFromPlacements(
     [],
     shapeById,
     options.innerBinWidthMm,
     options.innerBinLengthMm
   );
-  let winnerLabel: NestCandidateLabel | undefined;
+  let winnerKey = "";
   const candidateSummaries: string[] = [];
+  let svgnestWallTimeMs = 0;
+  let lastEarlyStop: string | undefined;
+  let winnerRotations = 1;
 
-  for (const label of labelsToRun) {
+  for (const attempt of attemptsToRun) {
     await new Promise((r) => window.setTimeout(r, 0));
-    const ordered = orderForLabel(label, options.normalizedParts);
+    const ordered = orderForLabel(attempt.label, normalizedSorted);
     const partsForNest = ordered
       .map((s) => partInputByInstanceId.get(s.partInstanceId))
       .filter((p): p is NonNullable<typeof p> => p != null);
+
+    const rot = options.allowRotation
+      ? clampAttemptRotations(attempt.svgnestRotations, true)
+      : 1;
+
     const run = await runSvgNest({
       parts: partsForNest,
       innerBinWidthMm: options.innerBinWidthMm,
       innerBinLengthMm: options.innerBinLengthMm,
       spacingMm: 0,
-      rotations,
+      rotations: rot,
       timeBudgetMs: perMs,
       workerUrl: options.workerUrl,
+      populationSize: mp.svgnestPopulationSize,
+      mutationRate: mp.mode === "quick" ? 8 : 10,
+      curveTolerance: mp.svgnestCurveTolerance,
+      earlyStop: {
+        enabled: true,
+        stopWhenAllPlaced: true,
+        plateauMs: mp.earlyStopPlateauMs,
+        minUtilizationImprovement: mp.earlyStopMinImprovement,
+        minRunMsBeforePlateauCheck: mp.mode === "quick" ? 2200 : 3000,
+      },
     });
 
-    const placed = run.placed;
-    const m = metricsFromPlacements(
+    svgnestWallTimeMs += run.actualRuntimeMs ?? 0;
+    if (run.earlyStopReason) lastEarlyStop = run.earlyStopReason;
+
+    let placed = run.placed;
+    if (placed.length > 0) {
+      const placedIds = new Set(placed.map((p) => p.id));
+      const unplacedForPass = normalizedSorted.filter(
+        (s) => !placedIds.has(s.partInstanceId)
+      );
+      if (placed.length <= MAX_POST_PROCESS_PARTS) {
+        placed = postProcessSvgnestPlacements(placed, {
+          shapeById,
+          innerW: options.innerBinWidthMm,
+          innerL: options.innerBinLengthMm,
+          spacingMm: options.spacingMm,
+          allowRotation: options.allowRotation,
+          unplacedShapes: unplacedForPass,
+        });
+      }
+    }
+
+    const L = layoutQualityFromPlacements(
       placed,
       shapeById,
       options.innerBinWidthMm,
       options.innerBinLengthMm
     );
     const warn = run.parseWarnings.filter(Boolean).join("; ") || "—";
+    const key = `${attempt.label}|r=${rot}`;
     candidateSummaries.push(
-      `${label}: placed=${m.placedCount} util=${(m.utilization * 100).toFixed(1)}% ${warn}`
+      `${key}: placed=${L.placedCount} util=${(L.utilization * 100).toFixed(1)}% bbox=${(L.layoutBBoxAreaMm2 / 1e6).toFixed(3)}M yMax=${L.layoutMaxYmm.toFixed(0)} ~${run.actualRuntimeMs ?? "?"}ms es=${run.earlyStopReason ?? "—"} ${warn}`
     );
 
-    if (compareSheetMetrics(m, bestMetrics) > 0) {
-      bestMetrics = m;
+    if (compareSheetLayoutQuality(L, bestLayout) > 0) {
+      bestLayout = L;
       bestPlaced = placed;
-      winnerLabel = label;
+      winnerKey = key;
+      winnerRotations = rot;
     }
     await new Promise((r) => window.setTimeout(r, 0));
   }
 
   let recoveryRan = false;
+  const recoveryRotations = effectiveSvgnestRotations(
+    options.allowRotation,
+    options.rotationMode,
+    options.nestingRunMode,
+    mp.capRotationsAtFourInQuick
+  );
+
   if (
     SVGNEST_RECOVERY_PASS &&
     bestPlaced.length === 0 &&
@@ -236,7 +321,7 @@ export async function runNestingCandidates(
       22_000,
       Math.max(12_000, Math.floor(totalBudgetMs * 0.75))
     );
-    const ordered = orderForLabel("area-desc", options.normalizedParts);
+    const ordered = orderForLabel("area-desc", normalizedSorted);
     const partsForNest = ordered
       .map((s) => partInputByInstanceId.get(s.partInstanceId))
       .filter((p): p is NonNullable<typeof p> => p != null);
@@ -245,48 +330,89 @@ export async function runNestingCandidates(
       innerBinWidthMm: options.innerBinWidthMm,
       innerBinLengthMm: options.innerBinLengthMm,
       spacingMm: 0,
-      rotations,
+      rotations: recoveryRotations,
       timeBudgetMs: recoveryBudget,
       workerUrl: options.workerUrl,
+      populationSize: options.modeParams.svgnestPopulationSize,
+      curveTolerance: options.modeParams.svgnestCurveTolerance,
+      earlyStop: {
+        enabled: true,
+        stopWhenAllPlaced: true,
+        plateauMs: options.modeParams.earlyStopPlateauMs,
+        minUtilizationImprovement: options.modeParams.earlyStopMinImprovement,
+        minRunMsBeforePlateauCheck: 3000,
+      },
     });
-    const m = metricsFromPlacements(
-      run.placed,
+    let placed = run.placed;
+    if (placed.length > 0) {
+      const placedIdsR = new Set(placed.map((p) => p.id));
+      const unplacedR = normalizedSorted.filter(
+        (s) => !placedIdsR.has(s.partInstanceId)
+      );
+      if (placed.length <= MAX_POST_PROCESS_PARTS) {
+        placed = postProcessSvgnestPlacements(placed, {
+          shapeById,
+          innerW: options.innerBinWidthMm,
+          innerL: options.innerBinLengthMm,
+          spacingMm: options.spacingMm,
+          allowRotation: options.allowRotation,
+          unplacedShapes: unplacedR,
+        });
+      }
+    }
+    const L = layoutQualityFromPlacements(
+      placed,
       shapeById,
       options.innerBinWidthMm,
       options.innerBinLengthMm
     );
     candidateSummaries.push(
-      `recovery(area-desc, ${recoveryBudget}ms): placed=${m.placedCount} util=${(m.utilization * 100).toFixed(1)}% ${run.parseWarnings.join("; ") || "—"}`
+      `recovery(area-desc|r=${recoveryRotations}, ${recoveryBudget}ms): placed=${L.placedCount} util=${(L.utilization * 100).toFixed(1)}% ${run.parseWarnings.join("; ") || "—"}`
     );
-    if (compareSheetMetrics(m, bestMetrics) > 0) {
-      bestMetrics = m;
-      bestPlaced = run.placed;
-      winnerLabel = "area-desc";
+    if (compareSheetLayoutQuality(L, bestLayout) > 0) {
+      bestLayout = L;
+      bestPlaced = placed;
+      winnerKey = "recovery";
+      winnerRotations = recoveryRotations;
     }
   }
 
   const rotationModeApplied: NestingEngineDebugMeta["rotationModeApplied"] =
     !options.allowRotation ? "locked" : options.rotationMode;
 
+  const fs = svgnestFootprint.footprintStats;
+  const simplifyRatio =
+    fs.simplifyOriginalPointsTotal > 0
+      ? fs.simplifySimplifiedPointsTotal / fs.simplifyOriginalPointsTotal
+      : 1;
+  const cache = options.footprintCache;
+
   return {
     placed: bestPlaced,
     candidateSummaries,
+    svgnestWallTimeMs,
     svgnestInputFootprint: {
       polygonCount: svgnestFootprint.polygonCount,
       bboxFallbackCount: svgnestFootprint.bboxFallbackCount,
       bboxFallbackInstanceIds: svgnestFootprint.bboxFallbackInstanceIds,
     },
+    footprintStats: fs,
     debugPatch: {
       primaryAlgorithm: "svgnest-polygon",
       fullPolygonNesting: true,
-      totalCandidateRuns: labelsToRun.length + (recoveryRan ? 1 : 0),
-      lastWinningCandidateLabel: winnerLabel,
-      lastWinningUtilizationPercent: bestMetrics.utilization * 100,
+      totalCandidateRuns: attemptsToRun.length + (recoveryRan ? 1 : 0),
+      lastWinningPlacementAttemptKey: winnerKey || undefined,
+      lastWinningCandidateLabel: winnerKey
+        ? winnerKey === "recovery"
+          ? "area-desc"
+          : (winnerKey.split("|")[0] as NestCandidateLabel)
+        : undefined,
+      lastWinningUtilizationPercent: bestLayout.utilization * 100,
       lastCandidateSummaries: candidateSummaries,
       spacingMmApplied: options.spacingMm,
       edgeMarginMmApplied: options.edgeMarginMm,
       rotationModeApplied,
-      rotationsSetting: rotations,
+      rotationsSetting: winnerRotations,
       allowRotationApplied: options.allowRotation,
       shelfFallbackCount: 0,
       shelfFallbackReasons: [],
@@ -294,6 +420,16 @@ export async function runNestingCandidates(
       svgnestInputPolygonCount: svgnestFootprint.polygonCount,
       svgnestInputBboxFallbackCount: svgnestFootprint.bboxFallbackCount,
       svgnestBboxFallbackInstanceIds: svgnestFootprint.bboxFallbackInstanceIds,
+      nestingRunMode: options.nestingRunMode,
+      nestingTimeBudgetMsPerSheet: totalBudgetMs,
+      nestingEarlyStopReasonLast: lastEarlyStop,
+      nestingSimplifyOriginalPointsTotal: fs.simplifyOriginalPointsTotal,
+      nestingSimplifySimplifiedPointsTotal: fs.simplifySimplifiedPointsTotal,
+      nestingSimplifyRatio: Math.round(simplifyRatio * 1000) / 1000,
+      nestingGeometryCacheHits: cache?.hits,
+      nestingGeometryCacheMisses: cache?.misses,
+      nestingReusedFootprintInstances: fs.reusedInstanceCount,
+      nestingBestCandidateScore: scoreLayoutQuality(bestLayout),
     },
   };
 }

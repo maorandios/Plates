@@ -1,6 +1,9 @@
 import type { StockSheetType } from "./nesting";
 import type { ProfileRotationMode } from "./production";
 
+/** Nesting speed/quality preset (engine-internal; UI can bind later). */
+export type NestingRunMode = "quick" | "optimize";
+
 /** How part footprints were represented during placement (for debugging). */
 export type NestingPlacementModeUsed =
   | "polygon-aware"
@@ -17,6 +20,8 @@ export interface NestingEngineDebugMeta {
   totalCandidateRuns: number;
   /** Label of the winning ordering for the last single-sheet pack. */
   lastWinningCandidateLabel?: string;
+  /** Full attempt key when multi-pass runs (e.g. `area-desc|r=4` or `recovery`). */
+  lastWinningPlacementAttemptKey?: string;
   /** Utilization % (0–100) of the inner bin for the last winning candidate sheet. */
   lastWinningUtilizationPercent?: number;
   /** Score summary strings per candidate from the last pack (for debugging). */
@@ -50,6 +55,22 @@ export interface NestingEngineDebugMeta {
   svgnestInputPolygonCount?: number;
   svgnestInputBboxFallbackCount?: number;
   svgnestBboxFallbackInstanceIds?: string[];
+
+  /** Performance / optimization trace (optional). */
+  nestingRunMode?: NestingRunMode;
+  nestingTimeBudgetMsPerSheet?: number;
+  nestingMaxThicknessBudgetMs?: number;
+  nestingThicknessActualRuntimeMs?: number;
+  nestingThicknessRemainingBudgetMs?: number;
+  nestingCandidateAttemptsTotal?: number;
+  nestingEarlyStopReasonLast?: string;
+  nestingSimplifyOriginalPointsTotal?: number;
+  nestingSimplifySimplifiedPointsTotal?: number;
+  nestingSimplifyRatio?: number;
+  nestingGeometryCacheHits?: number;
+  nestingGeometryCacheMisses?: number;
+  nestingReusedFootprintInstances?: number;
+  nestingBestCandidateScore?: number;
 }
 
 /** Degrees counter-clockwise in bin coordinates (any-nest / SVGNest-style). */

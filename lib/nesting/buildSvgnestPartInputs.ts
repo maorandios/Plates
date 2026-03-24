@@ -10,7 +10,13 @@ import type {
   PolygonAwareNestShape,
   SvgnestPartInput,
 } from "./convertGeometryToSvgNest";
-import { adaptNormalizedShapesForPolygonPlacement } from "./runPolygonAwarePlacement";
+import {
+  NestingFootprintGeometryCache,
+} from "./cacheNestingGeometry";
+import {
+  adaptNormalizedShapesForPolygonPlacement,
+  type AdaptFootprintOptions,
+} from "./runPolygonAwarePlacement";
 
 function toBaseShape(p: PolygonAwareNestShape): NormalizedNestShape {
   return {
@@ -33,17 +39,24 @@ function toBaseShape(p: PolygonAwareNestShape): NormalizedNestShape {
 export function buildSvgnestPartInputs(
   normalized: NormalizedNestShape[],
   spacingMm: number,
-  logIssue?: (message: string) => void
+  logIssue?: (message: string) => void,
+  adaptOpts?: AdaptFootprintOptions
 ): {
   parts: SvgnestPartInput[];
   polygonCount: number;
   bboxFallbackCount: number;
   bboxFallbackInstanceIds: string[];
+  footprintStats: {
+    simplifyOriginalPointsTotal: number;
+    simplifySimplifiedPointsTotal: number;
+    reusedInstanceCount: number;
+  };
 } {
   const adapted = adaptNormalizedShapesForPolygonPlacement(
     normalized,
     spacingMm,
-    logIssue
+    logIssue,
+    adaptOpts
   );
   const parts: SvgnestPartInput[] = adapted.parts.map((p) => ({
     shape: toBaseShape(p),
@@ -56,5 +69,10 @@ export function buildSvgnestPartInputs(
     polygonCount: adapted.polygonPartsCount,
     bboxFallbackCount: adapted.bboxFallbackPartsCount,
     bboxFallbackInstanceIds: [...adapted.fallbackPartIds],
+    footprintStats: adapted.footprintStats,
   };
+}
+
+export function createFootprintGeometryCache(): NestingFootprintGeometryCache {
+  return new NestingFootprintGeometryCache();
 }

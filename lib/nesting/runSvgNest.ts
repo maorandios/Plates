@@ -12,6 +12,16 @@ import type { SvgnestPartInput } from "./convertGeometryToSvgNest";
 import { SvgNest } from "./loadSvgNest";
 import type { EnginePlacement } from "./shelfNestEngine";
 
+/** Early exit so SVGNest does not burn the full wall-clock budget every sheet. */
+export interface SvgNestEarlyStopConfig {
+  enabled: boolean;
+  stopWhenAllPlaced: boolean;
+  plateauMs: number;
+  minUtilizationImprovement: number;
+  /** Only evaluate utilization plateau after this much runtime (ms). */
+  minRunMsBeforePlateauCheck: number;
+}
+
 export interface RunSvgNestOptions {
   /** Pre-built nesting polygons (offset outers / bbox fallback) + original shapes for metrics. */
   parts: SvgnestPartInput[];
@@ -27,6 +37,11 @@ export interface RunSvgNestOptions {
   timeBudgetMs: number;
   workerUrl: string;
   curveTolerance?: number;
+  populationSize?: number;
+  mutationRate?: number;
+  earlyStop?: SvgNestEarlyStopConfig;
+  /** Extra ms after `timeBudgetMs` before hard kill (worker cleanup). */
+  waitGraceMs?: number;
 }
 
 export interface RunSvgNestResult {
@@ -35,6 +50,9 @@ export interface RunSvgNestResult {
   numPlaced: number;
   numTotal: number;
   parseWarnings: string[];
+  /** Wall time for this SVGNest session (ms). */
+  actualRuntimeMs?: number;
+  earlyStopReason?: "all_parts_placed" | "utilization_plateau" | "time_budget" | "hard_cap";
 }
 
 function parsePartGroupTransform(
@@ -103,17 +121,18 @@ export function parsePlacementsFromSvgnestSvg(svgRoot: SVGElement): EnginePlacem
   return out;
 }
 
-const WAIT_GRACE_MS = 5_000;
+const DEFAULT_WAIT_GRACE_MS = 2_500;
 
 function clampBudgetMs(ms: number): number {
   if (!Number.isFinite(ms) || ms <= 0) return 20_000;
-  return Math.min(120_000, Math.max(1_000, ms));
+  return Math.min(120_000, Math.max(800, ms));
 }
 
 export async function runSvgNest(
   options: RunSvgNestOptions
 ): Promise<RunSvgNestResult> {
   const parseWarnings: string[] = [];
+  const wallStart = typeof performance !== "undefined" ? performance.now() : Date.now();
 
   if (typeof window === "undefined") {
     return {
@@ -134,6 +153,10 @@ export async function runSvgNest(
     timeBudgetMs: rawBudget,
     workerUrl,
     curveTolerance = 0.05,
+    populationSize = 10,
+    mutationRate = 10,
+    earlyStop,
+    waitGraceMs = DEFAULT_WAIT_GRACE_MS,
   } = options;
   const timeBudgetMs = clampBudgetMs(rawBudget);
 
@@ -144,6 +167,7 @@ export async function runSvgNest(
       numPlaced: 0,
       numTotal: 0,
       parseWarnings: [],
+      actualRuntimeMs: 0,
     };
   }
 
@@ -165,6 +189,12 @@ export async function runSvgNest(
     numTotal: svgnestParts.length,
   };
 
+  let earlyStopReason: RunSvgNestResult["earlyStopReason"];
+  const track = {
+    bestUtil: 0,
+    lastImproveMs: Date.now(),
+  };
+
   try {
     const nest = new SvgNest();
     const svgRoot = nest.parseSvg(svgStr);
@@ -177,6 +207,10 @@ export async function runSvgNest(
         numPlaced: 0,
         numTotal: svgnestParts.length,
         parseWarnings,
+        actualRuntimeMs: Math.round(
+          (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+            wallStart
+        ),
       };
     }
 
@@ -188,8 +222,8 @@ export async function runSvgNest(
       useHoles: false,
       exploreConcave: false,
       curveTolerance,
-      populationSize: 10,
-      mutationRate: 10,
+      populationSize,
+      mutationRate,
     });
 
     const started = nest.start(
@@ -203,12 +237,20 @@ export async function runSvgNest(
         if (!svgList?.[0]) return;
         const placed = parsePlacementsFromSvgnestSvg(svgList[0]);
         if (placed.length === 0) return;
+        const eff = efficiency ?? 0;
+        const nu = numPlaced ?? placed.length;
+        const nt = numTotal ?? svgnestParts.length;
         best = {
           placed,
-          efficiency: efficiency ?? 0,
-          numPlaced: numPlaced ?? placed.length,
-          numTotal: numTotal ?? svgnestParts.length,
+          efficiency: eff,
+          numPlaced: nu,
+          numTotal: nt,
         };
+        const minImp = earlyStop?.minUtilizationImprovement ?? 0.004;
+        if (eff > track.bestUtil + minImp) {
+          track.bestUtil = eff;
+          track.lastImproveMs = Date.now();
+        }
       }
     );
 
@@ -221,10 +263,14 @@ export async function runSvgNest(
         numPlaced: 0,
         numTotal: svgnestParts.length,
         parseWarnings,
+        actualRuntimeMs: Math.round(
+          (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+            wallStart
+        ),
       };
     }
 
-    const hardCapMs = timeBudgetMs + WAIT_GRACE_MS;
+    const hardCapMs = timeBudgetMs + waitGraceMs;
     await new Promise<void>((resolve) => {
       let done = false;
       const finish = () => {
@@ -233,33 +279,61 @@ export async function runSvgNest(
         resolve();
       };
 
-      let tickId = 0;
-      const capId = window.setTimeout(() => {
-        window.clearInterval(tickId);
+      let tickId: number | undefined;
+      let capId: number | undefined;
+      let stopped = false;
+
+      const stopNest = (reason: RunSvgNestResult["earlyStopReason"], warnHardCap: boolean) => {
+        if (stopped) return;
+        stopped = true;
+        if (earlyStopReason === undefined) earlyStopReason = reason;
+        if (tickId !== undefined) window.clearInterval(tickId);
+        if (capId !== undefined) window.clearTimeout(capId);
         try {
           nest.stop();
         } catch {
           /* ignore */
         }
-        parseWarnings.push(
-          "SVGNest hard time cap — stopped early so nesting can finish."
-        );
-        finish();
-      }, hardCapMs);
+        if (warnHardCap) {
+          parseWarnings.push(
+            "SVGNest hard time cap — stopped early so nesting can finish."
+          );
+        }
+        window.setTimeout(finish, 120);
+      };
+
+      capId = window.setTimeout(() => {
+        stopNest("hard_cap", true);
+      }, hardCapMs) as unknown as number;
 
       const t0 = Date.now();
       tickId = window.setInterval(() => {
-        if (Date.now() - t0 >= timeBudgetMs) {
-          window.clearInterval(tickId);
-          window.clearTimeout(capId);
-          try {
-            nest.stop();
-          } catch {
-            /* ignore */
+        const elapsed = Date.now() - t0;
+        const es = earlyStop;
+
+        if (es?.enabled && es.stopWhenAllPlaced) {
+          const nt = best.numTotal || svgnestParts.length;
+          if (nt > 0 && best.numPlaced >= nt && best.placed.length > 0) {
+            stopNest("all_parts_placed", false);
+            return;
           }
-          window.setTimeout(finish, 280);
         }
-      }, 100);
+
+        if (
+          es?.enabled &&
+          elapsed >= (es.minRunMsBeforePlateauCheck ?? 2800) &&
+          track.bestUtil >= 0.03 &&
+          Date.now() - track.lastImproveMs >= es.plateauMs
+        ) {
+          stopNest("utilization_plateau", false);
+          return;
+        }
+
+        if (elapsed >= timeBudgetMs) {
+          stopNest("time_budget", false);
+          return;
+        }
+      }, 90) as unknown as number;
     });
   } catch (e) {
     parseWarnings.push(
@@ -277,11 +351,17 @@ export async function runSvgNest(
     parseWarnings.push("Duplicate part instance ids in SVGNest SVG output.");
   }
 
+  const actualRuntimeMs = Math.round(
+    (typeof performance !== "undefined" ? performance.now() : Date.now()) - wallStart
+  );
+
   return {
     placed: placedCorrected,
     efficiency: best.efficiency,
     numPlaced: best.numPlaced,
     numTotal: best.numTotal,
     parseWarnings,
+    actualRuntimeMs,
+    earlyStopReason,
   };
 }

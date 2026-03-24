@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { runAutoNesting } from "@/lib/nesting/runAutoNesting";
+import { runServerNesting } from "@/lib/nesting/runServerNesting";
 import { saveNestingRun } from "@/lib/store";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import type { Batch } from "@/types";
@@ -55,11 +55,10 @@ export function GenerateNestingPanel({ batch }: { batch: Batch }) {
     await waitForPaint();
 
     try {
-      const runPromise = runAutoNesting({
-        batchId: batch.id,
+      const runPromise = runServerNesting({
+        batch,
         unitSystem: preferences.unitSystem,
-        nestDurationMs: 24_000,
-        usePolygonNesting: true,
+        nestingRunMode: "quick",
       });
 
       const runResult = await Promise.race([
@@ -99,10 +98,10 @@ export function GenerateNestingPanel({ batch }: { batch: Batch }) {
       <div>
         <h2 className="text-sm font-semibold text-foreground">Automatic nesting</h2>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-xl">
-          Packs parts by thickness using <strong>SVGNest</strong> on real outer contours (with
-          spacing offset in the SVG). If the nesting worker cannot load or places nothing, the app
-          falls back to polygon-aware shelf packing. Large jobs can take{" "}
-          <strong>over a minute per sheet</strong>; the timer below shows progress. Check{" "}
+          Packs parts by thickness on the <strong>server-side nesting engine</strong> using real
+          polygon contours and spacing offsets. Large jobs can take{" "}
+          <strong>over a minute per sheet</strong>; the timer below shows progress while your job
+          runs asynchronously. Check{" "}
           <code className="text-[11px] bg-muted px-1 rounded">engineDebug</code> on results for
           footprint stats.
         </p>
@@ -113,7 +112,7 @@ export function GenerateNestingPanel({ batch }: { batch: Batch }) {
         </Button>
         {busy ? (
           <span className="text-xs text-muted-foreground tabular-nums">
-            {elapsedSec}s elapsed — SVGNest is CPU-heavy; the page may feel slow until it finishes.
+            {elapsedSec}s elapsed — computing on the server; you can keep using the app meanwhile.
           </span>
         ) : null}
         {err ? (

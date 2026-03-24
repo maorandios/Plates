@@ -19,6 +19,7 @@ import type {
   GeneratedSheet,
   NestingEngineDebugMeta,
   NestingRun,
+  NestingRunMode,
   NestingThicknessResult,
   SheetPlacement,
   StockSheetEntry,
@@ -39,13 +40,23 @@ import {
   adaptNormalizedShapesForPolygonPlacement,
   packPolygonAwareShelfSingleSheetBestWithOrientation,
 } from "./runPolygonAwarePlacement";
-import { rotationAnglesDeg, type EnginePlacement } from "./shelfNestEngine";
+import {
+  packShelfSingleSheetBestWithOrientation as packAabbShelfSingleSheetBestWithOrientation,
+  rotationAnglesDeg,
+  type EnginePlacement,
+} from "./shelfNestEngine";
 import { prepareNestingInputs } from "./prepareNestingInputs";
 import { resolveNestRulesForThickness } from "./resolveBatchThicknessRules";
+import { clampSheetTimeBudgetMs } from "./applyTimeBudget";
+import { NestingFootprintGeometryCache } from "./cacheNestingGeometry";
 import { runNestingCandidates } from "./runNestingCandidates";
 import { resolveSvgnestWorkerUrlClient } from "./resolveSvgnestWorkerUrl";
 import { innerBinDimensionsMm } from "./resolveBinGeometry";
+import { nestingModeRuntimeParams } from "./runNestingMode";
 import { thicknessGroupKey } from "./stockConfiguration";
+
+const POLYGON_SHELF_MAX_PARTS = 26;
+const POLYGON_SHELF_MAX_ANGLE_COUNT = 4;
 
 /** Lets the browser paint loading state and stay responsive between heavy steps. */
 async function yieldToUi(): Promise<void> {
@@ -57,10 +68,11 @@ export interface RunAutoNestingOptions {
   batchId: string;
   unitSystem: UnitSystem;
   /**
-   * Time budget per sheet when `usePolygonNesting` is true (SVGNest multi-candidate + recovery).
-   * Ignored for shelf-only runs (default).
+   * Overrides per-sheet SVGNest time cap from {@link NestingRunMode} presets when set.
    */
   nestDurationMs?: number;
+  /** Default `quick` (fast); `optimize` runs longer with more candidates. */
+  nestingRunMode?: NestingRunMode;
   /**
    * When true (default), run SVGNest in the browser when the worker loads; otherwise shelf only.
    */
@@ -185,7 +197,8 @@ async function nestThicknessGroup(
   thicknessMm: number | null,
   instances: NestablePartInstance[],
   unitSystem: UnitSystem,
-  nestDurationMs: number,
+  nestingRunMode: NestingRunMode,
+  nestDurationMsOverride: number | undefined,
   usePolygonNesting: boolean
 ): Promise<NestingThicknessResult> {
   const warnings: string[] = [];
@@ -196,6 +209,18 @@ async function nestThicknessGroup(
   const rules = resolveNestRulesForThickness(batch, thicknessMm, unitSystem);
   const margin = Math.max(0, rules.edgeMarginMm);
   const spacing = Math.max(0, rules.spacingMm);
+  const nestingModeParams = nestingModeRuntimeParams(
+    nestingRunMode,
+    rules.rotationMode
+  );
+  const sheetCapMs =
+    nestDurationMsOverride ?? nestingModeParams.nestDurationMsPerSheet;
+  let remainingThicknessMs = nestingModeParams.maxThicknessBudgetMs;
+  const geometryCache = new NestingFootprintGeometryCache();
+  let thicknessPackWallMs = 0;
+  let sumSimplifyOrig = 0;
+  let sumSimplifySimplified = 0;
+  let sumFootprintReuse = 0;
 
   let anySvgNestSheet = false;
   const engineDebug: NestingEngineDebugMeta = {
@@ -208,6 +233,9 @@ async function nestThicknessGroup(
     allowRotationApplied: rules.allowRotation,
     shelfFallbackCount: 0,
     shelfFallbackReasons: [],
+    nestingRunMode,
+    nestingMaxThicknessBudgetMs: nestingModeParams.maxThicknessBudgetMs,
+    nestingTimeBudgetMsPerSheet: sheetCapMs,
   };
 
   const stockGroups = stockGroupsForThickness(batch.id, thicknessMm);
@@ -310,6 +338,13 @@ async function nestThicknessGroup(
 
       if (usePolygonNesting && effectiveSvgnestWorkerUrl) {
         try {
+          const sheetBudget = clampSheetTimeBudgetMs(
+            sheetCapMs,
+            remainingThicknessMs,
+            2000,
+            120_000
+          );
+          const tPack = Date.now();
           const candidates = await runNestingCandidates({
             normalizedParts: normalized,
             innerBinWidthMm: innerW,
@@ -318,9 +353,20 @@ async function nestThicknessGroup(
             edgeMarginMm: margin,
             allowRotation: rules.allowRotation,
             rotationMode: rules.rotationMode,
-            totalBudgetMs: nestDurationMs,
+            totalBudgetMs: sheetBudget,
             workerUrl: effectiveSvgnestWorkerUrl,
+            nestingRunMode,
+            modeParams: nestingModeParams,
+            footprintCache: geometryCache,
           });
+          const packElapsed = Date.now() - tPack;
+          thicknessPackWallMs += packElapsed;
+          remainingThicknessMs = Math.max(0, remainingThicknessMs - packElapsed);
+          sumSimplifyOrig += candidates.footprintStats.simplifyOriginalPointsTotal;
+          sumSimplifySimplified +=
+            candidates.footprintStats.simplifySimplifiedPointsTotal;
+          sumFootprintReuse += candidates.footprintStats.reusedInstanceCount;
+
           engineDebug.totalCandidateRuns +=
             candidates.debugPatch.totalCandidateRuns ?? 0;
           engineDebug.lastWinningCandidateLabel =
@@ -338,6 +384,23 @@ async function nestThicknessGroup(
             candidates.debugPatch.svgnestInputBboxFallbackCount;
           engineDebug.svgnestBboxFallbackInstanceIds =
             candidates.debugPatch.svgnestBboxFallbackInstanceIds;
+          engineDebug.nestingEarlyStopReasonLast =
+            candidates.debugPatch.nestingEarlyStopReasonLast;
+          engineDebug.nestingBestCandidateScore =
+            candidates.debugPatch.nestingBestCandidateScore;
+          engineDebug.nestingThicknessActualRuntimeMs = thicknessPackWallMs;
+          engineDebug.nestingThicknessRemainingBudgetMs = remainingThicknessMs;
+          engineDebug.nestingSimplifyOriginalPointsTotal = sumSimplifyOrig;
+          engineDebug.nestingSimplifySimplifiedPointsTotal = sumSimplifySimplified;
+          engineDebug.nestingSimplifyRatio =
+            sumSimplifyOrig > 0
+              ? Math.round((sumSimplifySimplified / sumSimplifyOrig) * 1000) /
+                1000
+              : 1;
+          engineDebug.nestingGeometryCacheHits = geometryCache.hits;
+          engineDebug.nestingGeometryCacheMisses = geometryCache.misses;
+          engineDebug.nestingReusedFootprintInstances = sumFootprintReuse;
+          engineDebug.nestingCandidateAttemptsTotal = engineDebug.totalCandidateRuns;
 
           if (candidates.placed.length > 0) {
             packPlaced = candidates.placed;
@@ -375,40 +438,83 @@ async function nestThicknessGroup(
           rules.allowRotation,
           rules.rotationMode
         );
-        const adapted = adaptNormalizedShapesForPolygonPlacement(
-          normalized,
-          spacing,
-          (msg) => {
-            if (process.env.NODE_ENV === "development") {
-              console.warn(msg);
+        const boundedAngles =
+          angles.length > POLYGON_SHELF_MAX_ANGLE_COUNT
+            ? [0, 90, 180, 270]
+            : angles;
+        const useFastAabbShelf = normalized.length > POLYGON_SHELF_MAX_PARTS;
+        if (useFastAabbShelf) {
+          const msg = `Large fallback batch (${normalized.length} parts) — using fast shelf approximation to keep UI responsive.`;
+          warnings.push(msg);
+          engineDebug.shelfFallbackCount += 1;
+          engineDebug.shelfFallbackReasons.push(msg);
+          packPlaced = packAabbShelfSingleSheetBestWithOrientation({
+            normalizedParts: normalized,
+            innerBinWidth: innerW,
+            innerBinLength: innerL,
+            spacingMm: spacing,
+            angles: boundedAngles,
+          }).placed;
+          await yieldToUi();
+        } else {
+          const adapted = adaptNormalizedShapesForPolygonPlacement(
+            normalized,
+            spacing,
+            (msg) => {
+              if (process.env.NODE_ENV === "development") {
+                console.warn(msg);
+              }
+            },
+            {
+              simplifyToleranceMm: nestingModeParams.simplifyToleranceMm,
+              footprintCache: geometryCache,
             }
-          }
-        );
-        shelfAdaptMaxPolygon = Math.max(
-          shelfAdaptMaxPolygon,
-          adapted.polygonPartsCount
-        );
-        shelfAdaptMaxBbox = Math.max(
-          shelfAdaptMaxBbox,
-          adapted.bboxFallbackPartsCount
-        );
-        for (const id of adapted.fallbackPartIds) {
-          shelfPolygonFallbackIds.add(id);
-        }
-        if (adapted.bboxFallbackPartsCount * 2 > normalized.length) {
-          warnings.push(
-            `More than half of parts (${adapted.bboxFallbackPartsCount}/${normalized.length}) used rectangular footprint fallback for nesting — check outer contours and spacing.`
           );
-        }
+          engineDebug.nestingSimplifyOriginalPointsTotal =
+            (engineDebug.nestingSimplifyOriginalPointsTotal ?? 0) +
+            adapted.footprintStats.simplifyOriginalPointsTotal;
+          engineDebug.nestingSimplifySimplifiedPointsTotal =
+            (engineDebug.nestingSimplifySimplifiedPointsTotal ?? 0) +
+            adapted.footprintStats.simplifySimplifiedPointsTotal;
+          engineDebug.nestingReusedFootprintInstances =
+            (engineDebug.nestingReusedFootprintInstances ?? 0) +
+            adapted.footprintStats.reusedInstanceCount;
+          engineDebug.nestingGeometryCacheHits = geometryCache.hits;
+          engineDebug.nestingGeometryCacheMisses = geometryCache.misses;
+          engineDebug.nestingSimplifyRatio =
+            (engineDebug.nestingSimplifyOriginalPointsTotal ?? 0) > 0
+              ? Math.round(
+                  ((engineDebug.nestingSimplifySimplifiedPointsTotal ?? 0) /
+                    (engineDebug.nestingSimplifyOriginalPointsTotal ?? 1)) *
+                    1000
+                ) / 1000
+              : 1;
+          shelfAdaptMaxPolygon = Math.max(
+            shelfAdaptMaxPolygon,
+            adapted.polygonPartsCount
+          );
+          shelfAdaptMaxBbox = Math.max(
+            shelfAdaptMaxBbox,
+            adapted.bboxFallbackPartsCount
+          );
+          for (const id of adapted.fallbackPartIds) {
+            shelfPolygonFallbackIds.add(id);
+          }
+          if (adapted.bboxFallbackPartsCount * 2 > normalized.length) {
+            warnings.push(
+              `More than half of parts (${adapted.bboxFallbackPartsCount}/${normalized.length}) used rectangular footprint fallback for nesting — check outer contours and spacing.`
+            );
+          }
 
-        const shelfPack = packPolygonAwareShelfSingleSheetBestWithOrientation({
-          parts: adapted.parts,
-          innerBinWidth: innerW,
-          innerBinLength: innerL,
-          angles,
-        });
-        packPlaced = shelfPack.placed;
-        await yieldToUi();
+          const shelfPack = packPolygonAwareShelfSingleSheetBestWithOrientation({
+            parts: adapted.parts,
+            innerBinWidth: innerW,
+            innerBinLength: innerL,
+            angles: boundedAngles,
+          });
+          packPlaced = shelfPack.placed;
+          await yieldToUi();
+        }
       }
 
       if (packPlaced.length === 0) {
@@ -534,7 +640,8 @@ export async function runAutoNesting(
   const {
     batchId,
     unitSystem,
-    nestDurationMs = 24_000,
+    nestDurationMs: nestDurationMsOverride,
+    nestingRunMode = "quick",
     usePolygonNesting = true,
   } = options;
   const batch = getBatchById(batchId);
@@ -587,7 +694,8 @@ export async function runAutoNesting(
       th,
       group,
       unitSystem,
-      nestDurationMs,
+      nestingRunMode,
+      nestDurationMsOverride,
       usePolygonNesting
     );
     thicknessResults.push(tr);
