@@ -1,4 +1,15 @@
 import type { CuttingMethod } from "./production";
+import type { GeometryPreparation, GeometryCleanupStatus } from "./geometry";
+
+export type {
+  GeometryCleanupStatus,
+  CleanedGeometryResult,
+  ManufacturingGeometry,
+  GeometryPreparation,
+  DiscardedSketchEntity,
+  MarkingLayerGeometry,
+  PartGeometryPrepStatus,
+} from "./geometry";
 
 // ─── Core Domain Types ──────────────────────────────────────────────────────
 
@@ -124,6 +135,11 @@ export interface ProcessedGeometry {
   status: GeometryStatus;
   /** Human-readable detail for warning / error */
   statusMessage?: string;
+  /**
+   * Cleanup, contour reconstruction, classification, and manufacturing groupings.
+   * Vertex arrays inside may be cleared when persisting (see store slimming).
+   */
+  preparation?: GeometryPreparation;
 }
 
 export interface DxfPartGeometry {
@@ -193,6 +209,12 @@ export interface Part {
   dxfLengthMm?: number;
   /** Geometry processing status */
   geometryStatus?: GeometryStatus;
+  /** Pre-CAM preparation rollup (ready / warning / error) */
+  geometryCleanupStatus?: GeometryCleanupStatus;
+  /** Short summary, e.g. "1 outer · 3 holes" */
+  geometryContourSummary?: string;
+  /** Combined cleanup / validation messages for tooltips */
+  geometryPrepMessages?: string[];
 }
 
 // ─── Excel Column Mapping ─────────────────────────────────────────────────────
@@ -258,3 +280,12 @@ export type {
   StockSheetEntry,
   StockSheetType,
 } from "./nesting";
+
+export type {
+  GeneratedSheet,
+  NestingEngineDebugMeta,
+  NestingRun,
+  NestingThicknessResult,
+  SheetPlacement,
+  UnplacedPart,
+} from "./nestingResults";

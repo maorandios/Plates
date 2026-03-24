@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-svgnest-worker.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-svgnest-worker.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node scripts/copy-svgnest-worker.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -31,6 +34,7 @@
     "react-dom": "19.2.4",
     "react-hook-form": "^7.71.2",
     "react-konva": "^19.2.3",
+    "svgnest-mjs": "^1.0.0",
     "tailwind-merge": "^3.5.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"

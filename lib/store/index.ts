@@ -14,10 +14,13 @@ import type {
   DxfPartGeometry,
   Part,
   ProcessedGeometry,
+  GeometryPreparation,
   StockSheetEntry,
   BatchThicknessOverride,
+  NestingRun,
 } from "@/types";
 import { deriveClientCode, generateClientCode, isSafeClientCode } from "@/lib/codegen/clientCode";
+import { slimNestingRunForStorage } from "@/lib/nesting/slimNestingRunForStorage";
 import { nanoid } from "@/lib/utils/nanoid";
 function normalizeBatch(b: Batch): Batch {
   const cm = b.cuttingMethod;
@@ -38,6 +41,7 @@ const STORAGE_KEYS = {
   stockSheets: "plate_stock_sheets",
   batchThicknessOverrides: "plate_batch_thickness_overrides",
   batchClientLinks: "plate_batch_client_links",
+  nestingRuns: "plate_nesting_runs",
 } as const;
 
 function thicknessStorageKey(thicknessMm: number | null): string {
@@ -73,15 +77,44 @@ function saveToStorage<T>(key: string, data: T[]): void {
   }
 }
 
+function slimGeometryPreparationForStorage(
+  prep: GeometryPreparation | undefined
+): GeometryPreparation | undefined {
+  if (!prep) return undefined;
+  return {
+    cleaned: {
+      ...prep.cleaned,
+      outerContour: [],
+      innerContours: [],
+      removedFragments: [],
+      invalidFragments: [],
+      classificationDiscarded: [],
+      reconstructedClosedLoops: [],
+    },
+    manufacturing: {
+      ...prep.manufacturing,
+      cutOuter: [],
+      cutInner: [],
+      marking: { ...prep.manufacturing.marking, paths: [] },
+    },
+  };
+}
+
 /**
  * Vertex arrays (outer + holes) dominate JSON size for plates with many holes.
- * Metrics stay for matching / table / diagnostics; preview rebuilds via `reprocessDxfGeometry`.
+ * Preparation vertex copies are also stripped; messages/stats stay for diagnostics.
+ * Preview rebuilds via `reprocessDxfGeometry`.
  */
 function slimProcessedGeometryForStorage(
   pg: ProcessedGeometry | null
 ): ProcessedGeometry | null {
   if (!pg) return null;
-  return { ...pg, outer: [], holes: [] };
+  return {
+    ...pg,
+    outer: [],
+    holes: [],
+    preparation: slimGeometryPreparationForStorage(pg.preparation),
+  };
 }
 
 /** DXF entities + mesh vertices are re-parsed from file text — do not persist them. */
@@ -123,6 +156,12 @@ export function deleteBatch(id: string): void {
     STORAGE_KEYS.batchClientLinks,
     loadFromStorage<BatchClientLink>(STORAGE_KEYS.batchClientLinks).filter(
       (l) => l.batchId !== id
+    )
+  );
+  saveToStorage(
+    STORAGE_KEYS.nestingRuns,
+    loadFromStorage<NestingRun>(STORAGE_KEYS.nestingRuns).filter(
+      (r) => r.batchId !== id
     )
   );
 }
@@ -670,4 +709,62 @@ export function removeBatchThicknessOverrideRecord(
         !(o.batchId === batchId && thicknessStorageKey(o.thicknessMm) === key)
     )
   );
+}
+
+// ─── Nesting runs (auto nesting MVP) ───────────────────────────────────────
+
+export function getNestingRuns(): NestingRun[] {
+  return loadFromStorage<NestingRun>(STORAGE_KEYS.nestingRuns);
+}
+
+export function getNestingRunsByBatch(batchId: string): NestingRun[] {
+  return getNestingRuns().filter((r) => r.batchId === batchId);
+}
+
+export function getNestingRunById(id: string): NestingRun | undefined {
+  return getNestingRuns().find((r) => r.id === id);
+}
+
+/** Most recent first */
+export function getLatestNestingRunForBatch(
+  batchId: string
+): NestingRun | undefined {
+  const list = getNestingRunsByBatch(batchId);
+  if (list.length === 0) return undefined;
+  return [...list].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0];
+}
+
+/** Dispatched on successful save so the nesting results view can re-read storage (same tab). */
+export const PLATE_NESTING_RUN_SAVED_EVENT = "plate-nesting-run-saved";
+
+/**
+ * Persists a nesting run (slimmed for localStorage size). Returns false if storage failed.
+ */
+export function saveNestingRun(run: NestingRun): boolean {
+  if (typeof window === "undefined") return false;
+  const slim = slimNestingRunForStorage(run);
+  const all = getNestingRuns().filter((r) => r.id !== slim.id);
+  const next = [...all, slim];
+  try {
+    localStorage.setItem(STORAGE_KEYS.nestingRuns, JSON.stringify(next));
+    window.dispatchEvent(
+      new CustomEvent(PLATE_NESTING_RUN_SAVED_EVENT, {
+        detail: { batchId: slim.batchId, runId: slim.id },
+      })
+    );
+    return true;
+  } catch (e) {
+    const isQuota =
+      e instanceof DOMException && e.name === "QuotaExceededError";
+    console.error(
+      isQuota
+        ? "[PLATE] Nesting run too large for browser storage (quota). Try fewer parts per run or clear site data."
+        : "[PLATE] Failed to save nesting run",
+      e
+    );
+    return false;
+  }
 }

@@ -7,9 +7,14 @@ export const BATCH_PROCESS_STEPS = [
     label: "Stock configuration",
     shortLabel: "Stock",
   },
+  {
+    segment: "nesting-results" as const,
+    label: "Nesting results",
+    shortLabel: "Nesting",
+  },
 ] as const;
 
-export type BatchProcessStepIndex = 0 | 1 | 2;
+export type BatchProcessStepIndex = 0 | 1 | 2 | 3;
 
 export function batchStepHref(
   batchId: string,
@@ -27,6 +32,8 @@ export function pathnameToStepIndex(
 ): BatchProcessStepIndex {
   const prefix = `/batches/${batchId}`;
   const norm = pathname.replace(/\/$/, "") || pathname;
+  if (norm === `${prefix}/nesting-results`) return 3;
+  if (norm.startsWith(`${prefix}/nesting-results/`)) return 3;
   if (norm === `${prefix}/stock`) return 2;
   if (norm === `${prefix}/parts`) return 1;
   if (norm === prefix) return 0;

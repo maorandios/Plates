@@ -3,12 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Stage, Layer, Line, Text, Group, Circle, Rect } from "react-konva";
-import type { ProcessedGeometry } from "@/types";
+import type { CleanedGeometryResult, ProcessedGeometry } from "@/types";
 import type { UnitSystem } from "@/types/settings";
 import type { Point } from "@/lib/geometry/extract";
-import { calculateViewTransform, transformContour, transformPoint } from "@/lib/geometry/viewTransform";
+import {
+  calculateViewTransform,
+  transformContour,
+  transformPoint,
+} from "@/lib/geometry/viewTransform";
 import { openPolygonVertices } from "@/lib/geometry/dimensions";
 import { formatLength } from "@/lib/settings/unitSystem";
+import { boundingBoxUnionOfContours } from "@/lib/geometry/calc";
+import {
+  getMarkingFontSizePx,
+  getMarkingPositionMm,
+} from "@/lib/geometry/marking";
 
 /** Max distance (px) from pointer to vertex to snap */
 const SNAP_PX = 16;
@@ -18,11 +27,29 @@ interface SnapPoint {
   screen: [number, number];
 }
 
-function collectSnapPoints(geometry: ProcessedGeometry, transform: ReturnType<typeof calculateViewTransform>): SnapPoint[] {
+function asPointRing(ring: [number, number][]): Point[] {
+  return ring.map(([x, y]) => [x, y] as Point);
+}
+
+function collectSnapPoints(
+  geometry: ProcessedGeometry,
+  transform: ReturnType<typeof calculateViewTransform>,
+  debugMode: boolean,
+  debugCleaned: CleanedGeometryResult | null | undefined
+): SnapPoint[] {
   const vertices: Point[] = [];
   vertices.push(...openPolygonVertices(geometry.outer));
   for (const hole of geometry.holes) {
     vertices.push(...openPolygonVertices(hole));
+  }
+  if (debugMode && debugCleaned) {
+    const addRing = (r: [number, number][]) => {
+      vertices.push(...openPolygonVertices(r as unknown as Point[]));
+    };
+    for (const r of debugCleaned.reconstructedClosedLoops ?? []) addRing(r);
+    for (const r of debugCleaned.classificationDiscarded ?? []) addRing(r);
+    for (const r of debugCleaned.removedFragments ?? []) addRing(r);
+    for (const r of debugCleaned.invalidFragments ?? []) addRing(r);
   }
   return vertices.map((mm) => ({
     mm,
@@ -50,16 +77,54 @@ function findNearestSnap(
   return best;
 }
 
+function allRingsForBounds(
+  geometry: ProcessedGeometry,
+  debugCleaned: CleanedGeometryResult | null | undefined,
+  markingPaths: [number, number][][]
+): Point[][] {
+  const rings: Point[][] = [];
+  if (geometry.outer.length) rings.push(geometry.outer as Point[]);
+  for (const h of geometry.holes) rings.push(h as Point[]);
+  if (debugCleaned) {
+    for (const r of debugCleaned.reconstructedClosedLoops ?? []) {
+      if (r.length) rings.push(asPointRing(r));
+    }
+    for (const r of debugCleaned.removedFragments ?? []) {
+      if (r.length) rings.push(asPointRing(r));
+    }
+    for (const r of debugCleaned.invalidFragments ?? []) {
+      if (r.length) rings.push(asPointRing(r));
+    }
+    for (const r of debugCleaned.classificationDiscarded ?? []) {
+      if (r.length) rings.push(asPointRing(r));
+    }
+    if (debugCleaned.outerContour.length) {
+      rings.push(asPointRing(debugCleaned.outerContour));
+    }
+    for (const h of debugCleaned.innerContours) {
+      if (h.length) rings.push(asPointRing(h));
+    }
+  }
+  for (const p of markingPaths) {
+    if (p.length) rings.push(asPointRing(p));
+  }
+  return rings.filter((r) => r.length > 0);
+}
+
 interface PlateGeometryCanvasProps {
   geometry: ProcessedGeometry;
   width?: number;
   height?: number;
-  /** When true, user can click two vertices (snapped) to measure distance */
   measureMode?: boolean;
-  /** Increment to clear the current measurement from parent */
   clearMeasurementKey?: number;
-  /** Display units for labels (geometry stays mm internally) */
   unitSystem?: UnitSystem;
+  /** Overlay pipeline layers (green/blue/red/orange etc.) */
+  debugMode?: boolean;
+  debugCleaned?: CleanedGeometryResult | null;
+  /** From manufacturing.marking.paths when non-empty (debug polylines, not label text) */
+  markingDebugPaths?: [number, number][][];
+  /** Plate marking preview: part name ± client code; empty hides the MARKING text layer */
+  plateMarkingText?: string;
 }
 
 export function PlateGeometryCanvas({
@@ -69,10 +134,25 @@ export function PlateGeometryCanvas({
   measureMode = false,
   clearMeasurementKey = 0,
   unitSystem = "metric",
+  debugMode = false,
+  debugCleaned = null,
+  markingDebugPaths = [],
+  plateMarkingText = "",
 }: PlateGeometryCanvasProps) {
+  const markingPaths = markingDebugPaths ?? [];
+  const markingLabel = plateMarkingText.trim();
+
+  const geomBounds = useMemo(() => {
+    if (debugMode && debugCleaned) {
+      const rings = allRingsForBounds(geometry, debugCleaned, markingPaths);
+      if (rings.length > 0) return boundingBoxUnionOfContours(rings);
+    }
+    return geometry.boundingBox;
+  }, [debugMode, debugCleaned, geometry, markingPaths]);
+
   const transform = useMemo(() => {
-    return calculateViewTransform(geometry.boundingBox, width, height, 50);
-  }, [geometry.boundingBox, width, height]);
+    return calculateViewTransform(geomBounds, width, height, 50);
+  }, [geomBounds, width, height]);
 
   const outerPoints = useMemo(() => {
     if (geometry.outer.length === 0) return [];
@@ -83,9 +163,30 @@ export function PlateGeometryCanvas({
     return geometry.holes.map((hole) => transformContour(hole, transform));
   }, [geometry.holes, transform]);
 
+  const debugLayers = useMemo(() => {
+    if (!debugMode || !debugCleaned) return null;
+    return {
+      preClosed: (debugCleaned.reconstructedClosedLoops ?? []).map((r) =>
+        transformContour(r as unknown as Point[], transform)
+      ),
+      outsideOuter: (debugCleaned.classificationDiscarded ?? []).map((r) =>
+        transformContour(r as unknown as Point[], transform)
+      ),
+      removed: (debugCleaned.removedFragments ?? []).map((r) =>
+        transformContour(r as unknown as Point[], transform)
+      ),
+      invalid: (debugCleaned.invalidFragments ?? []).map((r) =>
+        transformContour(r as unknown as Point[], transform)
+      ),
+      markingDxfPaths: markingPaths.map((r) =>
+        transformContour(r as unknown as Point[], transform)
+      ),
+    };
+  }, [debugMode, debugCleaned, transform, markingPaths]);
+
   const snapPoints = useMemo(
-    () => collectSnapPoints(geometry, transform),
-    [geometry.outer, geometry.holes, transform]
+    () => collectSnapPoints(geometry, transform, debugMode, debugCleaned),
+    [geometry.outer, geometry.holes, transform, debugMode, debugCleaned]
   );
 
   const [measurePts, setMeasurePts] = useState<{ p1: Point | null; p2: Point | null }>({
@@ -136,7 +237,6 @@ export function PlateGeometryCanvas({
       setMeasurePts((m) => {
         if (m.p1 == null) return { p1: snap.mm, p2: null };
         if (m.p2 == null) return { p1: m.p1, p2: snap.mm };
-        // Full measurement done — start a new one from this vertex
         return { p1: snap.mm, p2: null };
       });
     },
@@ -168,18 +268,40 @@ export function PlateGeometryCanvas({
   }, [measurementMm, unitSystem]);
 
   const bboxLabelW = useMemo(
-    () => formatLength(geometry.boundingBox.width, unitSystem),
-    [geometry.boundingBox.width, unitSystem]
+    () => formatLength(geomBounds.width, unitSystem),
+    [geomBounds.width, unitSystem]
   );
   const bboxLabelH = useMemo(
-    () => formatLength(geometry.boundingBox.height, unitSystem),
-    [geometry.boundingBox.height, unitSystem]
+    () => formatLength(geomBounds.height, unitSystem),
+    [geomBounds.height, unitSystem]
   );
 
   const p1Screen = p1Mm ? (transformPoint(p1Mm, transform) as [number, number]) : null;
   const p2Screen = p2Mm ? (transformPoint(p2Mm, transform) as [number, number]) : null;
 
-  if (geometry.outer.length === 0) {
+  const markingLayout = useMemo(() => {
+    if (!markingLabel || geometry.outer.length === 0) return null;
+    const pos = getMarkingPositionMm(geometry.outer as Point[]);
+    if (!pos) return null;
+    const [sx, sy] = transformPoint([pos.x, pos.y], transform);
+    const fontSize = getMarkingFontSizePx(pos.width, transform.scale);
+    const plateScreenW = pos.width * transform.scale;
+    const textWidth = Math.min(width * 0.9, Math.max(96, plateScreenW * 0.9));
+    const textHeight = Math.max(fontSize * 1.4, 24);
+    return { sx, sy, fontSize, textWidth, textHeight };
+  }, [markingLabel, geometry.outer, transform, width]);
+
+  const hasNormalOuter = geometry.outer.length > 0;
+  const hasDebugDraw =
+    debugMode &&
+    debugLayers &&
+    (debugLayers.preClosed.some((pts) => pts.length >= 3) ||
+      debugLayers.outsideOuter.some((pts) => pts.length >= 3) ||
+      debugLayers.removed.some((pts) => pts.length >= 3) ||
+      debugLayers.invalid.some((pts) => pts.length >= 2) ||
+      debugLayers.markingDxfPaths.some((pts) => pts.length >= 2));
+
+  if (!hasNormalOuter && !hasDebugDraw) {
     return (
       <div
         className="flex items-center justify-center bg-muted/20 rounded-lg border border-border"
@@ -190,6 +312,11 @@ export function PlateGeometryCanvas({
     );
   }
 
+  const holeStroke = debugMode ? "#2563eb" : "#dc2626";
+  const holeFill = debugMode ? "rgba(37,99,235,0.12)" : "#ffffff";
+  const outerStroke = debugMode ? "#16a34a" : "#1e40af";
+  const outerFill = debugMode ? "rgba(22,163,74,0.15)" : "#e0f2fe";
+
   return (
     <div
       className="relative rounded-lg border border-border overflow-hidden bg-white"
@@ -197,15 +324,103 @@ export function PlateGeometryCanvas({
     >
       <Stage width={width} height={height}>
         <Layer listening={false}>
-          <Line
-            points={outerPoints.flat()}
-            closed
-            fill="#e0f2fe"
-            stroke="#1e40af"
-            strokeWidth={2}
-            lineCap="round"
-            lineJoin="round"
-          />
+          {debugMode && debugLayers && (
+            <>
+              {debugLayers.preClosed.map((pts, i) => {
+                const flat = pts.flat();
+                if (flat.length < 4) return null;
+                return (
+                  <Line
+                    key={`pre-${i}`}
+                    points={flat}
+                    closed
+                    fill="rgba(100,116,139,0.08)"
+                    stroke="#64748b"
+                    strokeWidth={1.5}
+                    dash={[5, 4]}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                );
+              })}
+              {debugLayers.outsideOuter.map((pts, i) => {
+                const flat = pts.flat();
+                if (flat.length < 4) return null;
+                return (
+                  <Line
+                    key={`out-${i}`}
+                    points={flat}
+                    closed
+                    fill="rgba(192,38,211,0.06)"
+                    stroke="#a21caf"
+                    strokeWidth={2}
+                    dash={[6, 3]}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                );
+              })}
+              {debugLayers.removed.map((pts, i) => {
+                const flat = pts.flat();
+                if (flat.length < 4) return null;
+                return (
+                  <Line
+                    key={`rm-${i}`}
+                    points={flat}
+                    closed
+                    stroke="#dc2626"
+                    strokeWidth={2}
+                    dash={[8, 4]}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                );
+              })}
+              {debugLayers.invalid.map((pts, i) => {
+                const flat = pts.flat();
+                if (flat.length < 4) return null;
+                return (
+                  <Line
+                    key={`inv-${i}`}
+                    points={flat}
+                    closed={false}
+                    stroke="#ea580c"
+                    strokeWidth={2}
+                    dash={[4, 3]}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                );
+              })}
+              {debugLayers.markingDxfPaths.map((pts, i) => {
+                const flat = pts.flat();
+                if (flat.length < 4) return null;
+                return (
+                  <Line
+                    key={`mk-path-${i}`}
+                    points={flat}
+                    closed={false}
+                    stroke="#9333ea"
+                    strokeWidth={2}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                );
+              })}
+            </>
+          )}
+
+          {hasNormalOuter && (
+            <Line
+              points={outerPoints.flat()}
+              closed
+              fill={outerFill}
+              stroke={outerStroke}
+              strokeWidth={debugMode ? 2.5 : 2}
+              lineCap="round"
+              lineJoin="round"
+            />
+          )}
 
           {holePointsArray.map((hole, i) => {
             const flatPoints = hole.flat();
@@ -217,8 +432,8 @@ export function PlateGeometryCanvas({
                 key={`hole-${i}`}
                 points={flatPoints}
                 closed
-                fill="#ffffff"
-                stroke="#dc2626"
+                fill={holeFill}
+                stroke={holeStroke}
                 strokeWidth={2}
                 lineCap="round"
                 lineJoin="round"
@@ -227,7 +442,65 @@ export function PlateGeometryCanvas({
           })}
         </Layer>
 
-        {/* Manual measurement overlay — draw first; transparent hit-rect last (on top) */}
+        {markingLayout && (
+          <Layer listening={false}>
+            <Group
+              x={markingLayout.sx}
+              y={markingLayout.sy}
+              listening={false}
+            >
+              {debugMode && (
+                <>
+                  <Rect
+                    x={-markingLayout.textWidth / 2 - 6}
+                    y={-markingLayout.textHeight / 2 - 4}
+                    width={markingLayout.textWidth + 12}
+                    height={markingLayout.textHeight + 8}
+                    stroke="#9333ea"
+                    strokeWidth={1}
+                    dash={[5, 4]}
+                    fill="rgba(147,51,234,0.06)"
+                    listening={false}
+                  />
+                  <Text
+                    x={0}
+                    y={-markingLayout.textHeight / 2 - 22}
+                    text="MARKING"
+                    fontSize={11}
+                    fontFamily="ui-sans-serif, system-ui, sans-serif"
+                    fill="#7c3aed"
+                    fontStyle="bold"
+                    align="center"
+                    width={markingLayout.textWidth}
+                    offsetX={markingLayout.textWidth / 2}
+                    listening={false}
+                  />
+                </>
+              )}
+              <Text
+                x={0}
+                y={0}
+                text={markingLabel}
+                fontSize={markingLayout.fontSize}
+                fontFamily="ui-sans-serif, system-ui, sans-serif"
+                fontStyle="bold"
+                fill="#581c87"
+                stroke="rgba(255,255,255,0.92)"
+                strokeWidth={Math.max(1, markingLayout.fontSize * 0.06)}
+                lineJoin="round"
+                align="center"
+                verticalAlign="middle"
+                width={markingLayout.textWidth}
+                height={markingLayout.textHeight}
+                offsetX={markingLayout.textWidth / 2}
+                offsetY={markingLayout.textHeight / 2}
+                wrap="word"
+                listening={false}
+              />
+            </Group>
+          </Layer>
+        )}
+
         <Layer listening={measureMode}>
           {measureMode && hoverSnap && (
             <Circle
@@ -309,16 +582,22 @@ export function PlateGeometryCanvas({
         </Layer>
       </Stage>
 
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-center gap-4 text-xs text-muted-foreground font-mono bg-white/90 backdrop-blur-sm rounded px-2 py-1 border border-border">
+      <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-mono bg-white/90 backdrop-blur-sm rounded px-2 py-1 border border-border">
         <span>W: {bboxLabelW}</span>
         <span>×</span>
         <span>H: {bboxLabelH}</span>
         {geometry.holes.length > 0 && (
           <>
             <span className="text-muted-foreground/50">·</span>
-            <span className="text-red-600">
+            <span className={debugMode ? "text-blue-600" : "text-red-600"}>
               {geometry.holes.length} hole{geometry.holes.length > 1 ? "s" : ""}
             </span>
+          </>
+        )}
+        {debugMode && (
+          <>
+            <span className="text-muted-foreground/50">·</span>
+            <span className="text-violet-700">Debug</span>
           </>
         )}
       </div>

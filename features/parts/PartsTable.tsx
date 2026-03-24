@@ -117,7 +117,7 @@ function StatusDot({
   );
 }
 
-const COL_COUNT = 14;
+const COL_COUNT = 15;
 
 export function PartsTable({ parts, onRemoveParts }: PartsTableProps) {
   const {
@@ -411,7 +411,7 @@ export function PartsTable({ parts, onRemoveParts }: PartsTableProps) {
                   DXF plate parameters
                 </TableHead>
                 <TableHead
-                  colSpan={2}
+                  colSpan={3}
                   className="text-center text-xs font-bold uppercase tracking-wider text-muted-foreground py-2 border-l border-border"
                 >
                   Validations
@@ -496,7 +496,11 @@ export function PartsTable({ parts, onRemoveParts }: PartsTableProps) {
                   {tablePerimeterHeader(unitSystem)}
                 </TableHead>
 
-                <TableHead className="font-semibold text-foreground text-center w-[88px] border-l border-border">
+                <TableHead className="font-semibold text-foreground text-center w-[76px] border-l border-border">
+                  Geometry prep
+                </TableHead>
+
+                <TableHead className="font-semibold text-foreground text-center w-[88px]">
                   <FilterableHeader
                     label="DXF file"
                     options={["present", "missing"]}
@@ -557,6 +561,53 @@ export function PartsTable({ parts, onRemoveParts }: PartsTableProps) {
         </div>
       </div>
     </TooltipProvider>
+  );
+}
+
+function GeometryPrepCell({ part }: { part: Part }) {
+  if (part.dxfStatus !== "present") {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+  const st = part.geometryCleanupStatus;
+  if (!st) {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+  const label = st === "ready" ? "Ready" : st === "warning" ? "Warning" : "Error";
+  const summary = part.geometryContourSummary;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex w-full justify-center items-center rounded-md p-1 -m-1 border-0 bg-transparent cursor-help"
+          aria-label={`Geometry preparation: ${label}`}
+        >
+          <Badge
+            variant="outline"
+            className={
+              st === "ready"
+                ? "text-emerald-800 border-emerald-300 bg-emerald-50 text-[10px] font-semibold px-1.5"
+                : st === "warning"
+                  ? "text-amber-900 border-amber-300 bg-amber-50 text-[10px] font-semibold px-1.5"
+                  : "text-destructive border-destructive/40 bg-destructive/10 text-[10px] font-semibold px-1.5"
+            }
+          >
+            {label}
+          </Badge>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="left" className="max-w-xs text-xs space-y-1">
+        <p className="font-semibold text-foreground">{label}</p>
+        {summary && <p className="text-muted-foreground">{summary}</p>}
+        {part.geometryPrepMessages && part.geometryPrepMessages.length > 0 && (
+          <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
+            {part.geometryPrepMessages.slice(0, 8).map((m, i) => (
+              <li key={i}>{m}</li>
+            ))}
+          </ul>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -644,7 +695,11 @@ function PartsDataRow({
         )}
       </TableCell>
 
-      <TableCell className="text-center border-l border-border">
+      <TableCell className="text-center border-l border-border px-1">
+        <GeometryPrepCell part={part} />
+      </TableCell>
+
+      <TableCell className="text-center">
         <StatusDot
           ok={part.dxfStatus === "present"}
           title={part.dxfStatus === "present" ? "DXF file present" : "DXF file missing"}

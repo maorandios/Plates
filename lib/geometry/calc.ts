@@ -101,6 +101,38 @@ export function polygonBoundingBox(contour: Point[]): BoundingBox {
   };
 }
 
+/** Bounding box of all vertices across contours (for debug fit-to-view). */
+export function boundingBoxUnionOfContours(contours: Point[][]): BoundingBox {
+  if (contours.length === 0) {
+    return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+  }
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+  let any = false;
+  for (const c of contours) {
+    for (const [x, y] of c) {
+      any = true;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (!any) {
+    return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+  }
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
 // ─── Winding / orientation ────────────────────────────────────────────────────
 
 /** Returns true if the contour winds CCW (positive signed area, y-up coords). */
@@ -164,6 +196,8 @@ export function representativePoint(contour: Point[]): Point {
 export interface ClassifiedContours {
   outer: Point[];
   holes: Point[][];
+  /** Closed loops that are not the outer and not inside the outer (debug / sheet scrap) */
+  discardedOutsideOuter: Point[][];
 }
 
 /**
@@ -173,17 +207,19 @@ export interface ClassifiedContours {
  * 1. Sort by absolute area (descending) → largest is the outer candidate.
  * 2. For each remaining contour, test whether a representative point lies
  *    inside the outer → if so, it is a hole.
- * 3. Contours outside the outer are silently discarded (separate parts would
- *    need a different DXF file per part, which is the standard expectation).
+ * 3. Contours outside the outer are returned in `discardedOutsideOuter` for debugging.
  * 4. Correct winding: outer → CCW, holes → CW.
  * 5. Reconstruct degenerate circles (only for holes, not outer boundary).
  */
 export function classifyContours(contours: Point[][]): ClassifiedContours {
-  if (contours.length === 0) return { outer: [], holes: [] };
+  if (contours.length === 0) {
+    return { outer: [], holes: [], discardedOutsideOuter: [] };
+  }
 
   const sorted = [...contours].sort((a, b) => polygonArea(b) - polygonArea(a));
   const outer = ensureCCW(sorted[0]);
   const holes: Point[][] = [];
+  const discardedOutsideOuter: Point[][] = [];
 
   for (let i = 1; i < sorted.length; i++) {
     const testPt = representativePoint(sorted[i]);
@@ -197,8 +233,10 @@ export function classifyContours(contours: Point[][]): ClassifiedContours {
           `[classify] Hole ${i}: reconstructed ${hole.length} → ${reconstructed.length} pts (circle from DXF diameter / low-poly)`
         );
       }
+    } else {
+      discardedOutsideOuter.push(sorted[i]);
     }
   }
 
-  return { outer, holes };
+  return { outer, holes, discardedOutsideOuter };
 }

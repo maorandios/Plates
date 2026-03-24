@@ -22,6 +22,7 @@ import {
 } from "@/lib/nesting/stockConfiguration";
 import type { StockSheetEntry } from "@/types/nesting";
 import { ThicknessStockAccordion } from "./ThicknessStockAccordion";
+import { GenerateNestingPanel } from "./GenerateNestingPanel";
 
 function useBatchIdParam(): string {
   const params = useParams();
@@ -173,6 +174,8 @@ export default function StockConfigurationPage() {
           onPatchRow={patchRow}
           onDeleteRow={deleteRow}
         />
+
+        <GenerateNestingPanel batch={batch} />
       </div>
     </PageContainer>
   );

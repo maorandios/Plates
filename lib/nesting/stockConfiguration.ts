@@ -3,10 +3,14 @@ import type { StockSheetEntry, StockSheetType } from "@/types/nesting";
 
 const MM2_TO_M2 = 1 / 1_000_000;
 
-/** Stable grouping key for thickness (matches parts → stock rows). */
+/**
+ * Stable grouping key for thickness (matches parts → stock rows).
+ * Rounds to µm so Excel/float noise (e.g. 5.999999 vs 6) still matches stock.
+ */
 export function thicknessGroupKey(thicknessMm: number | null): string {
   if (thicknessMm == null || !Number.isFinite(thicknessMm)) return "__none__";
-  return String(thicknessMm);
+  const rounded = Math.round(thicknessMm * 1000) / 1000;
+  return String(rounded);
 }
 
 export interface PartThicknessGroup {
@@ -27,7 +31,7 @@ export function deriveThicknessGroupsFromParts(
       p.thickness != null &&
       typeof p.thickness === "number" &&
       Number.isFinite(p.thickness);
-    const key = has ? String(p.thickness) : "__none__";
+    const key = thicknessGroupKey(has ? (p.thickness as number) : null);
     const list = map.get(key) ?? [];
     list.push(p);
     map.set(key, list);

@@ -11,10 +11,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { Part } from "@/types";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import type { CleanedGeometryResult, Part } from "@/types";
 import { PlateGeometryCanvas } from "./PlateGeometryCanvas";
-import { getDxfGeometryByFile } from "@/lib/store";
-import { reprocessDxfGeometry } from "@/lib/geometry";
+import { GeometryDebugPanel } from "./GeometryDebugPanel";
+import { getBatchById, getDxfGeometryByFile } from "@/lib/store";
+import { getMarkingText, reprocessDxfGeometry } from "@/lib/geometry";
+import { getResolvedThicknessCuttingRule } from "@/lib/nesting/resolvedCuttingRules";
 import { estimateHoleDiameterMm } from "@/lib/geometry/dimensions";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import { formatArea, formatHoleDiameter, formatLength } from "@/lib/settings/unitSystem";
@@ -25,12 +29,27 @@ interface PartPreviewModalProps {
   onClose: () => void;
 }
 
+function hasDebugDrawable(c: CleanedGeometryResult): boolean {
+  const pre = c.reconstructedClosedLoops ?? [];
+  const inv = c.invalidFragments ?? [];
+  const rem = c.removedFragments ?? [];
+  const disc = c.classificationDiscarded ?? [];
+  return (
+    c.outerContour.length > 1 ||
+    pre.some((r) => r.length > 1) ||
+    inv.some((r) => r.length > 1) ||
+    rem.some((r) => r.length > 1) ||
+    disc.some((r) => r.length > 1)
+  );
+}
+
 export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps) {
   const { preferences } = useAppPreferences();
   const unitSystem = preferences.unitSystem;
 
   const [measureMode, setMeasureMode] = useState(false);
   const [clearMeasurementKey, setClearMeasurementKey] = useState(0);
+  const [debugGeometry, setDebugGeometry] = useState(false);
 
   /** Stored geometry omits vertices; rebuild from DXF file text when preview opens. */
   const geometry = useMemo(() => {
@@ -40,21 +59,70 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
     return reprocessDxfGeometry(stored).processedGeometry;
   }, [open, part.dxfFileId]);
 
-  const hasValidGeometry = geometry && geometry.isValid && geometry.outer.length > 0;
+  const cleaned = geometry?.preparation?.cleaned;
+  const canDebug = Boolean(cleaned);
+  const debugDrawable = cleaned ? hasDebugDrawable(cleaned) : false;
+
+  const hasRenderableContours = Boolean(geometry && geometry.outer.length > 0);
+  const showCanvas =
+    geometry &&
+    (hasRenderableContours || (debugGeometry && canDebug && debugDrawable));
+
+  const prep = cleaned;
+  const cleanupStatus =
+    prep?.cleanupStatus ??
+    (geometry?.status === "valid"
+      ? "ready"
+      : geometry?.status === "warning"
+        ? "warning"
+        : "error");
+  const prepMessages = [
+    ...(prep?.warnings ?? []),
+    ...(prep?.errors ?? []),
+  ];
+  if (geometry?.statusMessage) prepMessages.push(geometry.statusMessage);
 
   useEffect(() => {
     if (!open) {
       setMeasureMode(false);
       setClearMeasurementKey((k) => k + 1);
+      setDebugGeometry(false);
     }
   }, [open]);
+
+  const markingPaths = geometry?.preparation?.manufacturing?.marking?.paths ?? [];
+
+  const plateMarkingText = useMemo(() => {
+    const batch = getBatchById(part.batchId);
+    if (!batch) {
+      return getMarkingText(part, {
+        markPartName: true,
+        includeClientCode: false,
+      });
+    }
+    const resolved = getResolvedThicknessCuttingRule(
+      batch,
+      part.thickness ?? null,
+      unitSystem
+    );
+    return getMarkingText(part, {
+      markPartName: resolved.defaultMarkPartName,
+      includeClientCode: resolved.defaultIncludeClientCode,
+    });
+  }, [
+    part.batchId,
+    part.thickness,
+    part.partName,
+    part.clientCode,
+    unitSystem,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogDescription className="sr-only">
-            Plate geometry preview with optional manual distance measurement and hole sizes
+            Plate geometry preview with optional debug layers and distance measurement
           </DialogDescription>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -109,10 +177,20 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
               highlight={part.geometryStatus !== "valid"}
             />
           )}
+          {part.dxfFileId && geometry && (
+            <MetaItem
+              label="Prep status"
+              value={cleanupStatus}
+              highlight={cleanupStatus !== "ready"}
+            />
+          )}
+          {part.geometryContourSummary && (
+            <MetaItem label="Contours" value={part.geometryContourSummary} />
+          )}
         </div>
 
         {/* Geometry preview */}
-        <div className="py-4 flex items-center justify-center">
+        <div className="py-4 flex flex-col items-stretch">
           {!part.dxfFileId ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <AlertCircle className="h-12 w-12 text-muted-foreground/40 mb-3" />
@@ -128,10 +206,10 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
                 Geometry not processed
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Try clicking "Rebuild Table" to re-process geometry.
+                Try clicking &quot;Rebuild Table&quot; to re-process geometry.
               </p>
             </div>
-          ) : !hasValidGeometry ? (
+          ) : !showCanvas ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <AlertCircle className="h-12 w-12 text-red-400 mb-3" />
               <p className="text-sm font-medium text-foreground">
@@ -142,30 +220,103 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
                   {geometry.statusMessage}
                 </p>
               )}
+              {prepMessages.length > 0 && (
+                <ul className="text-xs text-left text-muted-foreground mt-3 max-w-md list-disc pl-4 space-y-1">
+                  {prepMessages.map((m, i) => (
+                    <li key={i}>{m}</li>
+                  ))}
+                </ul>
+              )}
+              {canDebug && (
+                <p className="text-xs text-muted-foreground mt-4 max-w-sm">
+                  Turn on <strong>Debug geometry</strong> below if closed loops or open chains
+                  were captured for inspection.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-4 w-full">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={measureMode ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setMeasureMode((m) => !m)}
-                  >
-                    <Ruler className="h-4 w-4 mr-2" />
-                    {measureMode ? "Stop measuring" : "Measure distance"}
-                  </Button>
-                  {measureMode && (
+              {!hasRenderableContours && debugGeometry && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                  No classified outer contour — showing debug layers only (e.g. open chains or
+                  pre-classify loops).
+                </div>
+              )}
+
+              {(cleanupStatus === "warning" || prepMessages.length > 0) && !debugGeometry && (
+                <div
+                  className={`rounded-lg border px-4 py-3 text-sm ${
+                    cleanupStatus === "warning"
+                      ? "border-amber-200 bg-amber-50 text-amber-950"
+                      : "border-border bg-muted/40 text-foreground"
+                  }`}
+                >
+                  <p className="font-medium mb-1">
+                    {cleanupStatus === "warning"
+                      ? "Geometry usable with warnings"
+                      : "Preparation notes"}
+                  </p>
+                  {prepMessages.length > 0 ? (
+                    <ul className="text-xs space-y-1 list-disc pl-4 opacity-90">
+                      {[...new Set(prepMessages)].map((m, i) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs opacity-80">
+                      Outer and inner contours were reconstructed; review dimensions in the table
+                      if inch scaling was applied.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {debugGeometry && cleaned && (
+                <GeometryDebugPanel
+                  geometryStatus={geometry.status}
+                  cleanupStatus={cleanupStatus}
+                  cleaned={cleaned}
+                />
+              )}
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-4">
+                  {canDebug && (
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="plate-debug-geometry"
+                        checked={debugGeometry}
+                        onCheckedChange={setDebugGeometry}
+                      />
+                      <Label
+                        htmlFor="plate-debug-geometry"
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        Debug geometry
+                      </Label>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
-                      variant="outline"
+                      variant={measureMode ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setClearMeasurementKey((k) => k + 1)}
+                      onClick={() => setMeasureMode((m) => !m)}
                     >
-                      Clear
+                      <Ruler className="h-4 w-4 mr-2" />
+                      {measureMode ? "Stop measuring" : "Measure distance"}
                     </Button>
-                  )}
+                    {measureMode && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setClearMeasurementKey((k) => k + 1)}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {measureMode && (
                   <p className="text-xs text-muted-foreground max-w-md">
@@ -174,14 +325,43 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
                   </p>
                 )}
               </div>
-              <PlateGeometryCanvas
-                geometry={geometry}
-                width={700}
-                height={500}
-                measureMode={measureMode}
-                clearMeasurementKey={clearMeasurementKey}
-                unitSystem={unitSystem}
-              />
+
+              {geometry && (
+                <PlateGeometryCanvas
+                  geometry={geometry}
+                  width={700}
+                  height={500}
+                  measureMode={measureMode}
+                  clearMeasurementKey={clearMeasurementKey}
+                  unitSystem={unitSystem}
+                  debugMode={debugGeometry}
+                  debugCleaned={cleaned ?? null}
+                  markingDebugPaths={markingPaths}
+                  plateMarkingText={plateMarkingText}
+                />
+              )}
+
+              {geometry.preparation?.manufacturing && (
+                <p className="text-[11px] text-muted-foreground text-center max-w-xl mx-auto">
+                  Manufacturing groups: CUT_OUTER (
+                  {geometry.preparation.manufacturing.cutOuter.length} pts), CUT_INNER (
+                  {geometry.preparation.manufacturing.cutInner.length} loop
+                  {geometry.preparation.manufacturing.cutInner.length === 1 ? "" : "s"}).{" "}
+                  {plateMarkingText ? (
+                    <>
+                      Marking preview (purple, centered on outer):{" "}
+                      <span className="font-mono text-foreground/90">{plateMarkingText}</span>.
+                    </>
+                  ) : (
+                    <>
+                      Part-name marking is off for this thickness band (cutting profile or batch
+                      override).
+                    </>
+                  )}{" "}
+                  {geometry.preparation.manufacturing.marking.note ?? ""}
+                </p>
+              )}
+
               {geometry.holes.length > 0 && (
                 <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
                   <p className="text-muted-foreground text-xs uppercase tracking-wide mb-2">
@@ -211,6 +391,20 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
             </div>
           )}
         </div>
+
+        {/* Allow enabling debug from error state when drawable data exists */}
+        {geometry && !showCanvas && canDebug && debugDrawable && (
+          <div className="flex items-center gap-2 pb-2 border-t border-border pt-4">
+            <Switch
+              id="plate-debug-geometry-error"
+              checked={debugGeometry}
+              onCheckedChange={setDebugGeometry}
+            />
+            <Label htmlFor="plate-debug-geometry-error" className="text-sm cursor-pointer">
+              Debug geometry (inspect loops &amp; discarded chains)
+            </Label>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

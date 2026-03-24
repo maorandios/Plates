@@ -1,4 +1,11 @@
-import type { DxfPartGeometry, ExcelRow, Part, MatchStatus } from "@/types";
+import type {
+  DxfPartGeometry,
+  ExcelRow,
+  Part,
+  MatchStatus,
+  ProcessedGeometry,
+  GeometryCleanupStatus,
+} from "@/types";
 import type { Client, UploadedFile } from "@/types";
 import { nanoid } from "@/lib/utils/nanoid";
 
@@ -55,6 +62,39 @@ function computeMatchStatus(score: number): MatchStatus {
   if (score >= MATCH_THRESHOLD) return "matched";
   if (score >= REVIEW_THRESHOLD) return "needs_review";
   return "unmatched";
+}
+
+function cleanupStatusFallback(geo: ProcessedGeometry): GeometryCleanupStatus {
+  const c = geo.preparation?.cleaned?.cleanupStatus;
+  if (c) return c;
+  if (geo.status === "valid") return "ready";
+  if (geo.status === "warning") return "warning";
+  return "error";
+}
+
+function partGeometryPrepFields(geo: ProcessedGeometry | null | undefined) {
+  if (!geo) return {};
+  const prep = geo.preparation?.cleaned;
+  let geometryContourSummary: string | undefined;
+  if (geo.outer.length > 0) {
+    geometryContourSummary = `1 outer · ${geo.holes.length} hole${geo.holes.length === 1 ? "" : "s"}`;
+  } else if (prep?.stats && prep.stats.closedLoopCount > 0) {
+    geometryContourSummary = `${prep.stats.closedLoopCount} loop(s), no valid outer`;
+  } else if (prep?.stats && prep.stats.rawContourCount > 0) {
+    geometryContourSummary = "No closed profile";
+  }
+
+  const messages = [
+    ...(prep?.warnings ?? []),
+    ...(prep?.errors ?? []),
+  ];
+  if (geo.statusMessage) messages.push(geo.statusMessage);
+
+  return {
+    geometryCleanupStatus: cleanupStatusFallback(geo),
+    geometryContourSummary,
+    geometryPrepMessages: messages.length > 0 ? [...new Set(messages)] : undefined,
+  };
 }
 
 // ─── Main matcher ─────────────────────────────────────────────────────────────
@@ -147,6 +187,7 @@ export function buildUnifiedParts({
               geo.boundingBox.width > 0 ? geo.boundingBox.width : undefined,
             dxfLengthMm:
               geo.boundingBox.height > 0 ? geo.boundingBox.height : undefined,
+            ...partGeometryPrepFields(geo),
           }
         : {};
 
