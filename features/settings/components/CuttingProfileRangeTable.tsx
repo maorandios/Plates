@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,30 +13,16 @@ import {
 import { formatLengthValueOnly } from "@/lib/settings/unitSystem";
 import type { UnitSystem } from "@/types/settings";
 import type { CuttingProfileRange } from "@/types/production";
-
-function formatRangeDisplay(
-  r: CuttingProfileRange,
-  unitSystem: UnitSystem
-): string {
-  const u = unitSystem === "metric" ? "mm" : "in";
-  const a = formatLengthValueOnly(r.minThicknessMm, unitSystem);
-  if (r.maxThicknessMm === null) {
-    return `${a}+ ${u}`;
-  }
-  const b = formatLengthValueOnly(r.maxThicknessMm, unitSystem);
-  return `${a}–${b} ${u}`;
-}
+import { formatCuttingProfileRangeLabel } from "@/lib/nesting/resolvedCuttingRules";
 
 function rotationSummary(r: CuttingProfileRange): string {
-  if (!r.allowRotation) return "Off";
-  return r.rotationMode === "free" ? "On · Free" : "On · 90°";
+  return r.rotationMode === "free" ? "Free rotation" : "90° only";
 }
 
 function markingSummary(r: CuttingProfileRange): string {
-  const parts: string[] = [];
-  if (r.defaultMarkPartName) parts.push("Part");
-  if (r.defaultIncludeClientCode) parts.push("Client");
-  return parts.length ? parts.join(" · ") : "—";
+  return r.defaultIncludeClientCode
+    ? "Part number · Client name"
+    : "Part number";
 }
 
 interface CuttingProfileRangeTableProps {
@@ -44,8 +30,6 @@ interface CuttingProfileRangeTableProps {
   unitSystem: UnitSystem;
   onEdit: (r: CuttingProfileRange) => void;
   onDelete: (r: CuttingProfileRange) => void;
-  onMoveUp: (r: CuttingProfileRange) => void;
-  onMoveDown: (r: CuttingProfileRange) => void;
 }
 
 export function CuttingProfileRangeTable({
@@ -53,8 +37,6 @@ export function CuttingProfileRangeTable({
   unitSystem,
   onEdit,
   onDelete,
-  onMoveUp,
-  onMoveDown,
 }: CuttingProfileRangeTableProps) {
   const lenUnitShort = unitSystem === "metric" ? "mm" : "in";
 
@@ -82,16 +64,22 @@ export function CuttingProfileRangeTable({
             </TableHead>
             <TableHead className="text-xs font-semibold h-10">Rotation</TableHead>
             <TableHead className="text-xs font-semibold h-10">Marking</TableHead>
-            <TableHead className="text-xs font-semibold h-10 w-[120px] text-right pr-3">
+            <TableHead className="text-xs font-semibold h-10 w-[88px] text-right pr-3">
               Actions
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {ranges.map((r, idx) => (
+          {ranges.map((r) => (
             <TableRow key={r.id} className="hover:bg-muted/30">
-              <TableCell className="font-mono text-sm tabular-nums">
-                {formatRangeDisplay(r, unitSystem)}
+              <TableCell
+                className={
+                  r.maxThicknessMm === null && r.minThicknessMm <= 1
+                    ? "text-sm text-foreground"
+                    : "font-mono text-sm tabular-nums"
+                }
+              >
+                {formatCuttingProfileRangeLabel(r, unitSystem)}
               </TableCell>
               <TableCell className="font-mono text-sm tabular-nums text-muted-foreground">
                 {formatLengthValueOnly(r.defaultSpacingMm, unitSystem)}
@@ -105,28 +93,6 @@ export function CuttingProfileRangeTable({
               </TableCell>
               <TableCell className="text-right pr-2">
                 <div className="flex justify-end items-center gap-0.5">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    disabled={idx === 0}
-                    onClick={() => onMoveUp(r)}
-                    aria-label="Move rule up"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    disabled={idx === ranges.length - 1}
-                    onClick={() => onMoveDown(r)}
-                    aria-label="Move rule down"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
                   <Button
                     type="button"
                     variant="ghost"

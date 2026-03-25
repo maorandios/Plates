@@ -48,6 +48,7 @@ export interface ServerDebugMetadata {
   runtimeMs: number;
   candidateAttempts: number;
   earlyStopReason?: string;
+  orderingStrategyUsed?: string;
   polygonPartsCount: number;
   fallbackCount: number;
   simplificationOriginalPoints: number;
@@ -82,6 +83,7 @@ export interface ServerNestingRunResult {
   jobId: string;
   batchId: string;
   runMode: NestingRunMode;
+  nestingEngine?: "heuristic" | "svgnest";
   totalSheets: number;
   totalUtilization: number;
   totalWasteArea: number;

@@ -31,12 +31,19 @@ export function ThicknessResultsSection({
     <section className="rounded-xl border border-border bg-muted/10 overflow-hidden">
       <div className="px-4 py-3 border-b border-border bg-muted/30 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-        <p className="text-xs text-muted-foreground tabular-nums">
-          {result.generatedSheets.length} sheet
-          {result.generatedSheets.length === 1 ? "" : "s"} ·{" "}
-          {result.utilizationPercent.toFixed(1)}% util. · {unplacedQty} unplaced
-          qty
-        </p>
+        <div className="text-xs text-muted-foreground text-right space-y-0.5">
+          <p className="tabular-nums">
+            {result.generatedSheets.length} sheet
+            {result.generatedSheets.length === 1 ? "" : "s"} ·{" "}
+            {result.utilizationPercent.toFixed(1)}% util. · {unplacedQty} unplaced
+            qty
+          </p>
+          {result.engineDebug?.lastWinningCandidateLabel ? (
+            <p className="font-mono text-[10px] max-w-[min(100%,28rem)] break-words">
+              Strategy: {result.engineDebug.lastWinningCandidateLabel}
+            </p>
+          ) : null}
+        </div>
       </div>
       <div className="p-4 space-y-3">
         {result.generatedSheets.length === 0 ? (

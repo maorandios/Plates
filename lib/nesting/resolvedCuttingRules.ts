@@ -22,10 +22,17 @@ function firstBandForMethod(method: Batch["cuttingMethod"]): CuttingProfileRange
   return seeds[0]!;
 }
 
+/**
+ * Human-readable thickness band for UI (settings table, batch summaries).
+ * Open-ended band from 1 mm (or legacy 0) with no max = all plate thicknesses.
+ */
 export function formatCuttingProfileRangeLabel(
   range: CuttingProfileRange,
   unitSystem: UnitSystem
 ): string {
+  if (range.maxThicknessMm === null && range.minThicknessMm <= 1) {
+    return "All plate thicknesses";
+  }
   const u = unitSystem === "metric" ? "mm" : "in";
   const a = formatLengthValueOnly(range.minThicknessMm, unitSystem);
   if (range.maxThicknessMm === null) {

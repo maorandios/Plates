@@ -10,6 +10,7 @@ import {
   Scissors,
   Settings,
   ContactRound,
+  SquareDashedBottom,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,15 @@ const navItems = [
     label: "Batches",
     href: "/batches",
     icon: Layers,
+  },
+  {
+    label: "Quick Plate Builder",
+    href: "/plate-builder",
+    icon: SquareDashedBottom,
+    /** Active on hub or when building inside a batch */
+    isActive: (pathname: string) =>
+      pathname === "/plate-builder" ||
+      /\/batches\/[^/]+\/plate-builder/.test(pathname),
   },
   {
     label: "Clients",
@@ -39,7 +49,7 @@ const navItems = [
     href: "/settings",
     icon: Settings,
   },
-];
+] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -66,9 +76,12 @@ export function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-0.5">
         {navItems.map((item) => {
           const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname === item.href || pathname.startsWith(item.href + "/");
+            "isActive" in item && item.isActive
+              ? item.isActive(pathname)
+              : item.href === "/"
+                ? pathname === "/"
+                : pathname === item.href ||
+                  pathname.startsWith(item.href + "/");
 
           return (
             <Link

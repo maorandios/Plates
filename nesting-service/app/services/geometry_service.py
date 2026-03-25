@@ -48,6 +48,8 @@ class ExpandedGeometrySet:
 
 
 class GeometryService:
+    """Per part: keep original geometry for export/viewer; build simplified, outward-offset footprint for nesting."""
+
     def __init__(self) -> None:
         self._footprint_cache: dict[str, tuple[Polygon, SimplifyStats]] = {}
 

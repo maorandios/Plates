@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { deleteFile, getDxfGeometryByFile } from "@/lib/store";
 import type { UploadedFile } from "@/types";
 import { cn } from "@/lib/utils";
@@ -130,7 +131,17 @@ export function ClientDxfTable({
               return (
                 <TableRow key={file.id} className="hover:bg-muted/30">
                   <TableCell className="font-medium text-foreground">
-                    {plateNameForDxf(file)}
+                    <div className="inline-flex flex-wrap items-center gap-2">
+                      <span>{plateNameForDxf(file)}</span>
+                      {file.sourceKind === "built" && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 font-normal"
+                        >
+                          Built
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex justify-center">

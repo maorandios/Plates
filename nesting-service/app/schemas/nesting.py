@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RotationMode(str, Enum):
@@ -25,11 +25,20 @@ class RunMode(str, Enum):
     optimize = "optimize"
 
 
+class NestingEngine(str, Enum):
+    """Server placement pipeline (anchor/score heuristic)."""
+
+    heuristic = "heuristic"
+
+
 class ResolvedRules(BaseModel):
     spacing_mm: float = Field(alias="spacingMm", ge=0)
     edge_margin_mm: float = Field(alias="edgeMarginMm", ge=0)
     allow_rotation: bool = Field(alias="allowRotation")
     rotation_mode: RotationMode = Field(alias="rotationMode")
+    # Minimum gap between *material* boundaries for two instances of the same part.
+    # 0 = allow flush/touching edges (common-line style); spacingMm still applies between different parts.
+    same_part_gap_mm: float = Field(default=0.0, alias="samePartGapMm", ge=0)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -72,9 +81,22 @@ class NestingJobCreateRequest(BaseModel):
     batch_id: str = Field(alias="batchId")
     cutting_method: str = Field(alias="cuttingMethod")
     run_mode: RunMode = Field(alias="runMode")
+    nesting_engine: NestingEngine = Field(
+        default=NestingEngine.heuristic,
+        alias="nestingEngine",
+        description="Anchor/score nesting engine (ignored if omitted).",
+    )
     thickness_groups: list[ThicknessGroupIn] = Field(alias="thicknessGroups", default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("nesting_engine", mode="before")
+    @classmethod
+    def _legacy_svgnest_to_heuristic(cls, v: object) -> object:
+        """Removed server SVGnest pipeline; old clients may still send svgnest."""
+        if v == "svgnest":
+            return "heuristic"
+        return v
 
 
 class JobCreateResponse(BaseModel):
@@ -169,6 +191,11 @@ class DebugMetadataOut(BaseModel):
     large_gap_penalty_score: float = Field(alias="largeGapPenaltyScore", default=0.0)
     final_selected_candidate_score: float = Field(alias="finalSelectedCandidateScore", default=0.0)
     score_trace: list[str] = Field(alias="scoreTrace", default_factory=list)
+    candidate_debug_log: list[str] = Field(alias="candidateDebugLog", default_factory=list)
+    last_score_breakdown: str = Field(alias="lastScoreBreakdown", default="")
+    final_layout_quality_score: float = Field(alias="finalLayoutQualityScore", default=0.0)
+    thickness_runtime_ms: int = Field(alias="thicknessRuntimeMs", default=0)
+    rejected_reasons_summary: str = Field(alias="rejectedReasonsSummary", default="")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -189,6 +216,7 @@ class NestingJobResultResponse(BaseModel):
     job_id: str = Field(alias="jobId")
     batch_id: str = Field(alias="batchId")
     run_mode: RunMode = Field(alias="runMode")
+    nesting_engine: NestingEngine = Field(default=NestingEngine.heuristic, alias="nestingEngine")
     total_sheets: int = Field(alias="totalSheets")
     total_utilization: float = Field(alias="totalUtilization")
     total_waste_area: float = Field(alias="totalWasteArea")

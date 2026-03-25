@@ -33,6 +33,10 @@ class EngineMetrics:
     large_gap_penalty_score: float = 0.0
     final_selected_candidate_score: float = 0.0
     score_trace: list[str] = field(default_factory=list)
+    candidate_debug_log: list[str] = field(default_factory=list)
+    last_score_breakdown: str = ""
+    final_layout_quality_score: float = 0.0
+    thickness_runtime_ms: int = 0
 
     @property
     def simplification_ratio(self) -> float:

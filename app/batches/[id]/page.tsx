@@ -16,6 +16,7 @@ import {
   ScanSearch,
   Weight,
   Upload,
+  SquareDashedBottom,
 } from "lucide-react";
 import {
   Select,
@@ -151,6 +152,19 @@ export default function BatchDetailsPage() {
           Link clients from your global directory, import DXF and Excel per client for this batch,
           then continue to validation.
         </p>
+        <div className="mt-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="gap-2"
+            asChild
+          >
+            <Link href={`/batches/${batchId}/plate-builder`}>
+              <SquareDashedBottom className="h-4 w-4" />
+              Quick Plate Builder
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Batch totals — from last saved Parts Review table */}
@@ -421,22 +435,33 @@ function ClientExpandable({
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
               Import
             </h4>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              className="gap-2"
-              onClick={(e) => {
-                e.stopPropagation();
-                setImportWizardOpen(true);
-              }}
-            >
-              <Upload className="h-4 w-4" />
-              Import files
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="gap-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setImportWizardOpen(true);
+                }}
+              >
+                <Upload className="h-4 w-4" />
+                Import files
+              </Button>
+              <Button type="button" size="sm" variant="outline" asChild>
+                <Link
+                  href={`/batches/${batchId}/plate-builder?clientId=${client.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <SquareDashedBottom className="h-4 w-4 mr-2" />
+                  New plate
+                </Link>
+              </Button>
+            </div>
             <p className="text-[11px] text-muted-foreground mt-2 leading-snug">
               Multi-step import: DXF parse, optional Excel with column mapping, then review DXF
-              plates in the table below.
+              plates in the table below. Use New plate to sketch a simple plate without CAD.
             </p>
           </div>
 

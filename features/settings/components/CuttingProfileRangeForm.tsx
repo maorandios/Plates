@@ -25,14 +25,21 @@ import {
   parseLengthInputToMm,
 } from "@/lib/settings/unitSystem";
 import { nanoid } from "@/lib/utils/nanoid";
-import { validateCuttingProfileRangesForMethod } from "@/lib/settings/cuttingProfiles";
+import {
+  MIN_PLATE_THICKNESS_MM,
+  validateCuttingProfileRangesForMethod,
+} from "@/lib/settings/cuttingProfiles";
 import type { UnitSystem } from "@/types/settings";
 import type {
   CuttingMethod,
   CuttingProfileRange,
   ProfileRotationMode,
 } from "@/types/production";
-import { PROFILE_ROTATION_MODE_LABELS } from "@/types/production";
+import {
+  DEFAULT_CUTTING_PROFILE_RANGES,
+  DEFAULT_THICKNESS_BAND_MAX_MM,
+  PROFILE_ROTATION_MODE_LABELS,
+} from "@/types/production";
 
 interface CuttingProfileRangeFormProps {
   open: boolean;
@@ -51,19 +58,29 @@ function nextSortOrder(siblingRanges: CuttingProfileRange[]): number {
   return Math.max(...siblingRanges.map((r) => r.sortOrder)) + 1;
 }
 
-function emptyDraft(method: CuttingMethod, sortOrder: number): CuttingProfileRange {
+function emptyDraft(
+  method: CuttingMethod,
+  sortOrder: number,
+  siblings: CuttingProfileRange[]
+): CuttingProfileRange {
+  const seed = DEFAULT_CUTTING_PROFILE_RANGES.filter((r) => r.method === method).sort(
+    (a, b) => a.sortOrder - b.sortOrder
+  )[0];
   const now = new Date().toISOString();
+  const maxBand = seed?.maxThicknessMm ?? DEFAULT_THICKNESS_BAND_MAX_MM;
+  const isFirst = siblings.length === 0;
+  /** First row: 1–100 mm. Additional row: 100 mm+ (touching band, no overlap). */
   return {
     id: nanoid(),
     method,
-    minThicknessMm: 0,
-    maxThicknessMm: 10,
-    defaultSpacingMm: 4,
-    defaultEdgeMarginMm: 8,
+    minThicknessMm: isFirst ? MIN_PLATE_THICKNESS_MM : maxBand,
+    maxThicknessMm: isFirst ? maxBand : null,
+    defaultSpacingMm: seed?.defaultSpacingMm ?? 4,
+    defaultEdgeMarginMm: seed?.defaultEdgeMarginMm ?? 8,
     allowRotation: true,
-    rotationMode: "ninetyOnly",
+    rotationMode: seed?.rotationMode ?? "ninetyOnly",
     defaultMarkPartName: true,
-    defaultIncludeClientCode: false,
+    defaultIncludeClientCode: seed?.defaultIncludeClientCode ?? false,
     sortOrder,
     updatedAt: now,
   };
@@ -79,7 +96,7 @@ export function CuttingProfileRangeForm({
   onSaved,
 }: CuttingProfileRangeFormProps) {
   const [draft, setDraft] = useState<CuttingProfileRange>(() =>
-    initial ?? emptyDraft(method, siblingRanges.length)
+    initial ?? emptyDraft(method, nextSortOrder(siblingRanges), siblingRanges)
   );
   const [minStr, setMinStr] = useState("");
   const [maxStr, setMaxStr] = useState("");
@@ -88,10 +105,12 @@ export function CuttingProfileRangeForm({
   const [edgeStr, setEdgeStr] = useState("");
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
+  const siblingKey = siblingRanges.map((r) => r.id).join("|");
+
   useEffect(() => {
     if (!open) return;
     const base =
-      initial ?? emptyDraft(method, nextSortOrder(siblingRanges));
+      initial ?? emptyDraft(method, nextSortOrder(siblingRanges), siblingRanges);
     setDraft(base);
     setMinStr(formatLengthValueOnly(base.minThicknessMm, unitSystem));
     setMaxStr(
@@ -103,13 +122,19 @@ export function CuttingProfileRangeForm({
     setSpacingStr(formatLengthValueOnly(base.defaultSpacingMm, unitSystem));
     setEdgeStr(formatLengthValueOnly(base.defaultEdgeMarginMm, unitSystem));
     setFormErrors([]);
-  }, [open, initial?.id, method, unitSystem, siblingRanges.length]);
+  }, [open, initial?.id, method, unitSystem, siblingKey]);
 
   function handleSubmit() {
     const errors: string[] = [];
     const minMm = parseLengthInputToMm(minStr, unitSystem);
-    if (minMm == null || minMm < 0 || !Number.isFinite(minMm)) {
-      errors.push("Min thickness must be a number ≥ 0.");
+    if (
+      minMm == null ||
+      !Number.isFinite(minMm) ||
+      minMm < MIN_PLATE_THICKNESS_MM
+    ) {
+      errors.push(
+        `Min thickness must be at least ${MIN_PLATE_THICKNESS_MM} mm (sheet stock does not use 0 mm).`
+      );
     }
     let maxMm: number | null = null;
     if (!noMax) {
@@ -143,6 +168,8 @@ export function CuttingProfileRangeForm({
       maxThicknessMm: noMax ? null : maxMm,
       defaultSpacingMm: sp!,
       defaultEdgeMarginMm: ed!,
+      allowRotation: true,
+      defaultMarkPartName: true,
       updatedAt: new Date().toISOString(),
     };
 
@@ -196,6 +223,9 @@ export function CuttingProfileRangeForm({
               />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Minimum is {MIN_PLATE_THICKNESS_MM} {lenUnit} — plate stock does not use 0 thickness.
+          </p>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
@@ -228,20 +258,13 @@ export function CuttingProfileRangeForm({
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/20 px-3 py-2">
-            <Label htmlFor="cp-rot">Allow rotation</Label>
-            <Switch
-              id="cp-rot"
-              checked={draft.allowRotation}
-              onCheckedChange={(v) => setDraft((d) => ({ ...d, allowRotation: v }))}
-            />
-          </div>
-
           <div className="space-y-2">
-            <Label>Rotation mode</Label>
+            <Label>Rotation</Label>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Rotation is always allowed for nesting. Choose how parts may rotate.
+            </p>
             <Select
               value={draft.rotationMode}
-              disabled={!draft.allowRotation}
               onValueChange={(v) =>
                 setDraft((d) => ({ ...d, rotationMode: v as ProfileRotationMode }))
               }
@@ -260,19 +283,20 @@ export function CuttingProfileRangeForm({
             </Select>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/20 px-3 py-2">
-            <Label htmlFor="cp-mark">Mark part name</Label>
-            <Switch
-              id="cp-mark"
-              checked={draft.defaultMarkPartName}
-              onCheckedChange={(v) =>
-                setDraft((d) => ({ ...d, defaultMarkPartName: v }))
-              }
-            />
+          <div className="rounded-lg border border-border/80 bg-muted/20 px-3 py-2 space-y-1">
+            <Label className="text-foreground">Marking</Label>
+            <p className="text-sm text-muted-foreground">
+              Part number is always included on nested parts.
+            </p>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/20 px-3 py-2">
-            <Label htmlFor="cp-client">Include client code</Label>
+            <div className="space-y-0.5 pr-2">
+              <Label htmlFor="cp-client">Include client name</Label>
+              <p className="text-xs text-muted-foreground font-normal">
+                Optional — adds the client to marking text when enabled.
+              </p>
+            </div>
             <Switch
               id="cp-client"
               checked={draft.defaultIncludeClientCode}

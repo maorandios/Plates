@@ -644,7 +644,21 @@ function PartsDataRow({
         </span>
       </TableCell>
       <TableCell className="font-medium text-foreground">
-        {part.partName || <span className="text-muted-foreground italic">—</span>}
+        <div className="inline-flex flex-wrap items-center gap-2">
+          <span>
+            {part.partName || (
+              <span className="text-muted-foreground italic">—</span>
+            )}
+          </span>
+          {part.partSource === "built" && (
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1.5 py-0 font-normal"
+            >
+              Built
+            </Badge>
+          )}
+        </div>
       </TableCell>
       <TableCell className="text-center text-sm tabular-nums">
         {part.quantity ?? <span className="text-muted-foreground">—</span>}

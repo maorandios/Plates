@@ -42,22 +42,6 @@ export function CuttingMethodProfileSection({
     onRangesChange();
   }
 
-  function handleMoveUp(r: CuttingProfileRange) {
-    const idx = sorted.findIndex((x) => x.id === r.id);
-    if (idx <= 0) return;
-    const next = [...sorted];
-    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-    persist(next);
-  }
-
-  function handleMoveDown(r: CuttingProfileRange) {
-    const idx = sorted.findIndex((x) => x.id === r.id);
-    if (idx < 0 || idx >= sorted.length - 1) return;
-    const next = [...sorted];
-    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-    persist(next);
-  }
-
   function handleDelete(r: CuttingProfileRange) {
     if (!window.confirm("Delete this thickness range rule?")) return;
     persist(sorted.filter((x) => x.id !== r.id));
@@ -87,8 +71,6 @@ export function CuttingMethodProfileSection({
           unitSystem={unitSystem}
           onEdit={openEdit}
           onDelete={handleDelete}
-          onMoveUp={handleMoveUp}
-          onMoveDown={handleMoveDown}
         />
         <Button type="button" size="sm" variant="secondary" className="gap-1.5" onClick={openAdd}>
           <Plus className="h-4 w-4" />

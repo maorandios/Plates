@@ -87,19 +87,53 @@ function seedRange(
   };
 }
 
-/** Built-in starter bands when no user data exists (mm). */
+/** Default max (mm) for the starter thickness band (1 mm … this value). User can add 100+ mm etc. later. */
+export const DEFAULT_THICKNESS_BAND_MAX_MM = 100;
+
+/**
+ * Built-in starter bands when no user data exists (mm).
+ * One band per cutting method: 1–100 mm; users can add more rows (e.g. 100 mm and up).
+ */
 export const DEFAULT_CUTTING_PROFILE_RANGES: CuttingProfileRange[] = [
-  seedRange("seed-laser-0", "laser", 0, 0, 6, 2, 5, true, "ninetyOnly", true, true),
-  seedRange("seed-laser-1", "laser", 1, 6, 12, 2.5, 6, true, "ninetyOnly", true, true),
-  seedRange("seed-laser-2", "laser", 2, 12, 25, 3, 8, true, "ninetyOnly", true, true),
-  seedRange("seed-laser-3", "laser", 3, 25, null, 4, 10, true, "free", true, false),
-  seedRange("seed-plasma-0", "plasma", 0, 0, 10, 4, 8, true, "ninetyOnly", true, false),
-  seedRange("seed-plasma-1", "plasma", 1, 10, 20, 5, 10, true, "ninetyOnly", true, false),
-  seedRange("seed-plasma-2", "plasma", 2, 20, 40, 6, 12, true, "ninetyOnly", true, false),
-  seedRange("seed-plasma-3", "plasma", 3, 40, null, 8, 15, true, "free", true, false),
-  seedRange("seed-oxy-0", "oxy_fuel", 0, 10, 25, 8, 16, true, "free", true, false),
-  seedRange("seed-oxy-1", "oxy_fuel", 1, 25, 50, 10, 18, true, "free", true, false),
-  seedRange("seed-oxy-2", "oxy_fuel", 2, 50, null, 12, 22, true, "free", true, false),
+  seedRange(
+    "seed-laser-0",
+    "laser",
+    0,
+    1,
+    DEFAULT_THICKNESS_BAND_MAX_MM,
+    2,
+    5,
+    true,
+    "ninetyOnly",
+    true,
+    false
+  ),
+  seedRange(
+    "seed-plasma-0",
+    "plasma",
+    0,
+    1,
+    DEFAULT_THICKNESS_BAND_MAX_MM,
+    4,
+    8,
+    true,
+    "ninetyOnly",
+    true,
+    false
+  ),
+  seedRange(
+    "seed-oxy-0",
+    "oxy_fuel",
+    0,
+    1,
+    DEFAULT_THICKNESS_BAND_MAX_MM,
+    8,
+    16,
+    true,
+    "free",
+    true,
+    false
+  ),
 ];
 
 function firstRangeForMethod(m: CuttingMethod): CuttingProfileRange | undefined {

@@ -59,6 +59,10 @@ export interface UploadedFile {
   batchId: string;
   name: string;
   type: FileType;
+  /** Defaults to upload when omitted — Quick Plate Builder sets `built`. */
+  sourceKind?: "upload" | "built";
+  /** JSON string of parametric plate spec for reopening built plates. */
+  builtPlateSpec?: string;
   sizeBytes: number;
   parseStatus: FileParseStatus;
   parseError?: string;
@@ -215,6 +219,10 @@ export interface Part {
   geometryContourSummary?: string;
   /** Combined cleanup / validation messages for tooltips */
   geometryPrepMessages?: string[];
+  /** DXF from Quick Plate Builder vs file upload */
+  partSource?: "upload" | "built";
+  /** Serialized plate builder spec JSON (Quick Plate Builder). */
+  builtPlateSpec?: string;
 }
 
 // ─── Excel Column Mapping ─────────────────────────────────────────────────────

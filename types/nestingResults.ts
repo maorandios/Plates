@@ -13,7 +13,13 @@ export type NestingPlacementModeUsed =
 /** Dev / trace metadata for one thickness group within a nesting run. */
 export interface NestingEngineDebugMeta {
   /** Primary engine used for this thickness (shelf only if SVGNest failed). */
-  primaryAlgorithm: "svgnest-polygon" | "shelf-fallback";
+  primaryAlgorithm:
+    | "svgnest-polygon"
+    | "shelf-fallback"
+    | "heuristic-anchor"
+    | "svgnest-nfp-ga";
+  /** Server pipeline that produced the run (when known). */
+  serverNestingEngine?: "heuristic" | "svgnest";
   /** True when polygon / NFP nesting (SVGNest) produced the placements. */
   fullPolygonNesting: boolean;
   /** Sum of candidate runs across all single-sheet packs in this thickness. */
@@ -139,6 +145,8 @@ export interface NestingRun {
   id: string;
   batchId: string;
   createdAt: string;
+  /** Present when server reports engine; heuristic = anchor/score, svgnest = NFP+GA. */
+  nestingEngine?: "heuristic" | "svgnest";
   totalSheets: number;
   totalUtilizationPercent: number;
   /** Aggregate waste area mm² */

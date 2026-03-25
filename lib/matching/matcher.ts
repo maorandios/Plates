@@ -191,6 +191,11 @@ export function buildUnifiedParts({
           }
         : {};
 
+      const partSource: "upload" | "built" =
+        dxfFile?.sourceKind === "built" ? "built" : "upload";
+      const builtPlateSpec =
+        dxfFile?.sourceKind === "built" ? dxfFile.builtPlateSpec : undefined;
+
       if (bestRow && matchStatus !== "unmatched") {
         usedExcelRowIds.add(bestRow.id);
         usedDxfFileIds.add(dxf.fileId);
@@ -217,6 +222,8 @@ export function buildUnifiedParts({
           excelRowId: bestRow.id,
           excelStatus: "present",
           matchStatus,
+          partSource,
+          builtPlateSpec,
           ...geomFields,
         });
       } else {
@@ -235,6 +242,8 @@ export function buildUnifiedParts({
           dxfStatus: "present",
           excelStatus: "missing",
           matchStatus: "unmatched",
+          partSource,
+          builtPlateSpec,
           ...geomFields,
         });
       }

@@ -23,9 +23,14 @@ function netAreaMm2(
   return Math.max(0, outerArea - holesArea);
 }
 
-function mapDebugMeta(m: ServerNestingRunResult["debugMetadata"]): NestingEngineDebugMeta {
+function mapDebugMeta(
+  m: ServerNestingRunResult["debugMetadata"],
+  nestingEngine: ServerNestingRunResult["nestingEngine"] | undefined
+): NestingEngineDebugMeta {
+  const isSvgnest = nestingEngine === "svgnest";
   return {
-    primaryAlgorithm: "svgnest-polygon",
+    primaryAlgorithm: isSvgnest ? "svgnest-nfp-ga" : "heuristic-anchor",
+    serverNestingEngine: nestingEngine ?? "heuristic",
     fullPolygonNesting: true,
     totalCandidateRuns: m.candidateAttempts,
     spacingMmApplied: 0,
@@ -34,7 +39,8 @@ function mapDebugMeta(m: ServerNestingRunResult["debugMetadata"]): NestingEngine
     allowRotationApplied: true,
     shelfFallbackCount: m.fallbackCount,
     shelfFallbackReasons: m.earlyStopReason ? [m.earlyStopReason] : [],
-    placementModeUsed: "polygon-aware",
+    lastWinningCandidateLabel: m.orderingStrategyUsed,
+    placementModeUsed: isSvgnest ? "svgnest-polygon" : "polygon-aware",
     polygonPartsCount: m.polygonPartsCount,
     bboxFallbackPartsCount: m.fallbackCount,
     nestingRunMode: "quick" as NestingRunMode,
@@ -42,10 +48,12 @@ function mapDebugMeta(m: ServerNestingRunResult["debugMetadata"]): NestingEngine
     nestingSimplifyOriginalPointsTotal: m.simplificationOriginalPoints,
     nestingSimplifySimplifiedPointsTotal: m.simplificationSimplifiedPoints,
     nestingSimplifyRatio: m.simplificationRatio,
+    nestingEarlyStopReasonLast: m.earlyStopReason,
   };
 }
 
 export function mapServerResultToNestingRun(result: ServerNestingRunResult): NestingRun {
+  const engine = result.nestingEngine ?? "heuristic";
   const thicknessResults = result.thicknessResults.map((tr) => ({
     thicknessMm: tr.thicknessMm,
     stockSheetsUsed: tr.sheetCount,
@@ -101,13 +109,14 @@ export function mapServerResultToNestingRun(result: ServerNestingRunResult): Nes
     usedAreaMm2: tr.generatedSheets.reduce((sum, g) => sum + g.usedArea, 0),
     warnings: [],
     errors: [],
-    engineDebug: mapDebugMeta(tr.debugMetadata),
+    engineDebug: mapDebugMeta(tr.debugMetadata, engine),
   }));
 
   return {
     id: result.jobId,
     batchId: result.batchId,
     createdAt: new Date().toISOString(),
+    nestingEngine: engine,
     totalSheets: result.totalSheets,
     totalUtilizationPercent: result.totalUtilization,
     totalWasteAreaMm2: result.totalWasteArea,

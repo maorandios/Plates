@@ -6,6 +6,7 @@ import type {
 import {
   CUTTING_METHOD_OPTIONS,
   DEFAULT_CUTTING_PROFILE_RANGES,
+  DEFAULT_THICKNESS_BAND_MAX_MM,
 } from "@/types/production";
 
 const STORAGE_KEY_V2 = "plate_cutting_profile_ranges_v2";
@@ -37,9 +38,16 @@ function dispatchChange(): void {
   }
 }
 
+/** Physical sheet stock: thickness rules use 1 mm minimum (no 0 mm plate). */
+export const MIN_PLATE_THICKNESS_MM = 1;
+
 function clampNonNegative(n: number): number {
   if (!Number.isFinite(n) || n < 0) return 0;
   return n;
+}
+
+function clampMinPlateThicknessMm(n: number): number {
+  return Math.max(MIN_PLATE_THICKNESS_MM, clampNonNegative(n));
 }
 
 export function normalizeProfileRotationMode(v: unknown): ProfileRotationMode {
@@ -68,8 +76,8 @@ function normalizeRange(raw: Partial<CuttingProfileRange> & { id: string; method
   return {
     id: raw.id,
     method: raw.method,
-    minThicknessMm: clampNonNegative(
-      Number(raw.minThicknessMm ?? base?.minThicknessMm ?? 0)
+    minThicknessMm: clampMinPlateThicknessMm(
+      Number(raw.minThicknessMm ?? base?.minThicknessMm ?? MIN_PLATE_THICKNESS_MM)
     ),
     maxThicknessMm,
     defaultSpacingMm: clampNonNegative(
@@ -78,17 +86,13 @@ function normalizeRange(raw: Partial<CuttingProfileRange> & { id: string; method
     defaultEdgeMarginMm: clampNonNegative(
       Number(raw.defaultEdgeMarginMm ?? fallback.defaultEdgeMarginMm)
     ),
-    allowRotation:
-      typeof raw.allowRotation === "boolean"
-        ? raw.allowRotation
-        : (fallback.allowRotation ?? true),
+    // Rotation is always enabled; only the mode (90° vs free) is stored.
+    allowRotation: true,
     rotationMode: normalizeProfileRotationMode(
       raw.rotationMode ?? fallback.rotationMode
     ),
-    defaultMarkPartName:
-      typeof raw.defaultMarkPartName === "boolean"
-        ? raw.defaultMarkPartName
-        : (fallback.defaultMarkPartName ?? true),
+    // Part number on nested parts is always on; field kept for compatibility.
+    defaultMarkPartName: true,
     defaultIncludeClientCode:
       typeof raw.defaultIncludeClientCode === "boolean"
         ? raw.defaultIncludeClientCode
@@ -112,8 +116,8 @@ function migrateLegacy(legacy: LegacyStored): CuttingProfileRange[] {
     out.push({
       id: `migrated-${method}-${t++}`,
       method,
-      minThicknessMm: 0,
-      maxThicknessMm: null,
+      minThicknessMm: MIN_PLATE_THICKNESS_MM,
+      maxThicknessMm: DEFAULT_THICKNESS_BAND_MAX_MM,
       defaultSpacingMm: clampNonNegative(p.defaultSpacingMm),
       defaultEdgeMarginMm: clampNonNegative(p.defaultEdgeMarginMm ?? 5),
       allowRotation: p.allowRotation !== false,
@@ -280,8 +284,13 @@ export function validateCuttingProfileRangesForMethod(
   const errors: string[] = [];
 
   for (const r of methodRanges) {
-    if (!Number.isFinite(r.minThicknessMm) || r.minThicknessMm < 0) {
-      errors.push("Min thickness must be a number ≥ 0.");
+    if (
+      !Number.isFinite(r.minThicknessMm) ||
+      r.minThicknessMm < MIN_PLATE_THICKNESS_MM
+    ) {
+      errors.push(
+        `Min thickness must be at least ${MIN_PLATE_THICKNESS_MM} mm (sheet stock does not use 0 mm).`
+      );
       break;
     }
     if (
@@ -324,9 +333,18 @@ export function validateCuttingProfileRangesForMethod(
           b.maxThicknessMm
         )
       ) {
-        errors.push(
-          "Thickness ranges cannot overlap. Touching bands are OK (e.g. 0–10 mm and 10–20 mm)."
-        );
+        const aOpen = a.maxThicknessMm === null;
+        const bOpen = b.maxThicknessMm === null;
+        if (aOpen || bOpen) {
+          errors.push(
+            "This overlaps another rule. A band with no upper limit already covers all plate thicknesses. " +
+              "Edit or remove that rule first, or set a max thickness on it, then add narrower bands (for example 1–50 mm and 51+ mm)."
+          );
+        } else {
+          errors.push(
+            "Thickness ranges cannot overlap. Touching bands are OK (e.g. 1–10 mm and 10–20 mm)."
+          );
+        }
         break outer;
       }
     }

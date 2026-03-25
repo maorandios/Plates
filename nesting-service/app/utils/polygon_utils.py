@@ -121,10 +121,11 @@ def holes_to_points(poly: Polygon) -> list[list[list[float]]]:
 def safe_rotation_set(allow_rotation: bool, mode: str, run_mode: str) -> list[int]:
     if not allow_rotation or mode == "none":
         return [0]
-    if mode == "ninetyOnly":
-        return [0, 90, 180, 270]
+    # Quick runs: only 0°/90° for predictable fast runtime on simple jobs.
     if run_mode == "quick":
         return [0, 90]
+    if mode == "ninetyOnly":
+        return [0, 90, 180, 270]
     # Free mode in optimize: bounded 15-degree search, still finite.
     return [i * 15 for i in range(24)]
 

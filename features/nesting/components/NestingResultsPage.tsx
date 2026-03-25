@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { PageContainer } from "@/components/shared/PageContainer";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,6 +20,11 @@ import {
 import { resolveNestingRunForBatch } from "@/lib/nesting/nestingResultsUtils";
 import type { NestingRun } from "@/types";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
+import {
+  formatNestingEngineDescription,
+  formatNestingEngineShort,
+  formatNestingEngineTitle,
+} from "@/lib/nesting/nestingEngineLabels";
 import { ThicknessResultsSection } from "./ThicknessResultsSection";
 import {
   Table,
@@ -103,12 +109,27 @@ export function NestingResultsPage() {
         <header className="space-y-2 border-b border-border pb-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-xl font-semibold text-foreground tracking-tight">
-                Nesting results
-              </h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl font-semibold text-foreground tracking-tight">
+                  Nesting results
+                </h1>
+                {run ? (
+                  <Badge
+                    variant={run.nestingEngine === "svgnest" ? "default" : "secondary"}
+                    title={formatNestingEngineDescription(run.nestingEngine)}
+                  >
+                    {formatNestingEngineTitle(run.nestingEngine)}
+                  </Badge>
+                ) : null}
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {batch.name} — verify layouts before export or adjustments.
               </p>
+              {run ? (
+                <p className="text-xs text-muted-foreground mt-2 max-w-2xl leading-relaxed">
+                  {formatNestingEngineDescription(run.nestingEngine)}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline" size="sm">
@@ -146,8 +167,9 @@ export function NestingResultsPage() {
                   )
                   .map((r) => (
                     <option key={r.id} value={r.id}>
-                      {new Date(r.createdAt).toLocaleString()} · {r.totalSheets}{" "}
-                      sheets · {r.placedPartCount} placed
+                      {new Date(r.createdAt).toLocaleString()} ·{" "}
+                      {formatNestingEngineShort(r.nestingEngine)} · {r.totalSheets} sheets ·{" "}
+                      {r.placedPartCount} placed
                     </option>
                   ))}
               </select>
@@ -176,6 +198,10 @@ export function NestingResultsPage() {
                 <StatCard
                   title="Sheets used"
                   value={String(run.totalSheets)}
+                />
+                <StatCard
+                  title="Placement engine"
+                  value={formatNestingEngineShort(run.nestingEngine)}
                 />
                 <StatCard
                   title="Utilization"
@@ -293,7 +319,8 @@ export function NestingResultsPage() {
             </section>
 
             <p className="text-xs text-muted-foreground">
-              Run {run.id} · {new Date(run.createdAt).toLocaleString()}
+              Run {run.id} · {formatNestingEngineShort(run.nestingEngine)} ·{" "}
+              {new Date(run.createdAt).toLocaleString()}
             </p>
           </>
         )}

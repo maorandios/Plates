@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections import Counter
 from dataclasses import dataclass
 from time import perf_counter
@@ -28,6 +29,25 @@ from app.utils.debug_metrics import EngineMetrics
 from app.utils.polygon_utils import safe_rotation_set
 
 
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        v = float(str(raw).strip())
+        return v if v > 0 else default
+    except ValueError:
+        return default
+
+
+# Whole-job wall clock (all thickness groups). Override: PLATE_NESTING_JOB_MAX_WALL_S
+# Per-thickness ceiling (each group also cannot exceed remaining job budget). Override:
+# PLATE_NESTING_MAX_RUNTIME_S_PER_THICKNESS
+# Defaults are high enough for large batches; placement + compaction + same-sheet retries are CPU-heavy.
+JOB_WALL_CLOCK_MAX_S = _env_float("PLATE_NESTING_JOB_MAX_WALL_S", 600.0)
+_DEFAULT_PER_THICKNESS_S = _env_float("PLATE_NESTING_MAX_RUNTIME_S_PER_THICKNESS", 600.0)
+
+
 @dataclass(slots=True)
 class ModeConfig:
     simplify_tolerance_mm: float
@@ -38,13 +58,13 @@ class ModeConfig:
 def mode_config(run_mode: str) -> ModeConfig:
     if run_mode == "optimize":
         return ModeConfig(
-            simplify_tolerance_mm=0.12,
-            max_runtime_s_per_thickness=120.0,
+            simplify_tolerance_mm=0.16,
+            max_runtime_s_per_thickness=_DEFAULT_PER_THICKNESS_S,
             max_sheets_per_thickness=300,
         )
     return ModeConfig(
-        simplify_tolerance_mm=0.35,
-        max_runtime_s_per_thickness=8.0,
+        simplify_tolerance_mm=0.38,
+        max_runtime_s_per_thickness=_DEFAULT_PER_THICKNESS_S,
         max_sheets_per_thickness=80,
     )
 
@@ -67,6 +87,14 @@ class NestingService:
         global_metrics = EngineMetrics()
 
         for tg in payload.thickness_groups:
+            elapsed_job = perf_counter() - run_start
+            if elapsed_job >= JOB_WALL_CLOCK_MAX_S:
+                all_warnings.append(
+                    f"Nesting stopped: total wall-clock budget ({JOB_WALL_CLOCK_MAX_S:.0f}s) reached before all thickness groups."
+                )
+                break
+            remaining_job_budget = max(0.5, JOB_WALL_CLOCK_MAX_S - elapsed_job)
+
             t_start = perf_counter()
             t_metrics = EngineMetrics()
             resolved = tg.resolved_rules
@@ -87,11 +115,13 @@ class NestingService:
                 stock_sheets=tg.stock_sheets,
                 spacing_mm=resolved.spacing_mm,
                 edge_margin_mm=resolved.edge_margin_mm,
+                same_part_gap_mm=resolved.same_part_gap_mm,
                 allow_rotation=resolved.allow_rotation,
                 rotation_mode=resolved.rotation_mode.value,
                 run_mode=payload.run_mode.value,
                 run_cfg=run_cfg,
                 metrics=t_metrics,
+                budget_s=remaining_job_budget,
             )
             all_thickness_results.append(thickness_result)
             global_metrics.candidate_attempts += t_metrics.candidate_attempts
@@ -129,6 +159,13 @@ class NestingService:
             )
             global_metrics.score_trace.extend(t_metrics.score_trace[:20])
             global_metrics.overlap_pairs.extend(t_metrics.overlap_pairs[:20])
+            global_metrics.candidate_debug_log.extend(t_metrics.candidate_debug_log[:80])
+            if t_metrics.last_score_breakdown:
+                global_metrics.last_score_breakdown = t_metrics.last_score_breakdown
+            global_metrics.final_layout_quality_score = max(
+                global_metrics.final_layout_quality_score, t_metrics.final_layout_quality_score
+            )
+            global_metrics.thickness_runtime_ms += t_metrics.thickness_runtime_ms
             global_metrics.sheet_valid = global_metrics.sheet_valid and t_metrics.sheet_valid
             if t_metrics.ordering_strategy_used:
                 if global_metrics.ordering_strategy_used:
@@ -157,6 +194,7 @@ class NestingService:
             jobId=job_id,
             batchId=payload.batch_id,
             runMode=payload.run_mode,
+            nestingEngine=payload.nesting_engine,
             totalSheets=total_sheets,
             totalUtilization=round(total_util * 100, 3),
             totalWasteArea=round(total_waste, 3),
@@ -176,16 +214,23 @@ class NestingService:
         stock_sheets,
         spacing_mm: float,
         edge_margin_mm: float,
+        same_part_gap_mm: float,
         allow_rotation: bool,
         rotation_mode: str,
         run_mode: str,
         run_cfg: ModeConfig,
         metrics: EngineMetrics,
+        budget_s: float | None = None,
     ) -> ThicknessResultOut:
         by_sheet = [s for s in stock_sheets if s.enabled]
         remaining = expanded.instances[:]
         generated: list[GeneratedSheetOut] = []
         start = perf_counter()
+        time_cap = (
+            min(run_cfg.max_runtime_s_per_thickness, budget_s)
+            if budget_s is not None
+            else run_cfg.max_runtime_s_per_thickness
+        )
         rotations = safe_rotation_set(allow_rotation, rotation_mode, run_mode)
         strategies_used: set[str] = set()
         gap_scores: list[float] = []
@@ -201,9 +246,11 @@ class NestingService:
             )
 
         stock_iter = 0
+        stopped_for_time_budget = False
         while remaining and stock_iter < len(by_sheet) and len(generated) < run_cfg.max_sheets_per_thickness:
-            if (perf_counter() - start) > run_cfg.max_runtime_s_per_thickness:
+            if (perf_counter() - start) > time_cap:
                 metrics.early_stop_reason = "thickness_runtime_cap"
+                stopped_for_time_budget = True
                 break
             stock = by_sheet[stock_iter]
             stock_iter += 1
@@ -218,11 +265,15 @@ class NestingService:
                 bin_poly=bin_poly,
                 run_mode=run_mode,
                 metrics=metrics,
+                same_part_gap_mm=same_part_gap_mm,
             )
             strategies_used.add(run.strategy_name)
             metrics.candidate_points_generated += run.candidate_points_generated
             metrics.final_selected_candidate_score = max(
                 metrics.final_selected_candidate_score, run.quality_score
+            )
+            metrics.final_layout_quality_score = max(
+                metrics.final_layout_quality_score, run.quality_score
             )
             if len(metrics.score_trace) < 120:
                 metrics.score_trace.append(
@@ -234,9 +285,13 @@ class NestingService:
                 # Could not place anything on this stock. Move on to next sheet.
                 continue
             self.compaction.compact(
-                placements, bin_poly, metrics, passes=1 if run_mode == "quick" else 3
+                placements,
+                bin_poly,
+                metrics,
+                same_part_gap_mm=same_part_gap_mm,
+                passes=3 if run_mode == "quick" else 4,
             )
-            if run_mode != "quick" or len(unplaced) <= 16:
+            if unplaced:
                 placements, unplaced = self.cavity_fill.fill(
                     placements,
                     unplaced,
@@ -244,11 +299,84 @@ class NestingService:
                     bin_poly=bin_poly,
                     metrics=metrics,
                     run_mode=run_mode,
+                    same_part_gap_mm=same_part_gap_mm,
                 )
             self.compaction.compact(
-                placements, bin_poly, metrics, passes=1 if run_mode == "quick" else 2
+                placements,
+                bin_poly,
+                metrics,
+                same_part_gap_mm=same_part_gap_mm,
+                passes=3 if run_mode == "quick" else 4,
             )
-            placements = self._sanitize_and_validate_sheet(placements, bin_poly, metrics)
+            placements = self._sanitize_and_validate_sheet(
+                placements, bin_poly, metrics, same_part_gap_mm
+            )
+
+            # Keep filling this sheet before the next stock line: alternate placement passes
+            # that respect existing parts with compaction + cavity fill (greedy single pass
+            # often leaves large voids while instances remain unplaced).
+            _sat_round = 0
+            _max_sat = 6
+            while unplaced and _sat_round < _max_sat:
+                if (perf_counter() - start) > time_cap:
+                    break
+                _prev_placed = len(placements)
+                _prev_unplaced = len(unplaced)
+                run_sat = self.placement.run_multi_pass(
+                    parts=unplaced,
+                    rotations=rotations,
+                    bin_poly=bin_poly,
+                    run_mode=run_mode,
+                    metrics=metrics,
+                    same_part_gap_mm=same_part_gap_mm,
+                    initial_placements=placements,
+                )
+                if len(run_sat.placements) <= _prev_placed and len(run_sat.unplaced) >= _prev_unplaced:
+                    break
+                _sat_round += 1
+                strategies_used.add(f"{run_sat.strategy_name}|sat{_sat_round}")
+                metrics.candidate_points_generated += run_sat.candidate_points_generated
+                metrics.final_selected_candidate_score = max(
+                    metrics.final_selected_candidate_score, run_sat.quality_score
+                )
+                metrics.final_layout_quality_score = max(
+                    metrics.final_layout_quality_score, run_sat.quality_score
+                )
+                if len(metrics.score_trace) < 120:
+                    metrics.score_trace.append(
+                        f"same_sheet_sat={_sat_round} strategy={run_sat.strategy_name} "
+                        f"placed={len(run_sat.placements)} unplaced={len(run_sat.unplaced)}"
+                    )
+                placements = run_sat.placements
+                unplaced = run_sat.unplaced
+                self.compaction.compact(
+                    placements,
+                    bin_poly,
+                    metrics,
+                    same_part_gap_mm=same_part_gap_mm,
+                    passes=3 if run_mode == "quick" else 4,
+                )
+                if unplaced:
+                    placements, unplaced = self.cavity_fill.fill(
+                        placements,
+                        unplaced,
+                        rotations=rotations,
+                        bin_poly=bin_poly,
+                        metrics=metrics,
+                        run_mode=run_mode,
+                        same_part_gap_mm=same_part_gap_mm,
+                    )
+                self.compaction.compact(
+                    placements,
+                    bin_poly,
+                    metrics,
+                    same_part_gap_mm=same_part_gap_mm,
+                    passes=3 if run_mode == "quick" else 4,
+                )
+                placements = self._sanitize_and_validate_sheet(
+                    placements, bin_poly, metrics, same_part_gap_mm
+                )
+
             placed_polys = [p.footprint_world for p in placements]
             env_w, env_h = self.placement.free_space.envelope_size(placed_polys)
             metrics.final_envelope_width_mm = max(metrics.final_envelope_width_mm, env_w)
@@ -268,17 +396,26 @@ class NestingService:
             )
 
         # If still remaining and out of sheets, mark as unplaced.
-        unplaced_reason = (
-            "Quick-mode runtime budget reached before all parts were nested."
-            if metrics.early_stop_reason == "thickness_runtime_cap"
-            else "No valid collision-free placement remained on the configured stock."
-        )
+        # Use a dedicated flag: placement.run_multi_pass may set early_stop_reason to
+        # multi_pass_no_improvement and must not be confused with the thickness time cap.
+        if stopped_for_time_budget:
+            unplaced_reason = (
+                f"Thickness run stopped: wall-clock limit hit (effective cap this step ~{time_cap:.0f}s; "
+                f"per-thickness max {_DEFAULT_PER_THICKNESS_S:.0f}s; whole job max {JOB_WALL_CLOCK_MAX_S:.0f}s). "
+                "The effective cap is the minimum of those limits and the time still left for this job "
+                "(earlier thickness groups or geometry prep reduce what is left). "
+                "Increase PLATE_NESTING_JOB_MAX_WALL_S and/or PLATE_NESTING_MAX_RUNTIME_S_PER_THICKNESS, "
+                "or split very large batches."
+            )
+        else:
+            unplaced_reason = "No valid collision-free placement remained on the configured stock."
         unplaced_summary = self._unplaced_summary(remaining, unplaced_reason)
         used_area = sum(s.used_area for s in generated)
         waste_area = sum(s.waste_area for s in generated)
         bin_area = sum(s.width_mm * s.height_mm for s in generated)
         util = (used_area / bin_area) * 100 if bin_area > 0 else 0.0
         metrics.runtime_ms = int((perf_counter() - start) * 1000)
+        metrics.thickness_runtime_ms = metrics.runtime_ms
         metrics.ordering_strategy_used = ",".join(sorted(strategies_used))
         metrics.large_gap_penalty_score = (
             sum(gap_scores) / len(gap_scores) if gap_scores else 0.0
@@ -345,12 +482,17 @@ class NestingService:
         placements: list[PlacementDecision],
         bin_poly: Polygon,
         metrics: EngineMetrics,
+        same_part_gap_mm: float,
     ) -> list[PlacementDecision]:
         if not placements:
             metrics.sheet_valid = True
             return placements
-        polys = [p.footprint_world for p in placements]
-        final_v = self.validation.validate_final_sheet(polys, bin_poly)
+        fps = [p.footprint_world for p in placements]
+        mats = [p.material_world for p in placements]
+        pids = [p.part_instance.part_id for p in placements]
+        final_v = self.validation.validate_final_sheet_pairwise(
+            fps, mats, pids, bin_poly, same_part_gap_mm
+        )
         if final_v.ok:
             metrics.sheet_valid = True
             return placements
@@ -363,10 +505,15 @@ class NestingService:
         kept: list[PlacementDecision] = []
         bin_prepared = prep(bin_poly)
         for pl in placements:
-            placed_polys = [k.footprint_world for k in kept]
-            placed_prepared = [prep(p) for p in placed_polys]
-            v = self.validation.validate_candidate(
-                pl.footprint_world, bin_prepared, placed_polys, placed_prepared
+            v = self.validation.validate_candidate_pairwise(
+                footprint_world=pl.footprint_world,
+                material_world=pl.material_world,
+                candidate_part_id=pl.part_instance.part_id,
+                bin_prepared=bin_prepared,
+                placed_footprints=[k.footprint_world for k in kept],
+                placed_materials=[k.material_world for k in kept],
+                placed_part_ids=[k.part_instance.part_id for k in kept],
+                same_part_gap_mm=same_part_gap_mm,
             )
             if not v.ok:
                 metrics.rejected_placements += 1
@@ -431,4 +578,14 @@ class NestingService:
             largeGapPenaltyScore=round(metrics.large_gap_penalty_score, 6),
             finalSelectedCandidateScore=round(metrics.final_selected_candidate_score, 6),
             scoreTrace=metrics.score_trace[:120],
+            candidateDebugLog=metrics.candidate_debug_log[:200],
+            lastScoreBreakdown=metrics.last_score_breakdown[:2000],
+            finalLayoutQualityScore=round(metrics.final_layout_quality_score, 6),
+            thicknessRuntimeMs=metrics.thickness_runtime_ms,
+            rejectedReasonsSummary=(
+                f"outside_bin:{metrics.rejected_outside_bin},"
+                f"overlap:{metrics.rejected_overlap},"
+                f"invalid_polygon:{metrics.rejected_invalid_polygon},"
+                f"invalid_transform:{metrics.rejected_invalid_transform}"
+            ),
         )

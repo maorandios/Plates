@@ -17,13 +17,12 @@ import { PartsTable } from "@/features/parts/PartsTable";
 import {
   getBatchById,
   getBatchMatchInputs,
-  saveDxfGeometriesBatch,
-  saveParts,
   getPartsByBatch,
   deletePartUploadSources,
+  saveParts,
 } from "@/lib/store";
-import { buildUnifiedParts } from "@/lib/matching/matcher";
 import { reprocessDxfGeometry } from "@/lib/geometry";
+import { rebuildUnifiedPartsForBatch } from "@/lib/parts/rebuildBatchParts";
 import { estimateDxfTotalWeightKg } from "@/lib/parts/excelDxfValidation";
 import { plateTypeDedupeKey } from "@/lib/parts/plateTypeKey";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
@@ -34,7 +33,7 @@ import {
   summaryTotalAreaLabel,
   summaryTotalWeightLabel,
 } from "@/lib/settings/unitSystem";
-import type { Batch, DxfPartGeometry, Part, UploadedFile, ExcelRow } from "@/types";
+import type { Batch, Part, UploadedFile, ExcelRow } from "@/types";
 
 interface GeomDiag {
   total: number;
@@ -85,17 +84,15 @@ export default function PartsReviewPage() {
     if (!batchId) return;
     setIsBuilding(true);
     try {
+      const built = rebuildUnifiedPartsForBatch(batchId);
+      setParts(built);
+
       const { clients, files, excelRows, dxfGeometries: rawDxfGeometries } =
         getBatchMatchInputs(batchId);
-
-      // ── Re-run geometry pipeline on every rebuild ──────────────────────
-      // This ensures pipeline improvements take effect without re-uploading.
-      const dxfGeometries: DxfPartGeometry[] = rawDxfGeometries.map((geo) =>
+      const dxfGeometries = rawDxfGeometries.map((geo) =>
         reprocessDxfGeometry(geo)
       );
-      saveDxfGeometriesBatch(dxfGeometries);
 
-      // ── Geometry diagnostics ───────────────────────────────────────────
       const geomDiag: GeomDiag = {
         total: dxfGeometries.length,
         valid: 0,
@@ -134,16 +131,6 @@ export default function PartsReviewPage() {
         excelRows,
         geom: geomDiag,
       });
-
-      const built = buildUnifiedParts({
-        batchId,
-        clients,
-        files,
-        excelRows,
-        dxfGeometries,
-      });
-      saveParts(batchId, built);
-      setParts(built);
     } catch (e) {
       console.error("[PartsReview] Rebuild failed:", e);
     } finally {

@@ -9,9 +9,8 @@ import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import type { Batch } from "@/types";
 
 /**
- * Hard stop so the button cannot spin forever if SVGNest/worker hangs.
- * One sheet can use the full `nestDurationMs` budget; many sheets and stock sizes multiply
- * wall time — keep this above plausible multi-sheet runs.
+ * Hard stop so the button cannot spin forever if the server job hangs.
+ * One sheet can use a large budget; many sheets multiply wall time.
  */
 const NESTING_TOTAL_TIMEOUT_MS = 900_000;
 
@@ -68,7 +67,7 @@ export function GenerateNestingPanel({ batch }: { batch: Batch }) {
             () =>
               reject(
                 new Error(
-                  `Nesting stopped after ${NESTING_TOTAL_TIMEOUT_MS / 60_000} minutes to avoid a frozen tab. SVGNest runs once per filled sheet; large batches or many sheets multiply wait time. Try fewer parts, then generate again, or refresh the page if the app feels stuck. In dev, save files only after nesting finishes — hot reload can break SVGNest mid-run.`
+                  `Nesting stopped after ${NESTING_TOTAL_TIMEOUT_MS / 60_000} minutes to avoid a frozen tab. Try fewer parts or refresh the page if the app feels stuck. In dev, save files only after nesting finishes — hot reload can break a run mid-job.`
                 )
               ),
             NESTING_TOTAL_TIMEOUT_MS
@@ -98,21 +97,17 @@ export function GenerateNestingPanel({ batch }: { batch: Batch }) {
       <div>
         <h2 className="text-sm font-semibold text-foreground">Automatic nesting</h2>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-xl">
-          Packs parts by thickness on the <strong>server-side nesting engine</strong> using real
-          polygon contours and spacing offsets. Large jobs can take{" "}
-          <strong>over a minute per sheet</strong>; the timer below shows progress while your job
-          runs asynchronously. Check{" "}
-          <code className="text-[11px] bg-muted px-1 rounded">engineDebug</code> on results for
-          footprint stats.
+          Uses multi-pass ordering, anchor/score candidates, and compaction on the server. Large jobs
+          can take <strong>over a minute</strong>; the timer shows elapsed time while the job runs.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={run} disabled={busy}>
+        <Button type="button" onClick={() => run()} disabled={busy}>
           {busy ? "Nesting…" : "Generate nesting"}
         </Button>
         {busy ? (
           <span className="text-xs text-muted-foreground tabular-nums">
-            {elapsedSec}s elapsed — computing on the server; you can keep using the app meanwhile.
+            {elapsedSec}s · server job running…
           </span>
         ) : null}
         {err ? (

@@ -34,6 +34,8 @@ export interface ServerNestingJobPayload {
       edgeMarginMm: number;
       allowRotation: boolean;
       rotationMode: "none" | "ninetyOnly" | "free";
+      /** Min gap (mm) between identical parts; 0 = allow flush / common-line style. Omitted sends 0. */
+      samePartGapMm?: number;
     };
     stockSheets: Array<{
       id: string;
@@ -129,6 +131,7 @@ export function buildServerNestingPayload(options: {
         edgeMarginMm: Math.max(0, rules.edgeMarginMm),
         allowRotation: rules.allowRotation,
         rotationMode,
+        samePartGapMm: 0,
       },
       stockSheets: groupStock,
       parts: groupParts,
