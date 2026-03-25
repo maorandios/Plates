@@ -4,13 +4,15 @@ import {
   holeFitsBounds,
   slotCornersFitBounds,
 } from "./lib/bounds";
-import { slotCorners } from "./lib/slotPolygon";
+import { slotCorners, slottedHoleCapsuleOutline } from "./lib/slotPolygon";
 
 const holeRowSchema = z.object({
   id: z.string(),
   cx: z.coerce.number(),
   cy: z.coerce.number(),
-  diameter: z.coerce.number().positive(),
+  diameter: z.coerce.number().min(0),
+  length: z.coerce.number().min(0),
+  rotationDeg: z.coerce.number(),
 });
 
 const slotRowSchema = z.object({
@@ -89,13 +91,52 @@ export const plateBuilderFormSchema = z
     );
 
     data.holes.forEach((hole, i) => {
-      const r = hole.diameter / 2;
-      if (!holeFitsBounds(hole.cx, hole.cy, r, b)) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Hole must lie fully inside the plate",
-          path: ["holes", i, "diameter"],
-        });
+      const L = hole.length ?? 0;
+      if (L > 0) {
+        if (hole.diameter <= 0) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Diameter must be > 0 for a slotted hole",
+            path: ["holes", i, "diameter"],
+          });
+        }
+        if (L < hole.diameter - 1e-6) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Slotted length must be ≥ diameter (slot width)",
+            path: ["holes", i, "length"],
+          });
+        }
+        const outline = slottedHoleCapsuleOutline(
+          hole.cx,
+          hole.cy,
+          L,
+          hole.diameter,
+          hole.rotationDeg
+        );
+        if (!slotCornersFitBounds(outline, b)) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Hole must lie fully inside the plate",
+            path: ["holes", i, "length"],
+          });
+        }
+      } else {
+        if (hole.diameter <= 0) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Set diameter for a round hole, or length > 0 for a slotted hole",
+            path: ["holes", i, "diameter"],
+          });
+        }
+        const r = hole.diameter / 2;
+        if (!holeFitsBounds(hole.cx, hole.cy, r, b)) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Hole must lie fully inside the plate",
+            path: ["holes", i, "diameter"],
+          });
+        }
       }
     });
 

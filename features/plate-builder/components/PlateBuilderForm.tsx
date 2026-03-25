@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useFieldArray, useForm, type Resolver } from "react-hook-form";
+import {
+  useFieldArray,
+  useForm,
+  useWatch,
+  type Resolver,
+} from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +36,7 @@ const PlatePreviewCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[360px] w-full items-center justify-center rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
+      <div className="flex min-h-[320px] w-full items-center justify-center rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
         Loading preview…
       </div>
     ),
@@ -56,20 +61,33 @@ function formValuesToSpec(values: PlateBuilderFormValues): PlateBuilderSpecV1 {
   };
 }
 
+function previewNumber(v: unknown): number {
+  if (typeof v === "number") return v;
+  if (typeof v === "string" && v.trim() === "") return Number.NaN;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : Number.NaN;
+}
+
 function previewSpecFromValues(values: PlateBuilderFormValues): PlateBuilderSpecV1 {
+  const w = previewNumber(values.width);
+  const h = previewNumber(values.height);
+  // RHF often keeps number inputs as strings while typing — Number.isFinite("10") is false.
+  const cornerRadius = previewNumber(values.cornerRadius);
+  const chamferSize = previewNumber(values.chamferSize);
+  const thickness = previewNumber(values.thickness);
   return {
     version: 1,
     shapeType: values.shapeType,
-    width: Number.isFinite(values.width) ? values.width : 100,
-    height: Number.isFinite(values.height) ? values.height : 50,
-    cornerRadius: Number.isFinite(values.cornerRadius) ? values.cornerRadius : 0,
-    chamferSize: Number.isFinite(values.chamferSize) ? values.chamferSize : 0,
+    width: w,
+    height: h,
+    cornerRadius: Number.isFinite(cornerRadius) ? cornerRadius : 0,
+    chamferSize: Number.isFinite(chamferSize) ? chamferSize : 0,
     holes: values.holes,
     slots: values.slots,
     partName: values.partName || "Preview",
     quantity: 1,
     material: values.material || "—",
-    thickness: Number.isFinite(values.thickness) ? values.thickness : 6,
+    thickness: Number.isFinite(thickness) ? thickness : 6,
     clientId: values.clientId || "preview",
   };
 }
@@ -121,10 +139,9 @@ export function PlateBuilderForm({
   const holesArr = useFieldArray({ control, name: "holes" });
   const slotsArr = useFieldArray({ control, name: "slots" });
 
-  const watched = form.watch();
-  const previewSpec = useMemo(
-    () => previewSpecFromValues(watched as PlateBuilderFormValues),
-    [watched]
+  const watched = useWatch({ control }) as PlateBuilderFormValues | undefined;
+  const previewSpec = previewSpecFromValues(
+    watched ?? (form.getValues() as PlateBuilderFormValues)
   );
 
   const shapeType = watched?.shapeType ?? "rectangle";
@@ -157,10 +174,39 @@ export function PlateBuilderForm({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="flex flex-col gap-10">
+          <section className="w-full flex flex-col items-stretch">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Live preview
+            </p>
+            <PlatePreviewCanvas
+              spec={previewSpec}
+              onHoleCenterChange={(index, cx, cy) => {
+                setValue(`holes.${index}.cx`, cx, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+                setValue(`holes.${index}.cy`, cy, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+              }}
+              onSlotCenterChange={(index, cx, cy) => {
+                setValue(`slots.${index}.cx`, cx, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+                setValue(`slots.${index}.cy`, cy, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+              }}
+            />
+          </section>
+
           <form
             onSubmit={handleSubmit(onSubmit)}
-            className="space-y-6 max-w-xl"
+            className="space-y-6 max-w-xl mx-auto w-full"
           >
             <Card>
               <CardHeader className="pb-3">
@@ -278,6 +324,8 @@ export function PlateBuilderForm({
                       cx: 50,
                       cy: 50,
                       diameter: 10,
+                      length: 0,
+                      rotationDeg: 0,
                     })
                   }
                 >
@@ -288,7 +336,8 @@ export function PlateBuilderForm({
               <CardContent className="space-y-3">
                 {holesArr.fields.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No holes — add circular holes as needed.
+                    Round holes (Ø) or slotted holes (length × Ø, rounded ends).
+                    Position is set in the live preview (5 mm snap).
                   </p>
                 ) : (
                   holesArr.fields.map((field, index) => (
@@ -300,32 +349,43 @@ export function PlateBuilderForm({
                         type="hidden"
                         {...register(`holes.${index}.id` as const)}
                       />
-                      <div className="space-y-1">
-                        <Label className="text-xs">cx (mm)</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          className="h-9 w-[88px]"
-                          {...form.register(`holes.${index}.cx` as const)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">cy (mm)</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          className="h-9 w-[88px]"
-                          {...form.register(`holes.${index}.cy` as const)}
-                        />
-                      </div>
+                      <input
+                        type="hidden"
+                        {...register(`holes.${index}.cx` as const)}
+                      />
+                      <input
+                        type="hidden"
+                        {...register(`holes.${index}.cy` as const)}
+                      />
                       <div className="space-y-1">
                         <Label className="text-xs">Ø (mm)</Label>
                         <Input
                           type="number"
                           step="0.1"
-                          min={0.001}
-                          className="h-9 w-[88px]"
+                          min={0}
+                          className="h-9 w-[76px]"
                           {...form.register(`holes.${index}.diameter` as const)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Slot length</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min={0}
+                          className="h-9 w-[76px]"
+                          {...form.register(`holes.${index}.length` as const)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Rot °</Label>
+                        <Input
+                          type="number"
+                          step="1"
+                          className="h-9 w-[72px]"
+                          {...form.register(
+                            `holes.${index}.rotationDeg` as const
+                          )}
                         />
                       </div>
                       <Button
@@ -338,6 +398,10 @@ export function PlateBuilderForm({
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                      <p className="w-full text-[11px] text-muted-foreground">
+                        Slotted: set length ≥ Ø (width matches Ø, ends stay
+                        round). Round: leave slot length at 0.
+                      </p>
                     </div>
                   ))
                 )}
@@ -375,7 +439,8 @@ export function PlateBuilderForm({
               <CardContent className="space-y-3">
                 {slotsArr.fields.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Optional rectangular slots (length × width, rotation in °).
+                    Rectangular slots (length × width, rotation in °). Position
+                    is set in the live preview.
                   </p>
                 ) : (
                   slotsArr.fields.map((field, index) => (
@@ -387,24 +452,14 @@ export function PlateBuilderForm({
                         type="hidden"
                         {...register(`slots.${index}.id` as const)}
                       />
-                      <div className="space-y-1">
-                        <Label className="text-xs">cx</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          className="h-9 w-[76px]"
-                          {...form.register(`slots.${index}.cx` as const)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">cy</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          className="h-9 w-[76px]"
-                          {...form.register(`slots.${index}.cy` as const)}
-                        />
-                      </div>
+                      <input
+                        type="hidden"
+                        {...register(`slots.${index}.cx` as const)}
+                      />
+                      <input
+                        type="hidden"
+                        {...register(`slots.${index}.cy` as const)}
+                      />
                       <div className="space-y-1">
                         <Label className="text-xs">Length</Label>
                         <Input
@@ -564,17 +619,6 @@ export function PlateBuilderForm({
               </Button>
             </div>
           </form>
-
-          <div className="lg:sticky lg:top-6 space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Live preview
-            </p>
-            <PlatePreviewCanvas spec={previewSpec} />
-            <p className="text-[11px] text-muted-foreground leading-snug">
-              Blue: outer contour · Red: holes · Orange: slots. Origin at bottom-left
-              (mm).
-            </p>
-          </div>
         </div>
       )}
     </PageContainer>

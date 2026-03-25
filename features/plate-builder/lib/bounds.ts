@@ -1,4 +1,5 @@
 import type { PlateBuilderShapeMvp } from "../types";
+import { slotCorners, slottedHoleCapsuleOutline } from "./slotPolygon";
 
 /** Conservative axis-aligned box [minX,maxX]×[minY,maxY] for hole/slot centers (circle centers / slot centers). */
 export function conservativeCenterBounds(
@@ -57,4 +58,77 @@ export function slotCornersFitBounds(
     }
   }
   return true;
+}
+
+/** Keep hole center so the circle stays inside the conservative plate interior. */
+export function clampHoleCenter(
+  cx: number,
+  cy: number,
+  radius: number,
+  b: { minX: number; maxX: number; minY: number; maxY: number }
+): [number, number] {
+  return [
+    Math.min(b.maxX - radius, Math.max(b.minX + radius, cx)),
+    Math.min(b.maxY - radius, Math.max(b.minY + radius, cy)),
+  ];
+}
+
+/**
+ * Move slot center until all corners lie inside bounds (nudge toward plate interior).
+ */
+export function clampSlotCenterToFit(
+  cx: number,
+  cy: number,
+  length: number,
+  width: number,
+  rotationDeg: number,
+  b: { minX: number; maxX: number; minY: number; maxY: number }
+): [number, number] {
+  let x = Math.min(Math.max(cx, b.minX), b.maxX);
+  let y = Math.min(Math.max(cy, b.minY), b.maxY);
+  if (slotCornersFitBounds(slotCorners(x, y, length, width, rotationDeg), b)) {
+    return [x, y];
+  }
+  const mx = (b.minX + b.maxX) / 2;
+  const my = (b.minY + b.maxY) / 2;
+  for (let i = 0; i < 100; i++) {
+    x = x + (mx - x) * 0.2;
+    y = y + (my - y) * 0.2;
+    x = Math.min(Math.max(x, b.minX), b.maxX);
+    y = Math.min(Math.max(y, b.minY), b.maxY);
+    if (slotCornersFitBounds(slotCorners(x, y, length, width, rotationDeg), b)) {
+      return [x, y];
+    }
+  }
+  return [mx, my];
+}
+
+/** Slotted hole (capsule): width = diameter, rounded ends. */
+export function clampCapsuleHoleCenterToFit(
+  cx: number,
+  cy: number,
+  overallLength: number,
+  diameter: number,
+  rotationDeg: number,
+  b: { minX: number; maxX: number; minY: number; maxY: number }
+): [number, number] {
+  const L = Math.max(overallLength, diameter);
+  let x = Math.min(Math.max(cx, b.minX), b.maxX);
+  let y = Math.min(Math.max(cy, b.minY), b.maxY);
+  const fits = (px: number, py: number) =>
+    slotCornersFitBounds(
+      slottedHoleCapsuleOutline(px, py, L, diameter, rotationDeg),
+      b
+    );
+  if (fits(x, y)) return [x, y];
+  const mx = (b.minX + b.maxX) / 2;
+  const my = (b.minY + b.maxY) / 2;
+  for (let i = 0; i < 100; i++) {
+    x = x + (mx - x) * 0.2;
+    y = y + (my - y) * 0.2;
+    x = Math.min(Math.max(x, b.minX), b.maxX);
+    y = Math.min(Math.max(y, b.minY), b.maxY);
+    if (fits(x, y)) return [x, y];
+  }
+  return [mx, my];
 }

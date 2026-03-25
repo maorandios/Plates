@@ -21,8 +21,13 @@ export function generatePlateDxf(spec: PlateBuilderSpecV1): string {
   }));
   dxf.addLWPolyline(outerVerts, { flags: LWPolylineFlags.Closed });
 
-  for (const c of geo.holeCircles) {
-    dxf.addCircle(point3d(c.cx, c.cy, 0), c.radius, {});
+  for (const hi of geo.holeItems) {
+    if (hi.kind === "circle") {
+      dxf.addCircle(point3d(hi.cx, hi.cy, 0), hi.radius, {});
+    } else if (hi.kind === "slotted") {
+      const verts = hi.outline.map((p) => ({ point: point2d(p[0], p[1]) }));
+      dxf.addLWPolyline(verts, { flags: LWPolylineFlags.Closed });
+    }
   }
 
   for (const ring of geo.slotOutlines) {

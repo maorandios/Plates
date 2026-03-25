@@ -13,7 +13,16 @@ export interface PlateBuilderHole {
   id: string;
   cx: number;
   cy: number;
+  /** Round hole, and the fixed width of a slotted hole (semicircular ends use d/2). */
   diameter: number;
+  /** Slotted hole: overall length along slot axis (≥ diameter); width is always `diameter`. */
+  length?: number;
+  rotationDeg?: number;
+}
+
+/** Slotted (rounded-end capsule); width is always `diameter`. */
+export function holeIsSlotted(hole: PlateBuilderHole): boolean {
+  return (hole.length ?? 0) > 0;
 }
 
 export interface PlateBuilderSlot {
@@ -44,11 +53,20 @@ export interface PlateBuilderSpecV1 {
   clientId: string;
 }
 
+export type BuiltHoleGeom =
+  | { kind: "circle"; cx: number; cy: number; radius: number }
+  | {
+      kind: "slotted";
+      cx: number;
+      cy: number;
+      outline: [number, number][];
+    };
+
 export interface BuiltPlateGeometry {
   /** Closed CCW outer ring in mm, Y-up, origin bottom-left */
   outer: [number, number][];
-  /** Circular holes (for DXF CIRCLE entities) */
-  holeCircles: Array<{ cx: number; cy: number; radius: number }>;
+  /** One entry per `spec.holes` (circle or slotted capsule) */
+  holeItems: BuiltHoleGeom[];
   /** Slot outlines (closed polylines) */
   slotOutlines: [number, number][][];
 }
