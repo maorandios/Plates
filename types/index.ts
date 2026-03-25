@@ -263,7 +263,7 @@ export type CreateBatchInput = {
 };
 
 // Re-exports for feature modules
-export type { AppPreferences, UnitSystem } from "./settings";
+export type { AppPreferences, PurchasedSheetSize, UnitSystem } from "./settings";
 export { DEFAULT_APP_PREFERENCES } from "./settings";
 export type {
   CuttingMethodProductionDefaults,

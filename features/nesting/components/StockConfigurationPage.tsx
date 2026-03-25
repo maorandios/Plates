@@ -11,6 +11,7 @@ import { nanoid } from "@/lib/utils/nanoid";
 import {
   getBatchById,
   getPartsByBatch,
+  getPurchasedSheetSizes,
   getStockSheetsByBatch,
   saveStockSheetsForBatch,
 } from "@/lib/store";
@@ -38,6 +39,7 @@ export default function StockConfigurationPage() {
 
   const [rows, setRows] = useState<StockSheetEntry[]>([]);
   const [cuttingOverridesRefreshKey, setCuttingOverridesRefreshKey] = useState(0);
+  const [purchasedCatalogRev, setPurchasedCatalogRev] = useState(0);
 
   const batch = useMemo(
     () => (batchId ? getBatchById(batchId) : undefined),
@@ -66,6 +68,21 @@ export default function StockConfigurationPage() {
     if (!batchId) return;
     setRows(getStockSheetsByBatch(batchId));
   }, [batchId]);
+
+  useEffect(() => {
+    const onCatalog = () => setPurchasedCatalogRev((n) => n + 1);
+    window.addEventListener("plate-purchased-sheet-catalog-changed", onCatalog);
+    return () =>
+      window.removeEventListener(
+        "plate-purchased-sheet-catalog-changed",
+        onCatalog
+      );
+  }, []);
+
+  const purchasedCatalog = useMemo(
+    () => getPurchasedSheetSizes(),
+    [purchasedCatalogRev]
+  );
 
   const persistValid = useCallback(
     (all: StockSheetEntry[]) => {
@@ -116,6 +133,25 @@ export default function StockConfigurationPage() {
     [batchId, persistValid]
   );
 
+  const addRowFromCatalog = useCallback(
+    (thicknessMm: number | null, widthMm: number, lengthMm: number) => {
+      if (!batchId) return;
+      const now = new Date().toISOString();
+      const id = nanoid();
+      const row: StockSheetEntry = {
+        ...createEmptyStockSheetEntry(batchId, thicknessMm, id, now),
+        widthMm,
+        lengthMm,
+      };
+      setRows((prev) => {
+        const next = [...prev, row];
+        persistValid(next);
+        return next;
+      });
+    },
+    [batchId, persistValid]
+  );
+
   if (!batchId) return null;
 
   if (!batch) return null;
@@ -155,9 +191,15 @@ export default function StockConfigurationPage() {
             Stock configuration
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-            Assign available stock sheets for each thickness in this batch. Each
-            thickness can use different sheet sizes — expand a group to add purchase
-            or leftover sheets.
+            Assign available stock sheets for each thickness. If you defined{" "}
+            <Link
+              href="/settings#purchased-sheets"
+              className="underline font-medium text-foreground hover:text-primary"
+            >
+              purchased sheet sizes
+            </Link>{" "}
+            in Preferences, pick them from the catalogue under each thickness — or add
+            sheets manually.
           </p>
         </header>
 
@@ -165,12 +207,14 @@ export default function StockConfigurationPage() {
           batch={batch}
           groups={groups}
           stockRows={rows}
+          purchasedCatalog={purchasedCatalog}
           unitSystem={unitSystem}
           cuttingOverridesRefreshKey={cuttingOverridesRefreshKey}
           onThicknessCuttingMutate={() =>
             setCuttingOverridesRefreshKey((k) => k + 1)
           }
           onAddRow={addRow}
+          onAddRowFromCatalog={addRowFromCatalog}
           onPatchRow={patchRow}
           onDeleteRow={deleteRow}
         />

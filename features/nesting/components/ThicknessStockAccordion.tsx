@@ -8,6 +8,8 @@ import { formatLength } from "@/lib/settings/unitSystem";
 import type { UnitSystem } from "@/types/settings";
 import type { Batch } from "@/types";
 import type { StockSheetEntry } from "@/types/nesting";
+import type { PurchasedSheetSize } from "@/types/settings";
+import { filterCatalogForThickness } from "@/lib/settings/purchasedSheetsCatalog";
 import {
   type PartThicknessGroup,
   countSheetsByType,
@@ -22,10 +24,17 @@ interface ThicknessStockAccordionProps {
   batch: Batch;
   groups: PartThicknessGroup[];
   stockRows: StockSheetEntry[];
+  /** Global catalog from Preferences — filtered per thickness inside the table. */
+  purchasedCatalog: PurchasedSheetSize[];
   unitSystem: UnitSystem;
   cuttingOverridesRefreshKey: number;
   onThicknessCuttingMutate: () => void;
   onAddRow: (thicknessMm: number | null) => void;
+  onAddRowFromCatalog: (
+    thicknessMm: number | null,
+    widthMm: number,
+    lengthMm: number
+  ) => void;
   onPatchRow: (id: string, patch: Partial<StockSheetEntry>) => void;
   onDeleteRow: (id: string) => void;
 }
@@ -34,10 +43,12 @@ export function ThicknessStockAccordion({
   batch,
   groups,
   stockRows,
+  purchasedCatalog,
   unitSystem,
   cuttingOverridesRefreshKey,
   onThicknessCuttingMutate,
   onAddRow,
+  onAddRowFromCatalog,
   onPatchRow,
   onDeleteRow,
 }: ThicknessStockAccordionProps) {
@@ -144,8 +155,15 @@ export function ThicknessStockAccordion({
                   <ThicknessStockTable
                     groupThicknessMm={group.thicknessMm}
                     rows={rows}
+                    catalogForGroup={filterCatalogForThickness(
+                      purchasedCatalog,
+                      group.thicknessMm
+                    )}
                     unitSystem={unitSystem}
                     onAddRow={() => onAddRow(group.thicknessMm)}
+                    onAddRowFromCatalog={(widthMm, lengthMm) =>
+                      onAddRowFromCatalog(group.thicknessMm, widthMm, lengthMm)
+                    }
                     onPatchRow={onPatchRow}
                     onDeleteRow={onDeleteRow}
                   />

@@ -19,6 +19,7 @@ import type {
   BatchThicknessOverride,
   NestingRun,
 } from "@/types";
+import type { PurchasedSheetSize } from "@/types/settings";
 import { deriveClientCode, generateClientCode, isSafeClientCode } from "@/lib/codegen/clientCode";
 import { slimNestingRunForStorage } from "@/lib/nesting/slimNestingRunForStorage";
 import { nanoid } from "@/lib/utils/nanoid";
@@ -42,6 +43,7 @@ const STORAGE_KEYS = {
   batchThicknessOverrides: "plate_batch_thickness_overrides",
   batchClientLinks: "plate_batch_client_links",
   nestingRuns: "plate_nesting_runs",
+  purchasedSheetCatalog: "plate_purchased_sheet_catalog",
 } as const;
 
 function thicknessStorageKey(thicknessMm: number | null): string {
@@ -667,6 +669,19 @@ export function deleteStockSheet(id: string): void {
     STORAGE_KEYS.stockSheets,
     getStockSheets().filter((s) => s.id !== id)
   );
+}
+
+// ─── Purchased sheet catalog (global, Preferences) ───────────────────────────
+
+export function getPurchasedSheetSizes(): PurchasedSheetSize[] {
+  return loadFromStorage<PurchasedSheetSize>(STORAGE_KEYS.purchasedSheetCatalog);
+}
+
+export function savePurchasedSheetSizes(sizes: PurchasedSheetSize[]): void {
+  saveToStorage(STORAGE_KEYS.purchasedSheetCatalog, sizes);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("plate-purchased-sheet-catalog-changed"));
+  }
 }
 
 // ─── Batch thickness cutting overrides (per batch, per thickness band) ───────

@@ -21,13 +21,31 @@ import {
   areaM2FromSheetMm,
   validateStockSheetEntry,
 } from "@/lib/nesting/stockConfiguration";
-import type { UnitSystem } from "@/types/settings";
+import type { PurchasedSheetSize, UnitSystem } from "@/types/settings";
 import type { StockSheetEntry, StockSheetType } from "@/types/nesting";
 import { cn } from "@/lib/utils";
+
+function matchCatalogId(
+  entry: StockSheetEntry,
+  catalog: PurchasedSheetSize[],
+  tol = 0.02
+): string {
+  for (const c of catalog) {
+    if (
+      Math.abs(entry.widthMm - c.widthMm) < tol &&
+      Math.abs(entry.lengthMm - c.lengthMm) < tol
+    ) {
+      return c.id;
+    }
+  }
+  return "__manual__";
+}
 
 interface StockSheetRowFormProps {
   entry: StockSheetEntry;
   groupThicknessMm: number | null;
+  /** Saved sizes from Preferences for this thickness (may be empty). */
+  catalog: PurchasedSheetSize[];
   unitSystem: UnitSystem;
   onPatch: (id: string, patch: Partial<StockSheetEntry>) => void;
   onDelete: (id: string) => void;
@@ -41,6 +59,7 @@ const TYPE_LABELS: Record<StockSheetType, string> = {
 export function StockSheetRowForm({
   entry,
   groupThicknessMm,
+  catalog,
   unitSystem,
   onPatch,
   onDelete,
@@ -97,6 +116,23 @@ export function StockSheetRowForm({
       ? formatLengthValueOnly(groupThicknessMm, unitSystem)
       : "—";
 
+  const rawCatalogMatch = matchCatalogId(entry, catalog);
+  const catalogSelectValue =
+    catalog.length === 0
+      ? "__manual__"
+      : rawCatalogMatch !== "__manual__" &&
+          catalog.some((c) => c.id === rawCatalogMatch)
+        ? rawCatalogMatch
+        : "__manual__";
+
+  function catalogLabel(c: PurchasedSheetSize): string {
+    const w = formatLengthValueOnly(c.widthMm, unitSystem);
+    const l = formatLengthValueOnly(c.lengthMm, unitSystem);
+    const base = `${w} × ${l}`;
+    const name = c.label?.trim();
+    return name ? `${name} · ${base}` : base;
+  }
+
   return (
     <TableRow
       className={cn(
@@ -104,7 +140,36 @@ export function StockSheetRowForm({
         "hover:bg-muted/40"
       )}
     >
-      <TableCell className="py-2 pr-2 pl-3 w-[120px]">
+      <TableCell className="py-2 pr-2 pl-3 min-w-[200px] max-w-[260px]">
+        <Select
+          value={catalogSelectValue}
+          onValueChange={(val) => {
+            if (val === "__manual__") return;
+            const c = catalog.find((x) => x.id === val);
+            if (c) {
+              onPatch(entry.id, { widthMm: c.widthMm, lengthMm: c.lengthMm });
+            }
+          }}
+          disabled={catalog.length === 0}
+        >
+          <SelectTrigger className="h-9 text-xs">
+            <SelectValue
+              placeholder={
+                catalog.length === 0 ? "No saved sizes" : "Pick or type below"
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__manual__">Custom (manual)</SelectItem>
+            {catalog.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {catalogLabel(c)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </TableCell>
+      <TableCell className="py-2 pr-2 pl-0 w-[120px]">
         <Input
           className={cn(
             "h-9 font-mono tabular-nums text-sm",
