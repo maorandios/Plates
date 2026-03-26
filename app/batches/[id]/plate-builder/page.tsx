@@ -2,7 +2,9 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { PlateBuilderForm } from "@/features/plate-builder/components/PlateBuilderForm";
+import { PageContainer } from "@/components/shared/PageContainer";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { PlateBatchWorkspace } from "@/features/plate-builder/components/PlateBatchWorkspace";
 import { getBatchById, getClientsByBatch } from "@/lib/store";
 
 function PlateBuilderPageInner() {
@@ -38,13 +40,24 @@ function PlateBuilderPageInner() {
   }
 
   const clients = getClientsByBatch(batchId);
+  const batch = getBatchById(batchId);
 
   return (
-    <PlateBuilderForm
-      batchId={batchId}
-      clients={clients}
-      defaultClientId={defaultClientId}
-    />
+    <PageContainer className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden">
+      <PageHeader
+        title="Plate builder"
+        description={
+          batch
+            ? `Batch: ${batch.name} — add plates, edit on the canvas, save DXF to this batch.`
+            : "Build plates for this batch."
+        }
+      />
+      <PlateBatchWorkspace
+        batchId={batchId}
+        clients={clients}
+        defaultClientId={defaultClientId}
+      />
+    </PageContainer>
   );
 }
 

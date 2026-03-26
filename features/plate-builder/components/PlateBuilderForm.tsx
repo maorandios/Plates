@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
@@ -28,6 +28,10 @@ import { nanoid } from "@/lib/utils/nanoid";
 import type { Client } from "@/types";
 import { plateBuilderFormSchema, type PlateBuilderFormValues } from "../schema";
 import type { PlateBuilderSpecV1 } from "../types";
+import {
+  downloadPlateDxf,
+  PLATE_BUILDER_STANDALONE_CLIENT_ID,
+} from "../lib/downloadPlateDxf";
 import { saveBuiltPlateToBatch } from "../lib/saveBuiltPlate";
 
 const PlatePreviewCanvas = dynamic(
@@ -92,20 +96,26 @@ function previewSpecFromValues(values: PlateBuilderFormValues): PlateBuilderSpec
   };
 }
 
-interface PlateBuilderFormProps {
-  batchId: string;
-  clients: Client[];
-  defaultClientId: string;
+export interface PlateBuilderFormProps {
+  /** Omit for standalone mode: download DXF only, no batch or client picker. */
+  batchId?: string;
+  clients?: Client[];
+  defaultClientId?: string;
 }
 
 export function PlateBuilderForm({
   batchId,
-  clients,
-  defaultClientId,
-}: PlateBuilderFormProps) {
+  clients: clientsProp,
+  defaultClientId = "",
+}: PlateBuilderFormProps = {}) {
   const router = useRouter();
+  const isStandalone = !batchId;
+  const clients = clientsProp ?? [];
+
   const initialClient =
-    defaultClientId && clients.some((c) => c.id === defaultClientId)
+    !isStandalone &&
+    defaultClientId &&
+    clients.some((c) => c.id === defaultClientId)
       ? defaultClientId
       : clients[0]?.id ?? "";
 
@@ -125,7 +135,9 @@ export function PlateBuilderForm({
       quantity: 1,
       material: "",
       thickness: 10,
-      clientId: initialClient,
+      clientId: isStandalone
+        ? PLATE_BUILDER_STANDALONE_CLIENT_ID
+        : initialClient,
     },
     mode: "onChange",
   });
@@ -133,8 +145,9 @@ export function PlateBuilderForm({
   const { control, handleSubmit, setValue, formState, register } = form;
 
   useEffect(() => {
+    if (isStandalone) return;
     if (initialClient) setValue("clientId", initialClient);
-  }, [initialClient, setValue]);
+  }, [isStandalone, initialClient, setValue]);
 
   const holesArr = useFieldArray({ control, name: "holes" });
   const slotsArr = useFieldArray({ control, name: "slots" });
@@ -144,12 +157,23 @@ export function PlateBuilderForm({
     watched ?? (form.getValues() as PlateBuilderFormValues)
   );
 
+  const [featureDimGuide, setFeatureDimGuide] = useState<{
+    kind: "hole" | "slot";
+    index: number;
+  } | null>(null);
+
   const shapeType = watched?.shapeType ?? "rectangle";
 
   const onSubmit = (data: PlateBuilderFormValues) => {
     const spec = formValuesToSpec(data);
-    saveBuiltPlateToBatch(spec, batchId);
-    router.push(`/batches/${batchId}/parts`);
+    if (isStandalone) {
+      downloadPlateDxf(spec);
+      return;
+    }
+    if (batchId) {
+      saveBuiltPlateToBatch(spec, batchId);
+      router.push(`/batches/${batchId}/parts`);
+    }
   };
 
   const busy = formState.isSubmitting;
@@ -161,12 +185,22 @@ export function PlateBuilderForm({
           Quick Plate Builder
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5 max-w-2xl">
-          Define a simple steel plate shape, holes, and slots. A real DXF is
-          saved and appears in Validation like any uploaded drawing.
+          {isStandalone ? (
+            <>
+              Define a simple steel plate shape, holes, and slots. Download a
+              real DXF when you are ready — no batch or import required.
+            </>
+          ) : (
+            <>
+              Define a simple steel plate shape, holes, and slots. A real DXF is
+              saved to this batch and appears in Validation like any uploaded
+              drawing.
+            </>
+          )}
         </p>
       </div>
 
-      {clients.length === 0 ? (
+      {!isStandalone && clients.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             Add at least one client to this batch on Import data before building
@@ -181,6 +215,17 @@ export function PlateBuilderForm({
             </p>
             <PlatePreviewCanvas
               spec={previewSpec}
+              featureDimGuide={featureDimGuide}
+              onHoleDragGuide={(index) =>
+                setFeatureDimGuide(
+                  index === null ? null : { kind: "hole", index }
+                )
+              }
+              onSlotDragGuide={(index) =>
+                setFeatureDimGuide(
+                  index === null ? null : { kind: "slot", index }
+                )
+              }
               onHoleCenterChange={(index, cx, cy) => {
                 setValue(`holes.${index}.cx`, cx, {
                   shouldDirty: true,
@@ -510,29 +555,33 @@ export function PlateBuilderForm({
                 <CardTitle className="text-base">Part &amp; material</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="clientId">Client</Label>
-                  <Select
-                    value={watched?.clientId || ""}
-                    onValueChange={(v) => setValue("clientId", v)}
-                  >
-                    <SelectTrigger id="clientId">
-                      <SelectValue placeholder="Select client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.shortCode} — {c.fullName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formState.errors.clientId && (
-                    <p className="text-xs text-destructive">
-                      {formState.errors.clientId.message}
-                    </p>
-                  )}
-                </div>
+                {isStandalone ? (
+                  <input type="hidden" {...register("clientId")} />
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="clientId">Client</Label>
+                    <Select
+                      value={watched?.clientId || ""}
+                      onValueChange={(v) => setValue("clientId", v)}
+                    >
+                      <SelectTrigger id="clientId">
+                        <SelectValue placeholder="Select client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.shortCode} — {c.fullName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formState.errors.clientId && (
+                      <p className="text-xs text-destructive">
+                        {formState.errors.clientId.message}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="partName">Part name</Label>
@@ -604,8 +653,10 @@ export function PlateBuilderForm({
                 {busy ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving…
+                    {isStandalone ? "Preparing…" : "Saving…"}
                   </>
+                ) : isStandalone ? (
+                  "Download DXF"
                 ) : (
                   "Save plate & DXF"
                 )}
@@ -613,7 +664,11 @@ export function PlateBuilderForm({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => router.push(`/batches/${batchId}`)}
+                onClick={() =>
+                  isStandalone
+                    ? router.push("/")
+                    : router.push(`/batches/${batchId}`)
+                }
               >
                 Cancel
               </Button>

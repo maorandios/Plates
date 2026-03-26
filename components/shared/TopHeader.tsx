@@ -9,6 +9,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/": "Dashboard",
   "/batches": "Batches",
   "/batches/new": "New Batch",
+  "/plate-builder": "Plate Builder",
   "/settings": "Preferences",
 };
 
@@ -16,6 +17,7 @@ function getPageLabel(pathname: string): string {
   if (ROUTE_LABELS[pathname]) return ROUTE_LABELS[pathname];
   if (pathname.match(/\/batches\/[^/]+\/stock/)) return "Stock configuration";
   if (pathname.match(/\/batches\/[^/]+\/parts/)) return "Validation";
+  if (pathname.match(/\/batches\/[^/]+\/plate-builder/)) return "Plate Builder";
   if (pathname.match(/\/batches\/[^/]+$/)) return "Import data";
   return "PLATE";
 }
