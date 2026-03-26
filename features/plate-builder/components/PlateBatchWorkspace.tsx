@@ -294,6 +294,13 @@ export function PlateBatchWorkspace({
     lastY: 0,
     button: 0,
   });
+  /** Only plain left button may move plates; middle / right / Shift+left use pan or are ignored for drag. */
+  const plateDragAllowedRef = useRef(true);
+  /**
+   * Konva may still emit dragEnd after middle-button pan; Stage mouseup resets plateDragAllowedRef
+   * before dragEnd, so we must only commit worldX/worldY after a real left-drag (dragStart allowed it).
+   */
+  const plateCommitWorldOnDragEndRef = useRef(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -661,15 +668,16 @@ export function PlateBatchWorkspace({
               if (isBg) {
                 setSelectedId(null);
               }
-              const wantPan =
-                e.evt.button === 1 ||
-                (e.evt.button === 0 && e.evt.shiftKey);
-              if (isBg && wantPan) {
+              const btn = e.evt.button;
+              const shift = e.evt.shiftKey;
+              const wantPan = btn === 1 || (btn === 0 && shift);
+              plateDragAllowedRef.current = btn === 0 && !shift;
+              if (wantPan) {
                 panRef.current = {
                   active: true,
                   lastX: e.evt.clientX,
                   lastY: e.evt.clientY,
-                  button: e.evt.button,
+                  button: btn,
                 };
               }
             }}
@@ -684,9 +692,11 @@ export function PlateBatchWorkspace({
             }}
             onMouseUp={() => {
               panRef.current.active = false;
+              plateDragAllowedRef.current = true;
             }}
             onMouseLeave={() => {
               panRef.current.active = false;
+              plateDragAllowedRef.current = true;
             }}
           >
             <Layer>
@@ -717,12 +727,24 @@ export function PlateBatchWorkspace({
                     draggable
                     dragDistance={6}
                     onMouseDown={(e) => {
-                      if (e.evt.button !== 0) return;
+                      plateDragAllowedRef.current =
+                        e.evt.button === 0 && !e.evt.shiftKey;
+                      if (e.evt.button !== 0 || e.evt.shiftKey) return;
                       // Select on press; draggable parent can swallow child onTap — don’t require a drag.
                       setSelectedId(p.id);
                     }}
+                    onDragStart={(e) => {
+                      if (!plateDragAllowedRef.current) {
+                        plateCommitWorldOnDragEndRef.current = false;
+                        e.target.stopDrag();
+                        return;
+                      }
+                      plateCommitWorldOnDragEndRef.current = true;
+                    }}
                     onDragEnd={(e) => {
                       const plate = e.currentTarget as Konva.Group;
+                      if (!plateCommitWorldOnDragEndRef.current) return;
+                      plateCommitWorldOnDragEndRef.current = false;
                       // Hole/slot drag: e.target is the circle/group — do not write its x/y as world position.
                       if (isKonvaHoleOrSlotDragTarget(e.target, plate)) return;
                       setPlates((prev) =>

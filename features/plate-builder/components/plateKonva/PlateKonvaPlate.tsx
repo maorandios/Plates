@@ -40,11 +40,11 @@ import {
   BATCH_VIEWPORT_SCALE_MAX,
 } from "../../lib/plateViewConstants";
 import {
-  clampCapsuleHoleCenterToFit,
-  clampHoleCenter,
-  clampSlotCenterToFit,
-  conservativeCenterBounds,
+  clampCapsuleHoleCenterToOuterRing,
+  clampHoleCenterToOuterRing,
+  clampSlotCenterToOuterRing,
 } from "../../lib/bounds";
+import { outerContourForShape } from "../../lib/outerContours";
 
 const PAD_PX = 24;
 const OUTLINE_STROKE_PX = 2;
@@ -69,19 +69,17 @@ const FEATURE_CENTER_DIM_LINE_GAP_PX = 18;
 /** Extra space past the dim line so value text does not touch the stroke. */
 const FEATURE_CENTER_DIM_LABEL_GAP_PX = 12;
 
-/**
- * Dimension extension/solid lines: stroke in plate space = this × inv so on-screen
- * thickness stays ~constant (do not use Math.max(floor, inv) — that blows up when zoomed in).
- */
-const DIM_LINE_STROKE_BASE_PX = 1;
-/** Dash/gap lengths at viewport scale 1; multiplied by inv like stroke. */
-const DIM_DASH_LEN_PX = 5;
-const DIM_DASH_GAP_PX = 4;
+/** Target on-screen thickness (px) for dimension gray lines at the Stage; divided by zoom for local stroke. */
+const DIM_LINE_STROKE_SCREEN_PX = 1;
+/** Dash/gap target lengths on screen (px); stored as local = screen × inv(zoom). */
+const DIM_DASH_LEN_SCREEN_PX = 5;
+const DIM_DASH_GAP_SCREEN_PX = 4;
 
 /**
  * For plate outline & feature strokes only: divide plate-local px by viewport
- * scale so stroke weight stays ~constant on screen. Dimension text/lines use
- * dimStyleClampForViewport so on-screen size stays in a readable band.
+ * scale so stroke weight stays ~constant on screen. Dimension text uses
+ * dimStyleClampForViewport; dimension strokes/dashes use the same inverse scale
+ * as the outline (not font ratio + floor — that made lines thick when zoomed in).
  */
 function dimZoomInv(worldZoomScale: number): number {
   if (!Number.isFinite(worldZoomScale) || worldZoomScale <= 0) return 1;
@@ -96,6 +94,8 @@ function dimZoomInv(worldZoomScale: number): number {
  * Dimensions are in plate space then multiplied by workspace `Group` scale.
  * Clamp **on-screen** text size so zoom-in doesn’t make labels huge and zoom-out
  * doesn’t leave them oversized vs a tiny plate.
+ * Stroke/dash for those dimensions use `1/zoom` so pixel thickness stays stable
+ * (same idea as `outlineW` / `featStrokeW`).
  */
 function dimStyleClampForViewport(
   worldZoomScale: number,
@@ -114,6 +114,7 @@ function dimStyleClampForViewport(
       Number.isFinite(worldZoomScale) && worldZoomScale > 0 ? worldZoomScale : 1
     )
   );
+  const zi = 1 / z;
   const rawScreenPx = baseFontPx * z;
   const minScreen = 8;
   const maxScreen = 20;
@@ -122,9 +123,9 @@ function dimStyleClampForViewport(
   const ratio = font / baseFontPx;
   return {
     font,
-    strokeW: Math.max(0.35, DIM_LINE_STROKE_BASE_PX * ratio),
-    dashU: Math.max(0.5, DIM_DASH_LEN_PX * ratio),
-    dashG: Math.max(0.5, DIM_DASH_GAP_PX * ratio),
+    strokeW: DIM_LINE_STROKE_SCREEN_PX * zi,
+    dashU: DIM_DASH_LEN_SCREEN_PX * zi,
+    dashG: DIM_DASH_GAP_SCREEN_PX * zi,
     gapScale: ratio,
   };
 }
@@ -153,7 +154,7 @@ function finalizeHolePosition(
   bh: number,
   scale: number,
   hole: PlateBuilderHole,
-  bounds: { minX: number; maxX: number; minY: number; maxY: number }
+  outerMm: [number, number][]
 ): [number, number] {
   let [x, y] = screenToPlateMm(sx, sy, cw, ch, bw, bh, scale);
   const hLen = hole.length ?? 0;
@@ -161,15 +162,29 @@ function finalizeHolePosition(
   const d = hole.diameter;
   const Leff = Math.max(hLen, d);
   if (holeIsSlotted(hole)) {
-    [x, y] = clampCapsuleHoleCenterToFit(x, y, Leff, d, hRot, bounds);
+    [x, y] = clampCapsuleHoleCenterToOuterRing(
+      x,
+      y,
+      Leff,
+      d,
+      hRot,
+      outerMm
+    );
   } else {
-    [x, y] = clampHoleCenter(x, y, d / 2, bounds);
+    [x, y] = clampHoleCenterToOuterRing(x, y, d / 2, outerMm);
   }
   [x, y] = snapHolePositionMm(x, y);
   if (holeIsSlotted(hole)) {
-    return clampCapsuleHoleCenterToFit(x, y, Leff, d, hRot, bounds);
+    return clampCapsuleHoleCenterToOuterRing(
+      x,
+      y,
+      Leff,
+      d,
+      hRot,
+      outerMm
+    );
   }
-  return clampHoleCenter(x, y, d / 2, bounds);
+  return clampHoleCenterToOuterRing(x, y, d / 2, outerMm);
 }
 
 function formatPlateContourCoord(n: number): string {
@@ -491,25 +506,25 @@ function finalizeSlotPosition(
   bh: number,
   scale: number,
   slot: PlateBuilderSlot,
-  bounds: { minX: number; maxX: number; minY: number; maxY: number }
+  outerMm: [number, number][]
 ): [number, number] {
   let [x, y] = screenToPlateMm(sx, sy, cw, ch, bw, bh, scale);
-  [x, y] = clampSlotCenterToFit(
+  [x, y] = clampSlotCenterToOuterRing(
     x,
     y,
     slot.length,
     slot.width,
     slot.rotationDeg,
-    bounds
+    outerMm
   );
   [x, y] = snapSlotPositionMm(x, y);
-  return clampSlotCenterToFit(
+  return clampSlotCenterToOuterRing(
     x,
     y,
     slot.length,
     slot.width,
     slot.rotationDeg,
-    bounds
+    outerMm
   );
 }
 
@@ -702,9 +717,10 @@ export function PlateKonvaPlate({
     return { cw, ch, scale: t.scale, tx: t.tx, ty: t.ty };
   }, [showPlate, batchMmScale, bw, bh, marginMm, cw, ch]);
 
-  const centerBounds = useMemo(
+  /** True plate outline in mm (same as DXF / geometry) — not the old inset AABB. */
+  const outerRingMm = useMemo(
     () =>
-      conservativeCenterBounds(
+      outerContourForShape(
         spec.shapeType,
         bw,
         bh,
@@ -873,7 +889,7 @@ export function PlateKonvaPlate({
                                 bh,
                                 scale,
                                 hole,
-                                centerBounds
+                                outerRingMm
                               );
                               e.target.position({ x: tx(cx), y: ty(cy) });
                               onHoleCenterChange(i, cx, cy);
@@ -894,7 +910,7 @@ export function PlateKonvaPlate({
                                   bh,
                                   scale,
                                   hole,
-                                  centerBounds
+                                  outerRingMm
                                 );
                                 e.target.position({ x: tx(cx), y: ty(cy) });
                                 onHoleCenterChange(i, cx, cy);
@@ -941,7 +957,7 @@ export function PlateKonvaPlate({
                               bh,
                               scale,
                               hole,
-                              centerBounds
+                              outerRingMm
                             );
                             e.target.position({ x: tx(cx), y: ty(cy) });
                             onHoleCenterChange(i, cx, cy);
@@ -962,7 +978,7 @@ export function PlateKonvaPlate({
                                 bh,
                                 scale,
                                 hole,
-                                centerBounds
+                                outerRingMm
                               );
                               e.target.position({ x: tx(cx), y: ty(cy) });
                               onHoleCenterChange(i, cx, cy);
@@ -1018,7 +1034,7 @@ export function PlateKonvaPlate({
                               bh,
                               scale,
                               slot,
-                              centerBounds
+                              outerRingMm
                             );
                             e.target.position({ x: tx(cx), y: ty(cy) });
                             onSlotCenterChange(i, cx, cy);
@@ -1039,7 +1055,7 @@ export function PlateKonvaPlate({
                                 bh,
                                 scale,
                                 slot,
-                                centerBounds
+                                outerRingMm
                               );
                               e.target.position({ x: tx(cx), y: ty(cy) });
                               onSlotCenterChange(i, cx, cy);

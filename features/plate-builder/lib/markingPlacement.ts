@@ -52,40 +52,25 @@ export interface MarkingTextLayout {
   x: number;
   yBase: number;
   textH: number;
-  lineGap: number;
-  hasMat: boolean;
-  hasPart: boolean;
   estWidth: number;
 }
 
-function markingTopExtent(
-  textH: number,
-  lineGap: number,
-  hasMat: boolean,
-  hasPart: boolean
-): number {
-  const lines = (hasMat ? 1 : 0) + (hasPart ? 1 : 0);
-  if (lines === 0) return 0;
-  return (lines - 1) * lineGap + textH;
-}
-
-/** Conservative AABB for the marking block (mm). */
+/** Conservative AABB for one-line marking text (mm). */
 export function markingTextBlockBounds(layout: MarkingTextLayout): {
   x0: number;
   y0: number;
   x1: number;
   y1: number;
 } {
-  const { x, yBase, textH, lineGap, hasMat, hasPart, estWidth } = layout;
+  const { x, yBase, textH, estWidth } = layout;
   const padX = textH * 0.18;
   const padYLo = textH * 0.3;
   const padYHi = textH * 0.14;
-  const topH = markingTopExtent(textH, lineGap, hasMat, hasPart);
   return {
     x0: x - padX,
     y0: yBase - padYLo,
     x1: x + estWidth + padX,
-    y1: yBase + topH + padYHi,
+    y1: yBase + textH + padYHi,
   };
 }
 
@@ -185,11 +170,11 @@ function collectMarkingCandidates(
   idealY: number,
   step: number
 ): { x: number; y: number; score: number }[] {
-  const { estWidth, textH, lineGap, hasMat, hasPart } = layoutStub;
+  const { estWidth, textH } = layoutStub;
   const padX = textH * 0.18;
   const padYLo = textH * 0.3;
   const padYHi = textH * 0.14;
-  const topH = markingTopExtent(textH, lineGap, hasMat, hasPart);
+  const topH = textH;
 
   const xMin = plateBox.minX + marginMm + padX;
   const xMax = plateBox.maxX - marginMm - estWidth - padX;
@@ -216,24 +201,16 @@ function collectMarkingCandidates(
 
 export function findMarkingPlacement(
   geo: BuiltPlateGeometry,
-  partLine: string,
-  matLine: string,
+  markingText: string,
   textH: number,
-  lineGap: number,
   plateMinDim: number,
   marginMm: number
 ): { x: number; yBase: number } | null {
-  const hasMat = Boolean(matLine);
-  const hasPart = Boolean(partLine);
-  if (!hasMat && !hasPart) return null;
+  if (!markingText) return null;
 
-  const longest = Math.max(partLine.length, matLine.length, 1);
-  const estWidth = longest * textH * 0.72;
+  const estWidth = Math.max(markingText.length, 1) * textH * 0.72;
   const layoutStub: Omit<MarkingTextLayout, "x" | "yBase"> = {
     textH,
-    lineGap,
-    hasMat,
-    hasPart,
     estWidth,
   };
 

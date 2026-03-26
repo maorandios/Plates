@@ -1,9 +1,9 @@
 import { z } from "zod";
 import {
-  conservativeCenterBounds,
-  holeFitsBounds,
-  slotCornersFitBounds,
+  circleFitsOuterRing,
+  polygonOutlineFitsOuterRing,
 } from "./lib/bounds";
+import { outerContourForShape } from "./lib/outerContours";
 import { slotCorners, slottedHoleCapsuleOutline } from "./lib/slotPolygon";
 
 const holeRowSchema = z.object({
@@ -82,7 +82,7 @@ export const plateBuilderFormSchema = z
       }
     }
 
-    const b = conservativeCenterBounds(
+    const outer = outerContourForShape(
       data.shapeType,
       w,
       h,
@@ -114,7 +114,7 @@ export const plateBuilderFormSchema = z
           hole.diameter,
           hole.rotationDeg
         );
-        if (!slotCornersFitBounds(outline, b)) {
+        if (!polygonOutlineFitsOuterRing(outer, outline)) {
           ctx.addIssue({
             code: "custom",
             message: "Hole must lie fully inside the plate",
@@ -130,7 +130,7 @@ export const plateBuilderFormSchema = z
           });
         }
         const r = hole.diameter / 2;
-        if (!holeFitsBounds(hole.cx, hole.cy, r, b)) {
+        if (!circleFitsOuterRing(outer, hole.cx, hole.cy, r)) {
           ctx.addIssue({
             code: "custom",
             message: "Hole must lie fully inside the plate",
@@ -148,7 +148,7 @@ export const plateBuilderFormSchema = z
         slot.width,
         slot.rotationDeg
       );
-      if (!slotCornersFitBounds(corners, b)) {
+      if (!polygonOutlineFitsOuterRing(outer, corners)) {
         ctx.addIssue({
           code: "custom",
           message: "Slot must lie fully inside the plate",

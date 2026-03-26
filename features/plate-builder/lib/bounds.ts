@@ -1,6 +1,150 @@
 import type { PlateBuilderShapeMvp } from "../types";
 import { slotCorners, slottedHoleCapsuleOutline } from "./slotPolygon";
 
+const PLATE_POLY_EPS = 1e-7;
+const CIRCLE_FIT_SAMPLES = 36;
+
+/** CCW convex plate outline; point inside or on boundary (half-plane cross ≥ −eps). */
+function pointInConvexPlateRing(
+  px: number,
+  py: number,
+  ring: [number, number][]
+): boolean {
+  const n = ring.length;
+  if (n < 3) return false;
+  for (let i = 0; i < n; i++) {
+    const ax = ring[i]![0];
+    const ay = ring[i]![1];
+    const bx = ring[(i + 1) % n]![0];
+    const by = ring[(i + 1) % n]![1];
+    const cross = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+    if (cross < -PLATE_POLY_EPS) return false;
+  }
+  return true;
+}
+
+function ringCentroid(ring: [number, number][]): [number, number] {
+  const n = ring.length;
+  if (n === 0) return [0, 0];
+  let a = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < n; i++) {
+    const [x0, y0] = ring[i]!;
+    const [x1, y1] = ring[(i + 1) % n]!;
+    const cross = x0 * y1 - x1 * y0;
+    a += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
+  }
+  a *= 0.5;
+  if (Math.abs(a) < 1e-18) {
+    let sx = 0;
+    let sy = 0;
+    for (const [x, y] of ring) {
+      sx += x;
+      sy += y;
+    }
+    return [sx / n, sy / n];
+  }
+  return [cx / (6 * a), cy / (6 * a)];
+}
+
+function clampTowardCentroid(
+  tcx: number,
+  tcy: number,
+  outer: [number, number][],
+  fits: (x: number, y: number) => boolean
+): [number, number] {
+  if (fits(tcx, tcy)) return [tcx, tcy];
+  const [gx, gy] = ringCentroid(outer);
+  if (!fits(gx, gy)) return [gx, gy];
+  let lo = 0;
+  let hi = 1;
+  for (let k = 0; k < 48; k++) {
+    const mid = (lo + hi) / 2;
+    const x = gx + (tcx - gx) * mid;
+    const y = gy + (tcy - gy) * mid;
+    if (fits(x, y)) lo = mid;
+    else hi = mid;
+  }
+  const t = lo;
+  return [gx + (tcx - gx) * t, gy + (tcy - gy) * t];
+}
+
+/** Round hole: entire circle lies in the plate outline (inclusive of boundary). */
+export function circleFitsOuterRing(
+  outer: [number, number][],
+  cx: number,
+  cy: number,
+  radius: number
+): boolean {
+  if (radius <= 0) return pointInConvexPlateRing(cx, cy, outer);
+  for (let i = 0; i < CIRCLE_FIT_SAMPLES; i++) {
+    const a = (i / CIRCLE_FIT_SAMPLES) * Math.PI * 2;
+    const px = cx + radius * Math.cos(a);
+    const py = cy + radius * Math.sin(a);
+    if (!pointInConvexPlateRing(px, py, outer)) return false;
+  }
+  return true;
+}
+
+/** Slotted hole capsule / slot: every vertex lies inside the plate outline. */
+export function polygonOutlineFitsOuterRing(
+  outer: [number, number][],
+  points: [number, number][]
+): boolean {
+  for (const [x, y] of points) {
+    if (!pointInConvexPlateRing(x, y, outer)) return false;
+  }
+  return true;
+}
+
+/** Keep hole center so the circle stays inside the true plate outline (not the inset AABB). */
+export function clampHoleCenterToOuterRing(
+  cx: number,
+  cy: number,
+  radius: number,
+  outer: [number, number][]
+): [number, number] {
+  return clampTowardCentroid(cx, cy, outer, (x, y) =>
+    circleFitsOuterRing(outer, x, y, radius)
+  );
+}
+
+export function clampCapsuleHoleCenterToOuterRing(
+  cx: number,
+  cy: number,
+  overallLength: number,
+  diameter: number,
+  rotationDeg: number,
+  outer: [number, number][]
+): [number, number] {
+  const L = Math.max(overallLength, diameter);
+  const fits = (px: number, py: number) =>
+    polygonOutlineFitsOuterRing(
+      outer,
+      slottedHoleCapsuleOutline(px, py, L, diameter, rotationDeg)
+    );
+  return clampTowardCentroid(cx, cy, outer, fits);
+}
+
+export function clampSlotCenterToOuterRing(
+  cx: number,
+  cy: number,
+  length: number,
+  width: number,
+  rotationDeg: number,
+  outer: [number, number][]
+): [number, number] {
+  const fits = (px: number, py: number) =>
+    polygonOutlineFitsOuterRing(
+      outer,
+      slotCorners(px, py, length, width, rotationDeg)
+    );
+  return clampTowardCentroid(cx, cy, outer, fits);
+}
+
 /** Conservative axis-aligned box [minX,maxX]×[minY,maxY] for hole/slot centers (circle centers / slot centers). */
 export function conservativeCenterBounds(
   shape: PlateBuilderShapeMvp,

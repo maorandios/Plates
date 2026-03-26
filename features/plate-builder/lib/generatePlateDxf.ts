@@ -26,6 +26,16 @@ function sanitizeDxfText(s: string): string {
     .slice(0, 250);
 }
 
+/** Single MARKING line: `Part name + Material` (one field omitted if empty). */
+function buildMarkingSingleLine(partName: string, material: string): string {
+  const p = sanitizeDxfText(partName);
+  const m = sanitizeDxfText(material);
+  let line = "";
+  if (p && m) line = `${p} + ${m}`;
+  else line = p || m;
+  return line.slice(0, 250);
+}
+
 export function generatePlateDxf(spec: PlateBuilderSpecV1): string {
   const dxf = new DxfWriter();
   dxf.setUnits(Units.Millimeters);
@@ -54,35 +64,25 @@ export function generatePlateDxf(spec: PlateBuilderSpecV1): string {
     dxf.addLWPolyline(verts, { flags: LWPolylineFlags.Closed });
   }
 
-  const partLine = sanitizeDxfText(spec.partName);
-  const matLine = sanitizeDxfText(spec.material);
-  if (partLine || matLine) {
+  const markingLine = buildMarkingSingleLine(spec.partName, spec.material);
+  if (markingLine) {
     const plateMin = Math.min(spec.width, spec.height);
     const textH = Math.min(6, Math.max(2.5, plateMin * 0.035));
-    const lineGap = textH * 1.35;
     const placed = findMarkingPlacement(
       geo,
-      partLine,
-      matLine,
+      markingLine,
       textH,
-      lineGap,
       plateMin,
       MARKING_MARGIN_MM
     );
     if (placed) {
-      const { x, yBase } = placed;
       const markingOpts = { layerName: PLATE_DXF_MARKING_LAYER } as const;
-      if (matLine) {
-        dxf.addText(point3d(x, yBase, 0), textH, matLine, markingOpts);
-      }
-      if (partLine) {
-        dxf.addText(
-          point3d(x, yBase + (matLine ? lineGap : 0), 0),
-          textH,
-          partLine,
-          markingOpts
-        );
-      }
+      dxf.addText(
+        point3d(placed.x, placed.yBase, 0),
+        textH,
+        markingLine,
+        markingOpts
+      );
     }
   }
 
