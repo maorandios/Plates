@@ -9,6 +9,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/": "Dashboard",
   "/batches": "Batches",
   "/batches/new": "New Batch",
+  "/quick-quote": "Quick Quote",
   "/plate-builder": "Plate Builder",
   "/settings": "Preferences",
 };

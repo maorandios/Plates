@@ -1,0 +1,414 @@
+import { nanoid } from "@/lib/utils/nanoid";
+import type {
+  JobSummaryMetrics,
+  ManufacturingParameters,
+  PricingSummary,
+  QuotePartRow,
+  ThicknessStockInput,
+  ValidationRecap,
+  ValidationRow,
+  ValidationSummary,
+} from "../types/quickQuote";
+import {
+  MOCK_JOB_SUMMARY,
+  MOCK_MFG_PARAMETERS,
+  MOCK_PRICING_SUMMARY,
+  MOCK_QUOTE_PART_ROWS,
+  MOCK_VALIDATION_ROWS,
+} from "../mock/quickQuoteMockData";
+
+function roundN(n: number, decimals: number): number {
+  const p = 10 ** decimals;
+  return Math.round(n * p) / p;
+}
+
+/** Quote part rows aligned by index with `MOCK_VALIDATION_ROWS`. */
+export function quotePartsForValidationSelection(
+  selected: ValidationRow[]
+): QuotePartRow[] {
+  const idSet = new Set(selected.map((r) => r.id));
+  return MOCK_QUOTE_PART_ROWS.filter((_, i) =>
+    idSet.has(MOCK_VALIDATION_ROWS[i].id)
+  );
+}
+
+export function jobSummaryFromParts(parts: QuotePartRow[]): JobSummaryMetrics {
+  const uniqueParts = parts.length;
+  const totalQty = parts.reduce((a, p) => a + p.qty, 0);
+  const totalPlateAreaM2 = roundN(
+    parts.reduce((a, p) => a + p.areaM2 * p.qty, 0),
+    2
+  );
+  const totalEstWeightKg = roundN(
+    parts.reduce((a, p) => a + p.weightKg * p.qty, 0),
+    1
+  );
+  const totalCutLengthMm = Math.round(
+    parts.reduce((a, p) => a + p.cutLengthMm * p.qty, 0)
+  );
+  const totalPierceCount = Math.round(
+    parts.reduce((a, p) => a + p.pierceCount * p.qty, 0)
+  );
+  return {
+    uniqueParts,
+    totalQty,
+    totalPlateAreaM2,
+    totalEstWeightKg,
+    totalCutLengthMm,
+    totalPierceCount,
+  };
+}
+
+export function validationSummaryFromRows(
+  rows: ValidationRow[]
+): ValidationSummary {
+  return {
+    totalRows: rows.length,
+    matched: rows.filter((r) => r.status === "valid").length,
+    warnings: rows.filter((r) => r.status === "warning").length,
+    critical: rows.filter((r) => r.status === "error").length,
+  };
+}
+
+export function validationRecapFromRows(rows: ValidationRow[]): ValidationRecap {
+  const fullyMatched = rows.filter((r) => r.status === "valid").length;
+  const warningItems = rows.filter((r) => r.status === "warning").length;
+  const errorItems = rows.filter((r) => r.status === "error").length;
+  if (rows.length === 0) {
+    return {
+      fullyMatched: 0,
+      warningItems: 0,
+      errorItems: 0,
+      confidenceNote: "No parts were included in this quote run.",
+    };
+  }
+  if (errorItems > 0) {
+    return {
+      fullyMatched,
+      warningItems,
+      errorItems,
+      confidenceNote:
+        "Selected parts include critical Excel/DXF mismatches — reconcile before production.",
+    };
+  }
+  if (warningItems > 0) {
+    return {
+      fullyMatched,
+      warningItems,
+      errorItems,
+      confidenceNote:
+        "Some selected parts have warnings; pricing may need written assumptions.",
+    };
+  }
+  return {
+    fullyMatched,
+    warningItems,
+    errorItems,
+    confidenceNote: "All selected parts matched between Excel and DXF.",
+  };
+}
+
+function scaleByWeightFactor(
+  baseWeight: number,
+  selectedWeight: number
+): number {
+  if (baseWeight <= 0) return 0;
+  return Math.min(1, selectedWeight / baseWeight);
+}
+
+/** Assumed nesting yield per sheet when estimating sheet count from purchased stock (UI mock). */
+const NEST_YIELD_ASSUMPTION = 0.67;
+
+function hasSheetsArray(r: ThicknessStockInput | unknown): r is ThicknessStockInput {
+  return (
+    typeof r === "object" &&
+    r !== null &&
+    "sheets" in r &&
+    Array.isArray((r as ThicknessStockInput).sheets)
+  );
+}
+
+/** Legacy row shape before multi-sheet (single dimensions on the thickness row). */
+type LegacyThicknessRow = {
+  thicknessMm: number;
+  sheetLengthMm: number;
+  sheetWidthMm: number;
+};
+
+function isLegacyThicknessRow(r: unknown): r is LegacyThicknessRow {
+  return (
+    typeof r === "object" &&
+    r !== null &&
+    "sheetLengthMm" in r &&
+    "sheetWidthMm" in r &&
+    !("sheets" in r)
+  );
+}
+
+/** True when every thickness has at least one sheet with valid dimensions. */
+export function isThicknessStockComplete(rows: ThicknessStockInput[]): boolean {
+  if (rows.length === 0) return false;
+  return rows.every(
+    (t) =>
+      t.sheets.length > 0 &&
+      t.sheets.every(
+        (s) =>
+          s.sheetLengthMm > 0 &&
+          s.sheetWidthMm > 0 &&
+          Number.isFinite(s.sheetLengthMm) &&
+          Number.isFinite(s.sheetWidthMm)
+      )
+  );
+}
+
+export function mergeDefaultStockRows(
+  parts: QuotePartRow[],
+  prev: ThicknessStockInput[]
+): ThicknessStockInput[] {
+  const unique = [...new Set(parts.map((p) => p.thicknessMm))].sort(
+    (a, b) => a - b
+  );
+  const prevMap = new Map(prev.map((r) => [r.thicknessMm, r]));
+  return unique.map((th) => {
+    const old = prevMap.get(th);
+    if (old && hasSheetsArray(old)) {
+      return { thicknessMm: th, sheets: old.sheets };
+    }
+    if (old && isLegacyThicknessRow(old)) {
+      const { sheetLengthMm, sheetWidthMm } = old;
+      if (sheetLengthMm > 0 && sheetWidthMm > 0) {
+        return {
+          thicknessMm: th,
+          sheets: [
+            {
+              id: nanoid(),
+              sheetLengthMm,
+              sheetWidthMm,
+            },
+          ],
+        };
+      }
+    }
+    return { thicknessMm: th, sheets: [] };
+  });
+}
+
+function stockMapFromRows(
+  rows: ThicknessStockInput[]
+): Map<number, ThicknessStockInput> {
+  return new Map(rows.map((r) => [r.thicknessMm, r]));
+}
+
+/** Σ (line weight × purchase price/kg); one global price applies to all thicknesses. */
+export function computeMaterialCostFromStock(
+  parts: QuotePartRow[],
+  stock: Map<number, ThicknessStockInput>,
+  pricePerKg: number
+): number {
+  let sum = 0;
+  for (const p of parts) {
+    const s = stock.get(p.thicknessMm);
+    if (!s) continue;
+    const lineKg = p.weightKg * p.qty;
+    sum += lineKg * pricePerKg;
+  }
+  return roundN(sum, 1);
+}
+
+function formatStockSummary(rows: ThicknessStockInput[], pricePerKg: number): string {
+  const byTh = rows
+    .map((r) => {
+      const sizes = r.sheets
+        .map((s) => `${s.sheetLengthMm} × ${s.sheetWidthMm} mm`)
+        .join(", ");
+      return `${r.thicknessMm} mm: ${sizes}`;
+    })
+    .join(" · ");
+  return `${byTh} · ${pricePerKg}/kg`;
+}
+
+/**
+ * For each thickness, pick the stock line that needs the fewest sheets (best fit among listed sizes).
+ */
+function estimateSheetUsageFromStock(
+  parts: QuotePartRow[],
+  stockRows: ThicknessStockInput[]
+): Pick<
+  ManufacturingParameters,
+  "totalSheetAreaM2" | "estimatedSheetCount" | "utilizationPct"
+> {
+  const netByTh = new Map<number, number>();
+  for (const p of parts) {
+    const a = p.areaM2 * p.qty;
+    netByTh.set(p.thicknessMm, (netByTh.get(p.thicknessMm) ?? 0) + a);
+  }
+  let totalSheetAreaM2 = 0;
+  let estimatedSheetCount = 0;
+  const totalNet = parts.reduce((a, p) => a + p.areaM2 * p.qty, 0);
+
+  for (const row of stockRows) {
+    const net = netByTh.get(row.thicknessMm) ?? 0;
+    if (row.sheets.length === 0) continue;
+
+    let bestSheets = Infinity;
+    let bestSheetM2 = 0;
+    for (const line of row.sheets) {
+      const sheetM2 =
+        (line.sheetLengthMm * line.sheetWidthMm) / 1_000_000;
+      if (sheetM2 <= 0) continue;
+      const sheets = Math.max(
+        1,
+        Math.ceil(net / (sheetM2 * NEST_YIELD_ASSUMPTION))
+      );
+      if (sheets < bestSheets) {
+        bestSheets = sheets;
+        bestSheetM2 = sheetM2;
+      }
+    }
+    if (bestSheets === Infinity || bestSheetM2 <= 0) continue;
+    totalSheetAreaM2 += bestSheets * bestSheetM2;
+    estimatedSheetCount += bestSheets;
+  }
+
+  const utilizationPct =
+    totalSheetAreaM2 > 0
+      ? roundN((totalNet / totalSheetAreaM2) * 100, 1)
+      : MOCK_MFG_PARAMETERS.utilizationPct;
+
+  return {
+    totalSheetAreaM2: roundN(totalSheetAreaM2, 2),
+    estimatedSheetCount,
+    utilizationPct,
+  };
+}
+
+function thicknessGroupLabel(parts: QuotePartRow[]): string {
+  const t = [...new Set(parts.map((p) => p.thicknessMm))].sort((a, b) => a - b);
+  if (t.length === 0) return MOCK_MFG_PARAMETERS.thicknessGroup;
+  if (t.length === 1) return `${t[0]} mm`;
+  return `${t[0]}–${t[t.length - 1]} mm`;
+}
+
+export function scaleManufacturingAndPricing(
+  parts: QuotePartRow[],
+  baseJob: JobSummaryMetrics,
+  baseMfg: ManufacturingParameters,
+  basePricing: PricingSummary
+): { mfg: ManufacturingParameters; pricing: PricingSummary } {
+  const selectedJob = jobSummaryFromParts(parts);
+  const f = scaleByWeightFactor(baseJob.totalEstWeightKg, selectedJob.totalEstWeightKg);
+
+  const mfg: ManufacturingParameters = {
+    ...baseMfg,
+    totalNetPlateAreaM2: roundN(baseMfg.totalNetPlateAreaM2 * f, 2),
+    totalCutLengthMm: Math.round(baseMfg.totalCutLengthMm * f),
+    totalPierceCount: Math.round(baseMfg.totalPierceCount * f),
+    estimatedMachineTimeMin: Math.max(
+      1,
+      Math.round(baseMfg.estimatedMachineTimeMin * f)
+    ),
+    totalSheetAreaM2: roundN(
+      Math.max(baseMfg.totalSheetAreaM2 * f, baseMfg.totalSheetAreaM2 * 0.12),
+      2
+    ),
+    estimatedSheetCount: Math.max(
+      1,
+      Math.round(baseMfg.estimatedSheetCount * f)
+    ),
+    utilizationPct: roundN(
+      Math.min(95, baseMfg.utilizationPct + (f < 1 ? (1 - f) * 4 : 0)),
+      1
+    ),
+  };
+
+  const pricing: PricingSummary = {
+    materialCost: roundN(basePricing.materialCost * f, 1),
+    cuttingCost: roundN(basePricing.cuttingCost * f, 1),
+    piercingCost: roundN(basePricing.piercingCost * f, 1),
+    setupCost: basePricing.setupCost,
+    overhead: roundN(basePricing.overhead * f, 1),
+    margin: roundN(basePricing.margin * f, 1),
+    finalEstimatedPrice: roundN(basePricing.finalEstimatedPrice * f, 1),
+    pricePerKg:
+      selectedJob.totalEstWeightKg > 0
+        ? roundN(
+            (basePricing.finalEstimatedPrice * f) / selectedJob.totalEstWeightKg,
+            2
+          )
+        : basePricing.pricePerKg,
+    avgPricePerPart:
+      parts.length > 0
+        ? roundN((basePricing.finalEstimatedPrice * f) / parts.length, 1)
+        : 0,
+    internalEstCost: roundN(basePricing.internalEstCost * f, 1),
+  };
+
+  return { mfg, pricing };
+}
+
+export function buildSelectionBundle(
+  rows: ValidationRow[],
+  stockByThickness?: ThicknessStockInput[] | null,
+  materialPricePerKg?: number
+) {
+  const parts = quotePartsForValidationSelection(rows);
+  const jobSummary = jobSummaryFromParts(parts);
+  const validationSummary = validationSummaryFromRows(rows);
+  const validationRecap = validationRecapFromRows(rows);
+  let { mfg, pricing } = scaleManufacturingAndPricing(
+    parts,
+    MOCK_JOB_SUMMARY,
+    MOCK_MFG_PARAMETERS,
+    MOCK_PRICING_SUMMARY
+  );
+
+  if (
+    stockByThickness?.length &&
+    isThicknessStockComplete(stockByThickness) &&
+    materialPricePerKg != null &&
+    Number.isFinite(materialPricePerKg)
+  ) {
+    const stock = stockMapFromRows(stockByThickness);
+    const sheetMetrics = estimateSheetUsageFromStock(parts, stockByThickness);
+    mfg = {
+      ...mfg,
+      ...sheetMetrics,
+      totalNetPlateAreaM2: jobSummary.totalPlateAreaM2,
+      materialRatePerKg: roundN(materialPricePerKg, 2),
+      standardStockSize: formatStockSummary(stockByThickness, materialPricePerKg),
+      thicknessGroup: thicknessGroupLabel(parts),
+    };
+
+    const userMaterial = computeMaterialCostFromStock(
+      parts,
+      stock,
+      materialPricePerKg
+    );
+    const deltaMat = userMaterial - pricing.materialCost;
+    const newFinal = roundN(pricing.finalEstimatedPrice + deltaMat, 1);
+    pricing = {
+      ...pricing,
+      materialCost: userMaterial,
+      finalEstimatedPrice: newFinal,
+      internalEstCost: roundN(pricing.internalEstCost + deltaMat, 1),
+      pricePerKg:
+        jobSummary.totalEstWeightKg > 0
+          ? roundN(newFinal / jobSummary.totalEstWeightKg, 2)
+          : pricing.pricePerKg,
+      avgPricePerPart:
+        parts.length > 0
+          ? roundN(newFinal / parts.length, 1)
+          : pricing.avgPricePerPart,
+    };
+  }
+
+  return {
+    validationRows: rows,
+    parts,
+    jobSummary,
+    validationSummary,
+    validationRecap,
+    mfgParams: mfg,
+    pricing,
+  };
+}

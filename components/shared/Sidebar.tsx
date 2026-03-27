@@ -11,6 +11,7 @@ import {
   Settings,
   ContactRound,
   SquareDashedBottom,
+  Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,11 @@ const navItems = [
     label: "Batches",
     href: "/batches",
     icon: Layers,
+  },
+  {
+    label: "Quick Quote",
+    href: "/quick-quote",
+    icon: Calculator,
   },
   {
     label: "Quick Plate Builder",

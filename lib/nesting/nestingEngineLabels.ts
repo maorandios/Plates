@@ -1,4 +1,4 @@
-/** Human-readable labels for server nesting engines. */
+/** Human-readable labels for nesting engine ids stored on runs. */
 
 export type NestingEngineId = "heuristic" | "svgnest";
 
