@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   ArrowLeft,
   FileDown,
@@ -10,19 +10,10 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { PartBreakdownTable } from "./PartBreakdownTable";
-import { PricingSummaryCard } from "./PricingSummaryCard";
 import { JobOverviewSection } from "../job-overview/components/JobOverviewSection";
-import { QuoteSummaryCards } from "./QuoteSummaryCards";
+import { MaterialBreakdownSection } from "../job-overview/components/MaterialBreakdownSection";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -30,16 +21,13 @@ import type {
   QuickQuoteJobDetails,
   QuotePartRow,
   ThicknessStockInput,
-  ValidationRecap,
 } from "../types/quickQuote";
-import { MOCK_QUOTE_ASSUMPTIONS } from "../mock/quickQuoteMockData";
 import { QuoteInsightsSection } from "../insights/components/QuoteInsightsSection";
 
 interface QuoteSummaryStepProps {
   jobDetails: QuickQuoteJobDetails;
   jobSummary: JobSummaryMetrics;
   parts: QuotePartRow[];
-  validationRecap: ValidationRecap;
   mfgParams: ManufacturingParameters;
   pricing: PricingSummary;
   thicknessStock?: ThicknessStockInput[];
@@ -51,16 +39,13 @@ export function QuoteSummaryStep({
   jobDetails,
   jobSummary,
   parts,
-  validationRecap,
   mfgParams,
   pricing,
   thicknessStock,
   onBack,
   onBackToValidation,
 }: QuoteSummaryStepProps) {
-  const [assumptions, setAssumptions] = useState(
-    () => MOCK_QUOTE_ASSUMPTIONS.join("\n")
-  );
+  const thicknessStockProvided = Boolean(thicknessStock?.length);
 
   const quoteDate = useMemo(
     () =>
@@ -113,12 +98,21 @@ export function QuoteSummaryStep({
         </div>
 
         <div className="p-4 sm:p-6 space-y-8">
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Job summary
-            </h2>
-            <QuoteSummaryCards metrics={jobSummary} />
-          </section>
+          <JobOverviewSection
+            jobSummary={jobSummary}
+            mfgParams={mfgParams}
+            parts={parts}
+            thicknessStock={thicknessStock}
+          />
+
+          <Separator />
+
+          <MaterialBreakdownSection
+            parts={parts}
+            thicknessStock={thicknessStock}
+            thicknessStockProvided={thicknessStockProvided}
+            currencyCode={jobDetails.currency}
+          />
 
           <Separator />
 
@@ -131,58 +125,6 @@ export function QuoteSummaryStep({
 
           <Separator />
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Validation recap
-            </h2>
-            <Card>
-              <CardContent className="pt-6 grid gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Fully matched</p>
-                  <p className="text-2xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                    {validationRecap.fullyMatched}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Warnings</p>
-                  <p className="text-2xl font-semibold tabular-nums text-amber-800 dark:text-amber-300">
-                    {validationRecap.warningItems}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Errors</p>
-                  <p className="text-2xl font-semibold tabular-nums text-destructive">
-                    {validationRecap.errorItems}
-                  </p>
-                </div>
-                <p className="text-sm text-muted-foreground sm:col-span-3 leading-relaxed">
-                  {validationRecap.confidenceNote}
-                </p>
-              </CardContent>
-            </Card>
-          </section>
-
-          <Separator />
-
-          <JobOverviewSection
-            jobSummary={jobSummary}
-            mfgParams={mfgParams}
-            parts={parts}
-            thicknessStock={thicknessStock}
-            currencyCode={jobDetails.currency}
-          />
-
-          <Separator />
-
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Pricing
-            </h2>
-            <PricingSummaryCard pricing={pricing} currency={jobDetails.currency} />
-          </section>
-
-          <Separator />
-
           <QuoteInsightsSection
             key={`${jobDetails.referenceNumber}-${pricing.finalEstimatedPrice}`}
             pricing={pricing}
@@ -190,30 +132,6 @@ export function QuoteSummaryStep({
             jobSummary={jobSummary}
             currencyCode={jobDetails.currency}
           />
-
-          <Separator />
-
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Notes & assumptions
-            </h2>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Editable notes (preview)</CardTitle>
-                <CardDescription>
-                  Shown on printouts; mock field for UI flow only.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={assumptions}
-                  onChange={(e) => setAssumptions(e.target.value)}
-                  rows={6}
-                  className="resize-y min-h-[140px] text-sm leading-relaxed"
-                />
-              </CardContent>
-            </Card>
-          </section>
         </div>
       </div>
 
@@ -221,7 +139,7 @@ export function QuoteSummaryStep({
         <Button type="button" variant="ghost" className="text-muted-foreground" onClick={onBackToValidation}>
           ← Back to validation
         </Button>
-        <p className="text-xs text-muted-foreground max-w-md">
+        <p className="text-xs text-muted-foreground">
           This quote workspace is a UI prototype. Actions and figures are not persisted or sent
           to a server.
         </p>

@@ -14,16 +14,12 @@ import {
   formatWeightKg,
 } from "../jobOverview.utils";
 import { JobOverviewCard } from "./JobOverviewCard";
-import { MaterialBreakdownSection } from "./MaterialBreakdownSection";
-import { QuickInsightCard } from "./QuickInsightCard";
-import { SizeRangeCard } from "./SizeRangeCard";
 
 interface JobOverviewSectionProps {
   jobSummary: JobSummaryMetrics;
   mfgParams: ManufacturingParameters;
   parts: QuotePartRow[];
   thicknessStock?: ThicknessStockInput[] | null;
-  currencyCode: string;
 }
 
 export function JobOverviewSection({
@@ -31,10 +27,7 @@ export function JobOverviewSection({
   mfgParams,
   parts,
   thicknessStock,
-  currencyCode,
 }: JobOverviewSectionProps) {
-  const thicknessStockProvided = Boolean(thicknessStock?.length);
-
   const model = useMemo(
     () =>
       buildJobOverview({ jobSummary, mfgParams, parts, thicknessStock }),
@@ -52,7 +45,7 @@ export function JobOverviewSection({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Job overview
         </h2>
-        <p className="text-sm text-muted-foreground max-w-2xl">
+        <p className="text-sm text-muted-foreground">
           Key job data extracted from the uploaded files.
         </p>
       </div>
@@ -99,18 +92,6 @@ export function JobOverviewSection({
           value={model.complexity}
           subtext={model.complexitySubtext}
         />
-      </div>
-
-      <MaterialBreakdownSection
-        parts={parts}
-        thicknessStock={thicknessStock}
-        thicknessStockProvided={thicknessStockProvided}
-        currencyCode={currencyCode}
-      />
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <SizeRangeCard sizeRange={model.sizeRange} />
-        <QuickInsightCard lines={model.quickInsights} />
       </div>
     </section>
   );

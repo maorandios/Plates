@@ -14,17 +14,36 @@ import {
   formatAreaM2,
 } from "../jobOverview.utils";
 
-/** Monochrome industrial tile fills (dark rects, light labels). */
-const TILE_COLORS = [
-  "#3f3f46",
-  "#52525b",
-  "#57534e",
-  "#64748b",
-  "#71717a",
-  "#5c5c5c",
-  "#4b5563",
-  "#525252",
-] as const;
+/**
+ * Exactly `count` distinct neutral grays (no rounding collisions).
+ * Flat treemap leaves use sibling `index` 0…count-1 to pick one fill each.
+ */
+function tileGrayFills(count: number): string[] {
+  if (count <= 0) return [];
+  if (count === 1) return ["hsl(0 0% 10%)"];
+  const minL = 6;
+  const maxL = 40;
+  const span = maxL - minL;
+  return Array.from({ length: count }, (_, i) => {
+    const t = count === 1 ? 0 : i / (count - 1);
+    const L = minL + t * span;
+    return `hsl(0 0% ${L.toFixed(2)}%)`;
+  });
+}
+
+function isTreemapLeaf(node: TreemapNode): boolean {
+  return !node.children || node.children.length === 0;
+}
+
+const labelFont =
+  'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+const textStyle = {
+  fontFamily: labelFont,
+  pointerEvents: "none" as const,
+  WebkitFontSmoothing: "antialiased" as const,
+  MozOsxFontSmoothing: "grayscale" as const,
+};
 
 type LeafPayload = TreemapNode & {
   sharePct?: number;
@@ -38,12 +57,43 @@ function truncateLabel(s: string, max: number) {
   return `${s.slice(0, max - 1)}…`;
 }
 
-function MaterialTreemapTile(props: LeafPayload) {
-  const { x, y, width, height, name, index, tooltipIndex } = props;
+function MaterialTreemapTile(
+  props: LeafPayload & { grayFills: string[] }
+) {
+  const { x, y, width, height, name, tooltipIndex, grayFills } = props;
   if (width <= 1 || height <= 1) return null;
-  const idx = typeof index === "number" ? index : 0;
-  const fill = TILE_COLORS[idx % TILE_COLORS.length];
+
+  if (!isTreemapLeaf(props)) {
+    return null;
+  }
+
   const sharePct = props.sharePct;
+  const leafIndex =
+    typeof props.index === "number" && Number.isFinite(props.index)
+      ? Math.min(
+          Math.max(0, Math.floor(props.index)),
+          Math.max(0, grayFills.length - 1)
+        )
+      : 0;
+  const fill =
+    grayFills.length > 0
+      ? grayFills[leafIndex] ?? grayFills[grayFills.length - 1]
+      : "hsl(0 0% 18%)";
+
+  const padX = 10;
+  const padY = 12;
+  const nameSize = 13;
+  const pctSize = 12;
+  const lineGap = 5;
+  const showName = width >= 64 && height >= 28 && name;
+  const showPct =
+    showName && sharePct != null && width >= 72 && height >= 48;
+
+  const maxChars = Math.max(8, Math.min(28, Math.floor((width - padX * 2) / 7)));
+
+  const tx = Math.round(x + padX);
+  const ty = Math.round(y + padY);
+  const ty2 = Math.round(ty + nameSize + lineGap);
 
   return (
     <g>
@@ -58,26 +108,32 @@ function MaterialTreemapTile(props: LeafPayload) {
         radius={3}
         data-recharts-item-index={tooltipIndex}
       />
-      {width > 52 && height >= 20 && name && (
+      {showName && (
         <text
-          x={x + 6}
-          y={y + 15}
-          fill="rgba(255,255,255,0.94)"
-          fontSize={11}
-          fontWeight={600}
-          style={{ pointerEvents: "none" }}
+          x={tx}
+          y={ty}
+          fill="#ffffff"
+          fillOpacity={0.96}
+          fontSize={nameSize}
+          fontWeight={500}
+          dominantBaseline="hanging"
+          stroke="none"
+          style={textStyle}
         >
-          {truncateLabel(String(name), 24)}
+          {truncateLabel(String(name), maxChars)}
         </text>
       )}
-      {width > 52 && height >= 34 && sharePct != null && (
+      {showPct && (
         <text
-          x={x + 6}
-          y={y + 29}
-          fill="rgba(255,255,255,0.78)"
-          fontSize={10}
-          fontWeight={500}
-          style={{ pointerEvents: "none" }}
+          x={tx}
+          y={ty2}
+          fill="#ffffff"
+          fillOpacity={0.82}
+          fontSize={pctSize}
+          fontWeight={400}
+          dominantBaseline="hanging"
+          stroke="none"
+          style={textStyle}
         >
           {sharePct.toFixed(0)}%
         </text>
@@ -98,7 +154,13 @@ export function MaterialTreemapChart({
   thicknessStockProvided,
   shareScopeLabel = "job",
 }: MaterialTreemapChartProps) {
-  const data = useMemo(() => buildMaterialTreemapLeaves(rows), [rows]);
+  const { data, grayFills } = useMemo(() => {
+    const leaves = buildMaterialTreemapLeaves(rows);
+    return {
+      data: leaves,
+      grayFills: tileGrayFills(leaves.length),
+    };
+  }, [rows]);
 
   if (data.length === 0) {
     return (
@@ -119,7 +181,7 @@ export function MaterialTreemapChart({
           stroke="hsl(var(--border))"
           aspectRatio={4 / 3}
           content={(nodeProps: LeafPayload) => (
-            <MaterialTreemapTile {...nodeProps} />
+            <MaterialTreemapTile {...nodeProps} grayFills={grayFills} />
           )}
         >
           <Tooltip

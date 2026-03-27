@@ -1,6 +1,5 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   INSIGHTS_MARGIN_MAX,
@@ -29,34 +28,15 @@ export function MarginSliderControl({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <Label htmlFor={id} className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Target margin on base cost
-          </Label>
-          <p className="text-3xl font-semibold tabular-nums tracking-tight">
-            {v}
-            <span className="text-lg font-medium text-muted-foreground ml-0.5">%</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor={`${id}-input`} className="text-xs text-muted-foreground sr-only">
-            Margin percent
-          </Label>
-          <Input
-            id={`${id}-input`}
-            type="number"
-            min={INSIGHTS_MARGIN_MIN}
-            max={INSIGHTS_MARGIN_MAX}
-            step={INSIGHTS_SLIDER_STEP}
-            className="h-9 w-[4.5rem] font-mono text-sm tabular-nums"
-            value={Number.isFinite(value) ? value : v}
-            onChange={(e) => apply(safeNumber(Number(e.target.value), v))}
-            onBlur={(e) => apply(safeNumber(Number(e.target.value), v))}
-          />
-          <span className="text-xs text-muted-foreground tabular-nums">%</span>
-        </div>
+    <div className="space-y-4 min-w-0">
+      <div className="space-y-1 min-w-0 text-left">
+        <Label htmlFor={id} className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Target margin on base cost
+        </Label>
+        <p className="text-3xl font-semibold tabular-nums tracking-tight">
+          {v}
+          <span className="text-lg font-medium text-muted-foreground ml-0.5">%</span>
+        </p>
       </div>
 
       <div className="space-y-2">

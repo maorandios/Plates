@@ -110,7 +110,7 @@ export function ValidationStep({
 
   return (
     <div className="space-y-8">
-      <div className="max-w-3xl">
+      <div className="w-full">
         <h1 className="text-2xl font-semibold tracking-tight">Validation results</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           We checked the uploaded Excel against the detected DXF part data (mocked extraction).

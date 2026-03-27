@@ -113,7 +113,7 @@ export function QuickQuotePage() {
 
   return (
     <PageContainer className="bg-muted/20">
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="w-full space-y-8">
         <div className="rounded-xl border border-border bg-card px-4 py-5 sm:px-6 shadow-sm">
           <QuoteStepper
             currentStep={step}
@@ -175,7 +175,6 @@ export function QuickQuotePage() {
             jobDetails={jobDetails}
             jobSummary={selection.jobSummary}
             parts={selection.parts}
-            validationRecap={selection.validationRecap}
             mfgParams={selection.mfgParams}
             pricing={selection.pricing}
             thicknessStock={

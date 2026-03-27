@@ -25,7 +25,7 @@ export function QuoteStepper({
 }: QuoteStepperProps) {
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between gap-2 max-w-4xl mx-auto">
+      <div className="flex w-full items-center justify-between gap-2">
         {STEPS.map(({ step, label }, index) => {
           const isComplete = step < currentStep;
           const isCurrent = step === currentStep;

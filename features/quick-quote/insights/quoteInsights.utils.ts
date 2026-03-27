@@ -1,18 +1,20 @@
-import type { JobSummaryMetrics, ManufacturingParameters, PricingSummary } from "../types/quickQuote";
+import { formatAreaM2 } from "../job-overview/jobOverview.utils";
+import type {
+  JobSummaryMetrics,
+  ManufacturingParameters,
+  PricingSummary,
+} from "../types/quickQuote";
 import {
-  INSIGHTS_BAR_FILLS,
   INSIGHTS_CHART_MARGIN_STEP,
   INSIGHTS_DEFAULT_MARGIN_FALLBACK,
   INSIGHTS_MARGIN_MAX,
   INSIGHTS_MARGIN_MIN,
 } from "./quoteInsights.mock";
 import type {
-  CostBreakdownRow,
-  LargestCostInfo,
   MarginCurvePoint,
   QuoteCostInputs,
   QuoteInsightsDerived,
-  ShareBreakdown,
+  SheetSensitivityPoint,
 } from "./quoteInsights.types";
 
 export function safeNumber(n: unknown, fallback = 0): number {
@@ -95,56 +97,6 @@ export function buildMarginChartData(
   return out;
 }
 
-export function buildCostBreakdownData(
-  inputs: QuoteCostInputs,
-  profitAmount: number
-): CostBreakdownRow[] {
-  const rows: CostBreakdownRow[] = [
-    { key: "material", label: "Material", value: safeNumber(inputs.materialCost), fill: INSIGHTS_BAR_FILLS[0] },
-    { key: "cutting", label: "Cutting", value: safeNumber(inputs.cuttingCost), fill: INSIGHTS_BAR_FILLS[1] },
-    { key: "piercing", label: "Piercing", value: safeNumber(inputs.piercingCost), fill: INSIGHTS_BAR_FILLS[2] },
-    { key: "setup", label: "Setup", value: safeNumber(inputs.setupCost), fill: INSIGHTS_BAR_FILLS[3] },
-    { key: "overhead", label: "Overhead", value: safeNumber(inputs.overheadCost), fill: INSIGHTS_BAR_FILLS[4] },
-    { key: "margin", label: "Profit / margin", value: Math.max(0, safeNumber(profitAmount)), fill: INSIGHTS_BAR_FILLS[5] },
-  ];
-  return rows;
-}
-
-export function processingCostFromInputs(inputs: QuoteCostInputs): number {
-  return (
-    safeNumber(inputs.cuttingCost) +
-    safeNumber(inputs.piercingCost) +
-    safeNumber(inputs.setupCost)
-  );
-}
-
-export function buildShareBreakdown(
-  inputs: QuoteCostInputs,
-  profitAmount: number,
-  finalQuotePrice: number
-): ShareBreakdown {
-  const final = Math.max(1e-9, safeNumber(finalQuotePrice));
-  const material = safeNumber(inputs.materialCost);
-  const processing = processingCostFromInputs(inputs);
-  const profit = Math.max(0, safeNumber(profitAmount));
-  return {
-    materialShare: material / final,
-    processingShare: processing / final,
-    marginShare: profit / final,
-  };
-}
-
-export function findLargestCostComponent(rows: CostBreakdownRow[]): LargestCostInfo {
-  if (rows.length === 0) {
-    return { key: "none", label: "—", value: 0 };
-  }
-  let best = rows[0];
-  for (const r of rows) {
-    if (r.value > best.value) best = r;
-  }
-  return { key: best.key, label: best.label, value: best.value };
-}
-
 export function deriveInsights(
   inputs: QuoteCostInputs,
   marginPercent: number,
@@ -168,11 +120,6 @@ export function deriveInsights(
 
 export function defaultMarginPercentFromMfg(mfg: ManufacturingParameters): number {
   return clampMargin(safeNumber(mfg.profitMarginPct, INSIGHTS_DEFAULT_MARGIN_FALLBACK));
-}
-
-export function formatPercentDisplay(ratio: number, fractionDigits = 0): string {
-  if (!Number.isFinite(ratio) || ratio < 0) return "0%";
-  return `${(ratio * 100).toFixed(fractionDigits)}%`;
 }
 
 export function formatKgDisplay(kg: number): string {
@@ -214,4 +161,106 @@ export function buildDynamicInsightLines(
     );
   }
   return lines;
+}
+
+/** Slider / chart domain for sheet sensitivity (utilization %). */
+export const SHEET_SENSITIVITY_UTIL_MIN = 50;
+export const SHEET_SENSITIVITY_UTIL_MAX = 90;
+
+export function clampSheetSensitivityUtil(u: number): number {
+  const n = Math.round(safeNumber(u, 67));
+  return Math.min(
+    SHEET_SENSITIVITY_UTIL_MAX,
+    Math.max(SHEET_SENSITIVITY_UTIL_MIN, n)
+  );
+}
+
+/**
+ * Effective area of one reference sheet (m²) from quote manufacturing totals.
+ * Falls back to 2500×1250 mm when sheet count / area are missing.
+ */
+export function referenceSheetAreaM2(mfg: ManufacturingParameters): number {
+  const count = Math.max(1, Math.round(safeNumber(mfg.estimatedSheetCount, 1)));
+  const total = Math.max(0, safeNumber(mfg.totalSheetAreaM2));
+  if (total > 0 && count > 0) return total / count;
+  return (2500 * 1250) / 1_000_000;
+}
+
+export function materialAndSheetsForUtilization(
+  totalNetPlateAreaM2: number,
+  stockSheetAreaM2: number,
+  utilizationPct: number
+): { requiredMaterialAreaM2: number; sheetCount: number } {
+  const uPct = Math.max(SHEET_SENSITIVITY_UTIL_MIN, Math.min(SHEET_SENSITIVITY_UTIL_MAX, utilizationPct));
+  const u = Math.max(1, uPct) / 100;
+  const net = Math.max(0, safeNumber(totalNetPlateAreaM2));
+  const sheetA = Math.max(1e-9, safeNumber(stockSheetAreaM2, 1e-9));
+  const required = net / u;
+  const sheetCount = Math.max(1, Math.ceil(required / sheetA));
+  return { requiredMaterialAreaM2: required, sheetCount };
+}
+
+const SHEET_SENSITIVITY_CHART_STEP = 2;
+
+export function buildSheetSensitivitySeries(
+  totalNetPlateAreaM2: number,
+  stockSheetAreaM2: number
+): SheetSensitivityPoint[] {
+  const out: SheetSensitivityPoint[] = [];
+  for (
+    let u = SHEET_SENSITIVITY_UTIL_MIN;
+    u <= SHEET_SENSITIVITY_UTIL_MAX;
+    u += SHEET_SENSITIVITY_CHART_STEP
+  ) {
+    const { requiredMaterialAreaM2, sheetCount } = materialAndSheetsForUtilization(
+      totalNetPlateAreaM2,
+      stockSheetAreaM2,
+      u
+    );
+    out.push({ utilizationPct: u, sheetCount, requiredMaterialAreaM2 });
+  }
+  const last = out[out.length - 1];
+  if (last && last.utilizationPct < SHEET_SENSITIVITY_UTIL_MAX) {
+    const { requiredMaterialAreaM2, sheetCount } = materialAndSheetsForUtilization(
+      totalNetPlateAreaM2,
+      stockSheetAreaM2,
+      SHEET_SENSITIVITY_UTIL_MAX
+    );
+    out.push({ utilizationPct: SHEET_SENSITIVITY_UTIL_MAX, sheetCount, requiredMaterialAreaM2 });
+  }
+  return out;
+}
+
+/**
+ * One-line insight comparing slider utilization to the quote baseline (same net plate area).
+ */
+export function buildSheetSensitivityInsightSentence(
+  quoteUtilizationPct: number,
+  sliderUtilizationPct: number,
+  totalNetPlateAreaM2: number,
+  stockSheetAreaM2: number
+): string {
+  const base = clampSheetSensitivityUtil(quoteUtilizationPct);
+  const cur = clampSheetSensitivityUtil(sliderUtilizationPct);
+  const atBase = materialAndSheetsForUtilization(
+    totalNetPlateAreaM2,
+    stockSheetAreaM2,
+    base
+  );
+  const atCur = materialAndSheetsForUtilization(
+    totalNetPlateAreaM2,
+    stockSheetAreaM2,
+    cur
+  );
+
+  if (cur > base && atCur.sheetCount < atBase.sheetCount) {
+    return `Improving utilization from ${base}% to ${cur}% reduces sheet count from ${atBase.sheetCount} to ${atCur.sheetCount}.`;
+  }
+  if (cur < base && atCur.sheetCount > atBase.sheetCount) {
+    return `Lowering utilization from ${base}% to ${cur}% increases sheet count from ${atBase.sheetCount} to ${atCur.sheetCount}.`;
+  }
+  if (cur === base) {
+    return `This matches the quote utilization (${base}%): ${atCur.sheetCount} sheet${atCur.sheetCount === 1 ? "" : "s"} at ${formatAreaM2(atCur.requiredMaterialAreaM2)} required material area.`;
+  }
+  return `At ${cur}% utilization, estimated sheets are ${atCur.sheetCount} with ${formatAreaM2(atCur.requiredMaterialAreaM2)} required material area (quote baseline ${base}%).`;
 }

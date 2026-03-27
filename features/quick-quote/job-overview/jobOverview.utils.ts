@@ -10,8 +10,6 @@ import type {
   ComplexityLevel,
   JobOverviewModel,
   MaterialBreakdownRow,
-  PartFootprint,
-  SizeRangeInfo,
   UtilizationBand,
 } from "./jobOverview.types";
 
@@ -54,16 +52,6 @@ export function utilizationToBand(utilizationPct: number): UtilizationBand {
   if (u < 48) return "Low efficiency";
   if (u < 68) return "Moderate efficiency";
   return "Good efficiency";
-}
-
-function footprintFromPart(p: QuotePartRow): PartFootprint {
-  const lengthMm = safeFinite(p.lengthMm);
-  const widthMm = safeFinite(p.widthMm);
-  return {
-    lengthMm,
-    widthMm,
-    areaMm2: Math.max(0, lengthMm * widthMm),
-  };
 }
 
 type AggBucket = {
@@ -232,18 +220,6 @@ export function buildMaterialTreemapLeaves(
   }));
 }
 
-export function buildSizeRange(parts: QuotePartRow[]): SizeRangeInfo | null {
-  if (parts.length === 0) return null;
-  const prints = parts.map(footprintFromPart);
-  let largest = prints[0];
-  let smallest = prints[0];
-  for (const fp of prints) {
-    if (fp.areaMm2 > largest.areaMm2) largest = fp;
-    if (fp.areaMm2 < smallest.areaMm2) smallest = fp;
-  }
-  return { largest, smallest };
-}
-
 function classifyComplexity(
   jobSummary: JobSummaryMetrics,
   parts: QuotePartRow[]
@@ -284,48 +260,10 @@ function classifyComplexity(
   return { level, subtext };
 }
 
-function buildQuickInsights(model: JobOverviewModel): string[] {
-  const lines: string[] = [];
-
-  if (model.utilizationPct < 55) {
-    lines.push(
-      "Low utilization suggests high material waste relative to the estimated nested sheets."
-    );
-  }
-
-  const piercePerPart =
-    model.totalPierceCount / Math.max(model.totalParts, 1);
-  if (piercePerPart > 14) {
-    lines.push(
-      "High pierce count indicates relatively complex cutting geometry (holes and starts)."
-    );
-  }
-
-  const top = model.materialBreakdown[0];
-  if (top && top.share >= 0.5) {
-    lines.push(
-      `Most of the job is concentrated in ${top.label} (${(top.share * 100).toFixed(0)}% by weight).`
-    );
-  }
-
-  if (model.complexity === "High" && lines.length < 3) {
-    lines.push(
-      "Overall job load is high — plan extra time for nesting validation and CAM checks."
-    );
-  }
-
-  if (model.totalPlates > 80 && lines.length < 3) {
-    lines.push("Large total plate count — confirm batching and material call-offs early.");
-  }
-
-  return lines.slice(0, 3);
-}
-
 export function buildJobOverview(input: BuildJobOverviewInput): JobOverviewModel {
   const { jobSummary, mfgParams, parts, thicknessStock } = input;
 
   const materialBreakdown = buildMaterialBreakdown(parts, thicknessStock);
-  const sizeRange = buildSizeRange(parts);
   const { level: complexity, subtext: complexitySubtext } = classifyComplexity(
     jobSummary,
     parts
@@ -346,10 +284,7 @@ export function buildJobOverview(input: BuildJobOverviewInput): JobOverviewModel
     complexity,
     complexitySubtext,
     materialBreakdown,
-    sizeRange,
-    quickInsights: [],
   };
 
-  model.quickInsights = buildQuickInsights(model);
   return model;
 }

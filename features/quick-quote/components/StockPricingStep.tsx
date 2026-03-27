@@ -96,7 +96,7 @@ export function StockPricingStep({
 
   return (
     <div className="space-y-8">
-      <div className="max-w-3xl">
+      <div className="w-full">
         <h1 className="text-2xl font-semibold tracking-tight">Stock & pricing</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           Add one or more purchased sheet sizes per thickness using{" "}
@@ -132,7 +132,7 @@ export function StockPricingStep({
         />
       </div>
 
-      <Card className="border-border shadow-sm max-w-xl">
+      <Card className="border-border shadow-sm w-full">
         <CardHeader className="border-b border-border bg-muted/20 py-3">
           <CardTitle className="text-base">Material purchase price</CardTitle>
           <CardDescription>

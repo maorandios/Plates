@@ -11,12 +11,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { cn } from "@/lib/utils";
 import { buildFinalQuotePrice, buildMarginChartData } from "../quoteInsights.utils";
 
 interface PriceImpactChartProps {
   baseCost: number;
   currentMarginPercent: number;
   formatCurrency: (n: number) => string;
+  /** Merges into the chart wrapper (e.g. `mt-2` when nested beside the margin slider). */
+  className?: string;
 }
 
 
@@ -24,6 +27,7 @@ export function PriceImpactChart({
   baseCost,
   currentMarginPercent,
   formatCurrency,
+  className = "",
 }: PriceImpactChartProps) {
   const data = useMemo(() => buildMarginChartData(baseCost), [baseCost]);
   const currentY = useMemo(
@@ -32,7 +36,7 @@ export function PriceImpactChart({
   );
 
   return (
-    <div className="w-full h-[240px] mt-4">
+    <div className={cn("w-full min-h-[220px] h-[220px] mt-4", className)}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
           <CartesianGrid

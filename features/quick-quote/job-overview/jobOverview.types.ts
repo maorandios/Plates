@@ -26,17 +26,6 @@ export interface MaterialBreakdownRow {
   stockSheetsCaption: string | null;
 }
 
-export interface PartFootprint {
-  lengthMm: number;
-  widthMm: number;
-  areaMm2: number;
-}
-
-export interface SizeRangeInfo {
-  largest: PartFootprint;
-  smallest: PartFootprint;
-}
-
 /** Fully derived view model for the Job Overview UI. */
 export interface JobOverviewModel {
   totalParts: number;
@@ -52,8 +41,6 @@ export interface JobOverviewModel {
   complexity: ComplexityLevel;
   complexitySubtext: string;
   materialBreakdown: MaterialBreakdownRow[];
-  sizeRange: SizeRangeInfo | null;
-  quickInsights: string[];
 }
 
 export interface BuildJobOverviewInput {

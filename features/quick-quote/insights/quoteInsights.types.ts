@@ -15,14 +15,6 @@ export interface MarginCurvePoint {
   profitAmount: number;
 }
 
-export interface CostBreakdownRow {
-  key: string;
-  label: string;
-  value: number;
-  /** Neutral fill for Recharts (hex). */
-  fill: string;
-}
-
 export interface QuoteInsightsDerived {
   baseCost: number;
   profitAmount: number;
@@ -32,21 +24,16 @@ export interface QuoteInsightsDerived {
   pricePerKgUnavailable: boolean;
 }
 
-export interface ShareBreakdown {
-  materialShare: number;
-  processingShare: number;
-  marginShare: number;
-}
-
-export interface LargestCostInfo {
-  key: string;
-  label: string;
-  value: number;
-}
-
 export interface QuoteInsightsProps {
   pricing: PricingSummary;
   mfgParams: ManufacturingParameters;
   jobSummary: JobSummaryMetrics;
   currencyCode: string;
+}
+
+/** One point on the sheet-count vs utilization sensitivity curve. */
+export interface SheetSensitivityPoint {
+  utilizationPct: number;
+  sheetCount: number;
+  requiredMaterialAreaM2: number;
 }

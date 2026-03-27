@@ -1,119 +1,76 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import type { ManufacturingParameters } from "../../types/quickQuote";
+import { InsightStatCard } from "./InsightStatCard";
 import { MarginSliderControl } from "./MarginSliderControl";
 import { PriceImpactChart } from "./PriceImpactChart";
-import { buildDynamicInsightLines } from "../quoteInsights.utils";
+import { SheetCountSensitivityPanel } from "./SheetCountSensitivityPanel";
 
 interface MarginImpactPanelProps {
   marginPercent: number;
   onMarginChange: (n: number) => void;
   baseCost: number;
-  defaultMarginPercent: number;
   finalQuotePrice: number;
   profitAmount: number;
   pricePerKg: number;
   pricePerKgUnavailable: boolean;
   formatCurrency: (n: number) => string;
-  formatKg: (kg: number) => string;
-  totalWeightKg: number;
-}
-
-function Kpi({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="text-lg font-semibold tabular-nums tracking-tight mt-1 text-foreground">
-        {value}
-      </p>
-      {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
-    </div>
-  );
+  mfgParams: ManufacturingParameters;
 }
 
 export function MarginImpactPanel({
   marginPercent,
   onMarginChange,
   baseCost,
-  defaultMarginPercent,
   finalQuotePrice,
   profitAmount,
   pricePerKg,
   pricePerKgUnavailable,
   formatCurrency,
-  formatKg,
-  totalWeightKg,
+  mfgParams,
 }: MarginImpactPanelProps) {
-  const insightLines = buildDynamicInsightLines(
-    marginPercent,
-    defaultMarginPercent,
-    baseCost,
-    formatCurrency
-  );
-
   return (
-    <Card className="border-border shadow-sm h-full flex flex-col">
-      <CardHeader className="border-b border-border bg-muted/20 pb-4">
-        <CardTitle className="text-base">Margin & price impact</CardTitle>
-        <CardDescription>
-          Margin is applied to base cost (material + cutting + piercing + setup + overhead).
-          Charts and KPIs update instantly.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-6 flex flex-col flex-1 gap-6">
-        <MarginSliderControl value={marginPercent} onChange={onMarginChange} />
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Kpi label="Final quote price" value={formatCurrency(finalQuotePrice)} />
-          <Kpi label="Profit amount" value={formatCurrency(profitAmount)} />
-          <Kpi
-            label="Price / kg"
-            value={
-              pricePerKgUnavailable
-                ? "—"
-                : formatCurrency(pricePerKg)
-            }
-            sub={
-              pricePerKgUnavailable
-                ? "Weight not available"
-                : `On ${formatKg(totalWeightKg)} estimated`
-            }
-          />
-        </div>
-
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Price impact by margin
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-stretch">
+      <Card className="border-border shadow-sm min-w-0 bg-muted/15 dark:bg-muted/25 h-full flex flex-col">
+        <CardContent className="pt-6 flex flex-col flex-1 gap-4 min-h-0 min-w-0">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide min-h-[1.25rem] leading-none">
+            Margin & price curve
           </p>
-          <PriceImpactChart
-            baseCost={baseCost}
-            currentMarginPercent={marginPercent}
-            formatCurrency={formatCurrency}
-          />
-        </div>
 
-        <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/10 px-4 py-3 text-sm text-muted-foreground leading-relaxed">
-          {insightLines.map((line, i) => (
-            <p key={i}>{line}</p>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0 auto-rows-fr">
+            <InsightStatCard label="Final quote price" value={formatCurrency(finalQuotePrice)} />
+            <InsightStatCard label="Profit amount" value={formatCurrency(profitAmount)} />
+            <InsightStatCard
+              label="Price / kg"
+              value={pricePerKgUnavailable ? "—" : formatCurrency(pricePerKg)}
+            />
+          </div>
+
+          <div className="min-w-0 pt-1 border-b border-border/60 pb-4 shrink-0">
+            <MarginSliderControl value={marginPercent} onChange={onMarginChange} />
+          </div>
+          <div className="min-h-0 flex flex-col flex-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide shrink-0">
+              Price impact by margin
+            </p>
+            <div className="mt-2 flex-1 min-h-[220px]">
+              <PriceImpactChart
+                baseCost={baseCost}
+                currentMarginPercent={marginPercent}
+                formatCurrency={formatCurrency}
+                className="mt-0 h-full min-h-[220px]"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border shadow-sm min-w-0 bg-muted/15 dark:bg-muted/25 h-full flex flex-col">
+        <CardContent className="pt-6 flex flex-col flex-1 gap-4 min-h-0 min-w-0">
+          <SheetCountSensitivityPanel mfgParams={mfgParams} />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

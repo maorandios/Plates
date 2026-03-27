@@ -65,7 +65,7 @@ export function UploadStep({
 
   return (
     <div className="space-y-8">
-      <div className="max-w-3xl">
+      <div className="w-full">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Quick Quote
         </h1>
@@ -152,7 +152,7 @@ export function UploadStep({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border">
-        <p className="text-xs text-muted-foreground max-w-md">
+        <p className="text-xs text-muted-foreground">
           Continue runs a mocked validation pass. No files leave your browser in this preview.
         </p>
         <Button type="button" size="lg" disabled={!canContinue} onClick={onContinue}>

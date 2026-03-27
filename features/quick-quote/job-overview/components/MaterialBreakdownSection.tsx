@@ -3,13 +3,7 @@
 import { useMemo, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -105,12 +99,12 @@ export function MaterialBreakdownSection({
   }
 
   return (
-    <section className="space-y-4 pt-6 mt-2 border-t border-border">
+    <section className="space-y-6">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Material breakdown
-        </h3>
-        <p className="text-sm text-muted-foreground max-w-3xl">
+        </h2>
+        <p className="text-sm text-muted-foreground">
           Treemap by grade and thickness. Use the filters to slice the job; tiles and summary
           cards update for the current selection. Reset clears all filters.
         </p>
@@ -249,17 +243,7 @@ export function MaterialBreakdownSection({
       </div>
 
       <Card className="border-border shadow-sm overflow-hidden">
-        <CardHeader className="border-b border-border bg-muted/15 py-4">
-          <CardTitle className="text-base font-semibold">
-            Job mix by grade &amp; thickness
-          </CardTitle>
-          <CardDescription className="text-xs">
-            {filtered
-              ? "Filtered view — tile sizes are shares within the selection only."
-              : "Full job — same nesting-yield assumption as quote totals."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6 pt-4">
+        <CardContent className="p-3 sm:p-4">
           {displayRows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-border rounded-lg">
               {filteredParts.length === 0

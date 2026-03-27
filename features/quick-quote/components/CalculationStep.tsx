@@ -78,7 +78,7 @@ export function CalculationStep({
 
   return (
     <div className="space-y-8">
-      <div className="max-w-3xl">
+      <div className="w-full">
         <h1 className="text-2xl font-semibold tracking-tight">Calculating quote</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           This step prepares the quote data based on uploaded files and validated part

@@ -28,13 +28,53 @@ export const QUICK_QUOTE_CURRENCY_OPTIONS: { code: string; label: string }[] = [
   { code: "SAR", label: "SAR — Saudi riyal" },
 ];
 
+function resolveQuickQuoteCurrencyCode(currencyCode: string): string {
+  return QUICK_QUOTE_CURRENCY_OPTIONS.some((c) => c.code === currencyCode)
+    ? currencyCode
+    : "EUR";
+}
+
+/** Symbol (or fallback code) for column headers and labels. */
+export function quickQuoteCurrencySymbol(currencyCode: string): string {
+  const code = resolveQuickQuoteCurrencyCode(currencyCode);
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: code,
+      currencyDisplay: "narrowSymbol",
+    }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Amount only — no currency symbol (for tables that show symbol in header). */
+export function formatQuickQuoteCurrencyAmount(
+  amount: number,
+  currencyCode: string
+): string {
+  const code = resolveQuickQuoteCurrencyCode(currencyCode);
+  try {
+    const ref = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: code,
+    });
+    const opts = ref.resolvedOptions();
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: opts.minimumFractionDigits,
+      maximumFractionDigits: opts.maximumFractionDigits,
+    }).format(amount);
+  } catch {
+    return amount.toFixed(2);
+  }
+}
+
 export function formatQuickQuoteCurrency(
   amount: number,
   currencyCode: string
 ): string {
-  const code = QUICK_QUOTE_CURRENCY_OPTIONS.some((c) => c.code === currencyCode)
-    ? currencyCode
-    : "EUR";
+  const code = resolveQuickQuoteCurrencyCode(currencyCode);
   try {
     return new Intl.NumberFormat(undefined, {
       style: "currency",

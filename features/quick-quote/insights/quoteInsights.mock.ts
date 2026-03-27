@@ -10,15 +10,3 @@ export const INSIGHTS_CHART_MARGIN_STEP = 2;
 
 /** Default margin % when `ManufacturingParameters.profitMarginPct` is invalid. */
 export const INSIGHTS_DEFAULT_MARGIN_FALLBACK = 12;
-
-/**
- * Neutral bar fills (industrial / monochrome). Order matches breakdown category order.
- */
-export const INSIGHTS_BAR_FILLS = [
-  "#57534e",
-  "#64748b",
-  "#71717a",
-  "#52525b",
-  "#737373",
-  "#3f3f46",
-] as const;
