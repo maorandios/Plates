@@ -1,4 +1,4 @@
-export type QuickQuoteStep = 1 | 2 | 3 | 4 | 5;
+export type QuickQuoteStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 /** One purchased sheet size line for a thickness (catalog or manual). */
 export interface QuoteSheetStockLine {

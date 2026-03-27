@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quotation {{ quote_number }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>{{ css_text | safe }}</style>
+</head>
+<body>
+  <div class="doc">
+    <header class="header">
+      <div class="brand">
+        {% if logo_data_uri %}
+        <img class="logo" src="{{ logo_data_uri }}" alt="" />
+        {% endif %}
+        <div class="brand-name">{{ company_name }}</div>
+      </div>
+      <div class="meta">
+        <h1 class="doc-title">QUOTATION</h1>
+        <div class="meta-row"><span class="label">Quote no.</span><span class="value">{{ quote_number }}</span></div>
+        <div class="meta-row"><span class="label">Date</span><span class="value">{{ quote_date }}</span></div>
+        <div class="meta-row"><span class="label">Valid until</span><span class="value">{{ valid_until }}</span></div>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2 class="section-title">Customer &amp; quote details</h2>
+      <div class="grid-2">
+        <div>
+          <div class="kv">
+            <div class="label">Customer</div>
+            <div class="value">{{ customer_name or "—" }}</div>
+          </div>
+          <div class="kv">
+            <div class="label">Company</div>
+            <div class="value">{{ customer_company or "—" }}</div>
+          </div>
+          <div class="kv">
+            <div class="label">Project / job</div>
+            <div class="value">{{ project_name or "—" }}</div>
+          </div>
+        </div>
+        <div>
+          <div class="kv">
+            <div class="label">Reference</div>
+            <div class="value">{{ reference_number or "—" }}</div>
+          </div>
+          <div class="kv">
+            <div class="label">Currency</div>
+            <div class="value">{{ currency }}</div>
+          </div>
+          <div class="kv">
+            <div class="label">Prepared by</div>
+            <div class="value">{{ prepared_by or "—" }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Job summary</h2>
+      <div class="cards">
+        {% for card in summary_cards %}
+        <div class="card">
+          <div class="label">{{ card.label }}</div>
+          <div class="value">{{ card.value }}</div>
+          {% if card.hint %}<div class="hint">{{ card.hint }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Scope of work</h2>
+      <p class="scope-text">{{ scope_primary }}</p>
+      {% if scope_secondary %}
+      <p class="scope-text secondary">{{ scope_secondary }}</p>
+      {% endif %}
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Part breakdown</h2>
+      <div class="table-wrap">
+        <table class="parts">
+          <thead>
+            <tr>
+              <th class="part-name">Part name</th>
+              <th class="qty">Qty</th>
+              <th>Material</th>
+              <th>Thickness</th>
+              <th>Size</th>
+              <th class="num">Weight</th>
+              <th class="num">Line total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in item_rows %}
+            <tr>
+              <td class="part-name">{{ row.part_name }}</td>
+              <td class="qty">{{ row.qty }}</td>
+              <td>{{ row.material }}</td>
+              <td>{{ row.thickness }}</td>
+              <td>{{ row.size }}</td>
+              <td class="num">{{ row.weight }}</td>
+              <td class="num">{{ row.line_total }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="pricing-wrap">
+        <div class="pricing-box">
+          <div class="pricing-row">
+            <span class="plabel">Material cost</span>
+            <span class="pvalue">{{ pricing_material }}</span>
+          </div>
+          <div class="pricing-row">
+            <span class="plabel">Processing cost</span>
+            <span class="pvalue">{{ pricing_processing }}</span>
+          </div>
+          <div class="pricing-row">
+            <span class="plabel">Subtotal</span>
+            <span class="pvalue">{{ pricing_subtotal }}</span>
+          </div>
+          {% if pricing_discount %}
+          <div class="pricing-row">
+            <span class="plabel">Discount</span>
+            <span class="pvalue">{{ pricing_discount }}</span>
+          </div>
+          {% endif %}
+          <div class="pricing-row total-final">
+            <span class="plabel">Final total</span>
+            <span class="pvalue">{{ pricing_final }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Notes &amp; assumptions</h2>
+      <ul class="bullets">
+        {% for line in notes_lines %}
+        <li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Terms</h2>
+      <ul class="bullets">
+        {% for line in terms_lines %}
+        <li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-left">
+        <span><strong>{{ company_name }}</strong></span>
+        {% if company_email %}<span>{{ company_email }}</span>{% endif %}
+        {% if company_phone %}<span>{{ company_phone }}</span>{% endif %}
+        {% if company_website %}<span>{{ company_website }}</span>{% endif %}
+      </div>
+      <div class="footer-right">{{ footer_generated }}</div>
+    </footer>
+  </div>
+</body>
+</html>

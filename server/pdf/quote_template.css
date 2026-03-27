@@ -1,0 +1,335 @@
+/* Customer quotation — print-first, A4, light theme */
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 12px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family:
+    Inter,
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  color: #1a1a1a;
+  background: #fff;
+  line-height: 1.45;
+}
+
+.doc {
+  max-width: 100%;
+}
+
+/* —— Header —— */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #d4d4d4;
+  margin-bottom: 28px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.brand img.logo {
+  max-height: 48px;
+  max-width: 160px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.brand-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: -0.02em;
+}
+
+.meta {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.doc-title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #0a0a0a;
+  margin: 0 0 10px 0;
+  line-height: 1.15;
+}
+
+.meta-row {
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.meta-row .label {
+  color: #6b7280;
+  margin-right: 6px;
+}
+
+.meta-row .value {
+  font-weight: 600;
+  color: #111;
+}
+
+/* —— Sections —— */
+.section {
+  margin-bottom: 28px;
+}
+
+.section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 10px 0;
+  letter-spacing: 0.02em;
+}
+
+/* —— Customer grid —— */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px 40px;
+}
+
+.kv {
+  margin-bottom: 12px;
+}
+
+.kv:last-child {
+  margin-bottom: 0;
+}
+
+.kv .label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin-bottom: 3px;
+}
+
+.kv .value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* —— Summary cards —— */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  padding: 14px 14px;
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.card .label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.card .value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0a0a0a;
+  line-height: 1.2;
+}
+
+.card .hint {
+  font-size: 0.65rem;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+/* —— Scope —— */
+.scope-text {
+  font-size: 0.85rem;
+  color: #374151;
+  margin: 0;
+  max-width: 52rem;
+}
+
+.scope-text.secondary {
+  margin-top: 10px;
+  color: #6b7280;
+}
+
+/* —— Table —— */
+.table-wrap {
+  width: 100%;
+  overflow: visible;
+}
+
+table.parts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+table.parts thead {
+  display: table-header-group;
+}
+
+table.parts th,
+table.parts td {
+  padding: 10px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+table.parts th {
+  background: #f3f4f6;
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #374151;
+}
+
+table.parts tbody tr {
+  page-break-inside: avoid;
+}
+
+table.parts td.num,
+table.parts th.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+table.parts td.qty,
+table.parts th.qty {
+  text-align: center;
+}
+
+table.parts td.part-name {
+  word-break: break-word;
+  max-width: 140px;
+}
+
+/* —— Pricing summary —— */
+.pricing-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+.pricing-box {
+  width: 100%;
+  max-width: 320px;
+  border: 1px solid #d4d4d4;
+  border-radius: 4px;
+  padding: 14px 16px;
+}
+
+.pricing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  padding: 6px 0;
+  gap: 16px;
+}
+
+.pricing-row .plabel {
+  color: #4b5563;
+}
+
+.pricing-row .pvalue {
+  font-weight: 600;
+  color: #111;
+  text-align: right;
+}
+
+.pricing-row.total-final {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #1a1a1a;
+}
+
+.pricing-row.total-final .plabel {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+
+.pricing-row.total-final .pvalue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* —— Lists —— */
+.bullets {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  color: #374151;
+}
+
+.bullets li {
+  margin-bottom: 6px;
+}
+
+.bullets li:last-child {
+  margin-bottom: 0;
+}
+
+/* —— Footer —— */
+.footer {
+  margin-top: 36px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e5e5;
+  font-size: 0.72rem;
+  color: #6b7280;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.footer-left span {
+  margin-right: 14px;
+}
+
+.footer-right {
+  opacity: 0.85;
+}

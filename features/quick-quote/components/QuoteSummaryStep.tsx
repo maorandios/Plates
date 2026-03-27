@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import {
   ArrowLeft,
-  FileDown,
+  ArrowRight,
   FileSpreadsheet,
   Save,
   Sparkles,
@@ -33,6 +33,7 @@ interface QuoteSummaryStepProps {
   thicknessStock?: ThicknessStockInput[];
   onBack: () => void;
   onBackToValidation: () => void;
+  onContinueToFinalize: () => void;
 }
 
 export function QuoteSummaryStep({
@@ -44,6 +45,7 @@ export function QuoteSummaryStep({
   thicknessStock,
   onBack,
   onBackToValidation,
+  onContinueToFinalize,
 }: QuoteSummaryStepProps) {
   const thicknessStockProvided = Boolean(thicknessStock?.length);
 
@@ -78,9 +80,14 @@ export function QuoteSummaryStep({
               <ArrowLeft className="h-4 w-4 mr-1.5" />
               Back
             </Button>
-            <Button type="button" variant="outline" size="sm" disabled>
-              <FileDown className="h-4 w-4 mr-1.5" />
-              Export PDF
+            <Button
+              type="button"
+              size="sm"
+              disabled={parts.length === 0}
+              onClick={onContinueToFinalize}
+            >
+              Continue to finalize
+              <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
             <Button type="button" variant="outline" size="sm" disabled>
               <FileSpreadsheet className="h-4 w-4 mr-1.5" />

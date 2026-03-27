@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { CalculationStep } from "./CalculationStep";
 import { QuoteStepper } from "./QuoteStepper";
+import { QuoteFinalizeExportStep } from "./QuoteFinalizeExportStep";
 import { QuoteSummaryStep } from "./QuoteSummaryStep";
 import { StockPricingStep } from "./StockPricingStep";
 import { UploadStep } from "./UploadStep";
@@ -28,6 +29,8 @@ import {
 } from "../lib/deriveQuoteSelection";
 import { generateQuoteReference } from "../lib/generateQuoteReference";
 import { MOCK_MFG_PARAMETERS } from "../mock/quickQuoteMockData";
+import type { QuotePdfFullPayload } from "../lib/quotePdfPayload";
+import { buildQuotePdfFullPayload } from "../lib/quotePdfPayload";
 
 const defaultJobDetails: QuickQuoteJobDetails = {
   referenceNumber: "",
@@ -53,6 +56,7 @@ export function QuickQuotePage() {
   const [materialPricePerKg, setMaterialPricePerKg] = useState(
     () => MOCK_MFG_PARAMETERS.materialRatePerKg
   );
+  const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
 
   const advanceTo = useCallback((s: QuickQuoteStep) => {
     setStep(s);
@@ -99,6 +103,33 @@ export function QuickQuotePage() {
   const handleViewQuote = () => advanceTo(5);
   const handleBackFromQuote = () => advanceTo(4);
   const handleBackToValidationFromQuote = () => advanceTo(2);
+
+  const buildFinalizeDraft = useCallback(
+    (): QuotePdfFullPayload =>
+      buildQuotePdfFullPayload(
+        jobDetails,
+        selection.jobSummary,
+        selection.parts,
+        selection.mfgParams,
+        selection.pricing
+      ),
+    [jobDetails, selection]
+  );
+
+  const handleContinueToFinalize = useCallback(() => {
+    setPdfExportDraft(buildFinalizeDraft());
+    advanceTo(6);
+  }, [advanceTo, buildFinalizeDraft]);
+
+  const handleBackFromFinalize = useCallback(() => {
+    advanceTo(5);
+  }, [advanceTo]);
+
+  useEffect(() => {
+    if (step === 6 && pdfExportDraft === null) {
+      setPdfExportDraft(buildFinalizeDraft());
+    }
+  }, [step, pdfExportDraft, buildFinalizeDraft]);
 
   const setSheetsForThickness = useCallback(
     (thicknessMm: number, sheets: QuoteSheetStockLine[]) => {
@@ -182,6 +213,20 @@ export function QuickQuotePage() {
             }
             onBack={handleBackFromQuote}
             onBackToValidation={handleBackToValidationFromQuote}
+            onContinueToFinalize={handleContinueToFinalize}
+          />
+        )}
+
+        {step === 6 && pdfExportDraft && (
+          <QuoteFinalizeExportStep
+            draft={pdfExportDraft}
+            setDraft={(action) => {
+              setPdfExportDraft((prev) => {
+                if (prev === null) return prev;
+                return typeof action === "function" ? action(prev) : action;
+              });
+            }}
+            onBack={handleBackFromFinalize}
           />
         )}
       </div>

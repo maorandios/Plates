@@ -10,6 +10,7 @@ const STEPS: { step: QuickQuoteStep; label: string }[] = [
   { step: 3, label: "Stock & pricing" },
   { step: 4, label: "Calculation" },
   { step: 5, label: "Quote" },
+  { step: 6, label: "Finalize" },
 ];
 
 interface QuoteStepperProps {
