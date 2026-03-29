@@ -94,7 +94,7 @@ export function ThicknessStockTable({
               <p className="text-xs text-muted-foreground leading-relaxed">
                 These sizes come from{" "}
                 <Link
-                  href="/settings#purchased-sheets"
+                  href="/settings/materials#purchased-sheets"
                   className="underline font-medium text-foreground hover:text-primary"
                 >
                   Preferences
@@ -145,7 +145,7 @@ export function ThicknessStockTable({
             <p className="text-xs text-muted-foreground max-w-md leading-snug">
               No purchased sheet sizes for this thickness in{" "}
               <Link
-                href="/settings#purchased-sheets"
+                href="/settings/materials#purchased-sheets"
                 className="underline font-medium text-foreground hover:text-primary"
               >
                 Preferences
@@ -219,7 +219,7 @@ export function ThicknessStockTable({
                         Click <strong className="text-foreground">Add sheet (manual)</strong>{" "}
                         to enter dimensions. Optional: define catalogue sizes in{" "}
                         <Link
-                          href="/settings#purchased-sheets"
+                          href="/settings/materials#purchased-sheets"
                           className="underline font-medium text-foreground hover:text-primary"
                         >
                           Preferences

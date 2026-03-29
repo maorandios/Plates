@@ -6,6 +6,13 @@ export type UnitSystem = "metric" | "imperial";
 
 export interface AppPreferences {
   unitSystem: UnitSystem;
+  /** Letterhead defaults for quotations (overrides env when set in Settings). */
+  companyName?: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  companyWebsite?: string;
+  /** Multi-line allowed; shown on PDF letterhead when set. */
+  companyAddress?: string;
 }
 
 export const DEFAULT_APP_PREFERENCES: AppPreferences = {

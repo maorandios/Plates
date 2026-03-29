@@ -19,6 +19,7 @@ import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { deleteFile, getDxfGeometryByFile } from "@/lib/store";
 import type { UploadedFile } from "@/types";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 
 function plateNameForDxf(file: UploadedFile): string {
@@ -79,8 +80,9 @@ function ParseDot({ kind, label }: { kind: ParseDot; label: string }) {
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes >= 1024 * 1024)
+    return `${formatDecimal(bytes / (1024 * 1024), 1)} MB`;
+  return `${formatInteger(Math.round(bytes / 1024))} KB`;
 }
 
 interface ClientDxfTableProps {

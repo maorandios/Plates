@@ -3,6 +3,7 @@
 import { useRef, useMemo } from "react";
 import Konva from "konva";
 import { Line, Circle, Group, Rect, Text } from "react-konva";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { buildPlateGeometry } from "../../lib/buildPlateGeometry";
 import {
   holeIsSlotted,
@@ -189,7 +190,7 @@ function finalizeHolePosition(
 
 function formatPlateContourCoord(n: number): string {
   const r = Math.round(n * 10) / 10;
-  return Number.isInteger(r) ? String(Math.round(r)) : r.toFixed(1);
+  return Number.isInteger(r) ? formatInteger(Math.round(r)) : formatDecimal(r, 1);
 }
 
 /** Overall width and height of the plate bbox, drawn outside the outline (no X/Y prefixes). */

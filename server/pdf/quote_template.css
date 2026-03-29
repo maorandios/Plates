@@ -49,8 +49,15 @@ body {
 
 .brand {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
+  min-width: 0;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
   min-width: 0;
 }
 
@@ -67,6 +74,15 @@ body {
   font-weight: 700;
   color: #111;
   letter-spacing: -0.02em;
+}
+
+.brand-address {
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: #4a4a4a;
+  line-height: 1.45;
+  max-width: 240px;
 }
 
 .meta {
@@ -328,6 +344,16 @@ table.parts td.part-name {
 
 .footer-left span {
   margin-right: 14px;
+}
+
+.footer-left .footer-address {
+  display: block;
+  width: 100%;
+  margin-right: 0;
+  margin-bottom: 4px;
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1.35;
 }
 
 .footer-right {

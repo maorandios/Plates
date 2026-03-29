@@ -1,3 +1,5 @@
+import { formatDecimal } from "@/lib/formatNumbers";
+
 /**
  * ISO 4217 codes for Intl + display labels. ILS = Israeli new shekel (NIS).
  */
@@ -66,7 +68,7 @@ export function formatQuickQuoteCurrencyAmount(
       maximumFractionDigits: opts.maximumFractionDigits,
     }).format(amount);
   } catch {
-    return amount.toFixed(2);
+    return formatDecimal(amount, 2);
   }
 }
 
@@ -82,6 +84,6 @@ export function formatQuickQuoteCurrency(
       maximumFractionDigits: 2,
     }).format(amount);
   } catch {
-    return `${amount.toFixed(2)} ${code}`;
+    return `${formatDecimal(amount, 2)} ${code}`;
   }
 }

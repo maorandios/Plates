@@ -1,6 +1,7 @@
 "use client";
 
 import type { GeneratedSheet, SheetPlacement } from "@/types";
+import { formatDecimal } from "@/lib/formatNumbers";
 import { formatLength } from "@/lib/settings/unitSystem";
 import type { UnitSystem } from "@/types/settings";
 import {
@@ -74,16 +75,16 @@ export function PartInspector({
         </div>
         <div>
           <dt className="text-muted-foreground uppercase tracking-wide">Rotation</dt>
-          <dd className="mt-0.5 tabular-nums">{placement.rotation.toFixed(1)}°</dd>
+          <dd className="mt-0.5 tabular-nums">{formatDecimal(placement.rotation, 1)}°</dd>
         </div>
         <div>
           <dt className="text-muted-foreground uppercase tracking-wide">
             Placement (inner frame)
           </dt>
           <dd className="mt-0.5 font-mono text-[11px] tabular-nums">
-            x={placement.x.toFixed(2)} mm, y={placement.y.toFixed(2)} mm
+            x={formatDecimal(placement.x, 2)} mm, y={formatDecimal(placement.y, 2)} mm
             <span className="text-muted-foreground block mt-0.5">
-              Inner origin on sheet: +({ox.toFixed(2)}, {oy.toFixed(2)}) mm
+              Inner origin on sheet: +({formatDecimal(ox, 2)}, {formatDecimal(oy, 2)}) mm
             </span>
           </dd>
         </div>
@@ -97,7 +98,7 @@ export function PartInspector({
         <div>
           <dt className="text-muted-foreground uppercase tracking-wide">Net area</dt>
           <dd className="mt-0.5">
-            {(placement.partNetAreaMm2 / 1_000_000).toFixed(4)} m²
+            {formatDecimal(placement.partNetAreaMm2 / 1_000_000, 4)} m²
           </dd>
         </div>
         {placement.markingText ? (

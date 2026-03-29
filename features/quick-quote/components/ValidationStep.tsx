@@ -1,22 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { PlateScopePickerDialog } from "./PlateScopePickerDialog";
 import { ValidationTable } from "./ValidationTable";
 import type { ValidationRow, ValidationSummary } from "../types/quickQuote";
@@ -33,6 +27,7 @@ function buildValidationReportCsv(rows: ValidationRow[]): string {
   const headers = [
     "Part name",
     "Qty",
+    "Thickness (mm)",
     "Status",
     "Excel L (mm)",
     "DXF L (mm)",
@@ -53,6 +48,7 @@ function buildValidationReportCsv(rows: ValidationRow[]): string {
       [
         escapeCsvField(r.partName),
         r.qty,
+        r.thicknessMm,
         r.status,
         r.excelLengthMm,
         r.dxfLengthMm,
@@ -95,15 +91,50 @@ export function ValidationStep({
   onBack,
   onContinue,
 }: ValidationStepProps) {
-  const [detailRow, setDetailRow] = useState<ValidationRow | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
   const hasCritical = summary.critical > 0;
 
+  const analyzeMetrics = useMemo(() => {
+    let totalQty = 0;
+    let totalAreaM2 = 0;
+    let totalWeightKg = 0;
+    let totalPerimeterMm = 0;
+    let totalPiercing = 0;
+    const gradeSet = new Set<string>();
+
+    for (const r of rows) {
+      totalQty += r.qty;
+      totalAreaM2 += r.dxfAreaM2 * r.qty;
+      totalWeightKg += r.excelWeightKg * r.qty;
+      totalPerimeterMm += r.dxfPerimeterMm * r.qty;
+      totalPiercing += r.dxfPiercingCount * r.qty;
+      const g = r.dxfMaterial?.trim();
+      if (g && g !== "-") gradeSet.add(g);
+      const eg = r.excelMaterial?.trim();
+      if (eg && eg !== "-") gradeSet.add(eg);
+    }
+
+    const materialGrades =
+      gradeSet.size === 0
+        ? "—"
+        : [...gradeSet].sort().join(", ");
+
+    return {
+      plates: rows.length,
+      quantity: totalQty,
+      areaM2: totalAreaM2,
+      weightKg: totalWeightKg,
+      perimeterMm: totalPerimeterMm,
+      piercing: totalPiercing,
+      materialGrades,
+    };
+  }, [rows]);
+
   const handleReportConfirm = (selected: ValidationRow[]) => {
     const stamp = new Date().toISOString().slice(0, 10);
     downloadCsv(
-      `validation-report-${stamp}.csv`,
+      `analyze-report-${stamp}.csv`,
       buildValidationReportCsv(selected)
     );
   };
@@ -111,9 +142,9 @@ export function ValidationStep({
   return (
     <div className="space-y-8">
       <div className="w-full">
-        <h1 className="text-2xl font-semibold tracking-tight">Validation results</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Analyze results</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-          We checked the uploaded Excel against the detected DXF part data (mocked extraction).
+          Comparing Excel BOM data against DXF geometry to identify any discrepancies.
         </p>
       </div>
 
@@ -133,33 +164,76 @@ export function ValidationStep({
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryTile label="Rows checked" value={summary.totalRows} />
-        <SummaryTile
-          label="Matched"
-          value={summary.matched}
-          variant="ok"
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <MetricCard label="Plates" value={analyzeMetrics.plates} />
+        <MetricCard label="Quantity" value={analyzeMetrics.quantity} />
+        <MetricCard
+          label="Area (m²)"
+          value={analyzeMetrics.areaM2}
+          decimals={2}
         />
-        <SummaryTile
-          label="Warnings"
-          value={summary.warnings}
-          variant="warn"
+        <MetricCard
+          label="Weight (kg)"
+          value={analyzeMetrics.weightKg}
+          decimals={1}
         />
-        <SummaryTile
-          label="Critical"
-          value={summary.critical}
-          variant="bad"
+        <MetricCard
+          label="Perimeter (mm)"
+          value={analyzeMetrics.perimeterMm}
+          decimals={0}
         />
+        <MetricCard label="Piercing" value={analyzeMetrics.piercing} />
+        <Card className="border-border/80 xl:col-span-1 min-h-[88px]">
+          <CardHeader className="pb-1 pt-3 px-3">
+            <CardDescription className="text-[10px] font-medium uppercase tracking-wide leading-tight">
+              Material grade
+            </CardDescription>
+            <CardTitle className="text-sm font-medium leading-snug line-clamp-3 break-words">
+              {analyzeMetrics.materialGrades}
+            </CardTitle>
+          </CardHeader>
+        </Card>
       </div>
 
-      <ValidationTable rows={rows} onRowOpen={setDetailRow} />
+      <Card className="border-primary/15 bg-muted/20">
+        <CardHeader className="pb-2 pt-4">
+          <CardDescription className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Row status
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0 pb-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <SummaryTile label="Rows checked" value={summary.totalRows} />
+            <SummaryTile
+              label="Row matched"
+              value={summary.matched}
+              variant="ok"
+            />
+            <SummaryTile
+              label="Warning"
+              value={summary.warnings}
+              variant="warn"
+            />
+            <SummaryTile
+              label="Critical"
+              value={summary.critical}
+              variant="bad"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-border">
+      <div className="flex justify-end">
         <Button type="button" variant="outline" onClick={() => setReportOpen(true)}>
           <FileDown className="h-4 w-4 mr-2" />
-          Open validation report
+          Export CSV
         </Button>
-        <div className="flex flex-wrap gap-2 justify-end">
+      </div>
+
+      <ValidationTable rows={rows} />
+
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-border">
+        <div className="flex flex-wrap gap-2 justify-end w-full sm:w-auto">
           <Button type="button" variant="outline" onClick={onBack}>
             Back to upload
           </Button>
@@ -173,7 +247,7 @@ export function ValidationStep({
         open={reportOpen}
         onOpenChange={setReportOpen}
         rows={rows}
-        title="Validation report"
+        title="Export CSV"
         description="Choose which rows to include in the downloaded CSV file."
         countMessage={(n) =>
           n === 1
@@ -199,51 +273,30 @@ export function ValidationStep({
         confirmLabel="Start calculation"
         onConfirm={onContinue}
       />
-
-      <Dialog open={!!detailRow} onOpenChange={(o) => !o && setDetailRow(null)}>
-        <DialogContent className="max-w-lg sm:max-w-xl">
-          {detailRow && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{detailRow.partName}</DialogTitle>
-                <DialogDescription>
-                  DXF file: <span className="font-mono text-xs">{detailRow.dxfFileName}</span>
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 text-sm">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Mismatch fields
-                  </p>
-                  <p className="mt-1">
-                    {detailRow.mismatchFields.length
-                      ? detailRow.mismatchFields.join(", ")
-                      : "—"}
-                  </p>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Likely cause
-                  </p>
-                  <p className="mt-1 text-muted-foreground">
-                    {detailRow.suggestedReason || "No discrepancy for this row."}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Recommended action
-                  </p>
-                  <p className="mt-1 text-muted-foreground">
-                    {detailRow.actionRecommendation || "None."}
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  decimals = 0,
+}: {
+  label: string;
+  value: number;
+  decimals?: number;
+}) {
+  const display =
+    decimals === 0 ? formatInteger(value) : formatDecimal(value, decimals);
+  return (
+    <Card className="border-border/80 min-h-[88px]">
+      <CardHeader className="pb-1 pt-3 px-3">
+        <CardDescription className="text-[10px] font-medium uppercase tracking-wide">
+          {label}
+        </CardDescription>
+        <CardTitle className="text-xl tabular-nums">{display}</CardTitle>
+      </CardHeader>
+    </Card>
   );
 }
 
@@ -265,14 +318,14 @@ function SummaryTile({
             ? "border-amber-500/25 bg-amber-500/[0.04]"
             : variant === "bad"
               ? "border-destructive/25 bg-destructive/[0.04]"
-              : ""
+              : "bg-card"
       }
     >
-      <CardHeader className="pb-1 pt-4">
-        <CardDescription className="text-xs font-medium uppercase tracking-wide">
+      <CardHeader className="pb-1 pt-3 px-3">
+        <CardDescription className="text-[10px] font-medium uppercase tracking-wide">
           {label}
         </CardDescription>
-        <CardTitle className="text-2xl tabular-nums">{value}</CardTitle>
+        <CardTitle className="text-xl tabular-nums">{formatInteger(value)}</CardTitle>
       </CardHeader>
     </Card>
   );

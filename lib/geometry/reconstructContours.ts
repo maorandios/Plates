@@ -3,6 +3,7 @@
  * from open chains that could not be closed within tolerance.
  */
 
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import type { DiscardedSketchEntity } from "@/types";
 import type { Point } from "./extract";
 import { isContourClosed } from "./validate";
@@ -48,14 +49,14 @@ export function reconstructClosedContours(
       openChains.push(c);
       discardedOpen.push({
         reason: "open_chain",
-        detail: `Open chain ${i + 1} (${c.length} pts, path ≈ ${len.toFixed(2)} mm) — endpoints beyond ${closeToleranceMm.toFixed(3)} mm snap.`,
+        detail: `Open chain ${i + 1} (${c.length} pts, path ≈ ${formatDecimal(len, 2)} mm) — endpoints beyond ${formatDecimal(closeToleranceMm, 3)} mm snap.`,
       });
     }
   }
 
   if (discardedOpen.length > 0) {
     warnings.push(
-      `${discardedOpen.length} open or incomplete chain(s) were not promoted to closed contours.`
+      `${formatInteger(discardedOpen.length)} open or incomplete chain(s) were not promoted to closed contours.`
     );
   }
 

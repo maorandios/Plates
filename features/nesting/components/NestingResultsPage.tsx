@@ -17,6 +17,7 @@ import {
   getNestingRunsByBatch,
   PLATE_NESTING_RUN_SAVED_EVENT,
 } from "@/lib/store";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { resolveNestingRunForBatch } from "@/lib/nesting/nestingResultsUtils";
 import type { NestingRun } from "@/types";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
@@ -197,7 +198,7 @@ export function NestingResultsPage() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <StatCard
                   title="Sheets used"
-                  value={String(run.totalSheets)}
+                  value={formatInteger(run.totalSheets)}
                 />
                 <StatCard
                   title="Placement engine"
@@ -205,23 +206,23 @@ export function NestingResultsPage() {
                 />
                 <StatCard
                   title="Utilization"
-                  value={`${run.totalUtilizationPercent.toFixed(1)}%`}
+                  value={`${formatDecimal(run.totalUtilizationPercent, 1)}%`}
                 />
                 <StatCard
                   title="Placed parts"
-                  value={String(run.placedPartCount)}
+                  value={formatInteger(run.placedPartCount)}
                 />
                 <StatCard
                   title="Unplaced qty"
-                  value={String(run.unplacedPartCount)}
+                  value={formatInteger(run.unplacedPartCount)}
                 />
                 <StatCard
                   title="Used area"
-                  value={`${(run.usedAreaMm2 / 1_000_000).toFixed(3)} m²`}
+                  value={`${formatDecimal(run.usedAreaMm2 / 1_000_000, 3)} m²`}
                 />
                 <StatCard
                   title="Waste area"
-                  value={`${(run.totalWasteAreaMm2 / 1_000_000).toFixed(3)} m²`}
+                  value={`${formatDecimal(run.totalWasteAreaMm2 / 1_000_000, 3)} m²`}
                 />
               </div>
               {run.errors.length > 0 ? (

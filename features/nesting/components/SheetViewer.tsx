@@ -6,6 +6,7 @@ import { ArrowLeft, Minus, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { GeneratedSheet, NestingRun, SheetPlacement } from "@/types";
 import type { UnitSystem } from "@/types/settings";
+import { formatDecimal } from "@/lib/formatNumbers";
 import { formatLength } from "@/lib/settings/unitSystem";
 import { SheetCanvas } from "./SheetCanvas";
 import { PartInspector } from "./PartInspector";
@@ -71,7 +72,7 @@ export function SheetViewer({
           {formatLength(sheet.widthMm, unitSystem)} ×{" "}
           {formatLength(sheet.lengthMm, unitSystem)} · {typeLabel} ·{" "}
           {sheet.placements.length} part{sheet.placements.length === 1 ? "" : "s"}{" "}
-          · {sheet.utilizationPercent.toFixed(1)}% utilization
+          · {formatDecimal(sheet.utilizationPercent, 1)}% utilization
         </p>
         <p className="text-xs text-muted-foreground font-mono">
           Run {run.id.slice(0, 10)}… · {sheet.id.slice(0, 10)}…
@@ -109,7 +110,7 @@ export function SheetViewer({
               Reset
             </Button>
             <span className="text-xs text-muted-foreground tabular-nums ml-2">
-              {(zoom * 100).toFixed(0)}% · scroll wheel to zoom
+              {formatDecimal(zoom * 100, 0)}% · scroll wheel to zoom
             </span>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">

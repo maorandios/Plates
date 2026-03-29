@@ -3,6 +3,7 @@
  * Checks that extracted geometry is usable for nesting.
  */
 
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import type { Point } from "./extract";
 import { polygonArea, polygonBoundingBox } from "./calc";
 import { POINT_TOLERANCE } from "./normalize";
@@ -79,7 +80,7 @@ export function validateGeometry(
     return {
       isValid: false,
       status: "error",
-      message: `Outer contour area too small (${area.toFixed(4)} mm²)`,
+      message: `Outer contour area too small (${formatDecimal(area, 4)} mm²)`,
     };
   }
 
@@ -90,7 +91,7 @@ export function validateGeometry(
     return {
       isValid: true,
       status: "warning",
-      message: `Part bounding box is very small (${bbox.width.toFixed(2)} × ${bbox.height.toFixed(2)} mm)`,
+      message: `Part bounding box is very small (${formatDecimal(bbox.width, 2)} × ${formatDecimal(bbox.height, 2)} mm)`,
     };
   }
 
@@ -98,7 +99,7 @@ export function validateGeometry(
     return {
       isValid: true,
       status: "warning",
-      message: `Unusually high hole count (${holes.length})`,
+      message: `Unusually high hole count (${formatInteger(holes.length)})`,
     };
   }
 
@@ -108,7 +109,7 @@ export function validateGeometry(
     return {
       isValid: true,
       status: "warning",
-      message: `${openHoles.length} hole(s) are not properly closed`,
+      message: `${formatInteger(openHoles.length)} hole(s) are not properly closed`,
     };
   }
 

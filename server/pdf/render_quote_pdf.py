@@ -121,6 +121,9 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
 
     css_text = (DIR / "quote_template.css").read_text(encoding="utf-8")
 
+    addr_raw = (cc.address or "").strip()
+    company_address_lines = [x.strip() for x in addr_raw.splitlines() if x.strip()]
+
     return {
         "css_text": css_text,
         "logo_data_uri": _logo_data_uri(cc.logo_path),
@@ -128,6 +131,7 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
         "company_email": cc.email or "",
         "company_phone": cc.phone or "",
         "company_website": cc.website or "",
+        "company_address_lines": company_address_lines,
         "quote_number": q.quote_number,
         "quote_date": format_date_display(q.quote_date),
         "valid_until": format_date_display(q.valid_until),
@@ -201,6 +205,7 @@ def sample_payload() -> QuotePdfPayload:
             "email": "quotes@acmefab.example",
             "phone": "+1 (555) 010-0200",
             "website": "www.acmefab.example",
+            "address": "100 Industrial Way\nSheffield, S1 2AB\nUnited Kingdom",
         },
         quote={
             "quote_number": "QQ-20260327-SAMPLE",

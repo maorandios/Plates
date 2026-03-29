@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDecimal } from "@/lib/formatNumbers";
 import {
   formatQuickQuoteCurrency,
   formatQuickQuoteCurrencyAmount,
@@ -394,13 +395,13 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                     {row.widthMm}
                   </TableCell>
                   <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs border-r border-border/40">
-                    {row.areaM2.toFixed(3)}
+                    {formatDecimal(row.areaM2, 3)}
                   </TableCell>
                   <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs">
-                    {totalWeightKg.toFixed(1)}
+                    {formatDecimal(totalWeightKg, 1)}
                   </TableCell>
                   <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs border-r border-border/40">
-                    {cutM.toFixed(2)}
+                    {formatDecimal(cutM, 2)}
                   </TableCell>
                   <TableCell className="py-2 px-3 text-left align-middle">
                     {statusBadge(row.validationStatus)}
@@ -462,15 +463,15 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Area (per plate)</dt>
-                    <dd className="tabular-nums">{p.areaM2.toFixed(3)} m²</dd>
+                    <dd className="tabular-nums">{formatDecimal(p.areaM2, 3)} m²</dd>
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Total weight (line)</dt>
-                    <dd className="tabular-nums">{totalWeightLine.toFixed(1)} kg</dd>
+                    <dd className="tabular-nums">{formatDecimal(totalWeightLine, 1)} kg</dd>
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Cut length (per plate)</dt>
-                    <dd className="tabular-nums">{cutLengthM.toFixed(2)} m</dd>
+                    <dd className="tabular-nums">{formatDecimal(cutLengthM, 2)} m</dd>
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Pierce count</dt>

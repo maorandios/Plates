@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   ChevronRight,
@@ -9,18 +10,46 @@ import {
   Settings,
   ContactRound,
   FileText,
+  UserCircle,
+  Ruler,
+  Layers,
+  ChevronDown,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const SETTINGS_SUB = [
+  {
+    label: "Account settings",
+    href: "/settings/account",
+    icon: UserCircle,
+  },
+  {
+    label: "Unit system",
+    href: "/settings/units",
+    icon: Ruler,
+  },
+  {
+    label: "Materials configuration",
+    href: "/settings/materials",
+    icon: Layers,
+  },
+  {
+    label: "Bill and usage",
+    href: "/settings/bill-and-usage",
+    icon: Receipt,
+  },
+] as const;
+
+const mainNavItems = [
   {
     label: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
   },
   {
-    label: "Quotes",
-    href: "/batches",
+    label: "Quote",
+    href: "/quick-quote",
     icon: FileText,
   },
   {
@@ -28,15 +57,25 @@ const navItems = [
     href: "/clients",
     icon: ContactRound,
   },
-  {
-    label: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
 ] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
+  const onSettingsRoute = pathname.startsWith("/settings");
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!onSettingsRoute) {
+      setSettingsMenuOpen(false);
+    }
+  }, [onSettingsRoute]);
+
+  const settingsExpanded = onSettingsRoute || settingsMenuOpen;
+
+  function toggleSettingsMenu() {
+    if (onSettingsRoute) return;
+    setSettingsMenuOpen((v) => !v);
+  }
 
   return (
     <aside
@@ -57,13 +96,14 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map((item) => {
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {mainNavItems.map((item) => {
           const isActive =
             item.href === "/"
               ? pathname === "/"
-              : pathname === item.href ||
-                pathname.startsWith(item.href + "/");
+              : item.href === "/quick-quote"
+                ? pathname === "/quick-quote" || pathname.startsWith("/quick-quote/")
+                : pathname === item.href || pathname.startsWith(item.href + "/");
 
           return (
             <Link
@@ -84,6 +124,73 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Settings with expandable sub-menu */}
+        <div className="pt-0.5">
+          <div
+            className={cn(
+              "flex items-center gap-1 rounded-lg",
+              onSettingsRoute ? "bg-white/15" : "hover:bg-white/8"
+            )}
+          >
+            <Link
+              href="/settings/account"
+              className={cn(
+                "flex flex-1 min-w-0 items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                onSettingsRoute
+                  ? "text-white"
+                  : "text-white/60 hover:text-white"
+              )}
+            >
+              <Settings className="h-4 w-4 shrink-0" />
+              <span className="truncate">Settings</span>
+              {onSettingsRoute && (
+                <ChevronRight className="h-3.5 w-3.5 ml-auto text-white/40 shrink-0" />
+              )}
+            </Link>
+            <button
+              type="button"
+              onClick={toggleSettingsMenu}
+              className={cn(
+                "shrink-0 p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors",
+                onSettingsRoute && "opacity-50 pointer-events-none"
+              )}
+              aria-expanded={settingsExpanded}
+              aria-label={settingsExpanded ? "Collapse settings menu" : "Expand settings menu"}
+            >
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  settingsExpanded ? "rotate-0" : "-rotate-90"
+                )}
+              />
+            </button>
+          </div>
+
+          {settingsExpanded && (
+            <div className="mt-0.5 ml-2 pl-2 border-l border-white/15 space-y-0.5">
+              {SETTINGS_SUB.map((sub) => {
+                const subActive =
+                  pathname === sub.href || pathname.startsWith(sub.href + "/");
+                return (
+                  <Link
+                    key={sub.href}
+                    href={sub.href}
+                    className={cn(
+                      "flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                      subActive
+                        ? "bg-white/12 text-white"
+                        : "text-white/55 hover:text-white hover:bg-white/8"
+                    )}
+                  >
+                    <sub.icon className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={1.75} />
+                    <span className="truncate">{sub.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Footer */}

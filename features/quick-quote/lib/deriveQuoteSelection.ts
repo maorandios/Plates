@@ -1,4 +1,10 @@
+import type { MaterialType } from "@/types/materials";
+import type { PurchasedSheetSize } from "@/types/settings";
 import { nanoid } from "@/lib/utils/nanoid";
+import {
+  hasDuplicateSheetSizes,
+  seedSheetsForThickness,
+} from "./quoteStockAvailability";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -145,25 +151,27 @@ function isLegacyThicknessRow(r: unknown): r is LegacyThicknessRow {
   );
 }
 
-/** True when every thickness has at least one sheet with valid dimensions. */
+/** True when every thickness has at least one sheet with valid dimensions and no duplicate sizes. */
 export function isThicknessStockComplete(rows: ThicknessStockInput[]): boolean {
   if (rows.length === 0) return false;
-  return rows.every(
-    (t) =>
-      t.sheets.length > 0 &&
-      t.sheets.every(
-        (s) =>
-          s.sheetLengthMm > 0 &&
-          s.sheetWidthMm > 0 &&
-          Number.isFinite(s.sheetLengthMm) &&
-          Number.isFinite(s.sheetWidthMm)
-      )
-  );
+  return rows.every((t) => {
+    if (t.sheets.length === 0) return false;
+    const dimsOk = t.sheets.every(
+      (s) =>
+        s.sheetLengthMm > 0 &&
+        s.sheetWidthMm > 0 &&
+        Number.isFinite(s.sheetLengthMm) &&
+        Number.isFinite(s.sheetWidthMm)
+    );
+    return dimsOk && !hasDuplicateSheetSizes(t.sheets);
+  });
 }
 
 export function mergeDefaultStockRows(
   parts: QuotePartRow[],
-  prev: ThicknessStockInput[]
+  prev: ThicknessStockInput[],
+  materialType: MaterialType,
+  purchasedCatalog: PurchasedSheetSize[]
 ): ThicknessStockInput[] {
   const unique = [...new Set(parts.map((p) => p.thicknessMm))].sort(
     (a, b) => a - b
@@ -171,7 +179,7 @@ export function mergeDefaultStockRows(
   const prevMap = new Map(prev.map((r) => [r.thicknessMm, r]));
   return unique.map((th) => {
     const old = prevMap.get(th);
-    if (old && hasSheetsArray(old)) {
+    if (old && hasSheetsArray(old) && old.sheets.length > 0) {
       return { thicknessMm: th, sheets: old.sheets };
     }
     if (old && isLegacyThicknessRow(old)) {
@@ -189,7 +197,10 @@ export function mergeDefaultStockRows(
         };
       }
     }
-    return { thicknessMm: th, sheets: [] };
+    return {
+      thicknessMm: th,
+      sheets: seedSheetsForThickness(materialType, th, purchasedCatalog),
+    };
   });
 }
 

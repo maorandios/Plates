@@ -1,3 +1,4 @@
+import { formatDecimal } from "@/lib/formatNumbers";
 import { z } from "zod";
 import {
   circleFitsOuterRing,
@@ -59,7 +60,7 @@ export const plateBuilderFormSchema = z
       if (data.cornerRadius > maxR + 1e-6) {
         ctx.addIssue({
           code: "custom",
-          message: `Radius must be ≤ ${maxR.toFixed(3)} mm`,
+          message: `Radius must be ≤ ${formatDecimal(maxR, 3)} mm`,
           path: ["cornerRadius"],
         });
       }

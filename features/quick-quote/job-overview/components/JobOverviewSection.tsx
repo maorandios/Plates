@@ -7,6 +7,7 @@ import type {
   QuotePartRow,
   ThicknessStockInput,
 } from "../../types/quickQuote";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import {
   buildJobOverview,
   formatAreaM2,
@@ -37,7 +38,7 @@ export function JobOverviewSection({
   const sheetSubtext =
     model.estimatedSheetCount === 1
       ? "Approx. 1 sheet (from stock + utilization estimate)"
-      : `Approx. ${model.estimatedSheetCount.toLocaleString()} sheets`;
+      : `Approx. ${formatInteger(model.estimatedSheetCount)} sheets`;
 
   return (
     <section className="space-y-6">
@@ -53,8 +54,8 @@ export function JobOverviewSection({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <JobOverviewCard
           title="Total parts"
-          value={model.totalParts.toLocaleString()}
-          subtext={`${model.totalPlates.toLocaleString()} total plates`}
+          value={formatInteger(model.totalParts)}
+          subtext={`${formatInteger(model.totalPlates)} total plates`}
         />
         <JobOverviewCard
           title="Total weight"
@@ -74,7 +75,7 @@ export function JobOverviewSection({
         />
         <JobOverviewCard
           title="Utilization"
-          value={`${model.utilizationPct.toFixed(1)}%`}
+          value={`${formatDecimal(model.utilizationPct, 1)}%`}
           subtext={model.utilizationBand}
         />
         <JobOverviewCard
@@ -84,7 +85,7 @@ export function JobOverviewSection({
         />
         <JobOverviewCard
           title="Pierce count"
-          value={model.totalPierceCount.toLocaleString()}
+          value={formatInteger(model.totalPierceCount)}
           subtext="Holes and internal starts (geometry-derived)"
         />
         <JobOverviewCard

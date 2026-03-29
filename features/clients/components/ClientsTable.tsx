@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import type { Client, ClientMetrics } from "@/types";
 import { saveClient } from "@/lib/store";
 
@@ -69,13 +70,13 @@ export function ClientsTable({
                   {m?.totalBatches ?? 0}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {m?.totalParts ?? 0}
+                  {formatInteger(m?.totalParts ?? 0)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {m?.totalQuantity ?? 0}
+                  {formatInteger(m?.totalQuantity ?? 0)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {(m?.totalWeight ?? 0).toFixed(1)}
+                  {formatDecimal(m?.totalWeight ?? 0, 1)}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {m?.lastBatchDate

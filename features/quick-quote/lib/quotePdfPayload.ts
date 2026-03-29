@@ -2,6 +2,7 @@
  * Builds the JSON body for POST /api/quotes/export-pdf (merged with company on the server).
  */
 
+import { getAppPreferences } from "@/lib/settings/appPreferences";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -16,6 +17,8 @@ export interface QuotePdfCompanyBlock {
   email: string;
   phone: string;
   website: string;
+  /** Letterhead address (multi-line supported). */
+  address: string;
 }
 
 /** Full POST body including company (finalize step). */
@@ -82,12 +85,27 @@ const DEFAULT_NOTES = [
   "Delivery is excluded unless explicitly stated.",
 ];
 
-export function getDefaultPdfCompany(): QuotePdfCompanyBlock {
+function envCompanyDefaults(): QuotePdfCompanyBlock {
   return {
     name: process.env.NEXT_PUBLIC_QUOTE_COMPANY_NAME?.trim() || "Fabrication partner",
     email: process.env.NEXT_PUBLIC_QUOTE_COMPANY_EMAIL?.trim() || "",
     phone: process.env.NEXT_PUBLIC_QUOTE_COMPANY_PHONE?.trim() || "",
     website: process.env.NEXT_PUBLIC_QUOTE_COMPANY_WEBSITE?.trim() || "",
+    address: process.env.NEXT_PUBLIC_QUOTE_COMPANY_ADDRESS?.trim() || "",
+  };
+}
+
+/** Company block for PDF and finalize step: Settings overrides, then env, then fallbacks. */
+export function getDefaultPdfCompany(): QuotePdfCompanyBlock {
+  const base = envCompanyDefaults();
+  if (typeof window === "undefined") return base;
+  const p = getAppPreferences();
+  return {
+    name: (p.companyName?.trim() || base.name) || "Fabrication partner",
+    email: (p.companyEmail?.trim() ?? base.email) || "",
+    phone: (p.companyPhone?.trim() ?? base.phone) || "",
+    website: (p.companyWebsite?.trim() ?? base.website) || "",
+    address: (p.companyAddress?.trim() ?? base.address) || "",
   };
 }
 

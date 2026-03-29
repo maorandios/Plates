@@ -11,6 +11,7 @@ import {
   saveDxfGeometry,
   getFileById,
 } from "@/lib/store";
+import { formatInteger } from "@/lib/formatNumbers";
 import { nanoid } from "@/lib/utils/nanoid";
 import {
   readExcelHeaders,
@@ -396,7 +397,7 @@ export function FileUploadZone({
                     {item.file.name}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {(item.file.size / 1024).toFixed(0)} KB
+                    {formatInteger(Math.round(item.file.size / 1024))} KB
                   </span>
 
                   {item.status === "parsing" && (

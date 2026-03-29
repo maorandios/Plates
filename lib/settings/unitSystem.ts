@@ -1,5 +1,6 @@
 import type { UnitSystem } from "@/types/settings";
 import { getAppPreferences } from "@/lib/settings/appPreferences";
+import { formatDecimal } from "@/lib/formatNumbers";
 
 const MM_PER_IN = 25.4;
 const MM_PER_FT = 304.8;
@@ -13,14 +14,14 @@ export function getUnitSystem(): UnitSystem {
 export function formatLength(mm: number, system: UnitSystem = getUnitSystem()): string {
   if (!Number.isFinite(mm)) return "—";
   if (system === "metric") {
-    return `${mm.toFixed(2)} mm`;
+    return `${formatDecimal(mm, 2)} mm`;
   }
   const inches = mm / MM_PER_IN;
   if (Math.abs(inches) >= 12) {
     const ft = mm / MM_PER_FT;
-    return `${ft.toFixed(3)} ft`;
+    return `${formatDecimal(ft, 3)} ft`;
   }
-  return `${inches.toFixed(3)} in`;
+  return `${formatDecimal(inches, 3)} in`;
 }
 
 /** Numeric part only — use with column headers that already state the unit (e.g. tables). */
@@ -30,9 +31,9 @@ export function formatLengthValueOnly(
 ): string {
   if (!Number.isFinite(mm)) return "—";
   if (system === "metric") {
-    return mm.toFixed(2);
+    return formatDecimal(mm, 2);
   }
-  return (mm / MM_PER_IN).toFixed(3);
+  return formatDecimal(mm / MM_PER_IN, 3);
 }
 
 /** Area m² → number string only (headers carry m² / ft²). */
@@ -42,9 +43,9 @@ export function formatAreaValueOnly(
 ): string {
   if (!Number.isFinite(areaM2)) return "—";
   if (system === "metric") {
-    return areaM2.toFixed(4);
+    return formatDecimal(areaM2, 4);
   }
-  return (areaM2 * 10.76391041671).toFixed(3);
+  return formatDecimal(areaM2 * 10.76391041671, 3);
 }
 
 /** Mass kg → number string only (headers carry kg / lb). */
@@ -54,9 +55,9 @@ export function formatWeightValueOnly(
 ): string {
   if (!Number.isFinite(kg)) return "—";
   if (system === "metric") {
-    return kg.toFixed(2);
+    return formatDecimal(kg, 2);
   }
-  return (kg * 2.2046226218).toFixed(2);
+  return formatDecimal(kg * 2.2046226218, 2);
 }
 
 /** Area: internal m² (not mm²) — matches existing Excel `area` field semantics in app copy. */
@@ -66,10 +67,10 @@ export function formatArea(
 ): string {
   if (!Number.isFinite(areaM2)) return "—";
   if (system === "metric") {
-    return `${areaM2.toFixed(4)} m²`;
+    return `${formatDecimal(areaM2, 4)} m²`;
   }
   const ft2 = areaM2 * 10.76391041671;
-  return `${ft2.toFixed(3)} ft²`;
+  return `${formatDecimal(ft2, 3)} ft²`;
 }
 
 /** Mass in kg. */
@@ -79,10 +80,10 @@ export function formatWeight(
 ): string {
   if (!Number.isFinite(kg)) return "—";
   if (system === "metric") {
-    return `${kg.toFixed(2)} kg`;
+    return `${formatDecimal(kg, 2)} kg`;
   }
   const lb = kg * 2.2046226218;
-  return `${lb.toFixed(2)} lb`;
+  return `${formatDecimal(lb, 2)} lb`;
 }
 
 /**

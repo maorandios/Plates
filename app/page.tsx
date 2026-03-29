@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Users, ArrowRight, PlusCircle, TrendingUp, Calculator } from "lucide-react";
+import { FileText, Users, ArrowRight, TrendingUp, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { BatchStatusBadge } from "@/components/shared/StatusBadge";
+import { formatInteger } from "@/lib/formatNumbers";
 import { getBatches, getClients, getFiles } from "@/lib/store";
 import type { Batch } from "@/types";
 
@@ -72,10 +73,10 @@ export default function DashboardPage() {
       bg: "bg-violet-50",
     },
     {
-      label: "Quick Quote",
+      label: "Quote",
       value: "→",
       icon: Calculator,
-      description: "Fast quote from files",
+      description: "Create a quotation",
       color: "text-amber-600",
       bg: "bg-amber-50",
       href: "/quick-quote",
@@ -88,20 +89,12 @@ export default function DashboardPage() {
         title="Dashboard"
         description="CNC steel quotation platform"
         actions={
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link href="/batches/new">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                New Quote Job
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href="/quick-quote">
-                <Calculator className="h-4 w-4 mr-2" />
-                Quick Quote
-              </Link>
-            </Button>
-          </div>
+          <Button asChild>
+            <Link href="/quick-quote">
+              <Calculator className="h-4 w-4 mr-2" />
+              New quote
+            </Link>
+          </Button>
         }
       />
 
@@ -116,7 +109,7 @@ export default function DashboardPage() {
                     {card.label}
                   </p>
                   <p className="text-3xl font-bold text-foreground">
-                    {card.value}
+                    {typeof card.value === "number" ? formatInteger(card.value) : card.value}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {card.description}
@@ -150,8 +143,8 @@ export default function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base font-semibold">Recent quotes</CardTitle>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/batches" className="flex items-center gap-1 text-sm">
-              View all
+            <Link href="/quick-quote" className="flex items-center gap-1 text-sm">
+              Open quote
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>
@@ -169,17 +162,16 @@ export default function DashboardPage() {
               <Button size="sm" asChild>
                 <Link href="/quick-quote">
                   <Calculator className="h-3.5 w-3.5 mr-2" />
-                  Quick Quote
+                  New quote
                 </Link>
               </Button>
             </div>
           ) : (
             <div className="divide-y divide-border">
               {recentBatches.map((batch) => (
-                <Link
+                <div
                   key={batch.id}
-                  href={`/batches/${batch.id}`}
-                  className="flex items-center justify-between px-6 py-3.5 hover:bg-muted/50 transition-colors group"
+                  className="flex items-center justify-between px-6 py-3.5"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -198,9 +190,8 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <BatchStatusBadge status={batch.status} />
-                    <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}

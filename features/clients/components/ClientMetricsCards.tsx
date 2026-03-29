@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import type { ClientMetrics } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Layers, Package, Hash, Weight, Calendar } from "lucide-react";
@@ -10,22 +11,22 @@ export function ClientMetricsCards({ metrics }: { metrics: ClientMetrics }) {
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <MetricCard
         title="Batches"
-        value={metrics.totalBatches}
+        value={formatInteger(metrics.totalBatches)}
         icon={Layers}
       />
       <MetricCard
         title="Parts"
-        value={metrics.totalParts}
+        value={formatInteger(metrics.totalParts)}
         icon={Package}
       />
       <MetricCard
         title="Quantity"
-        value={metrics.totalQuantity}
+        value={formatInteger(metrics.totalQuantity)}
         icon={Hash}
       />
       <MetricCard
         title="Weight (kg)"
-        value={metrics.totalWeight.toFixed(1)}
+        value={formatDecimal(metrics.totalWeight, 1)}
         icon={Weight}
       />
       <MetricCard

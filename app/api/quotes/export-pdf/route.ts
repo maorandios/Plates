@@ -59,6 +59,7 @@ const companySchema = z.object({
   email: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   website: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
 });
 
 const clientBodySchema = z.object({
@@ -76,6 +77,7 @@ function companyFromEnv() {
     email: process.env.QUOTE_PDF_COMPANY_EMAIL?.trim() || null,
     phone: process.env.QUOTE_PDF_COMPANY_PHONE?.trim() || null,
     website: process.env.QUOTE_PDF_COMPANY_WEBSITE?.trim() || null,
+    address: process.env.QUOTE_PDF_COMPANY_ADDRESS?.trim() || null,
   };
 }
 
@@ -94,6 +96,7 @@ function mergeCompany(
     email: empty(fromClient.email),
     phone: empty(fromClient.phone),
     website: empty(fromClient.website),
+    address: empty(fromClient.address) ?? fromEnv.address,
   };
 }
 

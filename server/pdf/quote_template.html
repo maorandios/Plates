@@ -16,7 +16,14 @@
         {% if logo_data_uri %}
         <img class="logo" src="{{ logo_data_uri }}" alt="" />
         {% endif %}
-        <div class="brand-name">{{ company_name }}</div>
+        <div class="brand-text">
+          <div class="brand-name">{{ company_name }}</div>
+          {% if company_address_lines %}
+          <div class="brand-address">
+            {% for line in company_address_lines %}<span>{{ line }}</span>{% if not loop.last %}<br />{% endif %}{% endfor %}
+          </div>
+          {% endif %}
+        </div>
       </div>
       <div class="meta">
         <h1 class="doc-title">QUOTATION</h1>
@@ -163,6 +170,9 @@
     <footer class="footer">
       <div class="footer-left">
         <span><strong>{{ company_name }}</strong></span>
+        {% if company_address_lines %}
+        <span class="footer-address">{% for line in company_address_lines %}{{ line }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+        {% endif %}
         {% if company_email %}<span>{{ company_email }}</span>{% endif %}
         {% if company_phone %}<span>{{ company_phone }}</span>{% endif %}
         {% if company_website %}<span>{{ company_website }}</span>{% endif %}

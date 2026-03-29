@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import type { NestingThicknessResult } from "@/types";
 import type { UnitSystem } from "@/types/settings";
 import { SheetCard } from "./SheetCard";
@@ -19,7 +20,7 @@ export function ThicknessResultsSection({
 }: ThicknessResultsSectionProps) {
   const label =
     result.thicknessMm != null
-      ? `${result.thicknessMm} mm`
+      ? `${formatInteger(result.thicknessMm)} mm`
       : "Thickness not set";
 
   const unplacedQty = result.unplacedParts.reduce(
@@ -33,9 +34,10 @@ export function ThicknessResultsSection({
         <h3 className="text-sm font-semibold text-foreground">{label}</h3>
         <div className="text-xs text-muted-foreground text-right space-y-0.5">
           <p className="tabular-nums">
-            {result.generatedSheets.length} sheet
+            {formatInteger(result.generatedSheets.length)} sheet
             {result.generatedSheets.length === 1 ? "" : "s"} ·{" "}
-            {result.utilizationPercent.toFixed(1)}% util. · {unplacedQty} unplaced
+            {formatDecimal(result.utilizationPercent, 1)}% util. ·{" "}
+            {formatInteger(unplacedQty)} unplaced
             qty
           </p>
           {result.engineDebug?.lastWinningCandidateLabel ? (

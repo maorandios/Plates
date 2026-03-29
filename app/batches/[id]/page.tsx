@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -156,27 +157,27 @@ export default function BatchDetailsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
         <BatchStatCard
           title="Clients"
-          value={clients.length}
+          value={formatInteger(clients.length)}
           icon={Users}
         />
         <BatchStatCard
           title="Plate types"
-          value={batchStats.plateTypes}
+          value={formatInteger(batchStats.plateTypes)}
           icon={LayoutGrid}
         />
         <BatchStatCard
           title="Plates quantity"
-          value={batchStats.platesQuantity}
+          value={formatInteger(batchStats.platesQuantity)}
           icon={Package}
         />
         <BatchStatCard
           title="Total area (m²)"
-          value={batchStats.platesAreaM2.toFixed(2)}
+          value={formatDecimal(batchStats.platesAreaM2, 2)}
           icon={ScanSearch}
         />
         <BatchStatCard
           title="Total weight (t)"
-          value={batchStats.totalWeightT.toFixed(3)}
+          value={formatDecimal(batchStats.totalWeightT, 3)}
           icon={Weight}
           className="col-span-2 sm:col-span-1 lg:col-span-1"
         />
@@ -284,7 +285,7 @@ function BatchStatCard({
   className,
 }: {
   title: string;
-  value: string | number;
+  value: ReactNode;
   icon: LucideIcon;
   className?: string;
 }) {

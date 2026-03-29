@@ -7,24 +7,37 @@ import { cn } from "@/lib/utils";
 
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Dashboard",
-  "/batches": "Quotes",
-  "/batches/new": "New quote job",
-  "/quick-quote": "Quick Quote",
+  "/quick-quote": "Quote",
   "/settings": "Settings",
+  "/settings/account": "Account settings",
+  "/settings/units": "Unit system",
+  "/settings/materials": "Materials configuration",
+  "/settings/bill-and-usage": "Bill and usage",
   "/clients": "Clients",
 };
 
 function getPageLabel(pathname: string): string {
   if (ROUTE_LABELS[pathname]) return ROUTE_LABELS[pathname];
-  if (pathname.match(/\/batches\/[^/]+\/parts/)) return "Review parts";
-  if (pathname.match(/\/batches\/[^/]+$/)) return "Import data";
+  if (pathname.startsWith("/quick-quote")) return "Quote";
   if (pathname.match(/\/clients\//)) return "Client";
+  if (pathname.startsWith("/settings/")) {
+    const seg = pathname.replace(/\/$/, "").split("/")[2];
+    if (seg === "account") return "Account settings";
+    if (seg === "units") return "Unit system";
+    if (seg === "materials") return "Materials configuration";
+    if (seg === "bill-and-usage") return "Bill and usage";
+  }
   return "PLATE";
 }
 
 export function TopHeader() {
   const pathname = usePathname();
   const label = getPageLabel(pathname);
+
+  // Hide header for quick-quote route (has its own sticky progress bar)
+  if (pathname.startsWith("/quick-quote")) {
+    return null;
+  }
 
   return (
     <header className="h-14 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-10 flex items-center px-4 lg:px-6 gap-4">

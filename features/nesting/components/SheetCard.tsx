@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { GeneratedSheet } from "@/types";
+import { formatDecimal } from "@/lib/formatNumbers";
 import { formatLength } from "@/lib/settings/unitSystem";
 import type { UnitSystem } from "@/types/settings";
 
@@ -27,7 +28,7 @@ export function SheetCard({ batchId, runId, sheet, unitSystem }: SheetCardProps)
           <span className="mx-1.5 text-border">·</span>
           {sheet.placements.length} part{sheet.placements.length === 1 ? "" : "s"}
           <span className="mx-1.5 text-border">·</span>
-          {sheet.utilizationPercent.toFixed(1)}% util.
+          {formatDecimal(sheet.utilizationPercent, 1)}% util.
         </p>
       </div>
       <Button asChild size="sm" variant="default">

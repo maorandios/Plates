@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import {
   Rectangle,
   ResponsiveContainer,
@@ -135,7 +136,7 @@ function MaterialTreemapTile(
           stroke="none"
           style={textStyle}
         >
-          {sharePct.toFixed(0)}%
+          {formatDecimal(sharePct, 0)}%
         </text>
       )}
     </g>
@@ -199,7 +200,7 @@ export function MaterialTreemapChart({
                   <p className="font-semibold text-foreground">{p.name}</p>
                   <p className="text-muted-foreground tabular-nums">
                     Share:{" "}
-                    {p.sharePct != null ? `${p.sharePct.toFixed(1)}%` : "—"} of{" "}
+                    {p.sharePct != null ? `${formatDecimal(p.sharePct, 1)}%` : "—"} of{" "}
                     {shareScopeLabel} (mass / area)
                   </p>
                   <p className="text-muted-foreground tabular-nums">
@@ -208,9 +209,7 @@ export function MaterialTreemapChart({
                   {p.massKg != null && p.massKg > 0 && (
                     <p className="text-muted-foreground tabular-nums">
                       Est. weight:{" "}
-                      {p.massKg.toLocaleString(undefined, {
-                        maximumFractionDigits: 0,
-                      })}{" "}
+                      {formatInteger(p.massKg)}{" "}
                       kg
                     </p>
                   )}

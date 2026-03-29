@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { FileUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import type { UploadedFileMeta } from "../types/quickQuote";
 
@@ -66,7 +67,7 @@ export function FileUploadCard({
         </div>
         {multiple && files.length > 0 && (
           <Badge variant="secondary" className="tabular-nums shrink-0">
-            {files.length} file{files.length !== 1 ? "s" : ""}
+            {formatInteger(files.length)} file{files.length !== 1 ? "s" : ""}
           </Badge>
         )}
       </div>
@@ -126,7 +127,7 @@ export function FileUploadCard({
 }
 
 function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024) return `${formatInteger(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${formatDecimal(bytes / 1024, 1)} KB`;
+  return `${formatDecimal(bytes / (1024 * 1024), 1)} MB`;
 }

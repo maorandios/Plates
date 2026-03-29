@@ -1,3 +1,4 @@
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { formatAreaM2 } from "../job-overview/jobOverview.utils";
 import type {
   JobSummaryMetrics,
@@ -125,7 +126,7 @@ export function defaultMarginPercentFromMfg(mfg: ManufacturingParameters): numbe
 export function formatKgDisplay(kg: number): string {
   const k = safeNumber(kg);
   if (k <= 0) return "—";
-  return `${k.toFixed(1)} kg`;
+  return `${formatDecimal(k, 1)} kg`;
 }
 
 /**
@@ -153,11 +154,11 @@ export function buildDynamicInsightLines(
 
   if (m < d) {
     lines.push(
-      `Compared with the quote default (${d}% margin), lowering margin by ${pts.toFixed(0)} percentage points reduces the quote by ${formatCurrency(Math.abs(quoteDelta))}.`
+      `Compared with the quote default (${d}% margin), lowering margin by ${formatInteger(pts)} percentage points reduces the quote by ${formatCurrency(Math.abs(quoteDelta))}.`
     );
   } else {
     lines.push(
-      `Compared with the quote default (${d}% margin), raising margin by ${pts.toFixed(0)} percentage points increases the quote by ${formatCurrency(quoteDelta)}.`
+      `Compared with the quote default (${d}% margin), raising margin by ${formatInteger(pts)} percentage points increases the quote by ${formatCurrency(quoteDelta)}.`
     );
   }
   return lines;

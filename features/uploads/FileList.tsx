@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { FileTypeBadge } from "@/components/shared/StatusBadge";
 import { deleteFile } from "@/lib/store";
 import type { UploadedFile } from "@/types";
+import { formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -154,7 +155,7 @@ function FileRow({
             />
             <span className="truncate font-medium text-foreground">{file.name}</span>
             <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-              {(file.sizeBytes / 1024).toFixed(0)} KB
+              {formatInteger(Math.round(file.sizeBytes / 1024))} KB
             </span>
             <FileTypeBadge type={file.type} />
           </div>

@@ -193,7 +193,7 @@ export default function StockConfigurationPage() {
           <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
             Assign available stock sheets for each thickness. If you defined{" "}
             <Link
-              href="/settings#purchased-sheets"
+              href="/settings/materials#purchased-sheets"
               className="underline font-medium text-foreground hover:text-primary"
             >
               purchased sheet sizes

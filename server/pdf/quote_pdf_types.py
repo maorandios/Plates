@@ -13,6 +13,7 @@ class CompanyBlock(BaseModel):
     email: str | None = None
     phone: str | None = None
     website: str | None = None
+    address: str | None = None
 
 
 class QuoteBlock(BaseModel):

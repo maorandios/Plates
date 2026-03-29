@@ -1,4 +1,4 @@
-export type QuickQuoteStep = 1 | 2 | 3 | 4 | 5 | 6;
+export type QuickQuoteStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 /** One purchased sheet size line for a thickness (catalog or manual). */
 export interface QuoteSheetStockLine {
@@ -7,6 +7,8 @@ export interface QuoteSheetStockLine {
   sheetWidthMm: number;
   /** Set when this line was added from Preferences purchased-sheet catalog. */
   catalogId?: string;
+  /** Set when this line came from Settings → material stock sheet row for this family. */
+  materialSheetId?: string;
 }
 
 /** Purchased stock for one plate thickness: zero or more sheet sizes (Quick Quote). Material price is global. */
@@ -37,6 +39,8 @@ export interface ValidationRow {
   id: string;
   partName: string;
   qty: number;
+  /** Nominal thickness from Excel BOM (mm). */
+  thicknessMm: number;
   excelLengthMm: number;
   dxfLengthMm: number;
   excelWidthMm: number;
@@ -45,6 +49,10 @@ export interface ValidationRow {
   dxfAreaM2: number;
   excelWeightKg: number;
   dxfWeightKg: number;
+  /** DXF outer cut perimeter (mm). */
+  dxfPerimeterMm: number;
+  /** Inner contours / pierce count from DXF. */
+  dxfPiercingCount: number;
   excelMaterial: string;
   dxfMaterial: string;
   status: ValidationRowStatus;

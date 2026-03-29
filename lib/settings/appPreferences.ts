@@ -16,6 +16,20 @@ function loadRaw(): AppPreferences {
         parsed.unitSystem === "imperial" || parsed.unitSystem === "metric"
           ? parsed.unitSystem
           : DEFAULT_APP_PREFERENCES.unitSystem,
+      companyName:
+        typeof parsed.companyName === "string" ? parsed.companyName : undefined,
+      companyEmail:
+        typeof parsed.companyEmail === "string" ? parsed.companyEmail : undefined,
+      companyPhone:
+        typeof parsed.companyPhone === "string" ? parsed.companyPhone : undefined,
+      companyWebsite:
+        typeof parsed.companyWebsite === "string"
+          ? parsed.companyWebsite
+          : undefined,
+      companyAddress:
+        typeof parsed.companyAddress === "string"
+          ? parsed.companyAddress
+          : undefined,
     };
   } catch {
     return DEFAULT_APP_PREFERENCES;

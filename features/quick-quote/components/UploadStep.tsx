@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatInteger } from "@/lib/formatNumbers";
 import { FileUploadCard } from "./FileUploadCard";
 import { JobDetailsForm } from "./JobDetailsForm";
 import type { QuickQuoteJobDetails, UploadedFileMeta } from "../types/quickQuote";
@@ -48,7 +49,7 @@ export function UploadStep({
       {
         id: `dxf-${Date.now()}`,
         name,
-        sizeLabel: `${(180 + mockDxfCounter * 40).toFixed(0)} KB`,
+        sizeLabel: `${formatInteger(180 + mockDxfCounter * 40)} KB`,
       },
     ]);
   };

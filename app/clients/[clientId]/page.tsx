@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Pencil, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ClientMetricsCards } from "@/features/clients/components/ClientMetricsCards";
@@ -140,12 +141,7 @@ export default function ClientDetailPage() {
                 {history.map((row) => (
                   <TableRow key={row.batchId}>
                     <TableCell className="font-medium">
-                      <Link
-                        href={`/batches/${row.batchId}`}
-                        className="hover:underline text-primary"
-                      >
-                        {row.batchName}
-                      </Link>
+                      <span className="text-foreground">{row.batchName}</span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {new Date(row.batchCreatedAt).toLocaleDateString()}
@@ -154,13 +150,13 @@ export default function ClientDetailPage() {
                       {CUTTING_METHOD_LABELS[row.cuttingMethod]}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {row.partsCount}
+                      {formatInteger(row.partsCount)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {row.totalQuantity}
+                      {formatInteger(row.totalQuantity)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {row.totalWeight.toFixed(1)}
+                      {formatDecimal(row.totalWeight, 1)}
                     </TableCell>
                   </TableRow>
                 ))}

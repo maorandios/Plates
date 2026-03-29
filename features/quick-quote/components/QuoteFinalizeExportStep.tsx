@@ -177,6 +177,22 @@ export function QuoteFinalizeExportStep({
                   }
                 />
               </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="co-address">Company address</Label>
+                <Textarea
+                  id="co-address"
+                  value={draft.company.address}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      company: { ...d.company, address: e.target.value },
+                    }))
+                  }
+                  rows={3}
+                  className="min-h-[72px] resize-y"
+                  placeholder="Street, city, postal code"
+                />
+              </div>
             </CardContent>
           </Card>
 

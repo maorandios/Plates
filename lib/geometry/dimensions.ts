@@ -2,6 +2,7 @@
  * Dimension helpers for preview UI: perimeter edge lengths, hole Ø in mm.
  */
 
+import { formatDecimal } from "@/lib/formatNumbers";
 import type { Point } from "./extract";
 import { polygonBoundingBox } from "./calc";
 
@@ -59,5 +60,5 @@ export function estimateHoleDiameterMm(hole: Point[]): number {
 
 export function formatHoleDiameterLabel(diameterMm: number): string {
   if (diameterMm <= 0) return "—";
-  return `Ø ${diameterMm.toFixed(1)} mm`;
+  return `Ø ${formatDecimal(diameterMm, 1)} mm`;
 }
