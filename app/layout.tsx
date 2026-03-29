@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PLATE — Plate Cutting Workflows",
-  description: "SaaS platform for plate cutting batch management",
+  title: "PLATE — CNC Steel Quotation",
+  description: "Fast, accurate CNC steel cutting quotes from DXF and Excel files",
 };
 
 export default function RootLayout({

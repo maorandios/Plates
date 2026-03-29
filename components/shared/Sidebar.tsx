@@ -4,14 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Layers,
-  PlusCircle,
   ChevronRight,
   Scissors,
   Settings,
   ContactRound,
-  SquareDashedBottom,
-  Calculator,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,23 +19,9 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    label: "Batches",
+    label: "Quotes",
     href: "/batches",
-    icon: Layers,
-  },
-  {
-    label: "Quick Quote",
-    href: "/quick-quote",
-    icon: Calculator,
-  },
-  {
-    label: "Quick Plate Builder",
-    href: "/plate-builder",
-    icon: SquareDashedBottom,
-    /** Active on hub or when building inside a batch */
-    isActive: (pathname: string) =>
-      pathname === "/plate-builder" ||
-      /\/batches\/[^/]+\/plate-builder/.test(pathname),
+    icon: FileText,
   },
   {
     label: "Clients",
@@ -46,12 +29,7 @@ const navItems = [
     icon: ContactRound,
   },
   {
-    label: "New Batch",
-    href: "/batches/new",
-    icon: PlusCircle,
-  },
-  {
-    label: "Preferences",
+    label: "Settings",
     href: "/settings",
     icon: Settings,
   },
@@ -82,12 +60,10 @@ export function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-0.5">
         {navItems.map((item) => {
           const isActive =
-            "isActive" in item && item.isActive
-              ? item.isActive(pathname)
-              : item.href === "/"
-                ? pathname === "/"
-                : pathname === item.href ||
-                  pathname.startsWith(item.href + "/");
+            item.href === "/"
+              ? pathname === "/"
+              : pathname === item.href ||
+                pathname.startsWith(item.href + "/");
 
           return (
             <Link
@@ -112,7 +88,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="px-5 py-4 border-t border-white/10">
-        <p className="text-xs text-white/30">Phase 1 · Foundation</p>
+        <p className="text-xs text-white/30">Quotation MVP</p>
       </div>
     </aside>
   );

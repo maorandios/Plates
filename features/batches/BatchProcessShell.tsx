@@ -56,7 +56,7 @@ export function BatchProcessShell({ batchId, children }: BatchProcessShellProps)
             <Button variant="ghost" size="sm" className="-ml-2 shrink-0" asChild>
               <Link href="/batches">
                 <ArrowLeft className="h-4 w-4 mr-1" />
-                All batches
+                All quotes
               </Link>
             </Button>
 

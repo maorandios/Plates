@@ -16,7 +16,6 @@ import {
   ScanSearch,
   Weight,
   Upload,
-  SquareDashedBottom,
 } from "lucide-react";
 import {
   Select,
@@ -149,22 +148,8 @@ export default function BatchDetailsPage() {
           Import data
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Link clients from your global directory, import DXF and Excel per client for this batch,
-          then continue to validation.
+          Link clients, upload DXF and Excel files for this quote job, then continue to review parts.
         </p>
-        <div className="mt-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="gap-2"
-            asChild
-          >
-            <Link href={`/batches/${batchId}/plate-builder`}>
-              <SquareDashedBottom className="h-4 w-4" />
-              Quick Plate Builder
-            </Link>
-          </Button>
-        </div>
       </div>
 
       {/* Batch totals — from last saved Parts Review table */}
@@ -197,9 +182,9 @@ export default function BatchDetailsPage() {
         />
       </div>
       <p className="text-[11px] text-muted-foreground mb-6">
-        Plate totals use the saved parts table. Go to{" "}
+        Part totals use the saved parts table. Go to{" "}
         <Link href={`/batches/${batchId}/parts`} className="underline hover:text-foreground">
-          Validation
+          Review parts
         </Link>{" "}
         (step 2) and click Rebuild Table to refresh after new uploads, or use{" "}
         <span className="font-medium text-foreground">Continue</span> above.
@@ -449,19 +434,9 @@ function ClientExpandable({
                 <Upload className="h-4 w-4" />
                 Import files
               </Button>
-              <Button type="button" size="sm" variant="outline" asChild>
-                <Link
-                  href={`/batches/${batchId}/plate-builder?clientId=${client.id}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <SquareDashedBottom className="h-4 w-4 mr-2" />
-                  New plate
-                </Link>
-              </Button>
             </div>
             <p className="text-[11px] text-muted-foreground mt-2 leading-snug">
-              Multi-step import: DXF parse, optional Excel with column mapping, then review DXF
-              plates in the table below. Use New plate to sketch a simple plate without CAD.
+              Multi-step import: DXF parse, optional Excel with column mapping, then review parts in the table below.
             </p>
           </div>
 

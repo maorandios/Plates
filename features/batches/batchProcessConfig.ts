@@ -1,20 +1,12 @@
-/** Ordered workflow under `/batches/[id]`. Segment is empty for the first step. */
+/** Ordered workflow under `/batches/[id]`. Segment is empty for the first step. 
+ * For MVP: only showing Import and Validation. Stock and Nesting are hidden from main flow.
+ */
 export const BATCH_PROCESS_STEPS = [
   { segment: "" as const, label: "Import data", shortLabel: "Import" },
-  { segment: "parts" as const, label: "Validation", shortLabel: "Validation" },
-  {
-    segment: "stock" as const,
-    label: "Stock configuration",
-    shortLabel: "Stock",
-  },
-  {
-    segment: "nesting-results" as const,
-    label: "Nesting results",
-    shortLabel: "Nesting",
-  },
+  { segment: "parts" as const, label: "Review parts", shortLabel: "Review" },
 ] as const;
 
-export type BatchProcessStepIndex = 0 | 1 | 2 | 3;
+export type BatchProcessStepIndex = 0 | 1;
 
 export function batchStepHref(
   batchId: string,
@@ -32,9 +24,6 @@ export function pathnameToStepIndex(
 ): BatchProcessStepIndex {
   const prefix = `/batches/${batchId}`;
   const norm = pathname.replace(/\/$/, "") || pathname;
-  if (norm === `${prefix}/nesting-results`) return 3;
-  if (norm.startsWith(`${prefix}/nesting-results/`)) return 3;
-  if (norm === `${prefix}/stock`) return 2;
   if (norm === `${prefix}/parts`) return 1;
   if (norm === prefix) return 0;
   return 0;

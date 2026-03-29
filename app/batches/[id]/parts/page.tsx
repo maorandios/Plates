@@ -220,12 +220,12 @@ export default function PartsReviewPage() {
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-foreground tracking-tight">
-            Validation
+            Review parts
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {batch
-              ? `Review and rebuild the unified parts table for ${batch.name}.`
-              : "Review the unified parts table for this batch."}
+              ? `Review and edit parts for ${batch.name}. Fix quantities, materials, or thicknesses as needed.`
+              : "Review and edit parts for this quote."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">

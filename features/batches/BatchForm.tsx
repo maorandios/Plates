@@ -58,16 +58,16 @@ export function BatchForm() {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Batch Name</FormLabel>
+              <FormLabel>Quote Job Name</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="e.g. March Production Run #1"
+                  placeholder="e.g. March 2026 Client Quotes"
                   autoFocus
                   {...field}
                 />
               </FormControl>
               <FormDescription>
-                A descriptive name for this production / cutting batch.
+                A descriptive name for this quote job.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -84,7 +84,7 @@ export function BatchForm() {
               <FormLabel>Notes (optional)</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Any additional information about this batch…"
+                  placeholder="Any additional information about this quote job…"
                   rows={3}
                   {...field}
                 />
@@ -96,7 +96,7 @@ export function BatchForm() {
 
         <div className="flex gap-3 pt-2">
           <Button type="submit" disabled={form.formState.isSubmitting}>
-            Create Batch
+            Create Quote Job
           </Button>
           <Button
             type="button"

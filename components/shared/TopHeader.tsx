@@ -7,19 +7,18 @@ import { cn } from "@/lib/utils";
 
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Dashboard",
-  "/batches": "Batches",
-  "/batches/new": "New Batch",
+  "/batches": "Quotes",
+  "/batches/new": "New quote job",
   "/quick-quote": "Quick Quote",
-  "/plate-builder": "Plate Builder",
-  "/settings": "Preferences",
+  "/settings": "Settings",
+  "/clients": "Clients",
 };
 
 function getPageLabel(pathname: string): string {
   if (ROUTE_LABELS[pathname]) return ROUTE_LABELS[pathname];
-  if (pathname.match(/\/batches\/[^/]+\/stock/)) return "Stock configuration";
-  if (pathname.match(/\/batches\/[^/]+\/parts/)) return "Validation";
-  if (pathname.match(/\/batches\/[^/]+\/plate-builder/)) return "Plate Builder";
+  if (pathname.match(/\/batches\/[^/]+\/parts/)) return "Review parts";
   if (pathname.match(/\/batches\/[^/]+$/)) return "Import data";
+  if (pathname.match(/\/clients\//)) return "Client";
   return "PLATE";
 }
 

@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Layers,
+  FileText,
   PlusCircle,
   ArrowRight,
   Calendar,
   Users,
+  Calculator,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,30 +37,46 @@ export default function BatchesPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Batches"
-        description="Manage your plate cutting production batches"
+        title="Quotes"
+        description="Manage your quotations and quote jobs"
         actions={
-          <Button asChild>
-            <Link href="/batches/new">
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New Batch
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href="/batches/new">
+                <PlusCircle className="h-4 w-4 mr-2" />
+                New Quote Job
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/quick-quote">
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Quick Quote
+              </Link>
+            </Button>
+          </div>
         }
       />
 
       {batches.length === 0 ? (
         <EmptyState
-          icon={Layers}
-          title="No batches yet"
-          description="Create your first batch to start organizing plate cutting jobs for your clients."
+          icon={FileText}
+          title="No quotes yet"
+          description="Create your first quote to get started. Use Quick Quote for fast DXF + Excel quotes."
           action={
-            <Button asChild>
-              <Link href="/batches/new">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Create Batch
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild variant="outline">
+                <Link href="/batches/new">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  New Quote Job
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/quick-quote">
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Quick Quote
+                </Link>
+              </Button>
+            </div>
           }
         />
       ) : (
@@ -82,7 +99,7 @@ function BatchCard({ batch }: { batch: Batch }) {
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-3 gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted shrink-0">
-              <Layers className="h-5 w-5 text-muted-foreground" />
+              <FileText className="h-5 w-5 text-muted-foreground" />
             </div>
             <div className="flex flex-col items-end gap-1.5 shrink-0">
               <BatchStatusBadge status={batch.status} />

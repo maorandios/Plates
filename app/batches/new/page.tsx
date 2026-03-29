@@ -7,8 +7,8 @@ export default function NewBatchPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="New Batch"
-        description="Create a new plate cutting production batch"
+        title="New quote job"
+        description="Create a new quote job for organizing client files and parts"
       />
       <Card className="max-w-lg border border-border shadow-none">
         <CardContent className="p-6">
