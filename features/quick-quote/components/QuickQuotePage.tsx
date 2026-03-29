@@ -540,7 +540,6 @@ export function QuickQuotePage() {
 
         {step === 5 && (
           <StockPricingStep
-            jobSummary={selection.jobSummary}
             stockRows={thicknessStock}
             materialType={materialType}
             currencyCode={jobDetails.currency}

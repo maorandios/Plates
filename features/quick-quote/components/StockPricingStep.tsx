@@ -2,43 +2,26 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Plus, Settings2, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Plus, Settings2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { badgeVariants } from "@/components/ui/badge";
 import { getPurchasedSheetSizes } from "@/lib/store";
-import { filterCatalogForThickness } from "@/lib/settings/purchasedSheetsCatalog";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import { nanoid } from "@/lib/utils/nanoid";
-import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
+import { formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import {
   MATERIAL_TYPE_LABELS,
   type MaterialConfig,
-  type MaterialStockSheet,
   type MaterialType,
 } from "@/types/materials";
 import type { PurchasedSheetSize } from "@/types/settings";
-import type {
-  JobSummaryMetrics,
-  QuoteSheetStockLine,
-  ThicknessStockInput,
-} from "../types/quickQuote";
+import type { QuoteSheetStockLine, ThicknessStockInput } from "../types/quickQuote";
 import { isThicknessStockComplete } from "../lib/deriveQuoteSelection";
-import {
-  hasDuplicateSheetSizes,
-  sheetFootprintKey,
-  thicknessMatchesStockList,
-} from "../lib/quoteStockAvailability";
+import { hasDuplicateSheetSizes } from "../lib/quoteStockAvailability";
 
 function catalogLabel(
   c: PurchasedSheetSize,
@@ -72,22 +55,7 @@ function lineLabelForStockLine(
   return `${formatInteger(line.sheetLengthMm)} × ${formatInteger(line.sheetWidthMm)} mm`;
 }
 
-function isFootprintInSheets(
-  sheets: QuoteSheetStockLine[],
-  widthMm: number,
-  lengthMm: number
-): boolean {
-  const k = sheetFootprintKey(widthMm, lengthMm);
-  return sheets.some(
-    (s) =>
-      s.sheetLengthMm > 0 &&
-      s.sheetWidthMm > 0 &&
-      sheetFootprintKey(s.sheetWidthMm, s.sheetLengthMm) === k
-  );
-}
-
 interface StockPricingStepProps {
-  jobSummary: JobSummaryMetrics;
   stockRows: ThicknessStockInput[];
   materialType: MaterialType;
   currencyCode: string;
@@ -99,7 +67,6 @@ interface StockPricingStepProps {
 }
 
 export function StockPricingStep({
-  jobSummary,
   stockRows,
   materialType,
   currencyCode,
@@ -109,8 +76,7 @@ export function StockPricingStep({
   onBack,
   onContinue,
 }: StockPricingStepProps) {
-  const { preferences, formatLengthValue } = useAppPreferences();
-  const unitSystem = preferences.unitSystem;
+  const { formatLengthValue } = useAppPreferences();
 
   const [catalogRev, setCatalogRev] = useState(0);
   const [materialRev, setMaterialRev] = useState(0);
@@ -151,55 +117,26 @@ export function StockPricingStep({
     <div className="space-y-8">
       <div className="w-full">
         <h1 className="text-2xl font-semibold tracking-tight">Stock & pricing</h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-base max-w-2xl">
-          Price per kg for <span className="font-medium text-foreground">{materialLabel}</span>
-          , then sheet sizes per plate thickness from this job. One size per footprint per
-          thickness; remove any line you will not use.
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+          {materialLabel} — price per kg and sheet stock per thickness (pre-filled from settings; remove unused lines).
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryMini
-          label="Unique parts"
-          value={formatInteger(jobSummary.uniqueParts)}
-        />
-        <SummaryMini
-          label="Total quantity"
-          value={formatInteger(jobSummary.totalQty)}
-        />
-        <SummaryMini
-          label="Total plate area"
-          value={`${formatDecimal(jobSummary.totalPlateAreaM2, 2)} m²`}
-        />
-        <SummaryMini
-          label="Est. weight"
-          value={`${formatDecimal(jobSummary.totalEstWeightKg, 1)} kg`}
-        />
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 pb-6 border-b border-border">
+        <div className="space-y-1.5 max-w-xs">
+          <Label className="text-xs text-muted-foreground font-normal">
+            Material price ({currencyCode}/kg)
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            step={0.01}
+            className="h-9 font-mono text-sm"
+            value={materialPricePerKg}
+            onChange={(e) => onMaterialPriceChange(Number(e.target.value))}
+          />
+        </div>
       </div>
-
-      <Card className="border-border shadow-sm w-full">
-        <CardHeader className="border-b border-border bg-muted/20 py-3">
-          <CardTitle className="text-base">Material purchase price</CardTitle>
-          <CardDescription>
-            One rate for all plate in this quote ({currencyCode}/kg, before other costs).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="space-y-1.5 max-w-xs">
-            <Label className="text-xs text-muted-foreground font-normal">
-              Price ({currencyCode}/kg)
-            </Label>
-            <Input
-              type="number"
-              min={0}
-              step={0.01}
-              className="h-9 font-mono text-sm"
-              value={materialPricePerKg}
-              onChange={(e) => onMaterialPriceChange(Number(e.target.value))}
-            />
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -213,42 +150,11 @@ export function StockPricingStep({
             </Link>
           </Button>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          {stockRows.map((row) => {
-            const forTh = filterCatalogForThickness(purchasedCatalog, row.thicknessMm);
-            const materialSheetsForTh = materialConfig.stockSheets.filter(
-              (s) =>
-                s.enabled && thicknessMatchesStockList(row.thicknessMm, s.thicknessesMm)
-            );
 
+        <div className="flex flex-col gap-2">
+          {stockRows.map((row, index) => {
             function updateSheets(next: QuoteSheetStockLine[]) {
               onSheetsChange(row.thicknessMm, next);
-            }
-
-            function addFromCatalog(c: PurchasedSheetSize) {
-              if (isFootprintInSheets(row.sheets, c.widthMm, c.lengthMm)) return;
-              updateSheets([
-                ...row.sheets,
-                {
-                  id: nanoid(),
-                  sheetLengthMm: Math.max(c.widthMm, c.lengthMm),
-                  sheetWidthMm: Math.min(c.widthMm, c.lengthMm),
-                  catalogId: c.id,
-                },
-              ]);
-            }
-
-            function addFromMaterialSheet(s: MaterialStockSheet) {
-              if (isFootprintInSheets(row.sheets, s.widthMm, s.lengthMm)) return;
-              updateSheets([
-                ...row.sheets,
-                {
-                  id: nanoid(),
-                  sheetLengthMm: Math.max(s.widthMm, s.lengthMm),
-                  sheetWidthMm: Math.min(s.widthMm, s.lengthMm),
-                  materialSheetId: s.id,
-                },
-              ]);
             }
 
             function removeLine(id: string) {
@@ -282,25 +188,31 @@ export function StockPricingStep({
             }
 
             const dupInRow = hasDuplicateSheetSizes(row.sheets);
+            const lineCount = row.sheets.length;
 
             return (
-              <Card key={row.thicknessMm} className="border-border shadow-sm">
-                <CardHeader className="border-b border-border bg-muted/20 py-3">
-                  <CardTitle className="text-base">{row.thicknessMm} mm plate</CardTitle>
-                  <CardDescription>
-                    Parts at this thickness use these purchased sheet sizes for costing (
-                    {unitSystem}).
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-4 grid gap-4">
+              <details
+                key={row.thicknessMm}
+                className="border border-border rounded-lg bg-card overflow-hidden open:shadow-sm"
+                open={index === 0}
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 bg-muted/25 hover:bg-muted/40 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0">
+                    {row.thicknessMm} mm
+                    <span className="font-normal text-muted-foreground ml-2">
+                      ({lineCount} sheet size{lineCount === 1 ? "" : "s"})
+                    </span>
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground opacity-70" />
+                </summary>
+                <div className="border-t border-border px-4 py-4 space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground font-normal">
                       Sheet sizes for this quote
                     </Label>
                     {row.sheets.length === 0 ? (
                       <p className="text-xs text-muted-foreground italic rounded-md border border-dashed border-border px-3 py-2">
-                        Add at least one sheet size — use settings, saved catalog, or manual
-                        entry.
+                        Add at least one sheet size — use Add custom sheet size below.
                       </p>
                     ) : (
                       <div className="flex flex-col gap-3">
@@ -310,7 +222,7 @@ export function StockPricingStep({
                               key={line.id}
                               className={cn(
                                 badgeVariants({ variant: "secondary" }),
-                                "inline-flex w-fit max-w-full items-center gap-1 pl-3 pr-1 py-1 h-auto font-normal"
+                                "inline-flex w-fit max-w-full items-center gap-1 pl-3 pr-1 py-1.5 h-auto font-normal"
                               )}
                             >
                               <span className="text-left leading-snug pr-1">
@@ -409,83 +321,6 @@ export function StockPricingStep({
                     ) : null}
                   </div>
 
-                  {(materialSheetsForTh.length > 0 || forTh.length > 0) && (
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground font-normal">
-                        Add from settings or saved catalog
-                      </Label>
-                      <div className="flex flex-wrap gap-2">
-                        {materialSheetsForTh.map((s) => {
-                          const inQuote = isFootprintInSheets(
-                            row.sheets,
-                            s.widthMm,
-                            s.lengthMm
-                          );
-                          return (
-                            <button
-                              key={`m-${s.id}`}
-                              type="button"
-                              disabled={inQuote}
-                              onClick={() => addFromMaterialSheet(s)}
-                              className={cn(
-                                badgeVariants({ variant: "outline" }),
-                                "h-auto min-h-8 gap-1.5 py-1.5 pl-2.5 pr-2 font-normal text-left",
-                                inQuote
-                                  ? "opacity-40 cursor-not-allowed"
-                                  : "cursor-pointer hover:bg-muted/80"
-                              )}
-                            >
-                              <span className="max-w-[220px] leading-snug">
-                                {formatLengthValue(s.widthMm)} ×{" "}
-                                {formatLengthValue(s.lengthMm)}
-                                <span className="text-muted-foreground"> · settings</span>
-                              </span>
-                              {!inQuote ? (
-                                <Plus
-                                  className="h-3.5 w-3.5 shrink-0 opacity-70"
-                                  aria-hidden
-                                />
-                              ) : null}
-                            </button>
-                          );
-                        })}
-                        {forTh.map((c) => {
-                          const inQuote = isFootprintInSheets(
-                            row.sheets,
-                            c.widthMm,
-                            c.lengthMm
-                          );
-                          return (
-                            <button
-                              key={`c-${c.id}`}
-                              type="button"
-                              disabled={inQuote}
-                              onClick={() => addFromCatalog(c)}
-                              className={cn(
-                                badgeVariants({ variant: "outline" }),
-                                "h-auto min-h-8 gap-1.5 py-1.5 pl-2.5 pr-2 font-normal text-left",
-                                inQuote
-                                  ? "opacity-40 cursor-not-allowed"
-                                  : "cursor-pointer hover:bg-muted/80"
-                              )}
-                            >
-                              <span className="max-w-[220px] leading-snug">
-                                {catalogLabel(c, formatLengthValue)}
-                                <span className="text-muted-foreground"> · saved</span>
-                              </span>
-                              {!inQuote ? (
-                                <Plus
-                                  className="h-3.5 w-3.5 shrink-0 opacity-70"
-                                  aria-hidden
-                                />
-                              ) : null}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
                   <Button
                     type="button"
                     variant="outline"
@@ -496,11 +331,12 @@ export function StockPricingStep({
                     <Plus className="h-3.5 w-3.5" />
                     Add custom sheet size
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </details>
             );
           })}
         </div>
+
         {stockRows.length === 0 && (
           <p className="text-sm text-muted-foreground rounded-md border border-dashed border-border px-4 py-8 text-center">
             No parts in this run — go back and select plates from validation.
@@ -518,18 +354,5 @@ export function StockPricingStep({
         </Button>
       </div>
     </div>
-  );
-}
-
-function SummaryMini({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="border-border shadow-sm">
-      <CardHeader className="pb-2 pt-4">
-        <CardDescription className="text-xs font-medium uppercase tracking-wide">
-          {label}
-        </CardDescription>
-        <CardTitle className="text-xl tabular-nums">{value}</CardTitle>
-      </CardHeader>
-    </Card>
   );
 }
