@@ -1,4 +1,33 @@
-export type QuickQuoteStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+import type { PlateFinish } from "../lib/plateFields";
+
+export type QuickQuoteStep =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10;
+
+/** How the user builds this quote after General — set in phase 2, details in phase 3. */
+export type QuoteCreationMethod = "dxf" | "manualAdd" | "bendPlate";
+
+/** One row in the Manually add quote table (phase 3). */
+export interface ManualQuotePartRow {
+  id: string;
+  partNumber: string;
+  /** Plate thickness (mm) — used with width/length for weight. */
+  thicknessMm: number;
+  widthMm: number;
+  lengthMm: number;
+  quantity: number;
+  /** Steel grade / designation (e.g. S235). */
+  material: string;
+  finish: PlateFinish;
+}
 
 /** One purchased sheet size line for a thickness (catalog or manual). */
 export interface QuoteSheetStockLine {
@@ -28,6 +57,8 @@ export interface UploadedFileMeta {
 export interface QuickQuoteJobDetails {
   /** Auto-generated unique quote id (e.g. QQ-20260327-AB12CD34). */
   referenceNumber: string;
+  /** Chosen in the Quote method step; drives method-specific details UI. */
+  quoteCreationMethod?: QuoteCreationMethod;
   customerName: string;
   /** Present when `customerName` was applied from the global client directory. */
   customerClientId?: string;

@@ -423,3 +423,86 @@ export function buildSelectionBundle(
     pricing,
   };
 }
+
+/**
+ * Same pricing/manufacturing pipeline as {@link buildSelectionBundle}, but with explicit
+ * part rows (e.g. bend-plate geometry) instead of Excel/DXF validation rows.
+ */
+export function buildSelectionBundleFromParts(
+  parts: QuotePartRow[],
+  stockByThickness?: ThicknessStockInput[] | null,
+  materialPricePerKg?: number
+) {
+  const jobSummary = jobSummaryFromParts(parts);
+  const validationSummary: ValidationSummary = {
+    totalRows: parts.length,
+    matched: parts.length,
+    warnings: 0,
+    critical: 0,
+  };
+  const validationRecap: ValidationRecap = {
+    fullyMatched: parts.length,
+    warningItems: 0,
+    errorItems: 0,
+    confidenceNote:
+      parts.length > 0
+        ? "Bend plate parts — geometry from side profile."
+        : "No parts in this quote run.",
+  };
+  let { mfg, pricing } = scaleManufacturingAndPricing(
+    parts,
+    MOCK_JOB_SUMMARY,
+    MOCK_MFG_PARAMETERS,
+    MOCK_PRICING_SUMMARY
+  );
+
+  if (
+    stockByThickness?.length &&
+    isThicknessStockComplete(stockByThickness) &&
+    materialPricePerKg != null &&
+    Number.isFinite(materialPricePerKg)
+  ) {
+    const stock = stockMapFromRows(stockByThickness);
+    const sheetMetrics = estimateSheetUsageFromStock(parts, stockByThickness);
+    mfg = {
+      ...mfg,
+      ...sheetMetrics,
+      totalNetPlateAreaM2: jobSummary.totalPlateAreaM2,
+      materialRatePerKg: roundN(materialPricePerKg, 2),
+      standardStockSize: formatStockSummary(stockByThickness, materialPricePerKg),
+      thicknessGroup: thicknessGroupLabel(parts),
+    };
+
+    const userMaterial = computeMaterialCostFromStock(
+      parts,
+      stock,
+      materialPricePerKg
+    );
+    const deltaMat = userMaterial - pricing.materialCost;
+    const newFinal = roundN(pricing.finalEstimatedPrice + deltaMat, 1);
+    pricing = {
+      ...pricing,
+      materialCost: userMaterial,
+      finalEstimatedPrice: newFinal,
+      internalEstCost: roundN(pricing.internalEstCost + deltaMat, 1),
+      pricePerKg:
+        jobSummary.totalEstWeightKg > 0
+          ? roundN(newFinal / jobSummary.totalEstWeightKg, 2)
+          : pricing.pricePerKg,
+      avgPricePerPart:
+        parts.length > 0
+          ? roundN(newFinal / parts.length, 1)
+          : pricing.avgPricePerPart,
+    };
+  }
+
+  return {
+    validationRows: [] as ValidationRow[],
+    parts,
+    jobSummary,
+    validationSummary,
+    validationRecap,
+    mfgParams: mfg,
+    pricing,
+  };
+}

@@ -7,13 +7,15 @@ import type { QuickQuoteStep } from "../types/quickQuote";
 
 const STEPS: { step: QuickQuoteStep; label: string }[] = [
   { step: 1, label: "General" },
-  { step: 2, label: "Upload Excel" },
-  { step: 3, label: "Upload DXF" },
-  { step: 4, label: "Analyze" },
-  { step: 5, label: "Stock & pricing" },
-  { step: 6, label: "Calculation" },
-  { step: 7, label: "Quote" },
-  { step: 8, label: "Finalize" },
+  { step: 2, label: "Quote method" },
+  { step: 3, label: "Method setup" },
+  { step: 4, label: "Upload Excel" },
+  { step: 5, label: "Upload DXF" },
+  { step: 6, label: "Analyze" },
+  { step: 7, label: "Stock & pricing" },
+  { step: 8, label: "Calculation" },
+  { step: 9, label: "Quote" },
+  { step: 10, label: "Finalize" },
 ];
 
 interface QuoteStepperProps {
@@ -119,7 +121,7 @@ export function QuoteStepper({
               Back
             </Button>
           )}
-          {showContinue && currentStep < 8 && onContinue && (
+          {showContinue && currentStep < 10 && onContinue && (
             <Button
               type="button"
               size="sm"

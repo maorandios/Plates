@@ -5,6 +5,8 @@ import { PageContainer } from "@/components/shared/PageContainer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GeneralSection } from "./GeneralSection";
+import { MethodDetailsRouter } from "./MethodDetailsRouter";
+import { QuoteMethodStep } from "./QuoteMethodStep";
 import { ExcelUploadStep } from "./ExcelUploadStep";
 import { DxfUploadStep } from "./DxfUploadStep";
 import { CalculationStep } from "./CalculationStep";
@@ -15,6 +17,7 @@ import { StockPricingStep } from "./StockPricingStep";
 import { UploadStep } from "./UploadStep";
 import { ValidationStep } from "./ValidationStep";
 import type {
+  ManualQuotePartRow,
   QuickQuoteJobDetails,
   QuickQuoteStep,
   QuoteSheetStockLine,
@@ -30,10 +33,13 @@ import {
 } from "../mock/quickQuoteMockData";
 import {
   buildSelectionBundle,
+  buildSelectionBundleFromParts,
   isThicknessStockComplete,
   mergeDefaultStockRows,
   quotePartsForValidationSelection,
 } from "../lib/deriveQuoteSelection";
+import { bendPlateQuoteItemsToQuoteParts } from "../bend-plate/toQuoteParts";
+import type { BendPlateQuoteItem } from "../bend-plate/types";
 import { generateQuoteReference } from "../lib/generateQuoteReference";
 import { MOCK_MFG_PARAMETERS } from "../mock/quickQuoteMockData";
 import type { QuotePdfFullPayload } from "../lib/quotePdfPayload";
@@ -43,6 +49,10 @@ import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import { normalizeName } from "@/lib/matching/matcher";
 import { getPurchasedSheetSizes } from "@/lib/store";
 import { nanoid } from "@/lib/utils/nanoid";
+import {
+  DEFAULT_PLATE_FINISH,
+  defaultMaterialGradeForFamily,
+} from "../lib/plateFields";
 
 const defaultJobDetails: QuickQuoteJobDetails = {
   referenceNumber: "",
@@ -261,6 +271,33 @@ export function QuickQuotePage() {
   );
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
 
+  const [manualQuoteRows, setManualQuoteRows] = useState<ManualQuotePartRow[]>(() => [
+    {
+      id: nanoid(),
+      partNumber: "PL01",
+      thicknessMm: 10,
+      widthMm: 0,
+      lengthMm: 0,
+      quantity: 1,
+      material: defaultMaterialGradeForFamily("carbonSteel"),
+      finish: DEFAULT_PLATE_FINISH,
+    },
+  ]);
+
+  const [bendPlateQuoteItems, setBendPlateQuoteItems] = useState<BendPlateQuoteItem[]>([]);
+
+  const handleBendPlateAddItem = useCallback((item: BendPlateQuoteItem) => {
+    setBendPlateQuoteItems((prev) => [...prev, item]);
+  }, []);
+
+  const handleBendPlateUpdateItem = useCallback((item: BendPlateQuoteItem) => {
+    setBendPlateQuoteItems((prev) => prev.map((x) => (x.id === item.id ? item : x)));
+  }, []);
+
+  const handleBendPlateRemoveItem = useCallback((id: string) => {
+    setBendPlateQuoteItems((prev) => prev.filter((x) => x.id !== id));
+  }, []);
+
   const advanceTo = useCallback((s: QuickQuoteStep) => {
     setStep(s);
     setHighestStepReached((h) => (s > h ? s : h));
@@ -281,6 +318,15 @@ export function QuickQuotePage() {
   }, [thicknessStock, materialPricePerKg]);
 
   const selection = useMemo(() => {
+    if (jobDetails.quoteCreationMethod === "bendPlate") {
+      const parts = bendPlateQuoteItemsToQuoteParts(bendPlateQuoteItems);
+      const stock = stockPricingReady ? thicknessStock : null;
+      return buildSelectionBundleFromParts(
+        parts,
+        stock,
+        stock ? materialPricePerKg : undefined
+      );
+    }
     const rows = calculationRows ?? MOCK_VALIDATION_ROWS;
     const stock = stockPricingReady ? thicknessStock : null;
     return buildSelectionBundle(
@@ -288,32 +334,59 @@ export function QuickQuotePage() {
       stock,
       stock ? materialPricePerKg : undefined
     );
-  }, [calculationRows, thicknessStock, materialPricePerKg, stockPricingReady]);
+  }, [
+    jobDetails.quoteCreationMethod,
+    bendPlateQuoteItems,
+    calculationRows,
+    thicknessStock,
+    materialPricePerKg,
+    stockPricingReady,
+  ]);
 
-  const handleContinueToExcelUpload = () => advanceTo(2);
-  const handleBackToGeneral = () => advanceTo(1);
-  
+  const handleContinueFromGeneral = () => advanceTo(2);
+  const handleContinueFromQuoteMethod = () => advanceTo(3);
+  const handleBackFromQuoteMethod = () => advanceTo(1);
+
+  const handleContinueFromMethodDetails = useCallback(() => {
+    if (jobDetails.quoteCreationMethod === "bendPlate") {
+      const parts = bendPlateQuoteItemsToQuoteParts(bendPlateQuoteItems);
+      setThicknessStock((prev) =>
+        mergeDefaultStockRows(parts, prev, materialType, getPurchasedSheetSizes())
+      );
+      advanceTo(7);
+      return;
+    }
+    advanceTo(4);
+  }, [
+    jobDetails.quoteCreationMethod,
+    bendPlateQuoteItems,
+    materialType,
+    advanceTo,
+  ]);
+
+  const handleBackFromMethodDetails = () => advanceTo(2);
+
   const handleExcelDataApproved = (data: ExcelRow[]) => {
     setExcelData(data);
-    advanceTo(3);
+    advanceTo(5);
   };
-  
-  const handleBackToExcelUpload = () => advanceTo(2);
-  
+
+  const handleBackToExcelUpload = () => advanceTo(3);
+
   const handleDxfDataApproved = useCallback((data: DxfPartGeometry[]) => {
     setDxfData(data);
-    
+
     // Build validation data from Excel and DXF
     if (excelData && excelData.length > 0) {
       const validation = buildValidationData(excelData, data, materialType);
       setValidationRows(validation.rows);
       setValidationSummary(validation.summary);
     }
-    
-    advanceTo(4);
+
+    advanceTo(6);
   }, [excelData, materialType, advanceTo]);
-  
-  const handleBackToDxfUpload = () => advanceTo(3);
+
+  const handleBackToDxfUpload = () => advanceTo(4);
 
   const handlePlateSelectionFromValidation = (selected: ValidationRow[]) => {
     setCalculationRows(selected);
@@ -321,20 +394,32 @@ export function QuickQuotePage() {
     setThicknessStock((prev) =>
       mergeDefaultStockRows(parts, prev, materialType, getPurchasedSheetSizes())
     );
-    advanceTo(5);
+    advanceTo(7);
   };
 
-  const handleBackFromStockToValidation = () => advanceTo(4);
+  const handleBackFromStockToValidation = useCallback(() => {
+    if (jobDetails.quoteCreationMethod === "bendPlate") {
+      advanceTo(3);
+      return;
+    }
+    advanceTo(6);
+  }, [jobDetails.quoteCreationMethod, advanceTo]);
 
   const handleContinueFromStockToCalculation = () => {
     setCalcRunId((id) => id + 1);
-    advanceTo(6);
+    advanceTo(8);
   };
 
-  const handleBackFromCalculationToStock = () => advanceTo(5);
-  const handleViewQuote = () => advanceTo(7);
-  const handleBackFromQuote = () => advanceTo(6);
-  const handleBackToValidationFromQuote = () => advanceTo(4);
+  const handleBackFromCalculationToStock = () => advanceTo(7);
+  const handleViewQuote = () => advanceTo(9);
+  const handleBackFromQuote = () => advanceTo(8);
+  const handleBackToValidationFromQuote = useCallback(() => {
+    if (jobDetails.quoteCreationMethod === "bendPlate") {
+      advanceTo(7);
+      return;
+    }
+    advanceTo(6);
+  }, [jobDetails.quoteCreationMethod, advanceTo]);
 
   const buildFinalizeDraft = useCallback(
     (): QuotePdfFullPayload =>
@@ -350,15 +435,15 @@ export function QuickQuotePage() {
 
   const handleContinueToFinalize = useCallback(() => {
     setPdfExportDraft(buildFinalizeDraft());
-    advanceTo(8);
+    advanceTo(10);
   }, [advanceTo, buildFinalizeDraft]);
 
   const handleBackFromFinalize = useCallback(() => {
-    advanceTo(7);
+    advanceTo(9);
   }, [advanceTo]);
 
   useEffect(() => {
-    if (step === 8 && pdfExportDraft === null) {
+    if (step === 10 && pdfExportDraft === null) {
       setPdfExportDraft(buildFinalizeDraft());
     }
   }, [step, pdfExportDraft, buildFinalizeDraft]);
@@ -379,6 +464,8 @@ export function QuickQuotePage() {
     return jobDetails.customerName.trim().length > 0;
   }, [jobDetails.customerName]);
 
+  const canContinueFromQuoteMethod = Boolean(jobDetails.quoteCreationMethod);
+
   // Determine which buttons to show and handlers
   const getStepNavigation = useCallback(() => {
     switch (step) {
@@ -387,23 +474,44 @@ export function QuickQuotePage() {
           showBack: false,
           showContinue: true,
           canContinue: canContinueFromGeneral,
-          onContinue: handleContinueToExcelUpload,
+          onContinue: handleContinueFromGeneral,
         };
       case 2:
         return {
           showBack: true,
-          showContinue: false,
-          canContinue: false,
-          onBack: handleBackToGeneral,
+          showContinue: true,
+          canContinue: canContinueFromQuoteMethod,
+          onBack: handleBackFromQuoteMethod,
+          onContinue: handleContinueFromQuoteMethod,
         };
-      case 3:
+      case 3: {
+        const canContinueMethodDetails =
+          jobDetails.quoteCreationMethod === "bendPlate"
+            ? bendPlateQuoteItems.length > 0
+            : true;
+        return {
+          showBack: true,
+          showContinue: true,
+          canContinue: canContinueMethodDetails,
+          onBack: handleBackFromMethodDetails,
+          onContinue: handleContinueFromMethodDetails,
+        };
+      }
+      case 4:
         return {
           showBack: true,
           showContinue: false,
           canContinue: false,
           onBack: handleBackToExcelUpload,
         };
-      case 4:
+      case 5:
+        return {
+          showBack: true,
+          showContinue: false,
+          canContinue: false,
+          onBack: handleBackToDxfUpload,
+        };
+      case 6:
         return {
           showBack: true,
           showContinue: true,
@@ -411,7 +519,7 @@ export function QuickQuotePage() {
           onBack: handleBackToDxfUpload,
           onContinue: () => handlePlateSelectionFromValidation(MOCK_VALIDATION_ROWS),
         };
-      case 5:
+      case 7:
         return {
           showBack: true,
           showContinue: true,
@@ -419,7 +527,7 @@ export function QuickQuotePage() {
           onBack: handleBackFromStockToValidation,
           onContinue: handleContinueFromStockToCalculation,
         };
-      case 6:
+      case 8:
         return {
           showBack: true,
           showContinue: true,
@@ -427,7 +535,7 @@ export function QuickQuotePage() {
           onBack: handleBackFromCalculationToStock,
           onContinue: handleViewQuote,
         };
-      case 7:
+      case 9:
         return {
           showBack: true,
           showContinue: true,
@@ -435,7 +543,7 @@ export function QuickQuotePage() {
           onBack: handleBackFromQuote,
           onContinue: handleContinueToFinalize,
         };
-      case 8:
+      case 10:
         return {
           showBack: true,
           showContinue: false,
@@ -453,10 +561,15 @@ export function QuickQuotePage() {
     step,
     stockPricingReady,
     canContinueFromGeneral,
-    handleContinueToExcelUpload,
-    handleBackToGeneral,
+    canContinueFromQuoteMethod,
+    handleContinueFromGeneral,
+    handleBackFromQuoteMethod,
+    handleContinueFromQuoteMethod,
+    jobDetails.quoteCreationMethod,
+    bendPlateQuoteItems.length,
+    handleBackFromMethodDetails,
+    handleContinueFromMethodDetails,
     handleBackToExcelUpload,
-    handleDxfDataApproved,
     handleBackToDxfUpload,
     handlePlateSelectionFromValidation,
     handleBackFromStockToValidation,
@@ -500,18 +613,41 @@ export function QuickQuotePage() {
           )}
 
           {step === 2 && (
-            <ExcelUploadStep onDataApproved={handleExcelDataApproved} />
-          )}
-
-          {step === 3 && (
-            <DxfUploadStep 
-              materialType={materialType}
-              defaultThickness={10}
-              onDataApproved={handleDxfDataApproved} 
+            <QuoteMethodStep
+              selected={jobDetails.quoteCreationMethod ?? null}
+              onSelect={(method) =>
+                setJobDetails((j) => ({ ...j, quoteCreationMethod: method }))
+              }
             />
           )}
 
-        {step === 4 && (
+          {step === 3 && (
+            <MethodDetailsRouter
+              method={jobDetails.quoteCreationMethod ?? null}
+              onBackToMethodPicker={() => advanceTo(2)}
+              materialType={materialType}
+              manualQuoteRows={manualQuoteRows}
+              onManualQuoteRowsChange={setManualQuoteRows}
+              bendPlateQuoteItems={bendPlateQuoteItems}
+              onBendPlateAddItem={handleBendPlateAddItem}
+              onBendPlateUpdateItem={handleBendPlateUpdateItem}
+              onBendPlateRemoveItem={handleBendPlateRemoveItem}
+            />
+          )}
+
+          {step === 4 && (
+            <ExcelUploadStep onDataApproved={handleExcelDataApproved} />
+          )}
+
+          {step === 5 && (
+            <DxfUploadStep
+              materialType={materialType}
+              defaultThickness={10}
+              onDataApproved={handleDxfDataApproved}
+            />
+          )}
+
+        {step === 6 && (
           <>
             {validationRows.length === 0 ? (
               <Card>
@@ -538,7 +674,7 @@ export function QuickQuotePage() {
           </>
         )}
 
-        {step === 5 && (
+        {step === 7 && (
           <StockPricingStep
             stockRows={thicknessStock}
             materialType={materialType}
@@ -551,13 +687,13 @@ export function QuickQuotePage() {
           />
         )}
 
-        {step === 6 && (
+        {step === 8 && (
           <CalculationStep
             key={calcRunId}
             runId={calcRunId}
             jobDetails={jobDetails}
             dxfFileCount={dxfFiles.length}
-            uniquePlatesInRun={selection.validationRows.length}
+            uniquePlatesInRun={selection.parts.length}
             totalPartsQty={selection.jobSummary.totalQty}
             validationSummary={selection.validationSummary}
             onBack={handleBackFromCalculationToStock}
@@ -565,7 +701,7 @@ export function QuickQuotePage() {
           />
         )}
 
-        {step === 7 && (
+        {step === 9 && (
           <QuoteSummaryStep
             jobDetails={jobDetails}
             jobSummary={selection.jobSummary}
@@ -581,7 +717,7 @@ export function QuickQuotePage() {
           />
         )}
 
-        {step === 8 && pdfExportDraft && (
+        {step === 10 && pdfExportDraft && (
           <QuoteFinalizeExportStep
             draft={pdfExportDraft}
             setDraft={(action) => {

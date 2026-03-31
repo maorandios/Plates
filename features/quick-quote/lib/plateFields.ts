@@ -1,0 +1,33 @@
+import type { MaterialType } from "@/types/materials";
+
+/** Surface / coating finish for plate line items (Quick Quote). */
+export type PlateFinish = "carbon" | "galvanized" | "paint";
+
+export const PLATE_FINISH_OPTIONS: { value: PlateFinish; label: string }[] = [
+  { value: "carbon", label: "Carbon" },
+  { value: "galvanized", label: "Galvanized" },
+  { value: "paint", label: "Paint" },
+];
+
+export const DEFAULT_PLATE_FINISH: PlateFinish = "carbon";
+
+/** Default material grade label for the selected material family (General step). */
+export function defaultMaterialGradeForFamily(materialType: MaterialType): string {
+  if (materialType === "carbonSteel") return "S235";
+  return "";
+}
+
+export function plateFinishLabel(finish: PlateFinish | undefined): string {
+  const f = finish ?? DEFAULT_PLATE_FINISH;
+  return PLATE_FINISH_OPTIONS.find((o) => o.value === f)?.label ?? f;
+}
+
+/** Single line for quote tables / BOM-style display. */
+export function formatMaterialGradeAndFinish(
+  grade: string,
+  finish?: PlateFinish
+): string {
+  const g = grade.trim() || "—";
+  const f = finish ?? DEFAULT_PLATE_FINISH;
+  return `${g} · ${plateFinishLabel(f)}`;
+}
