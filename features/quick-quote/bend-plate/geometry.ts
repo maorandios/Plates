@@ -9,7 +9,6 @@ import type {
   BendPlateFormState,
   BendTemplateId,
   CustomTemplateParams,
-  HatTemplateParams,
   LTemplateParams,
   UTemplateParams,
   ZTemplateParams,
@@ -146,35 +145,12 @@ export function buildZ(p: ZTemplateParams): {
   };
 }
 
-export function buildHat(p: HatTemplateParams): {
-  pts: Point2[];
-  straights: number[];
-  bends: number[];
-} {
-  const A = Math.max(0, p.aMm);
-  const B = Math.max(0, p.bMm);
-  const C = Math.max(0, p.cMm);
-  const D = Math.max(0, p.dMm);
-  const E = Math.max(0, p.eMm);
-  const turns = [
-    internalAngleToTurnDeg(p.angle1Deg, -1),
-    internalAngleToTurnDeg(p.angle2Deg, -1),
-    internalAngleToTurnDeg(p.angle3Deg, -1),
-    internalAngleToTurnDeg(p.angle4Deg, -1),
-  ];
-  return {
-    pts: polylineFromSegments([A, B, C, D, E], turns, 90),
-    straights: [A, B, C, D, E],
-    bends: turns.map((t) => Math.abs(t)),
-  };
-}
-
 export function buildCustom(p: CustomTemplateParams): {
   pts: Point2[];
   straights: number[];
   bends: number[];
 } {
-  const n = Math.min(6, Math.max(2, Math.floor(p.segmentCount) || 2));
+  const n = Math.min(7, Math.max(2, Math.floor(p.segmentCount) || 2));
   const segs = p.segmentsMm
     .slice(0, n)
     .map((s) => Math.max(0, s));
@@ -184,12 +160,16 @@ export function buildCustom(p: CustomTemplateParams): {
   const need = Math.max(0, segs.length - 1);
   const turns: number[] = [];
   for (let i = 0; i < need; i++) {
-    turns.push(p.anglesDeg[i] ?? 0);
+    let α = p.anglesDeg[i] ?? 180;
+    α = Math.max(0, Math.min(180, α));
+    if (α < 1e-6) α = 180;
+    const turn = internalAngleToTurnDeg(α, 1);
+    turns.push(turn);
   }
   return {
     pts: polylineFromSegments(segs, turns, 0),
     straights: segs,
-    bends: turns,
+    bends: turns.map((t) => Math.abs(t)),
   };
 }
 
@@ -198,9 +178,8 @@ function segmentLabelsForTemplate(state: BendPlateFormState): string[] {
   const t = state.template;
   if (t === "l") return ["A", "B"];
   if (t === "u" || t === "z") return ["A", "B", "C"];
-  if (t === "hat") return ["A", "B", "C", "D", "E"];
   if (t === "custom") {
-    const n = Math.min(6, Math.max(2, Math.floor(state.custom.segmentCount) || 2));
+    const n = Math.min(7, Math.max(2, Math.floor(state.custom.segmentCount) || 2));
     return Array.from({ length: n }, (_, i) => `${i + 1}`);
   }
   return [];
@@ -224,17 +203,18 @@ export function bendProfileBendAngles(state: BendPlateFormState): number[] {
   if (t === "l") return [state.l.angleDeg];
   if (t === "u") return [state.u.angle1Deg, state.u.angle2Deg];
   if (t === "z") return [state.z.angle1Deg, state.z.angle2Deg];
-  if (t === "hat") {
-    return [
-      state.hat.angle1Deg,
-      state.hat.angle2Deg,
-      state.hat.angle3Deg,
-      state.hat.angle4Deg,
-    ];
-  }
   if (t === "custom") {
-    const { pts } = buildCustom(state.custom);
-    return internalAnglesFromPolyline(pts);
+    const n = Math.min(7, Math.max(2, Math.floor(state.custom.segmentCount) || 2));
+    const need = Math.max(0, n - 1);
+    const a = state.custom.anglesDeg;
+    const out: number[] = [];
+    for (let i = 0; i < need; i++) {
+      let v = a[i] ?? 180;
+      v = Math.max(0, Math.min(180, v));
+      if (v < 1e-6) v = 180;
+      out.push(v);
+    }
+    return out;
   }
   return [];
 }
@@ -250,8 +230,6 @@ function buildForTemplate(
       return buildU(s.u);
     case "z":
       return buildZ(s.z);
-    case "hat":
-      return buildHat(s.hat);
     case "custom":
       return buildCustom(s.custom);
     default:

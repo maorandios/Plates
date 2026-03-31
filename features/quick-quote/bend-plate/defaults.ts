@@ -29,20 +29,66 @@ function migrateLegacyBendAnglesToInternal(form: BendPlateFormState): BendPlateF
           angle2Deg: toInternal(form.z.angle2Deg),
         },
       };
-    case "hat":
+    case "custom":
       return {
         ...form,
-        hat: {
-          ...form.hat,
-          angle1Deg: toInternal(form.hat.angle1Deg),
-          angle2Deg: toInternal(form.hat.angle2Deg),
-          angle3Deg: toInternal(form.hat.angle3Deg),
-          angle4Deg: toInternal(form.hat.angle4Deg),
+        custom: {
+          ...form.custom,
+          anglesDeg: form.custom.anglesDeg.map((a) => toInternal(a)),
         },
       };
     default:
       return form;
   }
+}
+
+/** Legacy saved lines used `template: "hat"` — map to an equivalent 5-segment custom profile. */
+function migrateLegacyHatQuoteToForm(
+  global: BendPlateQuoteItem["global"],
+  h: {
+    aMm: number;
+    bMm: number;
+    cMm: number;
+    dMm: number;
+    eMm: number;
+    angle1Deg: number;
+    angle2Deg: number;
+    angle3Deg: number;
+    angle4Deg: number;
+  },
+  bendAngleSemantic: BendPlateQuoteItem["bendAngleSemantic"]
+): BendPlateFormState {
+  const base = createDefaultBendPlateFormState();
+  let migrated: BendPlateFormState = {
+    ...base,
+    template: "custom",
+    global: {
+      ...base.global,
+      ...global,
+      finish: global.finish ?? DEFAULT_PLATE_FINISH,
+    },
+    custom: {
+      segmentCount: 5,
+      segmentsMm: [h.aMm, h.bMm, h.cMm, h.dMm, h.eMm, 0, 0],
+      anglesDeg: [h.angle1Deg, h.angle2Deg, h.angle3Deg, h.angle4Deg, 180, 180],
+    },
+  };
+  if (bendAngleSemantic === "internal") {
+    return migrated;
+  }
+  return migrateLegacyBendAnglesToInternal(migrated);
+}
+
+function padCustomParams(c: BendPlateFormState["custom"]): BendPlateFormState["custom"] {
+  const segmentsMm = [...c.segmentsMm];
+  while (segmentsMm.length < 7) segmentsMm.push(0);
+  const anglesDeg = [...c.anglesDeg];
+  while (anglesDeg.length < 6) anglesDeg.push(180);
+  return {
+    ...c,
+    segmentsMm: segmentsMm.slice(0, 7),
+    anglesDeg: anglesDeg.slice(0, 6),
+  };
 }
 
 export function createDefaultBendPlateFormState(): BendPlateFormState {
@@ -59,18 +105,11 @@ export function createDefaultBendPlateFormState(): BendPlateFormState {
     l: { aMm: 100, bMm: 80, angleDeg: 90 },
     u: { aMm: 40, bMm: 50, cMm: 40, angle1Deg: 90, angle2Deg: 90 },
     z: { aMm: 60, bMm: 40, cMm: 60, angle1Deg: 90, angle2Deg: 90 },
-    hat: {
-      aMm: 25,
-      bMm: 80,
-      cMm: 25,
-      dMm: 80,
-      eMm: 25,
-      angle1Deg: 90,
-      angle2Deg: 90,
-      angle3Deg: 90,
-      angle4Deg: 90,
+    custom: {
+      segmentCount: 2,
+      segmentsMm: [100, 100, 0, 0, 0, 0, 0],
+      anglesDeg: [90, 180, 180, 180, 180, 180],
     },
-    custom: { segmentCount: 2, segmentsMm: [100, 100, 0, 0, 0, 0], anglesDeg: [90, 0, 0, 0, 0] },
   };
 }
 
@@ -81,6 +120,26 @@ export function createFormStateForTemplate(template: BendTemplateId): BendPlateF
 
 /** Rehydrate editor state from a saved quote line (edit). */
 export function formStateFromQuoteItem(item: BendPlateQuoteItem): BendPlateFormState {
+  const legacy = item as unknown as {
+    template?: string;
+    hat?: {
+      aMm: number;
+      bMm: number;
+      cMm: number;
+      dMm: number;
+      eMm: number;
+      angle1Deg: number;
+      angle2Deg: number;
+      angle3Deg: number;
+      angle4Deg: number;
+    };
+    global: BendPlateQuoteItem["global"];
+    bendAngleSemantic?: BendPlateQuoteItem["bendAngleSemantic"];
+  };
+  if (legacy.template === "hat" && legacy.hat) {
+    return migrateLegacyHatQuoteToForm(legacy.global, legacy.hat, legacy.bendAngleSemantic);
+  }
+
   const base: BendPlateFormState = {
     template: item.template,
     global: {
@@ -90,12 +149,7 @@ export function formStateFromQuoteItem(item: BendPlateQuoteItem): BendPlateFormS
     l: { ...item.l },
     u: { ...item.u },
     z: { ...item.z },
-    hat: { ...item.hat },
-    custom: {
-      segmentCount: item.custom.segmentCount,
-      segmentsMm: [...item.custom.segmentsMm],
-      anglesDeg: [...item.custom.anglesDeg],
-    },
+    custom: padCustomParams({ ...item.custom }),
   };
   if (item.bendAngleSemantic === "internal") {
     return base;

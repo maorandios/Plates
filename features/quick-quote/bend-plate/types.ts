@@ -1,6 +1,6 @@
 import type { PlateFinish } from "../lib/plateFields";
 
-export type BendTemplateId = "l" | "u" | "z" | "hat" | "custom";
+export type BendTemplateId = "l" | "u" | "z" | "custom";
 
 export interface BendPlateGlobalParams {
   /** Steel grade / designation (e.g. S235). */
@@ -37,24 +37,11 @@ export interface ZTemplateParams {
   angle2Deg: number;
 }
 
-export interface HatTemplateParams {
-  aMm: number;
-  bMm: number;
-  cMm: number;
-  dMm: number;
-  eMm: number;
-  /** Included angle between adjacent legs at each bend (°), 0–180. */
-  angle1Deg: number;
-  angle2Deg: number;
-  angle3Deg: number;
-  angle4Deg: number;
-}
-
-/** Up to 6 straight segments; `anglesDeg` has length `segmentCount − 1`. */
+/** Up to 7 straight segments; `anglesDeg` has length `segmentCount − 1` (max 6). */
 export interface CustomTemplateParams {
   segmentCount: number;
   segmentsMm: number[];
-  /** Signed path turn after each segment (°), CCW + — advanced; not included angle. */
+  /** Included angle between legs after each segment (°), 0–180 — same as L/U/Z. */
   anglesDeg: number[];
 }
 
@@ -74,14 +61,13 @@ export interface BendPlateFormState {
   l: LTemplateParams;
   u: UTemplateParams;
   z: ZTemplateParams;
-  hat: HatTemplateParams;
   custom: CustomTemplateParams;
 }
 
 export interface BendPlateQuoteItem {
   id: string;
   inputMethod: "bend_plate";
-  /** When set, L/U/Z/hat angle fields are included angles (°); omit = legacy path-turn values. */
+  /** When set, L/U/Z/custom angle fields are included angles (°); omit = legacy path-turn values. */
   bendAngleSemantic?: "internal";
   template: BendTemplateId;
   global: BendPlateGlobalParams;
@@ -89,7 +75,6 @@ export interface BendPlateQuoteItem {
   l: LTemplateParams;
   u: UTemplateParams;
   z: ZTemplateParams;
-  hat: HatTemplateParams;
   custom: CustomTemplateParams;
   calc: BendPlateCalculation;
 }

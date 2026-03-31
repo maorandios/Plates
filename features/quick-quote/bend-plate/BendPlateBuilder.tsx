@@ -8,7 +8,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { Check, ChevronLeft, Pencil, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -69,8 +69,7 @@ const TEMPLATE_OPTIONS: { id: BendTemplateId; label: string; hint: string }[] = 
   { id: "l", label: "L", hint: "Two legs" },
   { id: "u", label: "U", hint: "Channel" },
   { id: "z", label: "Z", hint: "Zig-zag" },
-  { id: "hat", label: "Hat", hint: "Five bends" },
-  { id: "custom", label: "Custom", hint: "≤ 6 segments" },
+  { id: "custom", label: "Custom", hint: "≤ 7 segments" },
 ];
 
 function templateLabel(id: BendTemplateId): string {
@@ -173,7 +172,6 @@ function snapshotItem(
     l: { ...state.l },
     u: { ...state.u },
     z: { ...state.z },
-    hat: { ...state.hat },
     custom: {
       segmentCount: state.custom.segmentCount,
       segmentsMm: [...state.custom.segmentsMm],
@@ -511,6 +509,24 @@ function BendPlateShapeEditor({
   onComplete: () => void;
   onCancel: () => void;
 }) {
+  const resetTemplateShape = useCallback(() => {
+    setForm((s) => {
+      const d = createDefaultBendPlateFormState();
+      switch (s.template) {
+        case "l":
+          return { ...s, l: { ...d.l } };
+        case "u":
+          return { ...s, u: { ...d.u } };
+        case "z":
+          return { ...s, z: { ...d.z } };
+        case "custom":
+          return { ...s, custom: { ...d.custom } };
+        default:
+          return s;
+      }
+    });
+  }, [setForm]);
+
   return (
     <div
       className={cn(
@@ -618,13 +634,25 @@ function BendPlateShapeEditor({
             </div>
 
             <div className="space-y-3 border-t border-border pt-5">
-              <div>
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Template dimensions
-                </h2>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  mm · L/U/Z/hat angles = included angle between legs (side view)
-                </p>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Template dimensions
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    mm · angles = included angle between legs (side view); 180° = straight
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={resetTemplateShape}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset shape
+                </Button>
               </div>
               <TemplateFields form={form} setForm={setForm} />
             </div>
@@ -846,101 +874,9 @@ function TemplateFields({
     );
   }
 
-  if (t === "hat") {
-    const h = form.hat;
-    return (
-      <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <NumField
-          label="A (mm)"
-          value={h.aMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, hat: { ...s.hat, aMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="B (mm)"
-          value={h.bMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, hat: { ...s.hat, bMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="C (mm)"
-          value={h.cMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, hat: { ...s.hat, cMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="D (mm)"
-          value={h.dMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, hat: { ...s.hat, dMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="E (mm)"
-          value={h.eMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, hat: { ...s.hat, eMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="Included angle 1 (°)"
-          value={h.angle1Deg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              hat: { ...s.hat, angle1Deg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
-        <NumField
-          label="Included angle 2 (°)"
-          value={h.angle2Deg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              hat: { ...s.hat, angle2Deg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
-        <NumField
-          label="Included angle 3 (°)"
-          value={h.angle3Deg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              hat: { ...s.hat, angle3Deg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
-        <NumField
-          label="Included angle 4 (°)"
-          value={h.angle4Deg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              hat: { ...s.hat, angle4Deg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
-      </div>
-    );
-  }
-
   if (t === "custom") {
     const c = form.custom;
-    const n = Math.min(6, Math.max(2, c.segmentCount));
+    const n = Math.min(7, Math.max(2, c.segmentCount));
     return (
       <div className="space-y-4">
         <div className="max-w-xs space-y-1.5">
@@ -948,7 +884,7 @@ function TemplateFields({
           <Select
             value={String(n)}
             onValueChange={(v) => {
-              const next = Math.min(6, Math.max(2, parseInt(v, 10)));
+              const next = Math.min(7, Math.max(2, parseInt(v, 10)));
               setForm((s) => ({
                 ...s,
                 custom: { ...s.custom, segmentCount: next },
@@ -959,7 +895,7 @@ function TemplateFields({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {[2, 3, 4, 5, 6].map((x) => (
+              {[2, 3, 4, 5, 6, 7].map((x) => (
                 <SelectItem key={x} value={String(x)}>
                   {x} segments
                 </SelectItem>
@@ -976,7 +912,7 @@ function TemplateFields({
               onChange={(v) =>
                 setForm((s) => {
                   const next = [...s.custom.segmentsMm];
-                  while (next.length < 6) next.push(0);
+                  while (next.length < 7) next.push(0);
                   next[i] = Math.max(0, v);
                   return { ...s, custom: { ...s.custom, segmentsMm: next } };
                 })
@@ -990,12 +926,12 @@ function TemplateFields({
             {Array.from({ length: n - 1 }, (_, i) => (
               <NumField
                 key={`a-${i}`}
-                label={`Path turn after seg. ${i + 1} (°, CCW +)`}
-                value={c.anglesDeg[i] ?? 0}
+                label={`Included angle after seg. ${i + 1} (°)`}
+                value={c.anglesDeg[i] ?? 180}
                 onChange={(v) =>
                   setForm((s) => {
                     const next = [...s.custom.anglesDeg];
-                    while (next.length < 5) next.push(0);
+                    while (next.length < 6) next.push(180);
                     next[i] = v;
                     return { ...s, custom: { ...s.custom, anglesDeg: next } };
                   })
