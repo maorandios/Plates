@@ -8,8 +8,16 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { Check, ChevronLeft, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Pencil, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -55,6 +63,7 @@ import {
   createFormStateForTemplate,
   formStateFromQuoteItem,
 } from "./defaults";
+import { getBendEditorValidationLines } from "./bendEditorValidation";
 import { ProfilePreview2D } from "./ProfilePreview2D";
 import { ProfilePreview3D } from "./ProfilePreview3D";
 
@@ -179,7 +188,7 @@ function aggregateMetrics(items: BendPlateQuoteItem[]) {
   let totalAreaM2 = 0;
   let totalWeightKg = 0;
   for (const it of items) {
-    const q = Math.max(1, Math.floor(it.global.quantity) || 1);
+    const q = Math.max(0, Math.floor(it.global.quantity) || 0);
     totalQty += q;
     totalAreaM2 += it.calc.areaM2 * q;
     totalWeightKg += it.calc.weightKg;
@@ -191,9 +200,9 @@ function aggregateMetrics(items: BendPlateQuoteItem[]) {
   };
 }
 
-/** Hub list view — same viewport height as Manual add / bend editor. */
-const BEND_PLATE_HUB_VIEWPORT =
-  "min-h-[280px] min-h-0 h-[calc(100svh-14rem)] max-h-[calc(100svh-14rem)]";
+/** Fill parent (Quick Quote step 3 shell uses flex-1 min-h-0). */
+const BEND_PLATE_FILL =
+  "flex h-full min-h-0 w-full max-h-full flex-col overflow-hidden";
 
 /** One row in the left sidebar — matches Manual add parts metric strips. */
 function BendPlateHubMetricStrip({
@@ -227,6 +236,10 @@ interface BendPlateBuilderProps {
   onAddItem: (item: BendPlateQuoteItem) => void;
   onUpdateItem: (item: BendPlateQuoteItem) => void;
   onRemoveItem: (id: string) => void;
+  /** Return to the quote method step. */
+  onBack: () => void;
+  /** Finish this phase and return to the quote method step (e.g. after validation). */
+  onComplete: () => void;
 }
 
 export function BendPlateBuilder({
@@ -235,6 +248,8 @@ export function BendPlateBuilder({
   onAddItem,
   onUpdateItem,
   onRemoveItem,
+  onBack,
+  onComplete,
 }: BendPlateBuilderProps) {
   const [screen, setScreen] = useState<"hub" | "editor">("hub");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -317,11 +332,9 @@ export function BendPlateBuilder({
         form={form}
         setForm={setForm}
         pts={pts}
-        calc={calc}
         profileSegmentDims={profileSegmentDims}
         profileBendAnglesDeg={profileBendAnglesDeg}
         patchGlobal={patchGlobal}
-        title={editingId ? `Edit · ${templateLabel(form.template)}` : `New · ${templateLabel(form.template)}`}
         onComplete={handleComplete}
         onCancel={handleCancelEditor}
       />
@@ -336,6 +349,8 @@ export function BendPlateBuilder({
       onSelectTemplate={openNewEditor}
       onEdit={openEditEditor}
       onRemove={onRemoveItem}
+      onBack={onBack}
+      onComplete={onComplete}
     />
   );
 }
@@ -347,6 +362,8 @@ function BendPlateHub({
   onSelectTemplate,
   onEdit,
   onRemove,
+  onBack,
+  onComplete,
 }: {
   materialType: MaterialType;
   quoteItems: BendPlateQuoteItem[];
@@ -354,25 +371,38 @@ function BendPlateHub({
   onSelectTemplate: (t: BendTemplateId) => void;
   onEdit: (item: BendPlateQuoteItem) => void;
   onRemove: (id: string) => void;
+  onBack: () => void;
+  onComplete: () => void;
 }) {
   const plateTypeLabel = MATERIAL_TYPE_LABELS[materialType];
+  const [shapePickerOpen, setShapePickerOpen] = useState(false);
+  const [hubValidationOpen, setHubValidationOpen] = useState(false);
+
+  const pickShape = (id: BendTemplateId) => {
+    setShapePickerOpen(false);
+    onSelectTemplate(id);
+  };
+
+  function handleHubCompleteClick() {
+    if (quoteItems.length === 0) {
+      setHubValidationOpen(true);
+      return;
+    }
+    onComplete();
+  }
 
   return (
-    <div
-      className={cn(
-        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
-        BEND_PLATE_HUB_VIEWPORT
-      )}
-    >
+    <div className={cn(BEND_PLATE_FILL)}>
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-border/80">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
               Bent plate builder
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Pick L, U, Z, or Custom to configure a profile, then complete to add it to the list.
-              Edit or remove lines anytime.
+              Use <span className="font-medium text-foreground">Add part</span> to choose a shape,
+              configure it in the editor, then complete to add it to the list. Edit or remove lines
+              anytime.
             </p>
             <p className="text-xs text-muted-foreground pt-1">
               Plate type from General:{" "}
@@ -401,35 +431,35 @@ function BendPlateHub({
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
           <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold text-foreground">Configured plates</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {quoteItems.length === 0
-                    ? "No plates yet — pick L, U, Z, or Custom above the table to start."
+                    ? "No plates yet — use Add part to choose L, U, Z, or Custom and configure your first line."
                     : `${formatInteger(quoteItems.length)} line(s) on this quote`}
                 </p>
               </div>
-              <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 lg:max-w-[55%] lg:justify-end">
-                {TEMPLATE_OPTIONS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => onSelectTemplate(t.id)}
-                    className={cn(
-                      "min-w-[108px] shrink-0 rounded-lg border-2 px-3 py-2.5 text-left transition-all",
-                      "border-border bg-card hover:border-primary/40 hover:shadow-sm",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    )}
-                  >
-                    <span className="block text-base font-bold text-foreground leading-tight">
-                      {t.label}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground leading-snug block mt-0.5">
-                      {t.hint}
-                    </span>
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="default"
+                  className="gap-2"
+                  onClick={onBack}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  size="default"
+                  className="gap-2"
+                  onClick={handleHubCompleteClick}
+                >
+                  <Check className="h-4 w-4" />
+                  Complete
+                </Button>
               </div>
             </div>
           </div>
@@ -437,10 +467,24 @@ function BendPlateHub({
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="p-4 sm:p-5">
               {quoteItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-12 text-center rounded-lg border border-dashed border-border">
-                  Your bent plates will appear here after you complete a shape.
-                </p>
+                <div
+                  className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-muted/20 px-6 py-12"
+                >
+                  <p className="text-sm text-muted-foreground text-center max-w-sm">
+                    No bent plates yet. Add a part to pick a profile shape and open the editor.
+                  </p>
+                  <Button
+                    type="button"
+                    size="default"
+                    className="gap-2"
+                    onClick={() => setShapePickerOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add part
+                  </Button>
+                </div>
               ) : (
+                <>
                 <div className="rounded-lg border border-border overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -476,7 +520,7 @@ function BendPlateHub({
                     </TableHeader>
                     <TableBody>
                       {quoteItems.map((it, index) => {
-                        const q = Math.max(1, Math.floor(it.global.quantity) || 1);
+                        const q = Math.max(0, Math.floor(it.global.quantity) || 0);
                         const lineArea = it.calc.areaM2 * q;
                         return (
                           <TableRow key={it.id}>
@@ -540,39 +584,90 @@ function BendPlateHub({
                     </TableBody>
                   </Table>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 gap-1.5"
+                  onClick={() => setShapePickerOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add part
+                </Button>
+                </>
               )}
             </div>
           </div>
+
+          <Dialog open={shapePickerOpen} onOpenChange={setShapePickerOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Add bent plate</DialogTitle>
+                <DialogDescription>
+                  Choose a profile shape. You will configure dimensions and material in the editor next.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {TEMPLATE_OPTIONS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => pickShape(t.id)}
+                    className={cn(
+                      "rounded-xl border-2 px-4 py-4 text-left transition-all",
+                      "border-border bg-card hover:border-primary/50 hover:bg-muted/40 hover:shadow-sm",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    )}
+                  >
+                    <span className="block text-lg font-bold text-foreground leading-tight tracking-tight">
+                      {t.label}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground leading-snug block mt-1">
+                      {t.hint}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={hubValidationOpen} onOpenChange={setHubValidationOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add a plate first</DialogTitle>
+                <DialogDescription>
+                  Add at least one bent plate line before completing this step.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button type="button" onClick={() => setHubValidationOpen(false)}>
+                  OK
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>
   );
 }
 
-/** Viewport fill below Quick Quote stepper + page padding — keeps editor on one screen without page scroll. */
-const BEND_EDITOR_VIEWPORT =
-  "min-h-[280px] min-h-0 h-[calc(100svh-14rem)] max-h-[calc(100svh-14rem)]";
-
 function BendPlateShapeEditor({
   form,
   setForm,
   pts,
-  calc,
   profileSegmentDims,
   profileBendAnglesDeg,
   patchGlobal,
-  title,
   onComplete,
   onCancel,
 }: {
   form: BendPlateFormState;
   setForm: Dispatch<SetStateAction<BendPlateFormState>>;
   pts: Point2[];
-  calc: BendPlateCalculation;
   profileSegmentDims: ReturnType<typeof bendProfileDimensionSegments>;
   profileBendAnglesDeg: ReturnType<typeof bendProfileBendAngles>;
   patchGlobal: (patch: Partial<BendPlateFormState["global"]>) => void;
-  title: string;
   onComplete: () => void;
   onCancel: () => void;
 }) {
@@ -594,205 +689,239 @@ function BendPlateShapeEditor({
     });
   }, [setForm]);
 
+  const [preview3dOpen, setPreview3dOpen] = useState(false);
+  const [saveValidationOpen, setSaveValidationOpen] = useState(false);
+  const [saveValidationLines, setSaveValidationLines] = useState<string[]>([]);
+  const [backConfirmOpen, setBackConfirmOpen] = useState(false);
+
+  const handleSaveClick = useCallback(() => {
+    const lines = getBendEditorValidationLines(form);
+    if (lines) {
+      setSaveValidationLines(lines);
+      setSaveValidationOpen(true);
+      return;
+    }
+    onComplete();
+  }, [form, onComplete]);
+
+  const handleBackClick = useCallback(() => {
+    const lines = getBendEditorValidationLines(form);
+    if (lines) {
+      setBackConfirmOpen(true);
+      return;
+    }
+    onCancel();
+  }, [form, onCancel]);
+
+  const confirmBackDiscard = useCallback(() => {
+    setBackConfirmOpen(false);
+    onCancel();
+  }, [onCancel]);
+
   return (
-    <div
-      className={cn(
-        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
-        BEND_EDITOR_VIEWPORT
-      )}
-    >
-      <div className="shrink-0 flex flex-wrap items-center gap-2 sm:gap-3 pb-3 border-b border-border/80">
-        <Button type="button" variant="outline" size="sm" className="gap-1 shrink-0" onClick={onCancel}>
-          <ChevronLeft className="h-4 w-4" />
-          Cancel
-        </Button>
-        <div className="min-w-0 flex-1 basis-[200px]">
-          <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground leading-tight">
-            {title}
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Parameters in the sidebar — 2D and 3D previews side by side. Scroll the sidebar if
-            needed.
-          </p>
-        </div>
-        <Button type="button" size="lg" className="gap-2 shrink-0" onClick={onComplete}>
-          <Check className="h-4 w-4" />
-          Complete
-        </Button>
-      </div>
-
-      <div className="shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 py-3">
-        <SummaryTile
-          compact
-          label="Developed length"
-          value={`${formatDecimal(calc.developedLengthMm, 1)} mm`}
-        />
-        <SummaryTile compact label="Blank width" value={`${formatDecimal(calc.blankWidthMm, 1)} mm`} />
-        <SummaryTile compact label="Area" value={`${formatDecimal(calc.areaM2, 3)} m²`} />
-        <SummaryTile compact label="Est. weight" value={`${formatDecimal(calc.weightKg, 2)} kg`} />
-        <SummaryTile compact label="Bends" value={formatInteger(calc.bendCount)} />
-      </div>
-
-      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden rounded-lg border border-border bg-muted/20">
-        <aside className="flex w-full min-w-0 max-w-[420px] shrink-0 flex-col overflow-y-auto overflow-x-hidden border-r border-border bg-card">
-          <div className="space-y-6 p-4">
-            <div className="space-y-3">
-              <div>
+    <div className={cn(BEND_PLATE_FILL)}>
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
+        <aside className="flex w-2/5 min-w-0 flex-col bg-card">
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
+            <div className="space-y-6">
+              <div className="space-y-3">
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Global parameters
                 </h2>
-                <p className="text-[11px] text-muted-foreground mt-0.5">This plate line</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-muted-foreground font-normal">Material grade</Label>
-                  <Input
-                    className="h-9 text-sm"
-                    value={form.global.material}
-                    onChange={(e) => patchGlobal({ material: e.target.value })}
-                    placeholder="e.g. S235"
+                <div className="grid grid-cols-2 gap-3">
+                  <NumField
+                    label="Thickness (mm)"
+                    value={form.global.thicknessMm}
+                    onChange={(n) => patchGlobal({ thicknessMm: Math.max(0, n) })}
+                    min={0}
+                    step={0.01}
+                  />
+                  <NumField
+                    label="Plate width (mm)"
+                    value={form.global.plateWidthMm}
+                    onChange={(n) => patchGlobal({ plateWidthMm: Math.max(0, n) })}
+                    min={0}
+                  />
+                  <NumField
+                    label="Inside bend radius (mm)"
+                    value={form.global.insideRadiusMm}
+                    onChange={(n) => patchGlobal({ insideRadiusMm: Math.max(0, n) })}
+                    min={0}
+                    step={0.01}
+                  />
+                  <NumField
+                    label="Quantity"
+                    value={form.global.quantity}
+                    onChange={(n) =>
+                      patchGlobal({ quantity: Math.max(0, Math.floor(Number.isFinite(n) ? n : 0)) })
+                    }
+                    min={0}
                   />
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-muted-foreground font-normal">Finish</Label>
-                  <Select
-                    value={form.global.finish}
-                    onValueChange={(v) => patchGlobal({ finish: v as PlateFinish })}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PLATE_FINISH_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground font-normal">Material grade</Label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={form.global.material}
+                      onChange={(e) => patchGlobal({ material: e.target.value })}
+                      placeholder="e.g. S235"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground font-normal">Finish</Label>
+                    <Select
+                      value={form.global.finish}
+                      onValueChange={(v) => patchGlobal({ finish: v as PlateFinish })}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PLATE_FINISH_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <NumField
-                  label="Thickness (mm)"
-                  value={form.global.thicknessMm}
-                  onChange={(n) => patchGlobal({ thicknessMm: Math.max(0.1, n) })}
-                  min={0.1}
-                  step={0.01}
-                />
-                <NumField
-                  label="Plate width (mm)"
-                  value={form.global.plateWidthMm}
-                  onChange={(n) => patchGlobal({ plateWidthMm: Math.max(1, n) })}
-                  min={1}
-                />
-                <NumField
-                  label="Inside bend radius (mm)"
-                  value={form.global.insideRadiusMm}
-                  onChange={(n) => patchGlobal({ insideRadiusMm: Math.max(0.1, n) })}
-                  min={0.1}
-                  step={0.01}
-                />
-                <NumField
-                  label="Quantity"
-                  value={form.global.quantity}
-                  onChange={(n) => patchGlobal({ quantity: Math.max(1, Math.floor(n) || 1) })}
-                  min={1}
-                />
               </div>
-            </div>
 
-            <div className="space-y-3 border-t border-border pt-5">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Template dimensions
-                  </h2>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    mm · angles = included angle between legs (side view); 180° = straight
-                  </p>
+              <div className="space-y-3 border-t border-border pt-5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Template dimensions
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      mm · included angle between legs (side view); 180° = straight
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    onClick={resetTemplateShape}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset shape
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 gap-1.5"
-                  onClick={resetTemplateShape}
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Reset shape
-                </Button>
+                <TemplateFields form={form} setForm={setForm} />
               </div>
-              <TemplateFields form={form} setForm={setForm} />
             </div>
+          </div>
+          <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 sm:px-5">
+            <Button type="button" variant="outline" className="gap-2" onClick={handleBackClick}>
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <Button type="button" className="gap-2" onClick={handleSaveClick}>
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
           </div>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 flex-col gap-3 p-2 sm:p-3 md:flex-row md:items-stretch md:gap-4">
-            <div className="flex min-h-[200px] min-w-0 flex-1 flex-col md:min-h-0">
-              <p className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-0.5 pb-2">
-                2D side profile
-              </p>
-              <div className="relative flex min-h-0 flex-1 items-stretch overflow-hidden rounded-lg border border-border/70 bg-[#0f1419] p-2.5 sm:p-3 md:min-h-[220px]">
-                <ProfilePreview2D
-                  pts={pts}
-                  segments={profileSegmentDims}
-                  bendAnglesDeg={profileBendAnglesDeg}
-                  fill
-                  className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
-                />
-              </div>
+        <div className="flex w-3/5 min-w-0 min-h-0 flex-col overflow-hidden bg-background">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="relative flex min-h-0 flex-1 overflow-hidden bg-[#0f1419] p-1.5 sm:p-2">
+              <ProfilePreview2D
+                pts={pts}
+                segments={profileSegmentDims}
+                bendAnglesDeg={profileBendAnglesDeg}
+                fill
+                className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
+              />
             </div>
-            <div className="flex min-h-[200px] min-w-0 flex-1 flex-col md:min-h-0">
-              <p className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-0.5 pb-2">
-                3D extruded · width = plate width
-              </p>
-              <div className="relative flex min-h-0 flex-1 items-stretch overflow-hidden rounded-lg border border-border/70 bg-[#0f1419] p-2.5 sm:p-3 md:min-h-[220px]">
-                <ProfilePreview3D
-                  pts={pts}
-                  plateWidthMm={form.global.plateWidthMm}
-                  thicknessMm={form.global.thicknessMm}
-                  fill
-                  className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
-                />
-              </div>
+            <div className="shrink-0 border-t border-border/80 bg-background px-3 py-2.5 sm:px-4 flex justify-center sm:justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                className="min-w-[8rem]"
+                onClick={() => setPreview3dOpen(true)}
+              >
+                Preview 3D
+              </Button>
             </div>
           </div>
         </div>
       </div>
+
+      <Dialog open={preview3dOpen} onOpenChange={setPreview3dOpen}>
+        <DialogContent className="max-w-[min(96vw,56rem)] gap-0 p-0">
+          <DialogHeader className="border-b border-border px-6 py-4 text-left">
+            <DialogTitle>3D preview</DialogTitle>
+            <DialogDescription className="text-sm">
+              Extruded profile — width matches plate width.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="relative min-h-[min(70vh,560px)] w-full bg-[#0f1419] p-4 sm:p-5">
+            <ProfilePreview3D
+              pts={pts}
+              plateWidthMm={form.global.plateWidthMm}
+              thicknessMm={form.global.thicknessMm}
+              fill
+              className="h-full min-h-[min(64vh,500px)] w-full rounded-md border-0 bg-transparent"
+            />
+          </div>
+          <DialogFooter className="border-t border-border px-6 py-3 sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setPreview3dOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={saveValidationOpen} onOpenChange={setSaveValidationOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete fields first</DialogTitle>
+            <DialogDescription>
+              Fix the following before you can save this plate line.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-foreground">
+            {saveValidationLines.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button type="button" onClick={() => setSaveValidationOpen(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={backConfirmOpen} onOpenChange={setBackConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Discard incomplete edits?</DialogTitle>
+            <DialogDescription>
+              Some values are still missing or invalid. Going back will discard your changes on this
+              plate.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setBackConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="default" onClick={confirmBackDiscard}>
+              Discard and go back
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function SummaryTile({
-  label,
-  value,
-  compact,
-}: {
-  label: string;
-  value: string;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border bg-card",
-        compact ? "px-2.5 py-2" : "px-3 py-3"
-      )}
-    >
-      <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide text-muted-foreground leading-tight">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "font-semibold tabular-nums text-foreground mt-0.5 leading-tight",
-          compact ? "text-sm sm:text-base" : "text-base"
-        )}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
+const SEGMENT_DIM_BOX =
+  "rounded-lg border border-border bg-muted/25 p-3 space-y-3";
 
 function TemplateFields({
   form,
@@ -805,30 +934,42 @@ function TemplateFields({
 
   if (t === "l") {
     return (
-      <div className="grid sm:grid-cols-3 gap-4">
-        <NumField
-          label="A (mm)"
-          value={form.l.aMm}
-          onChange={(n) => setForm((s) => ({ ...s, l: { ...s.l, aMm: Math.max(0, n) } }))}
-          min={0}
-        />
-        <NumField
-          label="B (mm)"
-          value={form.l.bMm}
-          onChange={(n) => setForm((s) => ({ ...s, l: { ...s.l, bMm: Math.max(0, n) } }))}
-          min={0}
-        />
-        <NumField
-          label="Included angle (°)"
-          value={form.l.angleDeg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              l: { ...s.l, angleDeg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
+      <div className="space-y-3">
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Leg A — bend
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="A (mm)"
+              value={form.l.aMm}
+              onChange={(n) => setForm((s) => ({ ...s, l: { ...s.l, aMm: Math.max(0, n) } }))}
+              min={0}
+            />
+            <NumField
+              label="Included angle (°)"
+              value={form.l.angleDeg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  l: { ...s.l, angleDeg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Leg B
+          </p>
+          <NumField
+            label="B (mm)"
+            value={form.l.bMm}
+            onChange={(n) => setForm((s) => ({ ...s, l: { ...s.l, bMm: Math.max(0, n) } }))}
+            min={0}
+          />
+        </div>
       </div>
     );
   }
@@ -836,53 +977,72 @@ function TemplateFields({
   if (t === "u") {
     const block = form.u;
     return (
-      <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <NumField
-          label="A (mm)"
-          value={block.aMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, u: { ...s.u, aMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="B (mm)"
-          value={block.bMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, u: { ...s.u, bMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="C (mm)"
-          value={block.cMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, u: { ...s.u, cMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="Included angle 1 (°)"
-          value={block.angle1Deg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              u: { ...s.u, angle1Deg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
-        <NumField
-          label="Included angle 2 (°)"
-          value={block.angle2Deg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              u: { ...s.u, angle2Deg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
+      <div className="space-y-3">
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Leg A — bend 1
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="A (mm)"
+              value={block.aMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, u: { ...s.u, aMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 1 (°)"
+              value={block.angle1Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  u: { ...s.u, angle1Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Leg B — bend 2
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="B (mm)"
+              value={block.bMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, u: { ...s.u, bMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 2 (°)"
+              value={block.angle2Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  u: { ...s.u, angle2Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Leg C
+          </p>
+          <NumField
+            label="C (mm)"
+            value={block.cMm}
+            onChange={(n) =>
+              setForm((s) => ({ ...s, u: { ...s.u, cMm: Math.max(0, n) } }))
+            }
+            min={0}
+          />
+        </div>
       </div>
     );
   }
@@ -890,53 +1050,72 @@ function TemplateFields({
   if (t === "z") {
     const block = form.z;
     return (
-      <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <NumField
-          label="A (mm)"
-          value={block.aMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, z: { ...s.z, aMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="B (mm)"
-          value={block.bMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, z: { ...s.z, bMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="C (mm)"
-          value={block.cMm}
-          onChange={(n) =>
-            setForm((s) => ({ ...s, z: { ...s.z, cMm: Math.max(0, n) } }))
-          }
-          min={0}
-        />
-        <NumField
-          label="Included angle 1 (°)"
-          value={block.angle1Deg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              z: { ...s.z, angle1Deg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
-        <NumField
-          label="Included angle 2 (°)"
-          value={block.angle2Deg}
-          onChange={(n) =>
-            setForm((s) => ({
-              ...s,
-              z: { ...s.z, angle2Deg: Math.min(180, Math.max(0, n)) },
-            }))
-          }
-          step={0.1}
-        />
+      <div className="space-y-3">
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Leg A — bend 1
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="A (mm)"
+              value={block.aMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, z: { ...s.z, aMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 1 (°)"
+              value={block.angle1Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  z: { ...s.z, angle1Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Leg B — bend 2
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="B (mm)"
+              value={block.bMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, z: { ...s.z, bMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 2 (°)"
+              value={block.angle2Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  z: { ...s.z, angle2Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Leg C
+          </p>
+          <NumField
+            label="C (mm)"
+            value={block.cMm}
+            onChange={(n) =>
+              setForm((s) => ({ ...s, z: { ...s.z, cMm: Math.max(0, n) } }))
+            }
+            min={0}
+          />
+        </div>
       </div>
     );
   }
@@ -970,44 +1149,62 @@ function TemplateFields({
             </SelectContent>
           </Select>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4">
-          {Array.from({ length: n }, (_, i) => (
-            <NumField
-              key={`s-${i}`}
-              label={`Segment ${i + 1} (mm)`}
-              value={c.segmentsMm[i] ?? 0}
-              onChange={(v) =>
-                setForm((s) => {
-                  const next = [...s.custom.segmentsMm];
-                  while (next.length < 7) next.push(0);
-                  next[i] = Math.max(0, v);
-                  return { ...s, custom: { ...s.custom, segmentsMm: next } };
-                })
-              }
-              min={0}
-            />
-          ))}
+        <div className="space-y-3">
+          {Array.from({ length: n }, (_, i) => {
+            const isLast = i === n - 1;
+            return (
+              <div key={`seg-${i}`} className={SEGMENT_DIM_BOX}>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {isLast ? `Segment ${i + 1} (end)` : `Segment ${i + 1} — bend`}
+                </p>
+                {isLast ? (
+                  <NumField
+                    label={`Length (mm)`}
+                    value={c.segmentsMm[i] ?? 0}
+                    onChange={(v) =>
+                      setForm((s) => {
+                        const next = [...s.custom.segmentsMm];
+                        while (next.length < 7) next.push(0);
+                        next[i] = Math.max(0, v);
+                        return { ...s, custom: { ...s.custom, segmentsMm: next } };
+                      })
+                    }
+                    min={0}
+                  />
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <NumField
+                      label={`Segment ${i + 1} (mm)`}
+                      value={c.segmentsMm[i] ?? 0}
+                      onChange={(v) =>
+                        setForm((s) => {
+                          const next = [...s.custom.segmentsMm];
+                          while (next.length < 7) next.push(0);
+                          next[i] = Math.max(0, v);
+                          return { ...s, custom: { ...s.custom, segmentsMm: next } };
+                        })
+                      }
+                      min={0}
+                    />
+                    <NumField
+                      label={`Angle after (${i + 1}) (°)`}
+                      value={c.anglesDeg[i] ?? 180}
+                      onChange={(v) =>
+                        setForm((s) => {
+                          const next = [...s.custom.anglesDeg];
+                          while (next.length < 6) next.push(180);
+                          next[i] = v;
+                          return { ...s, custom: { ...s.custom, anglesDeg: next } };
+                        })
+                      }
+                      step={0.1}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-        {n > 1 ? (
-          <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {Array.from({ length: n - 1 }, (_, i) => (
-              <NumField
-                key={`a-${i}`}
-                label={`Included angle after seg. ${i + 1} (°)`}
-                value={c.anglesDeg[i] ?? 180}
-                onChange={(v) =>
-                  setForm((s) => {
-                    const next = [...s.custom.anglesDeg];
-                    while (next.length < 6) next.push(180);
-                    next[i] = v;
-                    return { ...s, custom: { ...s.custom, anglesDeg: next } };
-                  })
-                }
-                step={0.1}
-              />
-            ))}
-          </div>
-        ) : null}
       </div>
     );
   }

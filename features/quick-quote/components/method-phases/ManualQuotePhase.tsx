@@ -57,9 +57,9 @@ interface ManualQuotePhaseProps {
   onComplete: () => void;
 }
 
-/** Same viewport idea as Bend plate — fills area below stepper without growing the page. */
+/** Fills content area below stepper (parent must be flex with min-h-0). */
 const MANUAL_PHASE_VIEWPORT =
-  "min-h-[280px] min-h-0 h-[calc(100svh-14rem)] max-h-[calc(100svh-14rem)]";
+  "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
 
 function createRow(materialType: MaterialType): ManualQuotePartRow {
   return {

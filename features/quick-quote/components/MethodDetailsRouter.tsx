@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -57,11 +58,15 @@ export function MethodDetailsRouter({
     );
   }
 
+  const shell = (children: ReactNode) => (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+  );
+
   switch (method) {
     case "dxf":
-      return <DxfQuotePhase />;
+      return shell(<DxfQuotePhase />);
     case "manualAdd":
-      return (
+      return shell(
         <ManualQuotePhase
           materialType={materialType}
           rows={manualQuoteRows}
@@ -71,20 +76,22 @@ export function MethodDetailsRouter({
         />
       );
     case "excelImport":
-      return (
+      return shell(
         <ExcelImportQuotePhase
           materialType={materialType}
           onRowsChange={onExcelImportQuoteRowsChange}
         />
       );
     case "bendPlate":
-      return (
+      return shell(
         <BendPlateQuotePhase
           materialType={materialType}
           quoteItems={bendPlateQuoteItems}
           onAddItem={onBendPlateAddItem}
           onUpdateItem={onBendPlateUpdateItem}
           onRemoveItem={onBendPlateRemoveItem}
+          onBack={onBackToMethodPicker}
+          onComplete={onBackToMethodPicker}
         />
       );
     default: {

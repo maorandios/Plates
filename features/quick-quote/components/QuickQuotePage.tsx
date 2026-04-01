@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -639,8 +640,20 @@ export function QuickQuotePage() {
         onStepSelect={goToStep}
         {...stepNav}
       />
-      <PageContainer className="bg-muted/20 flex-1 overflow-y-auto">
-        <div className="w-full space-y-8">
+      <PageContainer
+        className={cn(
+          "bg-muted/20 flex-1 min-h-0",
+          step === 3
+            ? "flex flex-col overflow-hidden p-0 lg:p-0"
+            : "overflow-y-auto"
+        )}
+      >
+        <div
+          className={cn(
+            "w-full",
+            step === 3 ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "space-y-8"
+          )}
+        >
           {step === 1 && (
             <Card className="border border-border shadow-sm">
               <CardHeader>

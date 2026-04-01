@@ -251,8 +251,9 @@ export function computeBendGeometry(
   );
   const density = getMaterialConfig(materialType).densityKgPerM3;
   const areaM2 = (developedMm * plateWidthMm) / 1_000_000;
+  const q = Math.max(0, Math.floor(quantity));
   const weightKg =
-    areaM2 * (thicknessMm / 1000) * density * Math.max(1, Math.floor(quantity) || 1);
+    q > 0 ? areaM2 * (thicknessMm / 1000) * density * q : 0;
 
   return {
     pts,
