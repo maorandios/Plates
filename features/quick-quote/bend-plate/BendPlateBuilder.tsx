@@ -10,13 +10,6 @@ import {
 } from "react";
 import { Check, ChevronLeft, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,7 +30,7 @@ import {
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { nanoid } from "@/lib/utils/nanoid";
 import { cn } from "@/lib/utils";
-import type { MaterialType } from "@/types/materials";
+import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import {
   DEFAULT_PLATE_FINISH,
   PLATE_FINISH_OPTIONS,
@@ -192,20 +185,38 @@ function aggregateMetrics(items: BendPlateQuoteItem[]) {
     totalWeightKg += it.calc.weightKg;
   }
   return {
-    shapeCount: items.length,
     totalQty,
     totalAreaM2,
     totalWeightKg,
   };
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+/** Hub list view — same viewport height as Manual add / bend editor. */
+const BEND_PLATE_HUB_VIEWPORT =
+  "min-h-[280px] min-h-0 h-[calc(100svh-14rem)] max-h-[calc(100svh-14rem)]";
+
+/** One row in the left sidebar — matches Manual add parts metric strips. */
+function BendPlateHubMetricStrip({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+}) {
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 px-5 py-5 sm:px-7 sm:py-6">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </p>
-      <p className="text-lg font-semibold tabular-nums text-foreground mt-1">{value}</p>
+      <p
+        className="font-semibold tabular-nums tracking-tight text-foreground leading-none
+          text-[clamp(2rem,6.5vmin,4.25rem)]"
+      >
+        {value}
+      </p>
+      <p className="text-[11px] text-muted-foreground leading-snug pt-1 max-w-[18rem]">{sub}</p>
     </div>
   );
 }
@@ -319,6 +330,7 @@ export function BendPlateBuilder({
 
   return (
     <BendPlateHub
+      materialType={materialType}
       quoteItems={quoteItems}
       hubMetrics={hubMetrics}
       onSelectTemplate={openNewEditor}
@@ -329,155 +341,210 @@ export function BendPlateBuilder({
 }
 
 function BendPlateHub({
+  materialType,
   quoteItems,
   hubMetrics,
   onSelectTemplate,
   onEdit,
   onRemove,
 }: {
+  materialType: MaterialType;
   quoteItems: BendPlateQuoteItem[];
   hubMetrics: ReturnType<typeof aggregateMetrics>;
   onSelectTemplate: (t: BendTemplateId) => void;
   onEdit: (item: BendPlateQuoteItem) => void;
   onRemove: (id: string) => void;
 }) {
+  const plateTypeLabel = MATERIAL_TYPE_LABELS[materialType];
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-8 pb-4">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Bent plate builder
-        </h1>
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          Choose a profile shape to configure dimensions and bends. Complete each plate to add it to
-          the list below — you can edit or remove lines anytime.
-        </p>
-      </header>
+    <div
+      className={cn(
+        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
+        BEND_PLATE_HUB_VIEWPORT
+      )}
+    >
+      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-border/80">
+          <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
+              Bent plate builder
+            </h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Pick L, U, Z, or Custom to configure a profile, then complete to add it to the list.
+              Edit or remove lines anytime.
+            </p>
+            <p className="text-xs text-muted-foreground pt-1">
+              Plate type from General:{" "}
+              <span className="font-medium text-foreground">{plateTypeLabel}</span>
+            </p>
+          </div>
 
-      <section className="space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Shape template
-        </h2>
-        <div className="flex flex-nowrap gap-3 overflow-x-auto pb-1">
-          {TEMPLATE_OPTIONS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => onSelectTemplate(t.id)}
-              className={cn(
-                "min-w-[140px] shrink-0 flex-1 rounded-lg border-2 px-4 py-4 text-left transition-all",
-                "border-border bg-card hover:border-primary/40 hover:shadow-sm",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              )}
-            >
-              <span className="block text-lg font-bold text-foreground">{t.label}</span>
-              <span className="text-[11px] text-muted-foreground leading-snug block mt-1">{t.hint}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/70">
+            <BendPlateHubMetricStrip
+              label="Quantity"
+              value={formatInteger(hubMetrics.totalQty)}
+              sub="Total pieces across configured plates"
+            />
+            <BendPlateHubMetricStrip
+              label="Area (m²)"
+              value={formatDecimal(hubMetrics.totalAreaM2, 3)}
+              sub="Σ blank area × quantity per line"
+            />
+            <BendPlateHubMetricStrip
+              label="Weight (kg)"
+              value={formatDecimal(hubMetrics.totalWeightKg, 2)}
+              sub="Estimated from geometry and density (General)"
+            />
+          </div>
+        </aside>
 
-      <section className="space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Summary
-        </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <MetricCard label="Shapes" value={formatInteger(hubMetrics.shapeCount)} />
-          <MetricCard label="Quantity" value={formatInteger(hubMetrics.totalQty)} />
-          <MetricCard label="Area (m²)" value={formatDecimal(hubMetrics.totalAreaM2, 3)} />
-          <MetricCard label="Weight (kg)" value={formatDecimal(hubMetrics.totalWeightKg, 2)} />
-        </div>
-      </section>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-foreground">Configured plates</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {quoteItems.length === 0
+                    ? "No plates yet — pick L, U, Z, or Custom above the table to start."
+                    : `${formatInteger(quoteItems.length)} line(s) on this quote`}
+                </p>
+              </div>
+              <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 lg:max-w-[55%] lg:justify-end">
+                {TEMPLATE_OPTIONS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => onSelectTemplate(t.id)}
+                    className={cn(
+                      "min-w-[108px] shrink-0 rounded-lg border-2 px-3 py-2.5 text-left transition-all",
+                      "border-border bg-card hover:border-primary/40 hover:shadow-sm",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    )}
+                  >
+                    <span className="block text-base font-bold text-foreground leading-tight">
+                      {t.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground leading-snug block mt-0.5">
+                      {t.hint}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
-      <section className="space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Plates
-        </h2>
-        <Card className="border-border shadow-sm overflow-hidden">
-          <CardHeader className="border-b border-border bg-muted/20 py-3">
-            <CardTitle className="text-base">Configured plates</CardTitle>
-            <CardDescription>
-              {quoteItems.length === 0
-                ? "No plates yet — pick a shape above to start."
-                : `${formatInteger(quoteItems.length)} line(s) on this quote`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {quoteItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground px-4 py-8 text-center">
-                Your bent plates will appear here.
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Shape</TableHead>
-                    <TableHead>Material grade</TableHead>
-                    <TableHead>Finish</TableHead>
-                    <TableHead className="text-right">Thk (mm)</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Area (m²)</TableHead>
-                    <TableHead className="text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-right w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {quoteItems.map((it) => {
-                    const q = Math.max(1, Math.floor(it.global.quantity) || 1);
-                    const lineArea = it.calc.areaM2 * q;
-                    return (
-                      <TableRow key={it.id}>
-                        <TableCell className="font-medium capitalize">
-                          {templateLabel(it.template)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-[160px] truncate">
-                          {it.global.material || "—"}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground whitespace-nowrap">
-                          {plateFinishLabel(it.global.finish)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatDecimal(it.global.thicknessMm, 2)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{formatInteger(q)}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatDecimal(lineArea, 3)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatDecimal(it.calc.weightKg, 2)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              aria-label="Edit"
-                              onClick={() => onEdit(it)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              aria-label="Delete"
-                              onClick={() => onRemove(it.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="p-4 sm:p-5">
+              {quoteItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-12 text-center rounded-lg border border-dashed border-border">
+                  Your bent plates will appear here after you complete a shape.
+                </p>
+              ) : (
+                <div className="rounded-lg border border-border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead className="text-xs font-semibold w-12 text-center">#</TableHead>
+                        <TableHead className="text-xs font-semibold w-[72px]">Shape</TableHead>
+                        <TableHead className="text-xs font-semibold w-[120px] text-right">
+                          Thickness (mm)
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold w-[120px] text-right">
+                          Width (mm)
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold w-[120px] text-right">
+                          Length (mm)
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold w-[100px] text-right">
+                          Quantity
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold w-[120px] text-right">
+                          Area (m²)
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold w-[120px] text-right">
+                          Weight (kg)
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold min-w-[140px]">
+                          Material grade
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold min-w-[100px]">Finish</TableHead>
+                        <TableHead className="text-xs font-semibold w-[100px] text-right">
+                          Actions
+                        </TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+                    </TableHeader>
+                    <TableBody>
+                      {quoteItems.map((it, index) => {
+                        const q = Math.max(1, Math.floor(it.global.quantity) || 1);
+                        const lineArea = it.calc.areaM2 * q;
+                        return (
+                          <TableRow key={it.id}>
+                            <TableCell className="py-2 text-center text-muted-foreground text-sm tabular-nums">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="py-2 font-medium capitalize tabular-nums">
+                              {templateLabel(it.template)}
+                            </TableCell>
+                            <TableCell className="py-2 text-right tabular-nums text-sm">
+                              {formatDecimal(it.global.thicknessMm, 2)}
+                            </TableCell>
+                            <TableCell className="py-2 text-right tabular-nums text-sm">
+                              {formatDecimal(it.calc.blankWidthMm, 1)}
+                            </TableCell>
+                            <TableCell className="py-2 text-right tabular-nums text-sm">
+                              {formatDecimal(it.calc.blankLengthMm, 1)}
+                            </TableCell>
+                            <TableCell className="py-2 text-right tabular-nums text-sm">
+                              {formatInteger(q)}
+                            </TableCell>
+                            <TableCell className="py-2 text-right tabular-nums text-sm">
+                              {formatDecimal(lineArea, 3)}
+                            </TableCell>
+                            <TableCell className="py-2 text-right tabular-nums text-sm">
+                              {formatDecimal(it.calc.weightKg, 2)}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground max-w-[180px] truncate text-sm">
+                              {it.global.material || "—"}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground whitespace-nowrap text-sm">
+                              {plateFinishLabel(it.global.finish)}
+                            </TableCell>
+                            <TableCell className="py-2 text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label="Edit"
+                                  onClick={() => onEdit(it)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  aria-label="Delete"
+                                  onClick={() => onRemove(it.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

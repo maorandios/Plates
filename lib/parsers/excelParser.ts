@@ -45,6 +45,11 @@ const MATERIAL_KEYS = [
   "liga", "tipo",
 ];
 
+const FINISH_KEYS = [
+  "finish", "surface", "coating", "treatment", "surface treatment",
+  "galvanized", "paint", "carbon", "finish type", "acabamento", "oberflache",
+];
+
 const WIDTH_KEYS = [
   "width", "largura", "breite", "width (mm)", "width(mm)",
   "w", "wd", "wid",
@@ -330,7 +335,7 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
     return {
       rawHeaders: [], headerRowIdx: 0, sheetName: "", previewRows: [],
       autoDetected: {
-        partNameCol: 0, qtyCol: null, thkCol: null, matCol: null,
+        partNameCol: 0, qtyCol: null, thkCol: null, matCol: null, finishCol: null,
         widthCol: null, lengthCol: null, areaCol: null, weightCol: null,
         totalWeightCol: null, dxfFileCol: null, headerRowIdx: 0,
       },
@@ -363,6 +368,7 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
   const qtyColIdx         = findColumn(norm, QUANTITY_KEYS);
   const thkColIdx         = findColumn(norm, THICKNESS_KEYS);
   const matColIdx         = findColumn(norm, MATERIAL_KEYS);
+  const finishColIdx      = findColumn(norm, FINISH_KEYS);
   const widthColIdx       = findColumn(norm, WIDTH_KEYS);
   const lengthColIdx      = findColumn(norm, LENGTH_KEYS);
   const areaColIdx        = findColumn(norm, AREA_KEYS);
@@ -375,6 +381,7 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
     qtyCol:         qtyColIdx         >= 0 ? qtyColIdx         : null,
     thkCol:         thkColIdx         >= 0 ? thkColIdx         : null,
     matCol:         matColIdx         >= 0 ? matColIdx         : null,
+    finishCol:      finishColIdx      >= 0 ? finishColIdx      : null,
     widthCol:       widthColIdx       >= 0 ? widthColIdx       : null,
     lengthCol:      lengthColIdx      >= 0 ? lengthColIdx      : null,
     areaCol:        areaColIdx        >= 0 ? areaColIdx        : null,
@@ -448,6 +455,7 @@ export async function parseExcelFileWithMapping(
     const quantity    = mapping.qtyCol         != null ? parseNumber(cells[mapping.qtyCol])         : undefined;
     const thickness   = mapping.thkCol         != null ? parseNumber(cells[mapping.thkCol])         : undefined;
     const material    = mapping.matCol         != null ? String(cells[mapping.matCol] ?? "").trim() || undefined : undefined;
+    const finish      = mapping.finishCol      != null ? String(cells[mapping.finishCol] ?? "").trim() || undefined : undefined;
     const width       = mapping.widthCol       != null ? parseNumber(cells[mapping.widthCol])       : undefined;
     const length      = mapping.lengthCol      != null ? parseNumber(cells[mapping.lengthCol])      : undefined;
     const area        = mapping.areaCol        != null ? parseNumber(cells[mapping.areaCol])        : undefined;
@@ -473,6 +481,7 @@ export async function parseExcelFileWithMapping(
       quantity: quantity ?? 1,
       thickness,
       material,
+      ...(finish ? { finish } : {}),
       width,
       length,
       area,

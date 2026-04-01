@@ -22,6 +22,21 @@ export function plateFinishLabel(finish: PlateFinish | undefined): string {
   return PLATE_FINISH_OPTIONS.find((o) => o.value === f)?.label ?? f;
 }
 
+/** Map a BOM cell value to a plate finish when possible. */
+export function parsePlateFinishFromLabelOrValue(
+  s: string | undefined
+): PlateFinish | undefined {
+  if (!s?.trim()) return undefined;
+  const t = s.trim().toLowerCase();
+  if (t === "carbon" || t === "galvanized" || t === "paint") {
+    return t as PlateFinish;
+  }
+  if (t.includes("galvan")) return "galvanized";
+  if (t.includes("paint")) return "paint";
+  if (t.includes("carbon") || t.includes("black steel")) return "carbon";
+  return undefined;
+}
+
 /** Single line for quote tables / BOM-style display. */
 export function formatMaterialGradeAndFinish(
   grade: string,

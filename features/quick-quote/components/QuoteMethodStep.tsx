@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, FileCode2, FoldHorizontal } from "lucide-react";
+import { ClipboardList, FileCode2, FileSpreadsheet, FoldHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { QuoteCreationMethod } from "../types/quickQuote";
 
@@ -26,6 +26,13 @@ const OPTIONS: {
     Icon: ClipboardList,
   },
   {
+    id: "excelImport",
+    title: "Import Excel list",
+    description: "Upload a spreadsheet and map columns",
+    hint: "CSV or Excel — same mapping flow as DXF BOM",
+    Icon: FileSpreadsheet,
+  },
+  {
     id: "bendPlate",
     title: "Bend plate",
     description: "Build a bent plate from a side profile or template",
@@ -49,7 +56,7 @@ export function QuoteMethodStep({ selected, onSelect }: QuoteMethodStepProps) {
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {OPTIONS.map(({ id, title, description, hint, Icon }) => {
           const isSelected = selected === id;
           return (

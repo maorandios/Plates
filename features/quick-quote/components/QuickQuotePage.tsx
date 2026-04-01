@@ -39,6 +39,7 @@ import {
   quotePartsForValidationSelection,
 } from "../lib/deriveQuoteSelection";
 import { bendPlateQuoteItemsToQuoteParts } from "../bend-plate/toQuoteParts";
+import { manualQuoteRowsToQuoteParts } from "../lib/manualQuoteParts";
 import type { BendPlateQuoteItem } from "../bend-plate/types";
 import { generateQuoteReference } from "../lib/generateQuoteReference";
 import { MOCK_MFG_PARAMETERS } from "../mock/quickQuoteMockData";
@@ -49,10 +50,6 @@ import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import { normalizeName } from "@/lib/matching/matcher";
 import { getPurchasedSheetSizes } from "@/lib/store";
 import { nanoid } from "@/lib/utils/nanoid";
-import {
-  DEFAULT_PLATE_FINISH,
-  defaultMaterialGradeForFamily,
-} from "../lib/plateFields";
 
 const defaultJobDetails: QuickQuoteJobDetails = {
   referenceNumber: "",
@@ -271,18 +268,12 @@ export function QuickQuotePage() {
   );
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
 
-  const [manualQuoteRows, setManualQuoteRows] = useState<ManualQuotePartRow[]>(() => [
-    {
-      id: nanoid(),
-      partNumber: "PL01",
-      thicknessMm: 10,
-      widthMm: 0,
-      lengthMm: 0,
-      quantity: 1,
-      material: defaultMaterialGradeForFamily("carbonSteel"),
-      finish: DEFAULT_PLATE_FINISH,
-    },
-  ]);
+  const [manualQuoteRows, setManualQuoteRows] = useState<ManualQuotePartRow[]>([]);
+
+  /** Plates from the Import Excel list method only (separate from manual rows). */
+  const [excelImportQuoteRows, setExcelImportQuoteRows] = useState<ManualQuotePartRow[]>(
+    []
+  );
 
   const [bendPlateQuoteItems, setBendPlateQuoteItems] = useState<BendPlateQuoteItem[]>([]);
 
@@ -327,6 +318,26 @@ export function QuickQuotePage() {
         stock ? materialPricePerKg : undefined
       );
     }
+    if (jobDetails.quoteCreationMethod === "manualAdd") {
+      const density = getMaterialConfig(materialType).densityKgPerM3;
+      const parts = manualQuoteRowsToQuoteParts(manualQuoteRows, density);
+      const stock = stockPricingReady ? thicknessStock : null;
+      return buildSelectionBundleFromParts(
+        parts,
+        stock,
+        stock ? materialPricePerKg : undefined
+      );
+    }
+    if (jobDetails.quoteCreationMethod === "excelImport") {
+      const density = getMaterialConfig(materialType).densityKgPerM3;
+      const parts = manualQuoteRowsToQuoteParts(excelImportQuoteRows, density);
+      const stock = stockPricingReady ? thicknessStock : null;
+      return buildSelectionBundleFromParts(
+        parts,
+        stock,
+        stock ? materialPricePerKg : undefined
+      );
+    }
     const rows = calculationRows ?? MOCK_VALIDATION_ROWS;
     const stock = stockPricingReady ? thicknessStock : null;
     return buildSelectionBundle(
@@ -337,6 +348,9 @@ export function QuickQuotePage() {
   }, [
     jobDetails.quoteCreationMethod,
     bendPlateQuoteItems,
+    manualQuoteRows,
+    excelImportQuoteRows,
+    materialType,
     calculationRows,
     thicknessStock,
     materialPricePerKg,
@@ -356,10 +370,30 @@ export function QuickQuotePage() {
       advanceTo(7);
       return;
     }
+    if (jobDetails.quoteCreationMethod === "manualAdd") {
+      const density = getMaterialConfig(materialType).densityKgPerM3;
+      const parts = manualQuoteRowsToQuoteParts(manualQuoteRows, density);
+      setThicknessStock((prev) =>
+        mergeDefaultStockRows(parts, prev, materialType, getPurchasedSheetSizes())
+      );
+      advanceTo(7);
+      return;
+    }
+    if (jobDetails.quoteCreationMethod === "excelImport") {
+      const density = getMaterialConfig(materialType).densityKgPerM3;
+      const parts = manualQuoteRowsToQuoteParts(excelImportQuoteRows, density);
+      setThicknessStock((prev) =>
+        mergeDefaultStockRows(parts, prev, materialType, getPurchasedSheetSizes())
+      );
+      advanceTo(7);
+      return;
+    }
     advanceTo(4);
   }, [
     jobDetails.quoteCreationMethod,
     bendPlateQuoteItems,
+    manualQuoteRows,
+    excelImportQuoteRows,
     materialType,
     advanceTo,
   ]);
@@ -398,7 +432,11 @@ export function QuickQuotePage() {
   };
 
   const handleBackFromStockToValidation = useCallback(() => {
-    if (jobDetails.quoteCreationMethod === "bendPlate") {
+    if (
+      jobDetails.quoteCreationMethod === "bendPlate" ||
+      jobDetails.quoteCreationMethod === "manualAdd" ||
+      jobDetails.quoteCreationMethod === "excelImport"
+    ) {
       advanceTo(3);
       return;
     }
@@ -414,7 +452,11 @@ export function QuickQuotePage() {
   const handleViewQuote = () => advanceTo(9);
   const handleBackFromQuote = () => advanceTo(8);
   const handleBackToValidationFromQuote = useCallback(() => {
-    if (jobDetails.quoteCreationMethod === "bendPlate") {
+    if (
+      jobDetails.quoteCreationMethod === "bendPlate" ||
+      jobDetails.quoteCreationMethod === "manualAdd" ||
+      jobDetails.quoteCreationMethod === "excelImport"
+    ) {
       advanceTo(7);
       return;
     }
@@ -488,7 +530,11 @@ export function QuickQuotePage() {
         const canContinueMethodDetails =
           jobDetails.quoteCreationMethod === "bendPlate"
             ? bendPlateQuoteItems.length > 0
-            : true;
+            : jobDetails.quoteCreationMethod === "manualAdd"
+              ? manualQuoteRows.length > 0
+              : jobDetails.quoteCreationMethod === "excelImport"
+                ? excelImportQuoteRows.length > 0
+                : true;
         return {
           showBack: true,
           showContinue: true,
@@ -567,6 +613,8 @@ export function QuickQuotePage() {
     handleContinueFromQuoteMethod,
     jobDetails.quoteCreationMethod,
     bendPlateQuoteItems.length,
+    manualQuoteRows.length,
+    excelImportQuoteRows.length,
     handleBackFromMethodDetails,
     handleContinueFromMethodDetails,
     handleBackToExcelUpload,
@@ -615,9 +663,9 @@ export function QuickQuotePage() {
           {step === 2 && (
             <QuoteMethodStep
               selected={jobDetails.quoteCreationMethod ?? null}
-              onSelect={(method) =>
-                setJobDetails((j) => ({ ...j, quoteCreationMethod: method }))
-              }
+              onSelect={(method) => {
+                setJobDetails((j) => ({ ...j, quoteCreationMethod: method }));
+              }}
             />
           )}
 
@@ -628,6 +676,7 @@ export function QuickQuotePage() {
               materialType={materialType}
               manualQuoteRows={manualQuoteRows}
               onManualQuoteRowsChange={setManualQuoteRows}
+              onExcelImportQuoteRowsChange={setExcelImportQuoteRows}
               bendPlateQuoteItems={bendPlateQuoteItems}
               onBendPlateAddItem={handleBendPlateAddItem}
               onBendPlateUpdateItem={handleBendPlateUpdateItem}

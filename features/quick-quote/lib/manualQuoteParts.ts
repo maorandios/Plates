@@ -1,4 +1,56 @@
+import { formatMaterialGradeAndFinish } from "./plateFields";
+import { QUOTE_METHOD_LABEL } from "./mergeQuotePlates";
+import type { QuotePartRow } from "../types/quickQuote";
 import type { ManualQuotePartRow } from "../types/quickQuote";
+
+/** Per-row issues for manual entry — empty array means the row is complete enough to finish. */
+export function getManualRowValidationIssues(row: ManualQuotePartRow): string[] {
+  const issues: string[] = [];
+  if (!(Number(row.thicknessMm) > 0)) issues.push("thickness (mm)");
+  if (!(Number(row.widthMm) > 0)) issues.push("width (mm)");
+  if (!(Number(row.lengthMm) > 0)) issues.push("length (mm)");
+  if (!(Math.floor(row.quantity) >= 1)) issues.push("quantity");
+  if (!(row.material ?? "").trim()) issues.push("material grade");
+  return issues;
+}
+
+/** Human-readable lines for dialog; null if every row is valid. */
+export function getManualQuoteValidationLines(rows: ManualQuotePartRow[]): string[] | null {
+  const lines: string[] = [];
+  rows.forEach((row, index) => {
+    const rowIssues = getManualRowValidationIssues(row);
+    if (rowIssues.length > 0) {
+      lines.push(
+        `Row ${index + 1}: add ${rowIssues.join(", ")}.`
+      );
+    }
+  });
+  return lines.length > 0 ? lines : null;
+}
+
+/** Line total area (m²) = (width × length / 1e6) × quantity — matches sidebar totals. */
+export function manualRowLineAreaM2(row: ManualQuotePartRow): number {
+  const w = Math.max(0, row.widthMm);
+  const l = Math.max(0, row.lengthMm);
+  const q = Math.max(0, Math.floor(row.quantity));
+  if (!Number.isFinite(w) || !Number.isFinite(l) || !Number.isFinite(q)) return 0;
+  return ((w * l) / 1_000_000) * q;
+}
+
+/** Line total weight (kg) from thickness × area × density. */
+export function manualRowLineWeightKg(
+  row: ManualQuotePartRow,
+  densityKgPerM3: number
+): number {
+  const w = Math.max(0, row.widthMm);
+  const l = Math.max(0, row.lengthMm);
+  const q = Math.max(0, Math.floor(row.quantity));
+  const th = Math.max(0, Number(row.thicknessMm) || 0);
+  if (!Number.isFinite(w) || !Number.isFinite(l) || !Number.isFinite(q)) return 0;
+  const pieceAreaM2 = (w * l) / 1_000_000;
+  const tM = th / 1000;
+  return pieceAreaM2 * tM * q * densityKgPerM3;
+}
 
 /** Next part id like PL01, PL02 … based on existing PL## numbers. */
 export function suggestNextPartNumber(rows: ManualQuotePartRow[]): string {
@@ -34,4 +86,48 @@ export function computeManualQuoteMetrics(
   }
 
   return { totalQty, totalAreaM2, totalWeightKg };
+}
+
+/** Manual BOM lines → quote part rows (rectangular plate geometry). */
+export function manualQuoteRowsToQuoteParts(
+  rows: ManualQuotePartRow[],
+  densityKgPerM3: number
+): QuotePartRow[] {
+  const rho = densityKgPerM3;
+  return rows.map((r, index) => {
+    const w = Math.max(0, r.widthMm);
+    const l = Math.max(0, r.lengthMm);
+    const th = Math.max(0, Number(r.thicknessMm) || 0);
+    const q = Math.max(1, Math.floor(r.quantity) || 1);
+    const areaM2 = (w * l) / 1_000_000;
+    const tM = th / 1000;
+    const weightKg = areaM2 * tM * rho;
+    const cutLengthMm = w > 0 && l > 0 ? Math.round(2 * (w + l)) : 0;
+    const trimmed = (r.partNumber || "").trim();
+    const displayName =
+      trimmed ||
+      (r.sourceMethod === "manualAdd"
+        ? `Manual line ${index + 1}`
+        : `Line ${index + 1}`);
+    return {
+      id: r.id,
+      partName: displayName,
+      qty: q,
+      material: formatMaterialGradeAndFinish(r.material, r.finish),
+      thicknessMm: th,
+      lengthMm: l,
+      widthMm: w,
+      areaM2,
+      weightKg,
+      cutLengthMm,
+      pierceCount: 0,
+      validationStatus: "valid",
+      estimatedLineCost: 0,
+      dxfFileName: "—",
+      excelRowRef: trimmed || displayName,
+      notes: r.sourceMethod
+        ? `Source: ${QUOTE_METHOD_LABEL[r.sourceMethod]}`
+        : "",
+    };
+  });
 }

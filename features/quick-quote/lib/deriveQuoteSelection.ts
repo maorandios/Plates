@@ -446,7 +446,7 @@ export function buildSelectionBundleFromParts(
     errorItems: 0,
     confidenceNote:
       parts.length > 0
-        ? "Bend plate parts — geometry from side profile."
+        ? "Line items from the selected quote method (dimensions × quantities)."
         : "No parts in this quote run.",
   };
   let { mfg, pricing } = scaleManufacturingAndPricing(

@@ -97,6 +97,8 @@ export interface ExcelRow {
   material?: string;
   width?: number;    // mm
   length?: number;   // mm
+  /** Surface finish label or value from BOM (e.g. Carbon, Galvanized). */
+  finish?: string;
   area?: number;     // m²
   weight?: number;   // kg (unit weight)
   totalWeight?: number; // kg (weight × qty)
@@ -236,6 +238,8 @@ export interface ColumnMapping {
   thkCol: number | null;
   /** Index of the material column — null means omit */
   matCol: number | null;
+  /** Index of the finish column (surface treatment) — null means omit */
+  finishCol: number | null;
   /** Index of the width column (mm) */
   widthCol: number | null;
   /** Index of the length column (mm) */

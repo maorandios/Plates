@@ -1,10 +1,19 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, X, RefreshCw, Check } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import {
+  Upload,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  RefreshCw,
+  Check,
+  Trash2,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -26,11 +35,23 @@ import { cn } from "@/lib/utils";
 import { readExcelHeaders, parseExcelFileWithMapping } from "@/lib/parsers/excelParser";
 import type { ColumnMapping, ExcelRow } from "@/types";
 import type { ExcelHeadersResult } from "@/lib/parsers/excelParser";
+import {
+  DEFAULT_PLATE_FINISH,
+  PLATE_FINISH_OPTIONS,
+  type PlateFinish,
+} from "../lib/plateFields";
 
 const NONE = "__none__";
 
+export type ExcelUploadStepVariant = "dxf" | "quoteImport";
+
 interface ExcelUploadStepProps {
   onDataApproved: (data: ExcelRow[]) => void;
+  variant?: ExcelUploadStepVariant;
+  /** Quote import: sync parent whenever review rows change (step 3). */
+  onQuoteImportRowsChange?: (data: ExcelRow[]) => void;
+  /** Quote import: material density from General — used for estimated total weight. */
+  quoteImportDensityKgPerM3?: number;
 }
 
 interface ExcelMetrics {
@@ -57,6 +78,17 @@ const MAPPING_FIELDS: MappingField[] = [
   { key: "weightCol", label: "Weight", required: false, description: "Unit weight per piece in kg" },
 ];
 
+/** Column mapping for quote-from-list (no DXF / weight columns). */
+const QUOTE_IMPORT_MAPPING_FIELDS: MappingField[] = [
+  { key: "partNameCol", label: "Part number", required: true, description: "Unique identifier for each line" },
+  { key: "thkCol", label: "Thickness (mm)", required: false, description: "Plate thickness in mm" },
+  { key: "qtyCol", label: "Quantity", required: false, description: "Number of pieces (defaults to 1)" },
+  { key: "widthCol", label: "Width (mm)", required: false, description: "Plate width in mm" },
+  { key: "lengthCol", label: "Length (mm)", required: false, description: "Plate length in mm" },
+  { key: "matCol", label: "Material grade", required: false, description: "Steel grade or designation" },
+  { key: "finishCol", label: "Finish", required: false, description: "Surface finish (carbon, galvanized, paint)" },
+];
+
 type ExcelSubStep = 1 | 2 | 3;
 
 const SUB_STEPS = [
@@ -65,7 +97,27 @@ const SUB_STEPS = [
   { step: 3 as ExcelSubStep, label: "Review Data" },
 ];
 
-export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
+function parseCellNumber(raw: string): number | undefined {
+  const t = raw.trim();
+  if (!t) return undefined;
+  const n = parseFloat(t.replace(",", "."));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function finishStringToPlateFinish(s: string | undefined): PlateFinish {
+  const v = (s ?? "").trim().toLowerCase();
+  if (v === "galvanized" || v === "paint" || v === "carbon") return v;
+  if (v.includes("galvan")) return "galvanized";
+  if (v.includes("paint")) return "paint";
+  return DEFAULT_PLATE_FINISH;
+}
+
+export function ExcelUploadStep({
+  onDataApproved,
+  variant = "dxf",
+  onQuoteImportRowsChange,
+  quoteImportDensityKgPerM3,
+}: ExcelUploadStepProps) {
   const [subStep, setSubStep] = useState<ExcelSubStep>(1);
   const [file, setFile] = useState<File | null>(null);
   const [arrayBuffer, setArrayBuffer] = useState<ArrayBuffer | null>(null);
@@ -76,22 +128,28 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
 
+  const activeMappingFields = useMemo(
+    () => (variant === "quoteImport" ? QUOTE_IMPORT_MAPPING_FIELDS : MAPPING_FIELDS),
+    [variant]
+  );
+
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     setUploadError(null);
     setParseError(null);
     setFile(selectedFile);
     setParsedRows(null);
-    
+    if (variant === "quoteImport" && onQuoteImportRowsChange) {
+      onQuoteImportRowsChange([]);
+    }
+
     try {
       const buffer = await selectedFile.arrayBuffer();
       setArrayBuffer(buffer);
-      
-      // Read headers and auto-detect columns
+
       const headers = readExcelHeaders(buffer);
       setHeadersResult(headers);
       setMapping(headers.autoDetected);
-      
-      // Move to mapping step
+
       setSubStep(2);
     } catch (error) {
       setUploadError(
@@ -100,7 +158,7 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
       setFile(null);
       setArrayBuffer(null);
     }
-  }, []);
+  }, [variant, onQuoteImportRowsChange]);
 
   const handleFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,7 +200,10 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
     setUploadError(null);
     setParseError(null);
     setSubStep(1);
-  }, []);
+    if (variant === "quoteImport" && onQuoteImportRowsChange) {
+      onQuoteImportRowsChange([]);
+    }
+  }, [variant, onQuoteImportRowsChange]);
 
   const updateMapping = useCallback(
     (field: MappingField["key"], value: string) => {
@@ -186,15 +247,12 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
         return;
       }
 
-      // Add IDs to rows
       const rowsWithIds: ExcelRow[] = result.rows.map((row, index) => ({
         ...row,
         id: `excel-row-${index}`,
       }));
 
       setParsedRows(rowsWithIds);
-      
-      // Move to review step
       setSubStep(3);
     } catch (error) {
       setParseError(
@@ -202,9 +260,23 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
       );
     }
   }, [arrayBuffer, mapping, file]);
-  
+
   const handleBackToMapping = useCallback(() => {
     setSubStep(2);
+    setParsedRows(null);
+    if (variant === "quoteImport" && onQuoteImportRowsChange) {
+      onQuoteImportRowsChange([]);
+    }
+  }, [variant, onQuoteImportRowsChange]);
+
+  const patchParsedRow = useCallback((id: string, patch: Partial<ExcelRow>) => {
+    setParsedRows((prev) =>
+      prev ? prev.map((r) => (r.id === id ? { ...r, ...patch } : r)) : null
+    );
+  }, []);
+
+  const deleteParsedRow = useCallback((id: string) => {
+    setParsedRows((prev) => (prev ? prev.filter((r) => r.id !== id) : null));
   }, []);
 
   const metrics = useMemo((): ExcelMetrics | null => {
@@ -232,6 +304,41 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
     };
   }, [parsedRows]);
 
+  const quoteImportMetrics = useMemo(() => {
+    if (!parsedRows) return null;
+    const rho =
+      quoteImportDensityKgPerM3 != null &&
+      Number.isFinite(quoteImportDensityKgPerM3) &&
+      quoteImportDensityKgPerM3 > 0
+        ? quoteImportDensityKgPerM3
+        : 7850;
+    let totalQty = 0;
+    let totalAreaM2 = 0;
+    let totalWeightKg = 0;
+    for (const r of parsedRows) {
+      const q = Math.max(0, Math.floor(r.quantity) || 0);
+      const w = Math.max(0, r.width ?? 0);
+      const l = Math.max(0, r.length ?? 0);
+      const th = Math.max(0, Number(r.thickness) || 0);
+      totalQty += q;
+      const pieceAreaM2 = (w * l) / 1_000_000;
+      totalAreaM2 += pieceAreaM2 * q;
+      const tM = th / 1000;
+      totalWeightKg += pieceAreaM2 * tM * q * rho;
+    }
+    return {
+      plateLines: parsedRows.length,
+      totalQty,
+      totalAreaM2,
+      totalWeightKg,
+    };
+  }, [parsedRows, quoteImportDensityKgPerM3]);
+
+  useEffect(() => {
+    if (variant !== "quoteImport" || subStep !== 3 || !onQuoteImportRowsChange) return;
+    onQuoteImportRowsChange(parsedRows ?? []);
+  }, [variant, subStep, parsedRows, onQuoteImportRowsChange]);
+
   const handleContinueToNextPhase = useCallback(() => {
     if (parsedRows) {
       onDataApproved(parsedRows);
@@ -240,32 +347,37 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
 
   const previewData = useMemo(() => {
     if (!headersResult || !mapping) return null;
-    
+
     return headersResult.previewRows.slice(0, 3).map((row, rowIndex) => {
       const cells: { label: string; value: string }[] = [];
-      
-      MAPPING_FIELDS.forEach((field) => {
+
+      activeMappingFields.forEach((field) => {
         const colIdx = mapping[field.key];
-        const value = colIdx !== null && colIdx !== undefined 
-          ? String(row[colIdx] ?? "-")
-          : "-";
+        const value =
+          colIdx !== null && colIdx !== undefined
+            ? String(row[colIdx] ?? "-")
+            : "-";
         cells.push({ label: field.label, value });
       });
-      
+
       return { rowIndex, cells };
     });
-  }, [headersResult, mapping]);
+  }, [headersResult, mapping, activeMappingFields]);
+
+  const showDxfReview = variant === "dxf" && parsedRows && metrics;
+  const showQuoteReview = variant === "quoteImport" && parsedRows && quoteImportMetrics;
+
+  const uploadInputId =
+    variant === "quoteImport" ? "excel-upload-quote-import" : "excel-upload";
 
   return (
     <div className="space-y-6">
-      {/* Sub-Stepper */}
       <Card className="border-primary/20">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between gap-2">
             {SUB_STEPS.map(({ step, label }, index) => {
               const isComplete = step < subStep;
               const isCurrent = step === subStep;
-              const isReachable = step <= subStep || (step === 2 && file !== null);
 
               return (
                 <div key={step} className="flex items-center flex-1 last:flex-none">
@@ -306,13 +418,16 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
         </CardContent>
       </Card>
 
-      {/* Step 1: Upload Section */}
       {subStep === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Upload Excel/CSV</CardTitle>
+            <CardTitle>
+              {variant === "quoteImport" ? "Import Excel list" : "Upload Excel/CSV"}
+            </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Upload your bill of materials with part details
+              {variant === "quoteImport"
+                ? "Upload a spreadsheet with part dimensions and quantities for this quote."
+                : "Upload your bill of materials with part details"}
             </p>
           </CardHeader>
           <CardContent>
@@ -344,10 +459,10 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
                   accept=".xlsx,.xls,.csv"
                   onChange={handleFileInputChange}
                   className="hidden"
-                  id="excel-upload"
+                  id={uploadInputId}
                 />
                 <Button asChild variant="outline">
-                  <label htmlFor="excel-upload" className="cursor-pointer">
+                  <label htmlFor={uploadInputId} className="cursor-pointer">
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     Choose File
                   </label>
@@ -364,7 +479,6 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
         </Card>
       )}
 
-      {/* Step 2: Column Mapping */}
       {subStep === 2 && file && headersResult && mapping && (
         <>
           <Card>
@@ -424,22 +538,21 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Mapping Table with Dropdowns in Header */}
               {previewData && (
                 <div className="space-y-2">
-                  <div className="rounded-md border overflow-hidden">
+                  <div className="rounded-md border overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        {/* Mapping Row */}
                         <TableRow className="bg-muted/30">
-                          {MAPPING_FIELDS.map((field) => {
+                          {activeMappingFields.map((field) => {
                             const currentValue = mapping[field.key];
-                            const valueStr = currentValue !== null && currentValue !== undefined 
-                              ? String(currentValue) 
-                              : NONE;
-                            
+                            const valueStr =
+                              currentValue !== null && currentValue !== undefined
+                                ? String(currentValue)
+                                : NONE;
+
                             return (
-                              <TableHead key={field.key} className="p-2">
+                              <TableHead key={field.key} className="p-2 min-w-[140px]">
                                 <div className="space-y-1.5">
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-semibold">
@@ -449,7 +562,10 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
                                       <span className="text-destructive text-xs">*</span>
                                     )}
                                   </div>
-                                  <Select value={valueStr} onValueChange={(v) => updateMapping(field.key, v)}>
+                                  <Select
+                                    value={valueStr}
+                                    onValueChange={(v) => updateMapping(field.key, v)}
+                                  >
                                     <SelectTrigger className="h-8 text-xs">
                                       <SelectValue />
                                     </SelectTrigger>
@@ -476,7 +592,6 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {/* Preview Rows */}
                         {previewData.map((row) => (
                           <TableRow key={row.rowIndex}>
                             {row.cells.map((cell, cellIndex) => (
@@ -489,13 +604,10 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
                       </TableBody>
                     </Table>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Preview (first 3 rows)
-                  </p>
+                  <p className="text-xs text-muted-foreground">Preview (first 3 rows)</p>
                 </div>
               )}
 
-              {/* Parse Button */}
               <div className="flex items-center justify-between pt-4 border-t">
                 {!isMappingValid && (
                   <div className="flex items-center gap-2 text-amber-600">
@@ -503,14 +615,8 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
                     <p className="text-sm">Part Name is required</p>
                   </div>
                 )}
-                {isMappingValid && (
-                  <div className="flex-1" />
-                )}
-                <Button
-                  onClick={handleParseWithMapping}
-                  disabled={!isMappingValid}
-                  size="lg"
-                >
+                {isMappingValid && <div className="flex-1" />}
+                <Button onClick={handleParseWithMapping} disabled={!isMappingValid} size="lg">
                   Continue to Review
                 </Button>
               </div>
@@ -526,10 +632,201 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
         </>
       )}
 
-      {/* Step 3: Review Data */}
-      {subStep === 3 && parsedRows && metrics && (
+      {showQuoteReview && (
         <>
-          {/* Metrics Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>List metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-1 rounded-lg border bg-card p-4">
+                  <p className="text-sm text-muted-foreground">Plates</p>
+                  <p className="text-2xl font-semibold">
+                    {formatInteger(quoteImportMetrics.plateLines)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Line items</p>
+                </div>
+                <div className="space-y-1 rounded-lg border bg-card p-4">
+                  <p className="text-sm text-muted-foreground">Quantity</p>
+                  <p className="text-2xl font-semibold">
+                    {formatInteger(quoteImportMetrics.totalQty)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Total pieces</p>
+                </div>
+                <div className="space-y-1 rounded-lg border bg-card p-4">
+                  <p className="text-sm text-muted-foreground">Area (m²)</p>
+                  <p className="text-2xl font-semibold">
+                    {formatDecimal(quoteImportMetrics.totalAreaM2, 3)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Σ width × length × qty</p>
+                </div>
+                <div className="space-y-1 rounded-lg border bg-card p-4">
+                  <p className="text-sm text-muted-foreground">Weight (kg)</p>
+                  <p className="text-2xl font-semibold">
+                    {formatDecimal(quoteImportMetrics.totalWeightKg, 1)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Σ area × thickness × density (General)
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Review and edit</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {formatInteger(parsedRows.length)} rows — adjust values or remove lines as needed.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[120px]">Part number</TableHead>
+                      <TableHead className="min-w-[88px]">Thickness</TableHead>
+                      <TableHead className="min-w-[72px]">Qty</TableHead>
+                      <TableHead className="min-w-[88px]">Width (mm)</TableHead>
+                      <TableHead className="min-w-[88px]">Length (mm)</TableHead>
+                      <TableHead className="min-w-[120px]">Material grade</TableHead>
+                      <TableHead className="min-w-[120px]">Finish</TableHead>
+                      <TableHead className="w-[52px]" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {parsedRows.map((row) => {
+                      const finishVal = finishStringToPlateFinish(row.finish);
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            <Input
+                              className="h-8 min-w-[100px]"
+                              value={row.partName}
+                              onChange={(e) =>
+                                patchParsedRow(row.id, { partName: e.target.value })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              className="h-8 w-20"
+                              inputMode="decimal"
+                              value={
+                                row.thickness != null && Number.isFinite(row.thickness)
+                                  ? String(row.thickness)
+                                  : ""
+                              }
+                              onChange={(e) => {
+                                const n = parseCellNumber(e.target.value);
+                                patchParsedRow(row.id, {
+                                  thickness: n,
+                                });
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              className="h-8 w-16"
+                              inputMode="numeric"
+                              value={String(row.quantity)}
+                              onChange={(e) => {
+                                const n = parseCellNumber(e.target.value);
+                                patchParsedRow(row.id, {
+                                  quantity: Math.max(1, Math.floor(n ?? 1) || 1),
+                                });
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              className="h-8 w-24"
+                              inputMode="decimal"
+                              value={row.width != null ? String(row.width) : ""}
+                              onChange={(e) => {
+                                const n = parseCellNumber(e.target.value);
+                                patchParsedRow(row.id, { width: n });
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              className="h-8 w-24"
+                              inputMode="decimal"
+                              value={row.length != null ? String(row.length) : ""}
+                              onChange={(e) => {
+                                const n = parseCellNumber(e.target.value);
+                                patchParsedRow(row.id, { length: n });
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              className="h-8 min-w-[100px]"
+                              value={row.material ?? ""}
+                              onChange={(e) =>
+                                patchParsedRow(row.id, { material: e.target.value })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={finishVal}
+                              onValueChange={(v) =>
+                                patchParsedRow(row.id, {
+                                  finish: v as PlateFinish,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[130px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PLATE_FINISH_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => deleteParsedRow(row.id)}
+                              aria-label="Delete row"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                When finished, use <span className="font-medium text-foreground">Continue</span> at the
+                bottom of the page to proceed to stock and pricing.
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={handleBackToMapping}>
+              Back to Mapping
+            </Button>
+          </div>
+        </>
+      )}
+
+      {showDxfReview && (
+        <>
           <Card>
             <CardHeader>
               <CardTitle>Excel Metrics</CardTitle>
@@ -573,7 +870,6 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
             </CardContent>
           </Card>
 
-          {/* Data Table Section */}
           <Card>
             <CardHeader>
               <CardTitle>Complete Excel Data</CardTitle>
@@ -581,66 +877,58 @@ export function ExcelUploadStep({ onDataApproved }: ExcelUploadStepProps) {
                 {formatInteger(parsedRows.length)} parts ready for quotation
               </p>
             </CardHeader>
-          <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Part Number</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Thickness</TableHead>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Length (mm)</TableHead>
-                    <TableHead>Width (mm)</TableHead>
-                    <TableHead>Weight (kg)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parsedRows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">{row.partName}</TableCell>
-                      <TableCell>{formatInteger(row.quantity)}</TableCell>
-                      <TableCell>
-                        {row.thickness != null && Number.isFinite(Number(row.thickness))
-                          ? formatDecimal(
-                              Number(row.thickness),
-                              Number(row.thickness) % 1 === 0 ? 0 : 2
-                            )
-                          : "-"}
-                      </TableCell>
-                      <TableCell>{row.material || "-"}</TableCell>
-                      <TableCell>
-                        {row.length ? formatDecimal(row.length, 1) : "-"}
-                      </TableCell>
-                      <TableCell>{row.width ? formatDecimal(row.width, 1) : "-"}</TableCell>
-                      <TableCell>
-                        {row.weight
-                          ? formatDecimal(row.weight, 2)
-                          : row.totalWeight
-                            ? formatDecimal(row.totalWeight / row.quantity, 2)
-                            : "-"}
-                      </TableCell>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Part Number</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Thickness</TableHead>
+                      <TableHead>Material</TableHead>
+                      <TableHead>Length (mm)</TableHead>
+                      <TableHead>Width (mm)</TableHead>
+                      <TableHead>Weight (kg)</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
+                  </TableHeader>
+                  <TableBody>
+                    {parsedRows.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium">{row.partName}</TableCell>
+                        <TableCell>{formatInteger(row.quantity)}</TableCell>
+                        <TableCell>
+                          {row.thickness != null && Number.isFinite(Number(row.thickness))
+                            ? formatDecimal(
+                                Number(row.thickness),
+                                Number(row.thickness) % 1 === 0 ? 0 : 2
+                              )
+                            : "-"}
+                        </TableCell>
+                        <TableCell>{row.material || "-"}</TableCell>
+                        <TableCell>
+                          {row.length ? formatDecimal(row.length, 1) : "-"}
+                        </TableCell>
+                        <TableCell>{row.width ? formatDecimal(row.width, 1) : "-"}</TableCell>
+                        <TableCell>
+                          {row.weight
+                            ? formatDecimal(row.weight, 2)
+                            : row.totalWeight
+                              ? formatDecimal(row.totalWeight / row.quantity, 2)
+                              : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
           </Card>
 
-          {/* Navigation Buttons */}
           <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={handleBackToMapping}
-            >
+            <Button variant="outline" onClick={handleBackToMapping}>
               Back to Mapping
             </Button>
-            <Button
-              onClick={handleContinueToNextPhase}
-              size="lg"
-              className="gap-2"
-            >
+            <Button onClick={handleContinueToNextPhase} size="lg" className="gap-2">
               <CheckCircle2 className="h-4 w-4" />
               Continue to Next Phase
             </Button>

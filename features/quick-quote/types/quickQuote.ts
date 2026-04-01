@@ -13,7 +13,11 @@ export type QuickQuoteStep =
   | 10;
 
 /** How the user builds this quote after General — set in phase 2, details in phase 3. */
-export type QuoteCreationMethod = "dxf" | "manualAdd" | "bendPlate";
+export type QuoteCreationMethod =
+  | "dxf"
+  | "manualAdd"
+  | "bendPlate"
+  | "excelImport";
 
 /** One row in the Manually add quote table (phase 3). */
 export interface ManualQuotePartRow {
@@ -27,6 +31,14 @@ export interface ManualQuotePartRow {
   /** Steel grade / designation (e.g. S235). */
   material: string;
   finish: PlateFinish;
+  /**
+   * Which quote method created this row — used when merging several methods into one BOM.
+   */
+  sourceMethod?: QuoteCreationMethod;
+  /**
+   * Original client-facing label before merge-time deduplication rewrites `partNumber`.
+   */
+  clientPartLabel?: string;
 }
 
 /** One purchased sheet size line for a thickness (catalog or manual). */

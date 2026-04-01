@@ -39,6 +39,7 @@ interface MappingField {
     | "qtyCol"
     | "thkCol"
     | "matCol"
+    | "finishCol"
     | "widthCol"
     | "lengthCol"
     | "areaCol"
@@ -57,6 +58,7 @@ const FIELDS: MappingField[] = [
   { key: "qtyCol",         label: "Quantity",      required: false, description: "Number of pieces — defaults to 1" },
   { key: "thkCol",         label: "Thickness",     required: false, description: "Plate thickness (numeric, mm)" },
   { key: "matCol",         label: "Material",      required: false, description: "Steel grade or material type" },
+  { key: "finishCol",      label: "Finish",        required: false, description: "Surface finish or coating (e.g. carbon, galvanized, paint)" },
   { key: "widthCol",       label: "Width",         required: false, description: "Plate width (mm)" },
   { key: "lengthCol",      label: "Length",        required: false, description: "Plate length (mm or m)" },
   { key: "areaCol",        label: "Area",          required: false, description: "Plate area (m²)" },

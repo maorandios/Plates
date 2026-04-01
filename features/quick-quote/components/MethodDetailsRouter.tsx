@@ -13,6 +13,7 @@ import type { BendPlateQuoteItem } from "../bend-plate/types";
 import type { ManualQuotePartRow, QuoteCreationMethod } from "../types/quickQuote";
 import { BendPlateQuotePhase } from "./method-phases/BendPlateQuotePhase";
 import { DxfQuotePhase } from "./method-phases/DxfQuotePhase";
+import { ExcelImportQuotePhase } from "./method-phases/ExcelImportQuotePhase";
 import { ManualQuotePhase } from "./method-phases/ManualQuotePhase";
 
 interface MethodDetailsRouterProps {
@@ -21,6 +22,7 @@ interface MethodDetailsRouterProps {
   materialType: MaterialType;
   manualQuoteRows: ManualQuotePartRow[];
   onManualQuoteRowsChange: (rows: ManualQuotePartRow[]) => void;
+  onExcelImportQuoteRowsChange: (rows: ManualQuotePartRow[]) => void;
   bendPlateQuoteItems: BendPlateQuoteItem[];
   onBendPlateAddItem: (item: BendPlateQuoteItem) => void;
   onBendPlateUpdateItem: (item: BendPlateQuoteItem) => void;
@@ -33,6 +35,7 @@ export function MethodDetailsRouter({
   materialType,
   manualQuoteRows,
   onManualQuoteRowsChange,
+  onExcelImportQuoteRowsChange,
   bendPlateQuoteItems,
   onBendPlateAddItem,
   onBendPlateUpdateItem,
@@ -63,6 +66,15 @@ export function MethodDetailsRouter({
           materialType={materialType}
           rows={manualQuoteRows}
           onRowsChange={onManualQuoteRowsChange}
+          onBack={onBackToMethodPicker}
+          onComplete={onBackToMethodPicker}
+        />
+      );
+    case "excelImport":
+      return (
+        <ExcelImportQuotePhase
+          materialType={materialType}
+          onRowsChange={onExcelImportQuoteRowsChange}
         />
       );
     case "bendPlate":
