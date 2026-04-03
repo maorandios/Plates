@@ -16,7 +16,6 @@ import { QuoteStepper } from "./QuoteStepper";
 import { QuoteFinalizeExportStep } from "./QuoteFinalizeExportStep";
 import { QuoteSummaryStep } from "./QuoteSummaryStep";
 import { StockPricingStep } from "./StockPricingStep";
-import { UploadStep } from "./UploadStep";
 import { ValidationStep } from "./ValidationStep";
 import type {
   DxfMethodExcelSnapshot,
@@ -24,6 +23,7 @@ import type {
   QuickQuoteJobDetails,
   QuickQuoteStep,
   QuoteCreationMethod,
+  QuotePartRow,
   QuoteSheetStockLine,
   ThicknessStockInput,
   UploadedFileMeta,
@@ -105,9 +105,7 @@ export function QuickQuotePage() {
   /** Optional Excel BOM for DXF method — kept with geometries for session restore after Complete. */
   const [dxfMethodExcel, setDxfMethodExcel] = useState<DxfMethodExcelSnapshot | null>(null);
 
-  /** Step 2: picker vs merged quote-lines view (same step number for the stepper). */
-  const [quoteMethodSubView, setQuoteMethodSubView] = useState<"picker" | "merged">("picker");
-  /** How we entered stock (step 7) — drives Back target from pricing. */
+  /** How we entered stock (step 8 in the stepper) — drives Back target from pricing. */
   const [stockEntrySource, setStockEntrySource] = useState<"merged" | "method" | "legacy">(
     "legacy"
   );
@@ -132,7 +130,6 @@ export function QuickQuotePage() {
   const goToStep = useCallback(
     (s: QuickQuoteStep) => {
       if (s <= highestStepReached) {
-        if (s === 2) setQuoteMethodSubView("picker");
         setStep(s);
       }
     },
@@ -200,12 +197,10 @@ export function QuickQuotePage() {
   }, []);
 
   const handleContinueFromGeneral = () => {
-    setQuoteMethodSubView("picker");
     advanceTo(2);
   };
 
   const handleBackFromQuoteMethod = () => {
-    setQuoteMethodSubView("picker");
     advanceTo(1);
   };
 
@@ -218,13 +213,14 @@ export function QuickQuotePage() {
       bendPlateQuoteItems
     );
     if (parts.length === 0) return;
-    setQuoteMethodSubView("merged");
+    advanceTo(3);
   }, [
     materialType,
     manualQuoteRows,
     excelImportQuoteRows,
     dxfMethodGeometries,
     bendPlateQuoteItems,
+    advanceTo,
   ]);
 
   const handleResetQuoteMethodPicker = useCallback(() => {
@@ -234,14 +230,14 @@ export function QuickQuotePage() {
   const handleConfigureMethodFromPicker = useCallback(
     (method: QuoteCreationMethod) => {
       setJobDetails((j) => ({ ...j, quoteCreationMethod: method }));
-      advanceTo(3);
+      advanceTo(4);
     },
     [advanceTo]
   );
 
   const handleBackFromMergedLines = useCallback(() => {
-    setQuoteMethodSubView("picker");
-  }, []);
+    advanceTo(2);
+  }, [advanceTo]);
 
   const handleContinueFromMergedLines = useCallback(() => {
     const parts = mergeAllQuoteMethodParts(
@@ -256,7 +252,7 @@ export function QuickQuotePage() {
     setThicknessStock((prev) =>
       mergeDefaultStockRows(parts, prev, materialType, getPurchasedSheetSizes())
     );
-    advanceTo(7);
+    advanceTo(8);
   }, [
     materialType,
     manualQuoteRows,
@@ -268,12 +264,20 @@ export function QuickQuotePage() {
 
   const handleResetMergedLines = useCallback(() => {
     clearAllQuoteMethodData();
-    setQuoteMethodSubView("picker");
-  }, [clearAllQuoteMethodData]);
+    advanceTo(2);
+  }, [clearAllQuoteMethodData, advanceTo]);
+
+  const handleRemoveMergedPart = useCallback((row: QuotePartRow) => {
+    const ids = new Set(row.lineSourceIds?.length ? row.lineSourceIds : [row.id]);
+    setDxfMethodGeometries((prev) => prev.filter((g) => !ids.has(g.id)));
+    setExcelImportQuoteRows((prev) => prev.filter((r) => !ids.has(r.id)));
+    setManualQuoteRows((prev) => prev.filter((r) => !ids.has(r.id)));
+    setBendPlateQuoteItems((prev) => prev.filter((item) => !ids.has(item.id)));
+  }, []);
 
   const handleContinueFromMethodDetails = useCallback(() => {
     if (!jobDetails.quoteCreationMethod) {
-      advanceTo(4);
+      advanceTo(5);
       return;
     }
     setStockEntrySource("method");
@@ -287,7 +291,7 @@ export function QuickQuotePage() {
     setThicknessStock((prev) =>
       mergeDefaultStockRows(parts, prev, materialType, getPurchasedSheetSizes())
     );
-    advanceTo(7);
+    advanceTo(8);
   }, [
     jobDetails.quoteCreationMethod,
     materialType,
@@ -298,17 +302,22 @@ export function QuickQuotePage() {
     advanceTo,
   ]);
 
-  const handleBackFromMethodDetails = () => {
-    setQuoteMethodSubView("picker");
+  /** Complete / Back inside a method phase — return to Quote method (step 2), not Parts. */
+  const handleReturnToQuoteMethodFromMethodSetup = useCallback(() => {
     advanceTo(2);
-  };
+  }, [advanceTo]);
+
+  /** Stepper Back from Method setup — previous wizard step is Parts (3). */
+  const handleStepperBackFromMethodSetup = useCallback(() => {
+    advanceTo(3);
+  }, [advanceTo]);
 
   const handleExcelDataApproved = (data: ExcelRow[]) => {
     setExcelData(data);
-    advanceTo(5);
+    advanceTo(6);
   };
 
-  const handleBackToExcelUpload = () => advanceTo(3);
+  const handleBackToExcelUpload = () => advanceTo(4);
 
   const handleDxfDataApproved = useCallback((data: DxfPartGeometry[]) => {
     setDxfData(data);
@@ -320,10 +329,10 @@ export function QuickQuotePage() {
       setValidationSummary(validation.summary);
     }
 
-    advanceTo(6);
+    advanceTo(7);
   }, [excelData, materialType, advanceTo]);
 
-  const handleBackToDxfUpload = () => advanceTo(4);
+  const handleBackToDxfUpload = () => advanceTo(5);
 
   const handlePlateSelectionFromValidation = (selected: ValidationRow[]) => {
     setCalculationRows(selected);
@@ -332,41 +341,39 @@ export function QuickQuotePage() {
     setThicknessStock((prev) =>
       mergeDefaultStockRows(parts, prev, materialType, getPurchasedSheetSizes())
     );
-    advanceTo(7);
+    advanceTo(8);
   };
 
   const handleBackFromStockToValidation = useCallback(() => {
     if (stockEntrySource === "merged") {
-      setQuoteMethodSubView("merged");
-      advanceTo(2);
-      return;
-    }
-    if (stockEntrySource === "method") {
       advanceTo(3);
       return;
     }
-    advanceTo(6);
+    if (stockEntrySource === "method") {
+      advanceTo(4);
+      return;
+    }
+    advanceTo(7);
   }, [stockEntrySource, advanceTo]);
 
   const handleContinueFromStockToCalculation = () => {
     setCalcRunId((id) => id + 1);
-    advanceTo(8);
+    advanceTo(9);
   };
 
-  const handleBackFromCalculationToStock = () => advanceTo(7);
-  const handleViewQuote = () => advanceTo(9);
-  const handleBackFromQuote = () => advanceTo(8);
+  const handleBackFromCalculationToStock = () => advanceTo(8);
+  const handleViewQuote = () => advanceTo(10);
+  const handleBackFromQuote = () => advanceTo(9);
   const handleBackToValidationFromQuote = useCallback(() => {
     if (stockEntrySource === "merged") {
-      setQuoteMethodSubView("merged");
-      advanceTo(2);
+      advanceTo(3);
       return;
     }
     if (stockEntrySource === "method") {
       advanceTo(7);
       return;
     }
-    advanceTo(6);
+    advanceTo(7);
   }, [stockEntrySource, advanceTo]);
 
   const buildFinalizeDraft = useCallback(
@@ -383,15 +390,15 @@ export function QuickQuotePage() {
 
   const handleContinueToFinalize = useCallback(() => {
     setPdfExportDraft(buildFinalizeDraft());
-    advanceTo(10);
+    advanceTo(11);
   }, [advanceTo, buildFinalizeDraft]);
 
   const handleBackFromFinalize = useCallback(() => {
-    advanceTo(9);
+    advanceTo(10);
   }, [advanceTo]);
 
   useEffect(() => {
-    if (step === 10 && pdfExportDraft === null) {
+    if (step === 11 && pdfExportDraft === null) {
       setPdfExportDraft(buildFinalizeDraft());
     }
   }, [step, pdfExportDraft, buildFinalizeDraft]);
@@ -448,7 +455,13 @@ export function QuickQuotePage() {
           showContinue: false,
           canContinue: false,
         };
-      case 3: {
+      case 3:
+        return {
+          showBack: false,
+          showContinue: false,
+          canContinue: false,
+        };
+      case 4: {
         const canContinueMethodDetails =
           jobDetails.quoteCreationMethod === "bendPlate"
             ? bendPlateQuoteItems.length > 0
@@ -463,25 +476,25 @@ export function QuickQuotePage() {
           showBack: true,
           showContinue: true,
           canContinue: canContinueMethodDetails,
-          onBack: handleBackFromMethodDetails,
+          onBack: handleStepperBackFromMethodSetup,
           onContinue: handleContinueFromMethodDetails,
         };
       }
-      case 4:
+      case 5:
         return {
           showBack: true,
           showContinue: false,
           canContinue: false,
           onBack: handleBackToExcelUpload,
         };
-      case 5:
+      case 6:
         return {
           showBack: true,
           showContinue: false,
           canContinue: false,
           onBack: handleBackToDxfUpload,
         };
-      case 6:
+      case 7:
         return {
           showBack: true,
           showContinue: true,
@@ -489,7 +502,7 @@ export function QuickQuotePage() {
           onBack: handleBackToDxfUpload,
           onContinue: () => handlePlateSelectionFromValidation(MOCK_VALIDATION_ROWS),
         };
-      case 7:
+      case 8:
         return {
           showBack: true,
           showContinue: true,
@@ -497,7 +510,7 @@ export function QuickQuotePage() {
           onBack: handleBackFromStockToValidation,
           onContinue: handleContinueFromStockToCalculation,
         };
-      case 8:
+      case 9:
         return {
           showBack: true,
           showContinue: true,
@@ -505,7 +518,7 @@ export function QuickQuotePage() {
           onBack: handleBackFromCalculationToStock,
           onContinue: handleViewQuote,
         };
-      case 9:
+      case 10:
         return {
           showBack: true,
           showContinue: true,
@@ -513,7 +526,7 @@ export function QuickQuotePage() {
           onBack: handleBackFromQuote,
           onContinue: handleContinueToFinalize,
         };
-      case 10:
+      case 11:
         return {
           showBack: true,
           showContinue: false,
@@ -537,7 +550,7 @@ export function QuickQuotePage() {
     manualQuoteRows.length,
     excelImportQuoteRows.length,
     dxfMethodGeometries,
-    handleBackFromMethodDetails,
+    handleStepperBackFromMethodSetup,
     handleContinueFromMethodDetails,
     handleBackToExcelUpload,
     handleBackToDxfUpload,
@@ -564,7 +577,7 @@ export function QuickQuotePage() {
       <PageContainer
         className={cn(
           "bg-muted/20 flex-1 min-h-0",
-          step === 2 || step === 3
+          step === 2 || step === 3 || step === 4
             ? "flex flex-col overflow-hidden p-0 lg:p-0"
             : "overflow-y-auto"
         )}
@@ -572,7 +585,7 @@ export function QuickQuotePage() {
         <div
           className={cn(
             "w-full",
-            step === 2 || step === 3
+            step === 2 || step === 3 || step === 4
               ? "flex min-h-0 flex-1 flex-col overflow-hidden"
               : "space-y-8"
           )}
@@ -596,7 +609,7 @@ export function QuickQuotePage() {
             </Card>
           )}
 
-          {step === 2 && quoteMethodSubView === "picker" && (
+          {step === 2 && (
             <QuoteMethodPickerPhase
               materialType={materialType}
               manualQuoteRows={manualQuoteRows}
@@ -616,10 +629,11 @@ export function QuickQuotePage() {
             />
           )}
 
-          {step === 2 && quoteMethodSubView === "merged" && (
+          {step === 3 && (
             <MergedQuoteLinesStep
               parts={mergedQuotePartsList}
               currency={jobDetails.currency}
+              onDeletePart={handleRemoveMergedPart}
               onBack={handleBackFromMergedLines}
               onReset={handleResetMergedLines}
               onContinue={handleContinueFromMergedLines}
@@ -628,10 +642,10 @@ export function QuickQuotePage() {
             />
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <MethodDetailsRouter
               method={jobDetails.quoteCreationMethod ?? null}
-              onBackToMethodPicker={handleBackFromMethodDetails}
+              onBackToMethodPicker={handleReturnToQuoteMethodFromMethodSetup}
               materialType={materialType}
               manualQuoteRows={manualQuoteRows}
               onManualQuoteRowsChange={setManualQuoteRows}
@@ -648,11 +662,11 @@ export function QuickQuotePage() {
             />
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <ExcelUploadStep onDataApproved={handleExcelDataApproved} />
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <DxfUploadStep
               materialType={materialType}
               defaultThickness={10}
@@ -660,7 +674,7 @@ export function QuickQuotePage() {
             />
           )}
 
-        {step === 6 && (
+        {step === 7 && (
           <>
             {validationRows.length === 0 ? (
               <Card>
@@ -687,7 +701,7 @@ export function QuickQuotePage() {
           </>
         )}
 
-        {step === 7 && (
+        {step === 8 && (
           <StockPricingStep
             stockRows={thicknessStock}
             materialType={materialType}
@@ -700,7 +714,7 @@ export function QuickQuotePage() {
           />
         )}
 
-        {step === 8 && (
+        {step === 9 && (
           <CalculationStep
             key={calcRunId}
             runId={calcRunId}
@@ -714,7 +728,7 @@ export function QuickQuotePage() {
           />
         )}
 
-        {step === 9 && (
+        {step === 10 && (
           <QuoteSummaryStep
             jobDetails={jobDetails}
             jobSummary={selection.jobSummary}
@@ -730,7 +744,7 @@ export function QuickQuotePage() {
           />
         )}
 
-        {step === 10 && pdfExportDraft && (
+        {step === 11 && pdfExportDraft && (
           <QuoteFinalizeExportStep
             draft={pdfExportDraft}
             setDraft={(action) => {

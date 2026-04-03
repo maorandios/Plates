@@ -96,8 +96,12 @@ function mergeQuotePartGroup(rows: QuotePartRow[]): QuotePartRow {
   const sourceRef = refs.join(" · ");
   const estimatedLineCost = rows.reduce((s, p) => s + p.estimatedLineCost, 0);
   const first = rows[0];
+  const lineSourceIds = rows.flatMap((r) =>
+    r.lineSourceIds?.length ? r.lineSourceIds : [r.id]
+  );
   return {
     id: nanoid(),
+    lineSourceIds,
     sourceRef,
     partName: first.partName,
     qty: totalQty,

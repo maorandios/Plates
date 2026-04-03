@@ -46,3 +46,20 @@ export function formatMaterialGradeAndFinish(
   const f = finish ?? DEFAULT_PLATE_FINISH;
   return `${g} · ${plateFinishLabel(f)}`;
 }
+
+/** Split a {@link formatMaterialGradeAndFinish} string back into grade and finish labels. */
+export function splitMaterialGradeAndFinish(material: string): {
+  grade: string;
+  finish: string;
+} {
+  const s = (material || "").trim();
+  if (!s || s === "—") return { grade: "—", finish: "—" };
+  const parts = s.split(/\s*·\s*/);
+  if (parts.length >= 2) {
+    return {
+      grade: parts[0].trim() || "—",
+      finish: parts.slice(1).join(" · ").trim() || "—",
+    };
+  }
+  return { grade: s, finish: "—" };
+}

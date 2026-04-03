@@ -20,6 +20,7 @@ const VIEWPORT = "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
 interface MergedQuoteLinesStepProps {
   parts: QuotePartRow[];
   currency: string;
+  onDeletePart: (row: QuotePartRow) => void;
   onBack: () => void;
   onReset: () => void;
   onContinue: () => void;
@@ -30,6 +31,7 @@ interface MergedQuoteLinesStepProps {
 export function MergedQuoteLinesStep({
   parts,
   currency,
+  onDeletePart,
   onBack,
   onReset,
   onContinue,
@@ -49,9 +51,9 @@ export function MergedQuoteLinesStep({
         <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-foreground">All quote lines</h2>
+              <h2 className="text-base font-semibold text-foreground">Parts</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Combined plates from every method you configured. Continue to stock &amp; pricing.
+                Combined plates from every quote method. Continue when you are ready for stock &amp; pricing.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -92,7 +94,11 @@ export function MergedQuoteLinesStep({
               </p>
             </div>
           ) : (
-            <PartBreakdownTable parts={parts} currency={currency} />
+            <PartBreakdownTable
+              parts={parts}
+              currency={currency}
+              onDeletePart={onDeletePart}
+            />
           )}
         </div>
       </div>

@@ -21,7 +21,8 @@ export type QuickQuoteStep =
   | 7
   | 8
   | 9
-  | 10;
+  | 10
+  | 11;
 
 /** How the user builds this quote after General — set in phase 2, details in phase 3. */
 export type QuoteCreationMethod =
@@ -142,6 +143,11 @@ export interface JobSummaryMetrics {
 
 export interface QuotePartRow {
   id: string;
+  /**
+   * Source line ids contributing to this row (same method, merged duplicate part numbers).
+   * Used to remove the right underlying rows when deleting from the unified table.
+   */
+  lineSourceIds?: string[];
   /** Unified BOM: DXF | EXCEL | SHAPE | MANUAL; merged rows may combine e.g. "DXF · EXCEL". */
   sourceRef?: string;
   partName: string;

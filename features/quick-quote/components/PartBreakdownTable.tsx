@@ -2,9 +2,26 @@
 
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronsUpDown, Eye } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronsUpDown,
+  Eye,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -20,13 +37,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDecimal } from "@/lib/formatNumbers";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { jobSummaryFromParts } from "../lib/deriveQuoteSelection";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import {
-  formatQuickQuoteCurrency,
   formatQuickQuoteCurrencyAmount,
   quickQuoteCurrencySymbol,
 } from "../lib/quickQuoteCurrencies";
-import type { QuotePartRow, ValidationRowStatus } from "../types/quickQuote";
+import { splitMaterialGradeAndFinish } from "../lib/plateFields";
+import type { QuotePartRow } from "../types/quickQuote";
 
 type SortDir = "asc" | "desc";
 
@@ -34,22 +54,14 @@ type PartBreakdownSortKey =
   | "sourceRef"
   | "partName"
   | "qty"
-  | "material"
   | "thicknessMm"
-  | "lengthMm"
+  | "materialGrade"
+  | "finish"
   | "widthMm"
+  | "lengthMm"
   | "areaM2"
-  | "totalWeightKg"
-  | "cutLengthM"
-  | "validationStatus"
-  | "preview"
-  | "estimatedLineCost";
-
-function validationRank(s: ValidationRowStatus): number {
-  if (s === "error") return 0;
-  if (s === "warning") return 1;
-  return 2;
-}
+  | "lineWeightKg"
+  | "preview";
 
 function comparePartRows(
   a: QuotePartRow,
@@ -59,6 +71,8 @@ function comparePartRows(
 ): number {
   const sign = dir === "asc" ? 1 : -1;
   let cmp = 0;
+  const { grade: ga, finish: fa } = splitMaterialGradeAndFinish(a.material);
+  const { grade: gb, finish: fb } = splitMaterialGradeAndFinish(b.material);
   switch (key) {
     case "sourceRef":
       cmp = (a.sourceRef ?? "").localeCompare(b.sourceRef ?? "", undefined, {
@@ -71,85 +85,204 @@ function comparePartRows(
     case "qty":
       cmp = a.qty - b.qty;
       break;
-    case "material":
-      cmp = a.material.localeCompare(b.material, undefined, { sensitivity: "base" });
-      break;
     case "thicknessMm":
       cmp = a.thicknessMm - b.thicknessMm;
       break;
-    case "lengthMm":
-      cmp = a.lengthMm - b.lengthMm;
+    case "materialGrade":
+      cmp = ga.localeCompare(gb, undefined, { sensitivity: "base" });
+      break;
+    case "finish":
+      cmp = fa.localeCompare(fb, undefined, { sensitivity: "base" });
       break;
     case "widthMm":
       cmp = a.widthMm - b.widthMm;
       break;
+    case "lengthMm":
+      cmp = a.lengthMm - b.lengthMm;
+      break;
     case "areaM2":
       cmp = a.areaM2 - b.areaM2;
       break;
-    case "totalWeightKg":
-      cmp = a.weightKg * a.qty - (b.weightKg * b.qty);
-      break;
-    case "cutLengthM":
-      cmp = a.cutLengthMm - b.cutLengthMm;
-      break;
-    case "validationStatus":
-      cmp = validationRank(a.validationStatus) - validationRank(b.validationStatus);
+    case "lineWeightKg":
+      cmp = a.weightKg * a.qty - b.weightKg * b.qty;
       break;
     case "preview":
       cmp = a.id.localeCompare(b.id, undefined, { numeric: true });
       break;
-    case "estimatedLineCost":
-      cmp = a.estimatedLineCost - b.estimatedLineCost;
-      break;
-    }
+  }
   if (cmp !== 0) return cmp * sign;
   return a.id.localeCompare(b.id, undefined, { numeric: true }) * sign;
+}
+
+/** Empty selection = no filter (show all). Non-empty = row must match one of the selected values (OR). */
+function filterPartRows(
+  rows: QuotePartRow[],
+  partNameQuery: string,
+  refSelected: string[],
+  thicknessSelected: string[],
+  gradeSelected: string[],
+  finishSelected: string[]
+): QuotePartRow[] {
+  const q = partNameQuery.trim().toLowerCase();
+  const refSet = new Set(refSelected);
+  const thickSet = new Set(thicknessSelected);
+  const gradeSet = new Set(gradeSelected);
+  const finishSet = new Set(finishSelected);
+
+  return rows.filter((row) => {
+    if (q && !row.partName.toLowerCase().includes(q)) return false;
+    if (refSet.size > 0 && !refSet.has((row.sourceRef ?? "").trim())) {
+      return false;
+    }
+    if (thickSet.size > 0 && !thickSet.has(String(row.thicknessMm))) {
+      return false;
+    }
+    const { grade, finish } = splitMaterialGradeAndFinish(row.material);
+    if (gradeSet.size > 0 && !gradeSet.has(grade)) return false;
+    if (finishSet.size > 0 && !finishSet.has(finish)) return false;
+    return true;
+  });
+}
+
+function deriveFilterOptions(parts: QuotePartRow[]) {
+  const refs = new Set<string>();
+  const thicknessesMm = new Set<number>();
+  const grades = new Set<string>();
+  const finishes = new Set<string>();
+  for (const row of parts) {
+    const r = row.sourceRef?.trim();
+    if (r) refs.add(r);
+    thicknessesMm.add(row.thicknessMm);
+    const { grade, finish } = splitMaterialGradeAndFinish(row.material);
+    grades.add(grade);
+    finishes.add(finish);
+  }
+  return {
+    refs: [...refs].sort((a, b) => a.localeCompare(b)),
+    thicknessesMm: [...thicknessesMm].sort((a, b) => a - b),
+    grades: [...grades].sort((a, b) => a.localeCompare(b)),
+    finishes: [...finishes].sort((a, b) => a.localeCompare(b)),
+  };
 }
 
 const SORT_BUTTON_ARIA: Record<PartBreakdownSortKey, string> = {
   sourceRef: "Ref",
   partName: "part number",
   qty: "quantity",
-  material: "material",
   thicknessMm: "thickness",
-  lengthMm: "length",
+  materialGrade: "material grade",
+  finish: "finish",
   widthMm: "width",
+  lengthMm: "length",
   areaM2: "area",
-  totalWeightKg: "total weight",
-  cutLengthM: "cut length",
-  validationStatus: "validation status",
-  preview: "preview order",
-  estimatedLineCost: "line price",
+  lineWeightKg: "weight",
+  preview: "preview",
 };
 
-/**
- * Table-fixed column shares (sum 100). Part number kept relatively narrow; extra % to
- * dimension/processing columns. Order matches columns left → right (without Ref).
- */
-const COLUMN_WIDTH_PCT_BASE = [
-  11, 6, 8, 9, 9, 9, 10, 11, 9, 7, 5, 6,
-] as const;
-
-/** First column Ref (~5%) + scaled base columns so total is 100%. */
-function columnWidthsPctWithRef(): number[] {
-  const refPct = 5;
-  const remaining = 100 - refPct;
-  const sumBase = COLUMN_WIDTH_PCT_BASE.reduce((a, b) => a + b, 0);
-  const scaled = COLUMN_WIDTH_PCT_BASE.map((w) =>
-    Math.floor((w * remaining) / sumBase)
-  );
-  let diff = remaining - scaled.reduce((a, b) => a + b, 0);
-  for (let i = 0; i < scaled.length && diff > 0; i++) {
-    scaled[i] += 1;
-    diff -= 1;
-  }
-  return [refPct, ...scaled];
+/** Part (5) + Dimensions (4) + Preview (1) + optional Delete (1). */
+function columnCount(showRef: boolean, showDelete: boolean): number {
+  return (showRef ? 1 : 0) + 5 + 4 + 1 + (showDelete ? 1 : 0);
 }
 
+/** Equal-width columns: share 100% across n columns (handles rounding). */
+function equalColumnWidthsPct(n: number): number[] {
+  if (n <= 0) return [];
+  const base = Math.floor((10000 / n)) / 100;
+  const arr = Array.from({ length: n }, () => base);
+  const sum = arr.reduce((a, b) => a + b, 0);
+  arr[n - 1] = Math.round((arr[n - 1] + (100 - sum)) * 100) / 100;
+  return arr;
+}
+
+/** Vertical rules: standard column vs section boundary (Ref | Part | Dim | Actions). */
+const colRule = "border-r border-border/50";
+const sectionRule = "border-r border-border";
+
 const sectionHeadClass =
-  "text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-r border-border/60 bg-muted/55";
+  "text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/55";
 const subHeadClass =
   "h-auto py-2 px-3 text-left align-middle font-medium text-muted-foreground bg-muted/40 border-b border-border";
+
+type MultiSelectOption = { value: string; label: string };
+
+function MultiSelectFilter({
+  label,
+  options,
+  selected,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  options: MultiSelectOption[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  disabled?: boolean;
+}) {
+  const summary = useMemo(() => {
+    if (selected.length === 0) return "All";
+    if (selected.length === 1) {
+      return options.find((o) => o.value === selected[0])?.label ?? selected[0];
+    }
+    return `${selected.length} selected`;
+  }, [selected, options]);
+
+  return (
+    <div className="w-full min-w-[9rem] sm:w-[11rem]">
+      <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 w-full justify-between gap-2 px-3 font-normal"
+            disabled={disabled || options.length === 0}
+          >
+            <span className="min-w-0 flex-1 truncate text-left">{summary}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          className="max-h-64 w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            {selected.length > 0 ? `${selected.length} selected` : "Choose one or more"}
+          </DropdownMenuLabel>
+          {selected.length > 0 ? (
+            <>
+              <DropdownMenuItem
+                className="text-xs"
+                onSelect={() => {
+                  onChange([]);
+                }}
+              >
+                Clear selection
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          {options.map((opt) => (
+            <DropdownMenuCheckboxItem
+              key={opt.value}
+              checked={selected.includes(opt.value)}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  onChange([...selected, opt.value]);
+                } else {
+                  onChange(selected.filter((v) => v !== opt.value));
+                }
+              }}
+              onSelect={(e) => e.preventDefault()}
+            >
+              {opt.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
 
 function SortableColumnHead({
   sortKey,
@@ -205,59 +338,111 @@ function SortableColumnHead({
   );
 }
 
-function statusBadge(status: ValidationRowStatus) {
-  if (status === "valid")
-    return (
-      <Badge variant="outline" className="border-emerald-600/35 bg-emerald-600/10 text-xs">
-        Valid
-      </Badge>
-    );
-  if (status === "warning")
-    return (
-      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-xs">
-        Warn
-      </Badge>
-    );
-  return (
-    <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-xs">
-      Error
-    </Badge>
-  );
-}
-
 interface PartBreakdownTableProps {
   parts: QuotePartRow[];
   currency: string;
+  /** When set, shows a delete action per row (e.g. merged quote lines step). */
+  onDeletePart?: (row: QuotePartRow) => void;
 }
 
-export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps) {
+export function PartBreakdownTable({
+  parts,
+  currency,
+  onDeletePart,
+}: PartBreakdownTableProps) {
   const [previewPart, setPreviewPart] = useState<QuotePartRow | null>(null);
   const [sortState, setSortState] = useState<{
     key: PartBreakdownSortKey;
     dir: SortDir;
   }>({ key: "partName", dir: "asc" });
 
+  const [partNameSearch, setPartNameSearch] = useState("");
+  const [filterRef, setFilterRef] = useState<string[]>([]);
+  const [filterThickness, setFilterThickness] = useState<string[]>([]);
+  const [filterGrade, setFilterGrade] = useState<string[]>([]);
+  const [filterFinish, setFilterFinish] = useState<string[]>([]);
+
   const showRefColumn = useMemo(
     () => parts.some((row) => Boolean(row.sourceRef?.trim())),
     [parts]
   );
+  const showDelete = Boolean(onDeletePart);
+
   const columnWidthsPct = useMemo(
-    () =>
-      showRefColumn
-        ? columnWidthsPctWithRef()
-        : [...COLUMN_WIDTH_PCT_BASE],
-    [showRefColumn]
+    () => equalColumnWidthsPct(columnCount(showRefColumn, showDelete)),
+    [showRefColumn, showDelete]
   );
 
-  const fmtMoney = (n: number) => formatQuickQuoteCurrency(n, currency);
   const fmtAmount = (n: number) => formatQuickQuoteCurrencyAmount(n, currency);
   const priceHeaderSymbol = quickQuoteCurrencySymbol(currency);
 
+  const filterOptions = useMemo(() => deriveFilterOptions(parts), [parts]);
+
+  const refFilterOptions = useMemo(
+    () => filterOptions.refs.map((r) => ({ value: r, label: r })),
+    [filterOptions.refs]
+  );
+  const thicknessFilterOptions = useMemo(
+    () =>
+      filterOptions.thicknessesMm.map((t) => ({
+        value: String(t),
+        label: formatInteger(Math.round(t)),
+      })),
+    [filterOptions.thicknessesMm]
+  );
+  const gradeFilterOptions = useMemo(
+    () => filterOptions.grades.map((g) => ({ value: g, label: g })),
+    [filterOptions.grades]
+  );
+  const finishFilterOptions = useMemo(
+    () => filterOptions.finishes.map((f) => ({ value: f, label: f })),
+    [filterOptions.finishes]
+  );
+
+  const filteredParts = useMemo(
+    () =>
+      filterPartRows(
+        parts,
+        partNameSearch,
+        filterRef,
+        filterThickness,
+        filterGrade,
+        filterFinish
+      ),
+    [parts, partNameSearch, filterRef, filterThickness, filterGrade, filterFinish]
+  );
+
   const sortedParts = useMemo(() => {
-    const next = [...parts];
+    const next = [...filteredParts];
     next.sort((a, b) => comparePartRows(a, b, sortState.key, sortState.dir));
     return next;
-  }, [parts, sortState.key, sortState.dir]);
+  }, [filteredParts, sortState.key, sortState.dir]);
+
+  const breakdownMetrics = useMemo(
+    () => jobSummaryFromParts(filteredParts),
+    [filteredParts]
+  );
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      partNameSearch.trim().length > 0 ||
+      filterRef.length > 0 ||
+      filterThickness.length > 0 ||
+      filterGrade.length > 0 ||
+      filterFinish.length > 0
+    );
+  }, [partNameSearch, filterRef, filterThickness, filterGrade, filterFinish]);
+
+  function clearFilters() {
+    setPartNameSearch("");
+    setFilterRef([]);
+    setFilterThickness([]);
+    setFilterGrade([]);
+    setFilterFinish([]);
+  }
+
+  const showRefFilter = filterOptions.refs.length > 0;
+  const colSpanEmpty = columnCount(showRefColumn, showDelete);
 
   function handleSort(key: PartBreakdownSortKey) {
     setSortState((prev) =>
@@ -271,11 +456,137 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
   const totalWeightLine = p ? p.weightKg * p.qty : 0;
   const cutLengthM = p ? p.cutLengthMm / 1000 : 0;
 
+  const actionCols = showDelete ? 2 : 1;
+  const partCols = 5;
+  const dimCols = 4;
+
   return (
     <div className="rounded-lg border border-border overflow-hidden">
+      <div className="grid grid-cols-2 gap-3 border-b border-border bg-muted/20 p-4 sm:grid-cols-4">
+        <Card className="border-border/80 p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Plates
+          </p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+            {formatInteger(breakdownMetrics.uniqueParts)}
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Quote lines</p>
+        </Card>
+        <Card className="border-border/80 p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Quantity
+          </p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+            {formatInteger(breakdownMetrics.totalQty)}
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Total pieces</p>
+        </Card>
+        <Card className="border-border/80 p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Area
+          </p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+            {formatDecimal(breakdownMetrics.totalPlateAreaM2, 2)}
+            <span className="ml-1 text-lg font-medium text-muted-foreground">m²</span>
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Total plate area</p>
+        </Card>
+        <Card className="border-border/80 p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Weight
+          </p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+            {formatDecimal(breakdownMetrics.totalEstWeightKg, 1)}
+            <span className="ml-1 text-lg font-medium text-muted-foreground">kg</span>
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Estimated total</p>
+        </Card>
+      </div>
+
+      <div className="border-b border-border bg-muted/30 px-4 py-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+          <div className="min-w-0 flex-1 lg:min-w-[220px] lg:max-w-md">
+            <label
+              htmlFor="part-breakdown-search"
+              className="mb-1.5 block text-xs font-medium text-muted-foreground"
+            >
+              Search part name
+            </label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                id="part-breakdown-search"
+                type="search"
+                value={partNameSearch}
+                onChange={(e) => setPartNameSearch(e.target.value)}
+                placeholder="Type to filter…"
+                className="h-10 pl-9"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          {showRefFilter ? (
+            <MultiSelectFilter
+              label="Reference"
+              options={refFilterOptions}
+              selected={filterRef}
+              onChange={setFilterRef}
+            />
+          ) : null}
+
+          <MultiSelectFilter
+            label="Thickness (mm)"
+            options={thicknessFilterOptions}
+            selected={filterThickness}
+            onChange={setFilterThickness}
+            disabled={parts.length === 0}
+          />
+
+          <MultiSelectFilter
+            label="Material grade"
+            options={gradeFilterOptions}
+            selected={filterGrade}
+            onChange={setFilterGrade}
+            disabled={parts.length === 0}
+          />
+
+          <MultiSelectFilter
+            label="Finish"
+            options={finishFilterOptions}
+            selected={filterFinish}
+            onChange={setFilterFinish}
+            disabled={parts.length === 0}
+          />
+
+          {hasActiveFilters ? (
+            <div className="flex w-full shrink-0 lg:w-auto lg:pb-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10"
+                onClick={clearFilters}
+              >
+                Clear filters
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
       <div className="w-full overflow-x-auto">
         <Table
-          className={`table-fixed w-full ${showRefColumn ? "min-w-[1200px]" : "min-w-[1100px]"}`}
+          className={cn(
+            "table-fixed w-full border-collapse",
+            showRefColumn && showDelete && "min-w-[1180px]",
+            showRefColumn && !showDelete && "min-w-[1100px]",
+            !showRefColumn && showDelete && "min-w-[1080px]",
+            !showRefColumn && !showDelete && "min-w-[980px]"
+          )}
         >
           <colgroup>
             {columnWidthsPct.map((pct, i) => (
@@ -285,24 +596,18 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
           <TableHeader>
             <TableRow className="border-b border-border hover:bg-muted/55">
               {showRefColumn ? (
-                <TableHead colSpan={1} className={sectionHeadClass}>
+                <TableHead colSpan={1} className={cn(sectionHeadClass, sectionRule)}>
                   Ref
                 </TableHead>
               ) : null}
-              <TableHead colSpan={2} className={sectionHeadClass}>
+              <TableHead colSpan={partCols} className={cn(sectionHeadClass, sectionRule)}>
                 Part
               </TableHead>
-              <TableHead colSpan={2} className={sectionHeadClass}>
-                Material
-              </TableHead>
-              <TableHead colSpan={3} className={sectionHeadClass}>
+              <TableHead colSpan={dimCols} className={cn(sectionHeadClass, sectionRule)}>
                 Dimensions
               </TableHead>
-              <TableHead colSpan={2} className={sectionHeadClass}>
-                Processing
-              </TableHead>
-              <TableHead colSpan={3} className={`${sectionHeadClass} border-r-0`}>
-                Quote
+              <TableHead colSpan={actionCols} className={cn(sectionHeadClass, "border-r-0")}>
+                Actions
               </TableHead>
             </TableRow>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border">
@@ -311,7 +616,7 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                   sortKey="sourceRef"
                   sortState={sortState}
                   onSort={handleSort}
-                  className={`${subHeadClass} min-w-0 whitespace-nowrap`}
+                  className={cn(subHeadClass, sectionRule, "min-w-0 whitespace-nowrap")}
                 >
                   Ref
                 </SortableColumnHead>
@@ -320,7 +625,7 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                 sortKey="partName"
                 sortState={sortState}
                 onSort={handleSort}
-                className={`${subHeadClass} min-w-0`}
+                className={cn(subHeadClass, colRule, "min-w-0")}
               >
                 Part number
               </SortableColumnHead>
@@ -328,104 +633,109 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                 sortKey="qty"
                 sortState={sortState}
                 onSort={handleSort}
-                className={`${subHeadClass} whitespace-nowrap border-r border-border/40`}
+                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
               >
                 Quantity
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="material"
-                sortState={sortState}
-                onSort={handleSort}
-                className={`${subHeadClass} min-w-0`}
-              >
-                Material
               </SortableColumnHead>
               <SortableColumnHead
                 sortKey="thicknessMm"
                 sortState={sortState}
                 onSort={handleSort}
-                className={`${subHeadClass} whitespace-nowrap border-r border-border/40`}
+                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
               >
-                Thickness(mm)
+                Thickness (mm)
               </SortableColumnHead>
               <SortableColumnHead
-                sortKey="lengthMm"
+                sortKey="materialGrade"
                 sortState={sortState}
                 onSort={handleSort}
-                className={`${subHeadClass} whitespace-nowrap`}
+                className={cn(subHeadClass, colRule, "min-w-0")}
               >
-                Length(mm)
+                Material grade
+              </SortableColumnHead>
+              <SortableColumnHead
+                sortKey="finish"
+                sortState={sortState}
+                onSort={handleSort}
+                className={cn(subHeadClass, sectionRule, "min-w-0")}
+              >
+                Finish
               </SortableColumnHead>
               <SortableColumnHead
                 sortKey="widthMm"
                 sortState={sortState}
                 onSort={handleSort}
-                className={`${subHeadClass} whitespace-nowrap`}
+                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
               >
-                Width(mm)
+                Width (mm)
+              </SortableColumnHead>
+              <SortableColumnHead
+                sortKey="lengthMm"
+                sortState={sortState}
+                onSort={handleSort}
+                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
+              >
+                Length (mm)
               </SortableColumnHead>
               <SortableColumnHead
                 sortKey="areaM2"
                 sortState={sortState}
                 onSort={handleSort}
-                className={`${subHeadClass} whitespace-nowrap border-r border-border/40`}
+                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
               >
-                Area(m2)
+                Area (m²)
               </SortableColumnHead>
               <SortableColumnHead
-                sortKey="totalWeightKg"
+                sortKey="lineWeightKg"
                 sortState={sortState}
                 onSort={handleSort}
-                className={`${subHeadClass} whitespace-nowrap`}
+                className={cn(subHeadClass, sectionRule, "whitespace-nowrap")}
               >
-                Total Weight(kg)
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="cutLengthM"
-                sortState={sortState}
-                onSort={handleSort}
-                className={`${subHeadClass} whitespace-nowrap border-r border-border/40`}
-              >
-                Cut length(m)
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="validationStatus"
-                sortState={sortState}
-                onSort={handleSort}
-                className={subHeadClass}
-              >
-                Validation
+                Weight (kg)
               </SortableColumnHead>
               <SortableColumnHead
                 sortKey="preview"
                 sortState={sortState}
                 onSort={handleSort}
-                className={`${subHeadClass} border-r border-border/40`}
+                className={cn(subHeadClass, showDelete ? colRule : "border-r-0")}
               >
                 Preview
               </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="estimatedLineCost"
-                sortState={sortState}
-                onSort={handleSort}
-                thAriaLabel={`Price in ${currency}`}
-                className={`${subHeadClass} whitespace-nowrap`}
-              >
-                <span className="tabular-nums text-foreground" aria-hidden>
-                  {priceHeaderSymbol}
-                </span>
-                Price
-              </SortableColumnHead>
+              {showDelete ? (
+                <TableHead scope="col" className={cn(subHeadClass, "w-[1%] border-r-0")}>
+                  <span className="sr-only">Delete</span>
+                  <span aria-hidden className="text-muted-foreground">
+                    Delete
+                  </span>
+                </TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
           <TableBody>
+            {sortedParts.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={colSpanEmpty}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
+                  {parts.length === 0
+                    ? "No parts in this quote."
+                    : "No rows match your search and filters."}
+                </TableCell>
+              </TableRow>
+            ) : null}
             {sortedParts.map((row) => {
-              const totalWeightKg = row.weightKg * row.qty;
-              const cutM = row.cutLengthMm / 1000;
+              const lineWeightKg = row.weightKg * row.qty;
+              const { grade, finish } = splitMaterialGradeAndFinish(row.material);
               return (
                 <TableRow key={row.id}>
                   {showRefColumn ? (
-                    <TableCell className="py-2 px-3 text-left align-middle text-xs font-medium whitespace-nowrap min-w-0">
+                    <TableCell
+                      className={cn(
+                        "py-2 px-3 text-left align-middle text-xs font-medium whitespace-nowrap min-w-0",
+                        sectionRule
+                      )}
+                    >
                       <span
                         className="truncate block"
                         title={row.sourceRef ?? ""}
@@ -434,41 +744,84 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                       </span>
                     </TableCell>
                   ) : null}
-                  <TableCell className="py-2 px-3 text-left align-middle font-medium min-w-0">
+                  <TableCell
+                    className={cn(
+                      "py-2 px-3 text-left align-middle font-medium min-w-0",
+                      colRule
+                    )}
+                  >
                     <span className="truncate block" title={row.partName}>
                       {row.partName}
                     </span>
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle tabular-nums border-r border-border/40">
+                  <TableCell
+                    className={cn(
+                      "py-2 px-3 text-left align-middle tabular-nums",
+                      colRule
+                    )}
+                  >
                     {row.qty}
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle text-xs min-w-0">
-                    <span className="truncate block" title={row.material}>
-                      {row.material}
+                  <TableCell
+                    className={cn(
+                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
+                      colRule
+                    )}
+                  >
+                    {formatInteger(Math.round(row.thicknessMm))}
+                  </TableCell>
+                  <TableCell
+                    className={cn("py-2 px-3 text-left align-middle text-xs min-w-0", colRule)}
+                  >
+                    <span className="truncate block" title={grade}>
+                      {grade}
                     </span>
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs border-r border-border/40">
-                    {row.thicknessMm}
+                  <TableCell
+                    className={cn("py-2 px-3 text-left align-middle text-xs min-w-0", sectionRule)}
+                  >
+                    <span className="truncate block" title={finish}>
+                      {finish}
+                    </span>
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs">
-                    {row.lengthMm}
+                  <TableCell
+                    className={cn(
+                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
+                      colRule
+                    )}
+                  >
+                    {formatDecimal(row.widthMm, 2)}
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs">
-                    {row.widthMm}
+                  <TableCell
+                    className={cn(
+                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
+                      colRule
+                    )}
+                  >
+                    {formatDecimal(row.lengthMm, 2)}
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs border-r border-border/40">
+                  <TableCell
+                    className={cn(
+                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
+                      colRule
+                    )}
+                  >
                     {formatDecimal(row.areaM2, 3)}
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs">
-                    {formatDecimal(totalWeightKg, 1)}
+                  <TableCell
+                    className={cn(
+                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
+                      sectionRule
+                    )}
+                  >
+                    {formatDecimal(lineWeightKg, 2)}
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs border-r border-border/40">
-                    {formatDecimal(cutM, 2)}
-                  </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle">
-                    {statusBadge(row.validationStatus)}
-                  </TableCell>
-                  <TableCell className="py-1.5 px-3 text-left align-middle border-r border-border/40">
+                  <TableCell
+                    className={cn(
+                      "py-1.5 px-3 text-left align-middle",
+                      showDelete ? colRule : "border-r-0"
+                    )}
+                  >
                     <Button
                       type="button"
                       variant="ghost"
@@ -480,9 +833,20 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                       <Eye className="h-4 w-4" strokeWidth={1.75} />
                     </Button>
                   </TableCell>
-                  <TableCell className="py-2 px-3 text-left align-middle tabular-nums text-xs font-medium">
-                    {fmtAmount(row.estimatedLineCost)}
-                  </TableCell>
+                  {showDelete ? (
+                    <TableCell className="py-1.5 px-3 text-left align-middle border-r-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                        aria-label={`Remove ${row.partName} from quote`}
+                        onClick={() => onDeletePart?.(row)}
+                      >
+                        <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                      </Button>
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               );
             })}
@@ -521,12 +885,14 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Thickness</dt>
-                    <dd className="tabular-nums">{p.thicknessMm} mm</dd>
+                    <dd className="tabular-nums">
+                      {formatInteger(Math.round(p.thicknessMm))} mm
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Length × width</dt>
+                    <dt className="text-muted-foreground">Width × length</dt>
                     <dd className="tabular-nums">
-                      {p.lengthMm} × {p.widthMm} mm
+                      {formatDecimal(p.widthMm, 2)} × {formatDecimal(p.lengthMm, 2)} mm
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
@@ -535,7 +901,7 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Total weight (line)</dt>
-                    <dd className="tabular-nums">{formatDecimal(totalWeightLine, 1)} kg</dd>
+                    <dd className="tabular-nums">{formatDecimal(totalWeightLine, 2)} kg</dd>
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Cut length (per plate)</dt>
@@ -547,7 +913,12 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Line price (est.)</dt>
-                    <dd className="tabular-nums font-medium">{fmtMoney(p.estimatedLineCost)}</dd>
+                    <dd className="tabular-nums font-medium">
+                      <span className="tabular-nums text-foreground" aria-hidden>
+                        {priceHeaderSymbol}
+                      </span>{" "}
+                      {fmtAmount(p.estimatedLineCost)}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">DXF file</dt>
