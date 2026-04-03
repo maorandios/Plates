@@ -31,6 +31,7 @@ import type { QuotePartRow, ValidationRowStatus } from "../types/quickQuote";
 type SortDir = "asc" | "desc";
 
 type PartBreakdownSortKey =
+  | "sourceRef"
   | "partName"
   | "qty"
   | "material"
@@ -59,6 +60,11 @@ function comparePartRows(
   const sign = dir === "asc" ? 1 : -1;
   let cmp = 0;
   switch (key) {
+    case "sourceRef":
+      cmp = (a.sourceRef ?? "").localeCompare(b.sourceRef ?? "", undefined, {
+        sensitivity: "base",
+      });
+      break;
     case "partName":
       cmp = a.partName.localeCompare(b.partName, undefined, { sensitivity: "base" });
       break;
@@ -101,6 +107,7 @@ function comparePartRows(
 }
 
 const SORT_BUTTON_ARIA: Record<PartBreakdownSortKey, string> = {
+  sourceRef: "Ref",
   partName: "part number",
   qty: "quantity",
   material: "material",
@@ -117,11 +124,27 @@ const SORT_BUTTON_ARIA: Record<PartBreakdownSortKey, string> = {
 
 /**
  * Table-fixed column shares (sum 100). Part number kept relatively narrow; extra % to
- * dimension/processing columns. Order matches columns left → right.
+ * dimension/processing columns. Order matches columns left → right (without Ref).
  */
-const COLUMN_WIDTH_PCT = [
+const COLUMN_WIDTH_PCT_BASE = [
   11, 6, 8, 9, 9, 9, 10, 11, 9, 7, 5, 6,
 ] as const;
+
+/** First column Ref (~5%) + scaled base columns so total is 100%. */
+function columnWidthsPctWithRef(): number[] {
+  const refPct = 5;
+  const remaining = 100 - refPct;
+  const sumBase = COLUMN_WIDTH_PCT_BASE.reduce((a, b) => a + b, 0);
+  const scaled = COLUMN_WIDTH_PCT_BASE.map((w) =>
+    Math.floor((w * remaining) / sumBase)
+  );
+  let diff = remaining - scaled.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < scaled.length && diff > 0; i++) {
+    scaled[i] += 1;
+    diff -= 1;
+  }
+  return [refPct, ...scaled];
+}
 
 const sectionHeadClass =
   "text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-r border-border/60 bg-muted/55";
@@ -214,6 +237,18 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
     dir: SortDir;
   }>({ key: "partName", dir: "asc" });
 
+  const showRefColumn = useMemo(
+    () => parts.some((row) => Boolean(row.sourceRef?.trim())),
+    [parts]
+  );
+  const columnWidthsPct = useMemo(
+    () =>
+      showRefColumn
+        ? columnWidthsPctWithRef()
+        : [...COLUMN_WIDTH_PCT_BASE],
+    [showRefColumn]
+  );
+
   const fmtMoney = (n: number) => formatQuickQuoteCurrency(n, currency);
   const fmtAmount = (n: number) => formatQuickQuoteCurrencyAmount(n, currency);
   const priceHeaderSymbol = quickQuoteCurrencySymbol(currency);
@@ -239,14 +274,21 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
   return (
     <div className="rounded-lg border border-border overflow-hidden">
       <div className="w-full overflow-x-auto">
-        <Table className="table-fixed w-full min-w-[1100px]">
+        <Table
+          className={`table-fixed w-full ${showRefColumn ? "min-w-[1200px]" : "min-w-[1100px]"}`}
+        >
           <colgroup>
-            {COLUMN_WIDTH_PCT.map((pct, i) => (
+            {columnWidthsPct.map((pct, i) => (
               <col key={i} style={{ width: `${pct}%` }} />
             ))}
           </colgroup>
           <TableHeader>
             <TableRow className="border-b border-border hover:bg-muted/55">
+              {showRefColumn ? (
+                <TableHead colSpan={1} className={sectionHeadClass}>
+                  Ref
+                </TableHead>
+              ) : null}
               <TableHead colSpan={2} className={sectionHeadClass}>
                 Part
               </TableHead>
@@ -264,6 +306,16 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
               </TableHead>
             </TableRow>
             <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border">
+              {showRefColumn ? (
+                <SortableColumnHead
+                  sortKey="sourceRef"
+                  sortState={sortState}
+                  onSort={handleSort}
+                  className={`${subHeadClass} min-w-0 whitespace-nowrap`}
+                >
+                  Ref
+                </SortableColumnHead>
+              ) : null}
               <SortableColumnHead
                 sortKey="partName"
                 sortState={sortState}
@@ -372,6 +424,16 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
               const cutM = row.cutLengthMm / 1000;
               return (
                 <TableRow key={row.id}>
+                  {showRefColumn ? (
+                    <TableCell className="py-2 px-3 text-left align-middle text-xs font-medium whitespace-nowrap min-w-0">
+                      <span
+                        className="truncate block"
+                        title={row.sourceRef ?? ""}
+                      >
+                        {row.sourceRef ?? "—"}
+                      </span>
+                    </TableCell>
+                  ) : null}
                   <TableCell className="py-2 px-3 text-left align-middle font-medium min-w-0">
                     <span className="truncate block" title={row.partName}>
                       {row.partName}
@@ -443,6 +505,12 @@ export function PartBreakdownTable({ parts, currency }: PartBreakdownTableProps)
               </DialogHeader>
               <div className="grid gap-4 sm:grid-cols-2 text-sm">
                 <dl className="space-y-2 sm:col-span-2">
+                  {p.sourceRef ? (
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Ref</dt>
+                      <dd className="font-medium text-right">{p.sourceRef}</dd>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between gap-4 border-b border-border pb-2">
                     <dt className="text-muted-foreground">Quantity</dt>
                     <dd className="tabular-nums font-medium">{p.qty}</dd>

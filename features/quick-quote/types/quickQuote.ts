@@ -1,4 +1,15 @@
+import type { ExcelRow } from "@/types";
 import type { PlateFinish } from "../lib/plateFields";
+
+/**
+ * Optional Excel BOM attached to the DXF quote method — persisted in parent so returning after
+ * Complete restores the file + mapping alongside approved DXF geometries.
+ */
+export type DxfMethodExcelSnapshot = {
+  fileName: string;
+  buffer: ArrayBuffer;
+  rows: ExcelRow[];
+};
 
 export type QuickQuoteStep =
   | 1
@@ -131,6 +142,8 @@ export interface JobSummaryMetrics {
 
 export interface QuotePartRow {
   id: string;
+  /** Unified BOM: DXF | EXCEL | SHAPE | MANUAL; merged rows may combine e.g. "DXF · EXCEL". */
+  sourceRef?: string;
   partName: string;
   qty: number;
   material: string;

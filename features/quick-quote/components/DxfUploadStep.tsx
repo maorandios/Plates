@@ -1,7 +1,26 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { Upload, FileIcon, CheckCircle2, AlertCircle, X, Check, Eye } from "lucide-react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+} from "react";
+import {
+  Upload,
+  FileIcon,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
+  AlertTriangle,
+  X,
+  Check,
+  Eye,
+  ChevronRight,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,50 +46,281 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatDecimal } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import { parseDxfFile } from "@/lib/parsers/dxfParser";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
+import {
+  DEFAULT_PLATE_FINISH,
+  defaultMaterialGradeForFamily,
+  type PlateFinish,
+} from "../lib/plateFields";
 import { PlateGeometryCanvas } from "@/components/parts/PlateGeometryCanvas";
-import type { DxfPartGeometry, ProcessedGeometry } from "@/types";
+import type { DxfPartGeometry, ExcelRow } from "@/types";
 import type { MaterialType } from "@/types/materials";
+import type {
+  DxfMethodExcelSnapshot,
+  ValidationRow,
+  ValidationSummary,
+} from "../types/quickQuote";
+import { buildValidationData } from "../lib/buildValidationData";
+import { mergeExcelIntoDxfUploads } from "../lib/dxfUploadExcelMerge";
+import { ExcelColumnMappingModal } from "./ExcelColumnMappingModal";
+import { DxfExcelCompareModal } from "./DxfExcelCompareModal";
 
-type DxfSubStep = 1 | 2 | 3;
+export type DxfUploadSubStep = 1 | 2 | 3;
+type DxfSubStep = DxfUploadSubStep;
 
 const SUB_STEPS = [
-  { step: 1 as DxfSubStep, label: "Upload DXF" },
-  { step: 2 as DxfSubStep, label: "Parse Files" },
-  { step: 3 as DxfSubStep, label: "Review Parts" },
-];
+  { step: 1 as DxfSubStep, label: "Upload" },
+  { step: 2 as DxfSubStep, label: "Parse" },
+  { step: 3 as DxfSubStep, label: "Review" },
+] as const;
 
 interface DxfFileUpload {
   file: File;
   content: string;
   parsed: DxfPartGeometry | null;
   parseError: string | null;
+  /** Review table: BOM quantity (initial 1). */
+  quantity: number;
+  /** Review table: material grade (editable; seeded from DXF after parse). */
+  materialGrade: string;
+  /** Review table: finish (editable; default carbon = “Carbon steel”). */
+  finish: PlateFinish;
+}
+
+const DXF_FINISH_OPTIONS: { value: PlateFinish; label: string }[] = [
+  { value: "carbon", label: "Carbon steel" },
+  { value: "galvanized", label: "Galvanized" },
+  { value: "paint", label: "Paint" },
+];
+
+/**
+ * Rebuild upload rows from geometries already approved in the quote (same session).
+ * Synthetic empty file + empty content — review UI works; re-parse requires re-uploading files.
+ */
+function restoredGeometriesToUploads(
+  geometries: DxfPartGeometry[],
+  materialType: MaterialType
+): DxfFileUpload[] {
+  return geometries.map((g) => {
+    const base = (g.guessedPartName || "part").trim() || "part";
+    const safeName = base.toLowerCase().endsWith(".dxf") ? base : `${base}.dxf`;
+    const blob = new Blob([], { type: "application/dxf" });
+    const file = new File([blob], safeName, {
+      type: "application/dxf",
+      lastModified: Date.now(),
+    });
+    const qty = Math.max(1, Math.floor(Number(g.reviewQuantity ?? 1)) || 1);
+    const finish = (g.reviewFinish as PlateFinish) ?? DEFAULT_PLATE_FINISH;
+    return {
+      file,
+      content: "",
+      parsed: g,
+      parseError: null,
+      quantity: qty,
+      materialGrade: g.materialGrade?.trim() || defaultMaterialGradeForFamily(materialType),
+      finish,
+    };
+  });
+}
+
+function parseDxfUploadsInPlace(
+  uploads: DxfFileUpload[],
+  materialType: MaterialType
+): DxfFileUpload[] {
+  return uploads.map((upload) => {
+    try {
+      const result = parseDxfFile(
+        upload.content,
+        `dxf-${Date.now()}-${Math.random()}`,
+        upload.file.name,
+        "temp-client-id",
+        "temp-batch-id"
+      );
+
+      const geomGrade = result.geometry.materialGrade?.trim() ?? "";
+      const mergedGrade =
+        upload.materialGrade.trim() ||
+        geomGrade ||
+        defaultMaterialGradeForFamily(materialType);
+
+      return {
+        ...upload,
+        parsed: { id: `parsed-${Date.now()}-${Math.random()}`, ...result.geometry },
+        parseError: result.warnings.length > 0 ? result.warnings.join("; ") : null,
+        materialGrade: mergedGrade,
+      };
+    } catch (error) {
+      return {
+        ...upload,
+        parsed: null,
+        parseError: error instanceof Error ? error.message : "Failed to parse DXF",
+      };
+    }
+  });
 }
 
 interface DxfMetrics {
   totalFiles: number;
   validParts: number;
   errorParts: number;
+  /** Sum of BOM quantities for valid parts (min 1 each). */
+  totalQuantity: number;
   totalArea: number;
   totalWeight: number;
   totalPerimeter: number;
 }
 
+/** Live metrics for quote-method sidebar (DXF phase). */
+export type DxfPhaseMetricsPayload = {
+  totalQuantity: number;
+  totalAreaM2: number;
+  totalWeightKg: number;
+  dxfFileCount: number;
+};
+
+export type DxfUploadStepHandle = {
+  /** Same as “Continue to Next Phase” on Review when data is valid; returns false if nothing to approve. */
+  attemptComplete: () => boolean;
+  /** Advance upload → parse → review (steps 1–2); no-op on step 3. */
+  attemptNext: () => boolean;
+  /** Clear all DXF/Excel session data and return to step 1; notifies parent via onSessionReset. */
+  resetSession: () => void;
+  /** True when there is no upload / Excel / progress to warn about before leaving the phase. */
+  canLeaveWithoutConfirm: () => boolean;
+};
+
+export type DxfUploadNavState = {
+  subStep: DxfUploadSubStep;
+  canGoNext: boolean;
+  isReviewStep: boolean;
+  /** Step 3: at least one valid part — enables Complete. */
+  canCompleteReview: boolean;
+  /** False when session is empty (nothing to reset). */
+  canReset: boolean;
+};
+
 interface DxfUploadStepProps {
   materialType: MaterialType;
   defaultThickness?: number;
   onDataApproved: (data: DxfPartGeometry[]) => void;
+  /** Optional BOM after upload + column mapping in the modal. */
+  onOptionalExcelChange?: (
+    payload: { file: File; buffer: ArrayBuffer; rows: ExcelRow[] } | null
+  ) => void;
+  /** Fired when parsed-file metrics change (quote method DXF sidebar). */
+  onPhaseMetricsChange?: (payload: DxfPhaseMetricsPayload) => void;
+  /**
+   * When set (non-empty), hydrate upload + review from parent-approved geometries so returning
+   * to the DXF method after Complete keeps the session (same idea as manual rows in parent state).
+   */
+  restoredGeometries?: DxfPartGeometry[] | null;
+  /** Parent-persisted optional Excel BOM — restored together with approved DXF geometries. */
+  restoredExcelBundle?: DxfMethodExcelSnapshot | null;
+  /** Quote method only: persist optional Excel file + rows in parent for session restore. */
+  onExcelSessionPersist?: (payload: DxfMethodExcelSnapshot | null) => void;
+  /** Hide bottom Continue / Back to parse buttons (quote method uses header Next / Complete / Reset). */
+  hideBottomNavigation?: boolean;
+  /** Fired when sub-step or next-button availability changes (for header controls). */
+  onDxfNavStateChange?: (state: DxfUploadNavState) => void;
+  /** After internal reset: clear parent `dxfMethodGeometries` + Excel snapshot. */
+  onSessionReset?: () => void;
 }
 
-export function DxfUploadStep({ materialType, defaultThickness = 10, onDataApproved }: DxfUploadStepProps) {
-  const [subStep, setSubStep] = useState<DxfSubStep>(1);
-  const [uploadedFiles, setUploadedFiles] = useState<DxfFileUpload[]>([]);
+export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>(
+  function DxfUploadStep(
+    {
+      materialType,
+      defaultThickness = 10,
+      onDataApproved,
+      onOptionalExcelChange,
+      onPhaseMetricsChange,
+      restoredGeometries,
+      restoredExcelBundle,
+      onExcelSessionPersist,
+      hideBottomNavigation = false,
+      onDxfNavStateChange,
+      onSessionReset,
+    },
+    ref
+  ) {
+  const [subStep, setSubStep] = useState<DxfSubStep>(() =>
+    restoredGeometries && restoredGeometries.length > 0 ? 3 : 1
+  );
+  const [uploadedFiles, setUploadedFiles] = useState<DxfFileUpload[]>(() =>
+    restoredGeometries && restoredGeometries.length > 0
+      ? restoredGeometriesToUploads(restoredGeometries, materialType)
+      : []
+  );
   const [isDragging, setIsDragging] = useState(false);
+  const [isDraggingExcel, setIsDraggingExcel] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [excelUploadError, setExcelUploadError] = useState<string | null>(null);
+  const [excelMappingModalOpen, setExcelMappingModalOpen] = useState(false);
+  const [excelModalFile, setExcelModalFile] = useState<File | null>(null);
+  const [excelModalBuffer, setExcelModalBuffer] = useState<ArrayBuffer | null>(null);
+  const [optionalExcelFile, setOptionalExcelFile] = useState<File | null>(null);
+  const [mappedExcelRows, setMappedExcelRows] = useState<ExcelRow[] | null>(null);
+  const [validationRows, setValidationRows] = useState<ValidationRow[] | null>(null);
+  const [validationSummary, setValidationSummary] = useState<ValidationSummary | null>(
+    null
+  );
+  const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [previewGeometry, setPreviewGeometry] = useState<DxfPartGeometry | null>(null);
+
+  const excelRestoreAppliedRef = useRef(false);
+  useEffect(() => {
+    if (excelRestoreAppliedRef.current) return;
+    if (!restoredExcelBundle?.rows?.length) return;
+    excelRestoreAppliedRef.current = true;
+    const { fileName, buffer, rows } = restoredExcelBundle;
+    const file = new File([buffer], fileName, { lastModified: Date.now() });
+    setOptionalExcelFile(file);
+    setMappedExcelRows(rows);
+    if (restoredGeometries?.length) {
+      const { rows: vr, summary } = buildValidationData(
+        rows,
+        restoredGeometries,
+        materialType
+      );
+      setValidationRows(vr);
+      setValidationSummary(summary);
+    }
+  }, [restoredExcelBundle, restoredGeometries, materialType]);
+
+  const step2Label = mappedExcelRows?.length ? "Match" : "Parse";
+
+  const resetSession = useCallback(() => {
+    setUploadedFiles([]);
+    setSubStep(1);
+    setIsDragging(false);
+    setIsDraggingExcel(false);
+    setUploadError(null);
+    setExcelUploadError(null);
+    setExcelMappingModalOpen(false);
+    setExcelModalFile(null);
+    setExcelModalBuffer(null);
+    setOptionalExcelFile(null);
+    setMappedExcelRows(null);
+    setValidationRows(null);
+    setValidationSummary(null);
+    setCompareModalOpen(false);
+    setPreviewGeometry(null);
+    excelRestoreAppliedRef.current = false;
+    onOptionalExcelChange?.(null);
+    onExcelSessionPersist?.(null);
+    onSessionReset?.();
+  }, [onOptionalExcelChange, onExcelSessionPersist, onSessionReset]);
 
   const handleFilesSelect = useCallback(async (files: FileList | File[]) => {
     setUploadError(null);
@@ -93,12 +343,14 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
             content,
             parsed: null,
             parseError: null,
+            quantity: 1,
+            materialGrade: "",
+            finish: "carbon" satisfies PlateFinish,
           };
         })
       );
 
-      setUploadedFiles(prev => [...prev, ...uploads]);
-      setSubStep(2);
+      setUploadedFiles((prev) => [...prev, ...uploads]);
     } catch (error) {
       setUploadError(
         error instanceof Error ? error.message : "Failed to read DXF files"
@@ -135,55 +387,191 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
     setIsDragging(false);
   }, []);
 
-  const handleRemoveFile = useCallback((index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-    if (uploadedFiles.length === 1) {
-      setSubStep(1);
+  const handleOptionalExcelSelect = useCallback(
+    async (file: File) => {
+      setExcelUploadError(null);
+      setOptionalExcelFile(null);
+      setMappedExcelRows(null);
+      setValidationRows(null);
+      setValidationSummary(null);
+      onOptionalExcelChange?.(null);
+      onExcelSessionPersist?.(null);
+      try {
+        const buffer = await file.arrayBuffer();
+        setExcelModalFile(file);
+        setExcelModalBuffer(buffer);
+        setExcelMappingModalOpen(true);
+      } catch (error) {
+        setExcelUploadError(
+          error instanceof Error ? error.message : "Failed to read file"
+        );
+        setExcelModalFile(null);
+        setExcelModalBuffer(null);
+      }
+    },
+    [onOptionalExcelChange, onExcelSessionPersist]
+  );
+
+  const handleExcelMappingComplete = useCallback(
+    (rows: ExcelRow[]) => {
+      if (!excelModalFile || !excelModalBuffer) return;
+      const file = excelModalFile;
+      const buffer = excelModalBuffer;
+      setOptionalExcelFile(file);
+      setMappedExcelRows(rows);
+      setExcelModalFile(null);
+      setExcelModalBuffer(null);
+      setExcelMappingModalOpen(false);
+      onOptionalExcelChange?.({ file, buffer, rows });
+      onExcelSessionPersist?.({
+        fileName: file.name,
+        buffer: buffer.slice(0),
+        rows,
+      });
+    },
+    [excelModalFile, excelModalBuffer, onOptionalExcelChange, onExcelSessionPersist]
+  );
+
+  const handleExcelMappingDiscard = useCallback(() => {
+    setExcelModalFile(null);
+    setExcelModalBuffer(null);
+    setExcelMappingModalOpen(false);
+    onOptionalExcelChange?.(null);
+  }, [onOptionalExcelChange]);
+
+  const handleExcelMappingRemoved = useCallback(() => {
+    setExcelModalFile(null);
+    setExcelModalBuffer(null);
+    setOptionalExcelFile(null);
+    setMappedExcelRows(null);
+    setValidationRows(null);
+    setValidationSummary(null);
+    setCompareModalOpen(false);
+    setExcelMappingModalOpen(false);
+    onOptionalExcelChange?.(null);
+    onExcelSessionPersist?.(null);
+  }, [onOptionalExcelChange, onExcelSessionPersist]);
+
+  const handleExcelFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      if (f) void handleOptionalExcelSelect(f);
+    },
+    [handleOptionalExcelSelect]
+  );
+
+  const handleExcelDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDraggingExcel(false);
+      const f = e.dataTransfer.files[0];
+      if (f) void handleOptionalExcelSelect(f);
+    },
+    [handleOptionalExcelSelect]
+  );
+
+  const handleExcelDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingExcel(true);
+  }, []);
+
+  const handleExcelDragLeave = useCallback(() => {
+    setIsDraggingExcel(false);
+  }, []);
+
+  const handleRemoveOptionalExcel = useCallback(() => {
+    setExcelUploadError(null);
+    handleExcelMappingRemoved();
+  }, [handleExcelMappingRemoved]);
+
+  const handleContinueToParse = useCallback(() => {
+    if (uploadedFiles.length === 0) return;
+
+    if (mappedExcelRows?.length) {
+      const parsed = parseDxfUploadsInPlace(uploadedFiles, materialType);
+      const merged = mergeExcelIntoDxfUploads(parsed, mappedExcelRows, materialType);
+      setUploadedFiles(merged);
+      const geoms = merged
+        .map((u) => u.parsed)
+        .filter((p): p is DxfPartGeometry => p !== null);
+      const { rows, summary } = buildValidationData(
+        mappedExcelRows,
+        geoms,
+        materialType
+      );
+      setValidationRows(rows);
+      setValidationSummary(summary);
+      setSubStep(3);
+      return;
     }
-  }, [uploadedFiles.length]);
+
+    setSubStep(2);
+  }, [uploadedFiles, mappedExcelRows, materialType]);
+
+  const handleRemoveFile = useCallback((index: number) => {
+    setUploadedFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) {
+        setSubStep(1);
+        setValidationRows(null);
+        setValidationSummary(null);
+        setCompareModalOpen(false);
+      }
+      return next;
+    });
+  }, []);
 
   const handleParseFiles = useCallback(() => {
-    const parsed = uploadedFiles.map((upload) => {
-      try {
-        const result = parseDxfFile(
-          upload.content,
-          `dxf-${Date.now()}-${Math.random()}`,
-          upload.file.name,
-          "temp-client-id",
-          "temp-batch-id"
-        );
-
-        return {
-          ...upload,
-          parsed: { id: `parsed-${Date.now()}-${Math.random()}`, ...result.geometry },
-          parseError: result.warnings.length > 0 ? result.warnings.join("; ") : null,
-        };
-      } catch (error) {
-        return {
-          ...upload,
-          parsed: null,
-          parseError: error instanceof Error ? error.message : "Failed to parse DXF",
-        };
-      }
-    });
-
-    setUploadedFiles(parsed);
+    const parsed = parseDxfUploadsInPlace(uploadedFiles, materialType);
+    const merged = mergeExcelIntoDxfUploads(parsed, null, materialType);
+    setUploadedFiles(merged);
     setSubStep(3);
-  }, [uploadedFiles]);
+  }, [uploadedFiles, materialType]);
 
   const handleBackToUpload = useCallback(() => {
+    setCompareModalOpen(false);
+    setValidationRows(null);
+    setValidationSummary(null);
     setSubStep(1);
   }, []);
 
   const handleBackToParse = useCallback(() => {
+    setCompareModalOpen(false);
+    if (mappedExcelRows?.length) {
+      setValidationRows(null);
+      setValidationSummary(null);
+      setSubStep(1);
+      return;
+    }
     setSubStep(2);
-  }, []);
+  }, [mappedExcelRows?.length]);
+
+  const updateUploadRow = useCallback(
+    (
+      index: number,
+      patch: Partial<Pick<DxfFileUpload, "quantity" | "materialGrade" | "finish">>
+    ) => {
+      setUploadedFiles((prev) =>
+        prev.map((row, i) => (i === index ? { ...row, ...patch } : row))
+      );
+    },
+    []
+  );
 
   const handleContinueToNextPhase = useCallback(() => {
     const validGeometries = uploadedFiles
-      .filter(u => u.parsed !== null)
-      .map(u => u.parsed!);
-    
+      .filter((u) => u.parsed !== null)
+      .map((u) => {
+        const p = u.parsed!;
+        const qty = Math.max(1, Math.floor(Number(u.quantity)) || 1);
+        return {
+          ...p,
+          materialGrade: u.materialGrade.trim() || p.materialGrade,
+          reviewQuantity: qty,
+          reviewFinish: u.finish,
+        };
+      });
+
     if (validGeometries.length > 0) {
       onDataApproved(validGeometries);
     }
@@ -199,8 +587,11 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
     let totalArea = 0;
     let totalWeight = 0;
     let totalPerimeter = 0;
+    let totalQuantity = 0;
 
-    validParts.forEach(u => {
+    validParts.forEach((u) => {
+      const qty = Math.max(1, Math.floor(Number(u.quantity)) || 1);
+      totalQuantity += qty;
       const geom = u.parsed?.processedGeometry;
       if (geom) {
         totalArea += geom.area / 1000000; // mm² to m²
@@ -217,11 +608,97 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
       totalFiles: uploadedFiles.length,
       validParts: validParts.length,
       errorParts: uploadedFiles.length - validParts.length,
+      totalQuantity,
       totalArea,
       totalWeight,
       totalPerimeter,
     };
   }, [uploadedFiles, materialType, defaultThickness]);
+
+  useEffect(() => {
+    onPhaseMetricsChange?.({
+      totalQuantity: metrics.totalQuantity,
+      totalAreaM2: metrics.totalArea,
+      totalWeightKg: metrics.totalWeight,
+      dxfFileCount: metrics.totalFiles,
+    });
+  }, [metrics, onPhaseMetricsChange]);
+
+  useEffect(() => {
+    if (!onDxfNavStateChange) return;
+    const canGoNext =
+      !excelMappingModalOpen &&
+      (subStep === 1
+        ? uploadedFiles.length > 0
+        : subStep === 2
+          ? uploadedFiles.length > 0
+          : false);
+    const canLeaveEmpty =
+      uploadedFiles.length === 0 &&
+      !(mappedExcelRows && mappedExcelRows.length > 0) &&
+      !optionalExcelFile &&
+      subStep === 1 &&
+      !excelMappingModalOpen;
+    onDxfNavStateChange({
+      subStep,
+      canGoNext,
+      isReviewStep: subStep === 3,
+      canCompleteReview: subStep === 3 && metrics.validParts > 0,
+      canReset: !canLeaveEmpty,
+    });
+  }, [
+    subStep,
+    uploadedFiles.length,
+    excelMappingModalOpen,
+    mappedExcelRows,
+    optionalExcelFile,
+    metrics.validParts,
+    onDxfNavStateChange,
+  ]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      attemptComplete: () => {
+        if (metrics.validParts === 0) return false;
+        handleContinueToNextPhase();
+        return true;
+      },
+      attemptNext: () => {
+        if (excelMappingModalOpen) return false;
+        if (subStep === 3) return false;
+        if (subStep === 1) {
+          if (uploadedFiles.length === 0) return false;
+          handleContinueToParse();
+          return true;
+        }
+        if (subStep === 2) {
+          handleParseFiles();
+          return true;
+        }
+        return false;
+      },
+      resetSession,
+      canLeaveWithoutConfirm: () =>
+        uploadedFiles.length === 0 &&
+        !(mappedExcelRows && mappedExcelRows.length > 0) &&
+        !optionalExcelFile &&
+        subStep === 1 &&
+        !excelMappingModalOpen,
+    }),
+    [
+      metrics.validParts,
+      handleContinueToNextPhase,
+      handleContinueToParse,
+      handleParseFiles,
+      resetSession,
+      uploadedFiles.length,
+      mappedExcelRows,
+      optionalExcelFile,
+      subStep,
+      excelMappingModalOpen,
+    ]
+  );
 
   const getStatusColor = (geometry: DxfPartGeometry | null): "success" | "error" | "warning" => {
     if (!geometry || !geometry.processedGeometry) return "error";
@@ -239,6 +716,7 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
             {SUB_STEPS.map(({ step, label }, index) => {
               const isComplete = step < subStep;
               const isCurrent = step === subStep;
+              const displayLabel = index === 1 ? step2Label : label;
 
               return (
                 <div key={step} className="flex items-center flex-1 last:flex-none">
@@ -261,7 +739,7 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
                         !isCurrent && !isComplete && "text-muted-foreground"
                       )}
                     >
-                      {label}
+                      {displayLabel}
                     </span>
                   </div>
                   {index < SUB_STEPS.length - 1 && (
@@ -279,100 +757,205 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
         </CardContent>
       </Card>
 
-      {/* Step 1: Upload DXF */}
+      {/* Step 1: DXF + optional Excel (two cards) */}
       {subStep === 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload DXF Files</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Upload part geometry files (multiple files supported)
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              className={cn(
-                "border-2 border-dashed rounded-lg p-12 text-center transition-colors",
-                isDragging
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/50"
-              )}
-            >
-              <div className="flex flex-col items-center gap-4">
-                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                  <Upload className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">
-                    Drag and drop DXF files here
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    or click to browse (multiple files allowed)
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  accept=".dxf"
-                  multiple
-                  onChange={handleFileInputChange}
-                  className="hidden"
-                  id="dxf-upload"
-                />
-                <Button asChild variant="outline">
-                  <label htmlFor="dxf-upload" className="cursor-pointer">
-                    <FileIcon className="h-4 w-4 mr-2" />
-                    Choose Files
-                  </label>
-                </Button>
-              </div>
-            </div>
-            
-            {uploadedFiles.length > 0 && (
-              <div className="mt-6 space-y-2">
-                <p className="text-sm font-medium">
-                  {uploadedFiles.length} file{uploadedFiles.length !== 1 ? "s" : ""} ready
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 md:items-stretch">
+            <Card className="flex flex-col">
+              <CardHeader>
+                <CardTitle>DXF files</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Upload part geometry — required before continuing (multiple files supported).
                 </p>
-                <div className="space-y-2">
-                  {uploadedFiles.map((upload, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="text-sm truncate">{upload.file.name}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {formatDecimal(upload.file.size / 1024, 1)} KB
-                        </Badge>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveFile(index)}
-                        className="shrink-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col">
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={cn(
+                    "border-2 border-dashed rounded-lg p-8 text-center transition-colors flex-1 flex flex-col justify-center min-h-[200px]",
+                    isDragging
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  )}
+                >
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
+                      <Upload className="h-7 w-7 text-muted-foreground" />
                     </div>
-                  ))}
+                    <div>
+                      <p className="text-sm font-medium">Drag and drop DXF files here</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        or browse — multiple files allowed
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".dxf"
+                      multiple
+                      onChange={handleFileInputChange}
+                      className="hidden"
+                      id="dxf-upload"
+                    />
+                    <Button asChild variant="outline" size="sm">
+                      <label htmlFor="dxf-upload" className="cursor-pointer">
+                        <FileIcon className="h-4 w-4 mr-2" />
+                        Choose DXF files
+                      </label>
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {uploadError && (
-              <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                <p className="text-sm text-destructive">{uploadError}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm font-medium">
+                      {uploadedFiles.length} file{uploadedFiles.length !== 1 ? "s" : ""} ready
+                    </p>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {uploadedFiles.map((upload, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between gap-2 p-3 rounded-lg border bg-muted/30"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span className="text-sm truncate">{upload.file.name}</span>
+                            <Badge variant="secondary" className="text-xs shrink-0">
+                              {formatDecimal(upload.file.size / 1024, 1)} KB
+                            </Badge>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveFile(index)}
+                            className="shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    <p className="text-sm text-destructive">{uploadError}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="flex flex-col border-dashed">
+              <CardHeader>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      Excel / CSV
+                      <Badge variant="outline" className="font-normal text-muted-foreground">
+                        Optional
+                      </Badge>
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      BOM or part list for matching. After you choose a file, a dialog opens to map
+                      columns (same as the main Excel upload step). Skip if you only have DXF.
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col">
+                <div
+                  onDrop={handleExcelDrop}
+                  onDragOver={handleExcelDragOver}
+                  onDragLeave={handleExcelDragLeave}
+                  className={cn(
+                    "border-2 border-dashed rounded-lg p-8 text-center transition-colors flex-1 flex flex-col justify-center min-h-[200px]",
+                    isDraggingExcel
+                      ? "border-primary bg-primary/5"
+                      : "border-border/80 hover:border-muted-foreground/40"
+                  )}
+                >
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
+                      <FileSpreadsheet className="h-7 w-7 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Drop Excel or CSV here</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        One file — mapping opens in a dialog
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleExcelFileInputChange}
+                      className="hidden"
+                      id="dxf-step-excel-upload"
+                      key={optionalExcelFile?.name ?? "no-excel"}
+                    />
+                    <Button asChild variant="outline" size="sm">
+                      <label htmlFor="dxf-step-excel-upload" className="cursor-pointer">
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Choose spreadsheet
+                      </label>
+                    </Button>
+                  </div>
+                </div>
+
+                {optionalExcelFile && mappedExcelRows && mappedExcelRows.length > 0 && (
+                  <div className="mt-4 flex items-center justify-between gap-2 p-3 rounded-lg border bg-emerald-500/5 border-emerald-500/20">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span className="text-sm truncate">{optionalExcelFile.name}</span>
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {formatDecimal(optionalExcelFile.size / 1024, 1)} KB
+                      </Badge>
+                      <Badge className="text-xs shrink-0 bg-emerald-600/15 text-emerald-800 dark:text-emerald-200">
+                        {mappedExcelRows.length} rows mapped
+                      </Badge>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveOptionalExcel}
+                      className="shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {excelUploadError && (
+                  <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    <p className="text-sm text-destructive">{excelUploadError}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {!hideBottomNavigation && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 pt-1">
+              <Button
+                size="lg"
+                className="gap-2 w-full sm:w-auto"
+                disabled={uploadedFiles.length === 0}
+                onClick={handleContinueToParse}
+              >
+                {mappedExcelRows?.length ? "Continue to review" : "Continue to parse"}
+                <CheckCircle2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Step 2: Parse Files */}
-      {subStep === 2 && (
+      {/* Step 2: Parse only (Excel+BOM goes straight to review + comparison modal) */}
+      {subStep === 2 && !mappedExcelRows?.length && (
         <Card>
           <CardHeader>
             <CardTitle>Parse DXF Files</CardTitle>
@@ -387,18 +970,21 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
                   {uploadedFiles.length} file{uploadedFiles.length !== 1 ? "s" : ""} ready to parse
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Click the button below to extract geometry, dimensions, and material information from your DXF files.
+                  Click the button below to extract geometry, dimensions, and material information from
+                  your DXF files.
                 </p>
               </div>
 
-              <div className="flex items-center justify-between">
-                <Button variant="outline" onClick={handleBackToUpload}>
-                  Back to Upload
-                </Button>
-                <Button onClick={handleParseFiles} size="lg">
-                  Parse All Files
-                </Button>
-              </div>
+              {!hideBottomNavigation && (
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" onClick={handleBackToUpload}>
+                    Back to Upload
+                  </Button>
+                  <Button onClick={handleParseFiles} size="lg">
+                    Parse All Files
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -407,29 +993,79 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
       {/* Step 3: Review Parts */}
       {subStep === 3 && uploadedFiles.length > 0 && (
         <>
+          {mappedExcelRows?.length &&
+            validationSummary &&
+            validationRows &&
+            validationRows.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCompareModalOpen(true)}
+                className={cn(
+                  "w-full text-left rounded-lg border p-4 flex items-start gap-3 transition-colors",
+                  "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  validationSummary.warnings > 0 || validationSummary.critical > 0
+                    ? "border-amber-500/50 bg-amber-500/[0.06]"
+                    : "border-emerald-500/40 bg-emerald-500/[0.05]"
+                )}
+              >
+                {validationSummary.warnings > 0 || validationSummary.critical > 0 ? (
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {validationSummary.warnings > 0 || validationSummary.critical > 0
+                      ? "We found differences between your Excel BOM and DXF geometry"
+                      : "Excel BOM and DXF geometry match within tolerance"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {validationSummary.warnings > 0 || validationSummary.critical > 0
+                      ? "Open the full comparison table to review dimensions, area, weight, and material. You can export a CSV report."
+                      : "Open the comparison table to inspect details or export a CSV report."}
+                  </p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+              </button>
+            )}
+
+          {validationSummary && validationRows && validationRows.length > 0 && (
+            <DxfExcelCompareModal
+              open={compareModalOpen}
+              onOpenChange={setCompareModalOpen}
+              summary={validationSummary}
+              rows={validationRows}
+            />
+          )}
+
           {/* Parts Table */}
           <Card>
             <CardHeader>
               <CardTitle>DXF Parts Data</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 Parsed geometry and part information
+                {mappedExcelRows?.length
+                  ? " — quantity and material grade are taken from the Excel list where part names match; otherwise quantity is 1 and grade follows the DXF."
+                  : ""}
               </p>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Part Number</TableHead>
-                      <TableHead>Material</TableHead>
-                      <TableHead>Width (mm)</TableHead>
-                      <TableHead>Length (mm)</TableHead>
-                      <TableHead>Weight (kg)</TableHead>
-                      <TableHead>Area (m²)</TableHead>
-                      <TableHead>Perimeter (mm)</TableHead>
-                      <TableHead>Piercing</TableHead>
-                      <TableHead>Preview</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="min-w-[120px]">Part Number</TableHead>
+                      <TableHead className="min-w-[88px]">Quantity</TableHead>
+                      <TableHead className="min-w-[88px]">Width (mm)</TableHead>
+                      <TableHead className="min-w-[88px]">Length (mm)</TableHead>
+                      <TableHead className="min-w-[88px]">Weight (kg)</TableHead>
+                      <TableHead className="min-w-[88px]">Area (m²)</TableHead>
+                      <TableHead className="min-w-[100px]">Perimeter (mm)</TableHead>
+                      <TableHead className="min-w-[80px]">Piercing</TableHead>
+                      <TableHead className="min-w-[120px]">Material Grade</TableHead>
+                      <TableHead className="min-w-[140px]">Finish</TableHead>
+                      <TableHead className="w-[72px]">Preview</TableHead>
+                      <TableHead className="w-[72px]">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -439,38 +1075,97 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
                       const status = getStatusColor(upload.parsed);
                       const hasError = upload.parseError !== null;
 
-                      // Calculate weight using material density
                       const materialConfig = getMaterialConfig(materialType);
                       const densityKgPerM3 = materialConfig.densityKgPerM3;
-                      const weight = geom 
-                        ? (geom.area / 1000000) * (defaultThickness / 1000) * densityKgPerM3
-                        : 0;
+                      const unitWeightKg =
+                        geom && geom.area > 0
+                          ? (geom.area / 1_000_000) *
+                            (defaultThickness / 1000) *
+                            densityKgPerM3
+                          : 0;
+
+                      const dim1 = bbox?.width ?? 0;
+                      const dim2 = bbox?.height ?? 0;
+                      const widthMm = dim1 > 0 && dim2 > 0 ? Math.min(dim1, dim2) : dim1 || dim2;
+                      const lengthMm = dim1 > 0 && dim2 > 0 ? Math.max(dim1, dim2) : 0;
+
+                      const partLabel =
+                        upload.parsed?.guessedPartName ||
+                        upload.file.name.replace(/\.dxf$/i, "");
 
                       return (
                         <TableRow key={index}>
-                          <TableCell className="font-medium">
-                            {upload.parsed?.guessedPartName || upload.file.name.replace('.dxf', '')}
+                          <TableCell className="font-medium">{partLabel}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={1}
+                              step={1}
+                              className="h-8 w-20"
+                              value={upload.quantity}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                updateUploadRow(
+                                  index,
+                                  Number.isFinite(v) && v >= 1
+                                    ? { quantity: Math.floor(v) }
+                                    : { quantity: 1 }
+                                );
+                              }}
+                            />
                           </TableCell>
                           <TableCell>
-                            {upload.parsed?.materialGrade || "-"}
+                            {bbox ? formatDecimal(widthMm, 1) : "-"}
                           </TableCell>
                           <TableCell>
-                            {bbox ? formatDecimal(bbox.width, 1) : "-"}
+                            {bbox ? formatDecimal(lengthMm, 1) : "-"}
                           </TableCell>
                           <TableCell>
-                            {bbox ? formatDecimal(bbox.height, 1) : "-"}
+                            {unitWeightKg > 0
+                              ? formatDecimal(unitWeightKg, 2)
+                              : "-"}
                           </TableCell>
                           <TableCell>
-                            {weight > 0 ? formatDecimal(weight, 2) : "-"}
-                          </TableCell>
-                          <TableCell>
-                            {geom ? formatDecimal(geom.area / 1000000, 4) : "-"}
+                            {geom ? formatDecimal(geom.area / 1_000_000, 4) : "-"}
                           </TableCell>
                           <TableCell>
                             {geom ? formatDecimal(geom.perimeter, 1) : "-"}
                           </TableCell>
                           <TableCell>
-                            {geom?.preparation?.manufacturing?.cutInner?.length || 0}
+                            {geom?.preparation?.manufacturing?.cutInner?.length ?? 0}
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              className="h-8 min-w-[7rem]"
+                              value={upload.materialGrade}
+                              onChange={(e) =>
+                                updateUploadRow(index, {
+                                  materialGrade: e.target.value,
+                                })
+                              }
+                              placeholder="Grade"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={upload.finish}
+                              onValueChange={(v) =>
+                                updateUploadRow(index, {
+                                  finish: v as PlateFinish,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[140px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {DXF_FINISH_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             <Button
@@ -496,11 +1191,12 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
                                     )}
                                   />
                                 </TooltipTrigger>
-                                {(status === "error" || status === "warning") && hasError && (
-                                  <TooltipContent side="left" className="max-w-xs">
-                                    <p className="text-xs">{upload.parseError}</p>
-                                  </TooltipContent>
-                                )}
+                                {(status === "error" || status === "warning") &&
+                                  hasError && (
+                                    <TooltipContent side="left" className="max-w-xs">
+                                      <p className="text-xs">{upload.parseError}</p>
+                                    </TooltipContent>
+                                  )}
                                 {status === "success" && (
                                   <TooltipContent side="left">
                                     <p className="text-xs">Valid geometry</p>
@@ -518,23 +1214,32 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
             </CardContent>
           </Card>
 
-          {/* Navigation Buttons */}
-          <div className="flex items-center justify-between">
-            <Button variant="outline" onClick={handleBackToParse}>
-              Back to Parse
-            </Button>
-            <Button
-              onClick={handleContinueToNextPhase}
-              size="lg"
-              className="gap-2"
-              disabled={metrics.validParts === 0}
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Continue to Next Phase
-            </Button>
-          </div>
+          {!hideBottomNavigation && (
+            <div className="flex items-center justify-between">
+              <Button variant="outline" onClick={handleBackToParse}>
+                Back to Parse
+              </Button>
+              <Button
+                onClick={handleContinueToNextPhase}
+                size="lg"
+                className="gap-2"
+                disabled={metrics.validParts === 0}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Continue to Next Phase
+              </Button>
+            </div>
+          )}
         </>
       )}
+
+      <ExcelColumnMappingModal
+        open={excelMappingModalOpen}
+        file={excelModalFile}
+        arrayBuffer={excelModalBuffer}
+        onComplete={handleExcelMappingComplete}
+        onDiscard={handleExcelMappingDiscard}
+      />
 
       {/* Preview Modal */}
       <Dialog open={previewGeometry !== null} onOpenChange={(open) => !open && setPreviewGeometry(null)}>
@@ -618,5 +1323,7 @@ export function DxfUploadStep({ materialType, defaultThickness = 10, onDataAppro
       </Dialog>
     </div>
   );
-}
+});
+
+DxfUploadStep.displayName = "DxfUploadStep";
 

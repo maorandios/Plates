@@ -1,4 +1,12 @@
-import { formatMaterialGradeAndFinish } from "./plateFields";
+import type { ExcelRow } from "@/types";
+import type { MaterialType } from "@/types/materials";
+import {
+  DEFAULT_PLATE_FINISH,
+  defaultMaterialGradeForFamily,
+  formatMaterialGradeAndFinish,
+  parsePlateFinishFromLabelOrValue,
+  plateFinishLabel,
+} from "./plateFields";
 import { QUOTE_METHOD_LABEL } from "./mergeQuotePlates";
 import type { QuotePartRow } from "../types/quickQuote";
 import type { ManualQuotePartRow } from "../types/quickQuote";
@@ -86,6 +94,46 @@ export function computeManualQuoteMetrics(
   }
 
   return { totalQty, totalAreaM2, totalWeightKg };
+}
+
+/** Parsed Excel rows → same shape as manual entry (quote-from-list flow). */
+export function excelRowsToManualQuoteRows(
+  rows: ExcelRow[],
+  materialType: MaterialType
+): ManualQuotePartRow[] {
+  return rows.map((r) => {
+    const partNumber = r.partName.trim() || "—";
+    return {
+      id: r.id,
+      partNumber,
+      thicknessMm: r.thickness ?? 0,
+      widthMm: r.width ?? 0,
+      lengthMm: r.length ?? 0,
+      quantity: Math.max(1, Math.floor(r.quantity) || 1),
+      material: (r.material ?? "").trim() || defaultMaterialGradeForFamily(materialType),
+      finish: parsePlateFinishFromLabelOrValue(r.finish) ?? DEFAULT_PLATE_FINISH,
+      sourceMethod: "excelImport",
+      clientPartLabel: partNumber,
+    };
+  });
+}
+
+/** Rebuild quote-import editor rows from saved manual lines (re-enter Import Excel list). */
+export function manualQuoteRowsToRestoredExcelRows(rows: ManualQuotePartRow[]): ExcelRow[] {
+  return rows.map((r) => ({
+    id: r.id,
+    fileId: "quick-quote-import",
+    clientId: "quick-quote",
+    batchId: "quick-quote",
+    partName: r.partNumber,
+    quantity: Math.max(1, Math.floor(r.quantity) || 1),
+    thickness: r.thicknessMm > 0 ? r.thicknessMm : undefined,
+    material: (r.material ?? "").trim() || undefined,
+    width: r.widthMm > 0 ? r.widthMm : undefined,
+    length: r.lengthMm > 0 ? r.lengthMm : undefined,
+    finish: plateFinishLabel(r.finish),
+    rawRow: {},
+  }));
 }
 
 /** Manual BOM lines → quote part rows (rectangular plate geometry). */

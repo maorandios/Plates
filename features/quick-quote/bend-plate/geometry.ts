@@ -9,7 +9,9 @@ import type {
   BendPlateFormState,
   BendTemplateId,
   CustomTemplateParams,
+  GutterTemplateParams,
   LTemplateParams,
+  OmegaTemplateParams,
   UTemplateParams,
   ZTemplateParams,
 } from "./types";
@@ -145,6 +147,58 @@ export function buildZ(p: ZTemplateParams): {
   };
 }
 
+/** Omega: left base → up → top → down → right base (5 straights, 4 bends). */
+export function buildOmega(p: OmegaTemplateParams): {
+  pts: Point2[];
+  straights: number[];
+  bends: number[];
+} {
+  const A = Math.max(0, p.aMm);
+  const B = Math.max(0, p.bMm);
+  const C = Math.max(0, p.cMm);
+  const D = Math.max(0, p.dMm);
+  const E = Math.max(0, p.eMm);
+  /** HAT / Ω: east → north → east → south → east (bend signs match U/Z convention). */
+  const turns = [
+    internalAngleToTurnDeg(p.angle1Deg, 1),
+    internalAngleToTurnDeg(p.angle2Deg, -1),
+    internalAngleToTurnDeg(p.angle3Deg, -1),
+    internalAngleToTurnDeg(p.angle4Deg, 1),
+  ];
+  return {
+    pts: polylineFromSegments([A, B, C, D, E], turns, 0),
+    straights: [A, B, C, D, E],
+    bends: turns.map((t) => Math.abs(t)),
+  };
+}
+
+/**
+ * Gutter / tray: left lip outward → down → floor → up → right lip outward (5 straights, 4 bends).
+ * Start at inner corner of left lip; segment A points west (symmetric outward flanges).
+ */
+export function buildGutter(p: GutterTemplateParams): {
+  pts: Point2[];
+  straights: number[];
+  bends: number[];
+} {
+  const A = Math.max(0, p.aMm);
+  const B = Math.max(0, p.bMm);
+  const C = Math.max(0, p.cMm);
+  const D = Math.max(0, p.dMm);
+  const E = Math.max(0, p.eMm);
+  const turns = [
+    internalAngleToTurnDeg(p.angle1Deg, 1),
+    internalAngleToTurnDeg(p.angle2Deg, 1),
+    internalAngleToTurnDeg(p.angle3Deg, 1),
+    internalAngleToTurnDeg(p.angle4Deg, -1),
+  ];
+  return {
+    pts: polylineFromSegments([A, B, C, D, E], turns, 180),
+    straights: [A, B, C, D, E],
+    bends: turns.map((t) => Math.abs(t)),
+  };
+}
+
 export function buildCustom(p: CustomTemplateParams): {
   pts: Point2[];
   straights: number[];
@@ -160,10 +214,10 @@ export function buildCustom(p: CustomTemplateParams): {
   const need = Math.max(0, segs.length - 1);
   const turns: number[] = [];
   for (let i = 0; i < need; i++) {
-    let α = p.anglesDeg[i] ?? 180;
-    α = Math.max(0, Math.min(180, α));
-    if (α < 1e-6) α = 180;
-    const turn = internalAngleToTurnDeg(α, 1);
+    let turn = p.anglesDeg[i] ?? 0;
+    if (!Number.isFinite(turn)) turn = 0;
+    turn = Math.max(-360, Math.min(360, turn));
+    if (Math.abs(turn) < 1e-6) turn = 0;
     turns.push(turn);
   }
   return {
@@ -178,6 +232,8 @@ function segmentLabelsForTemplate(state: BendPlateFormState): string[] {
   const t = state.template;
   if (t === "l") return ["A", "B"];
   if (t === "u" || t === "z") return ["A", "B", "C"];
+  if (t === "omega") return ["A", "B", "C", "D", "E"];
+  if (t === "gutter") return ["A", "B", "C", "D", "E"];
   if (t === "custom") {
     const n = Math.min(7, Math.max(2, Math.floor(state.custom.segmentCount) || 2));
     return Array.from({ length: n }, (_, i) => `${i + 1}`);
@@ -203,18 +259,25 @@ export function bendProfileBendAngles(state: BendPlateFormState): number[] {
   if (t === "l") return [state.l.angleDeg];
   if (t === "u") return [state.u.angle1Deg, state.u.angle2Deg];
   if (t === "z") return [state.z.angle1Deg, state.z.angle2Deg];
+  if (t === "omega") {
+    return [
+      state.omega.angle1Deg,
+      state.omega.angle2Deg,
+      state.omega.angle3Deg,
+      state.omega.angle4Deg,
+    ];
+  }
+  if (t === "gutter") {
+    return [
+      state.gutter.angle1Deg,
+      state.gutter.angle2Deg,
+      state.gutter.angle3Deg,
+      state.gutter.angle4Deg,
+    ];
+  }
   if (t === "custom") {
-    const n = Math.min(7, Math.max(2, Math.floor(state.custom.segmentCount) || 2));
-    const need = Math.max(0, n - 1);
-    const a = state.custom.anglesDeg;
-    const out: number[] = [];
-    for (let i = 0; i < need; i++) {
-      let v = a[i] ?? 180;
-      v = Math.max(0, Math.min(180, v));
-      if (v < 1e-6) v = 180;
-      out.push(v);
-    }
-    return out;
+    const built = buildCustom(state.custom);
+    return internalAnglesFromPolyline(built.pts);
   }
   return [];
 }
@@ -230,18 +293,87 @@ function buildForTemplate(
       return buildU(s.u);
     case "z":
       return buildZ(s.z);
+    case "omega":
+      return buildOmega(s.omega);
+    case "gutter":
+      return buildGutter(s.gutter);
     case "custom":
       return buildCustom(s.custom);
-    default:
-      return { pts: [{ x: 0, y: 0 }], straights: [], bends: [] };
+    default: {
+      const _exhaustive: never = template;
+      return _exhaustive;
+    }
   }
+}
+
+/**
+ * Index of the straight run `pts[i] → pts[i+1]` that stays horizontal in previews when angles change
+ * (parallel to +X after normalization). Matches product UX: fixed “base” leg per template.
+ */
+export function horizontalAnchorSegmentIndex(
+  template: BendTemplateId
+): number | null {
+  switch (template) {
+    case "l":
+      return 0;
+    case "z":
+      return 2;
+    case "u":
+      return 1;
+    case "omega":
+      return 2;
+    case "gutter":
+      return 2;
+    case "custom":
+      return null;
+    default: {
+      const _exhaustive: never = template;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Rotate all points about `pts[anchorSegIndex]` so the anchor edge lies on the +X axis. */
+export function normalizePolylineToHorizontalAnchor(
+  pts: Point2[],
+  anchorSegIndex: number | null
+): Point2[] {
+  if (
+    anchorSegIndex === null ||
+    pts.length < 2 ||
+    anchorSegIndex < 0 ||
+    anchorSegIndex > pts.length - 2
+  ) {
+    return pts;
+  }
+  const p0 = pts[anchorSegIndex];
+  const p1 = pts[anchorSegIndex + 1];
+  const vx = p1.x - p0.x;
+  const vy = p1.y - p0.y;
+  const len = Math.hypot(vx, vy);
+  if (len < 1e-9) {
+    return pts;
+  }
+  const phi = -Math.atan2(vy, vx);
+  const c = Math.cos(phi);
+  const s = Math.sin(phi);
+  return pts.map((p) => {
+    const rx = p.x - p0.x;
+    const ry = p.y - p0.y;
+    return {
+      x: p0.x + c * rx - s * ry,
+      y: p0.y + s * rx + c * ry,
+    };
+  });
 }
 
 export function computeBendGeometry(
   state: BendPlateFormState,
   materialType: MaterialType
 ): { pts: Point2[]; calc: BendPlateCalculation } {
-  const { pts, straights, bends } = buildForTemplate(state.template, state);
+  const { pts: ptsRaw, straights, bends } = buildForTemplate(state.template, state);
+  const anchorIdx = horizontalAnchorSegmentIndex(state.template);
+  const pts = normalizePolylineToHorizontalAnchor(ptsRaw, anchorIdx);
   const { insideRadiusMm, thicknessMm, plateWidthMm, quantity } = state.global;
   const { developedMm, bendCount } = computeDeveloped(
     straights,

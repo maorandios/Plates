@@ -1,46 +1,28 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import type { MaterialType } from "@/types/materials";
+import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import type { ExcelRow } from "@/types";
 import { ExcelUploadStep } from "../ExcelUploadStep";
 import type { ManualQuotePartRow } from "../../types/quickQuote";
-import {
-  DEFAULT_PLATE_FINISH,
-  defaultMaterialGradeForFamily,
-  parsePlateFinishFromLabelOrValue,
-} from "../../lib/plateFields";
+import { excelRowsToManualQuoteRows } from "../../lib/manualQuoteParts";
 
 interface ExcelImportQuotePhaseProps {
   materialType: MaterialType;
   onRowsChange: (rows: ManualQuotePartRow[]) => void;
-}
-
-function excelRowsToManualRows(
-  rows: ExcelRow[],
-  materialType: MaterialType
-): ManualQuotePartRow[] {
-  return rows.map((r) => {
-    const partNumber = r.partName.trim() || "—";
-    return {
-      id: r.id,
-      partNumber,
-      thicknessMm: r.thickness ?? 0,
-      widthMm: r.width ?? 0,
-      lengthMm: r.length ?? 0,
-      quantity: Math.max(1, Math.floor(r.quantity) || 1),
-      material: (r.material ?? "").trim() || defaultMaterialGradeForFamily(materialType),
-      finish: parsePlateFinishFromLabelOrValue(r.finish) ?? DEFAULT_PLATE_FINISH,
-      sourceMethod: "excelImport" as const,
-      clientPartLabel: partNumber,
-    };
-  });
+  /** Persisted lines when user returns from quote method — reopen on review step. */
+  savedRows: ManualQuotePartRow[];
+  onBack: () => void;
+  onComplete: () => void;
 }
 
 export function ExcelImportQuotePhase({
   materialType,
   onRowsChange,
+  savedRows,
+  onBack,
+  onComplete,
 }: ExcelImportQuotePhaseProps) {
   const densityKgPerM3 = useMemo(
     () => getMaterialConfig(materialType).densityKgPerM3,
@@ -49,7 +31,7 @@ export function ExcelImportQuotePhase({
 
   const sync = useCallback(
     (excel: ExcelRow[]) => {
-      onRowsChange(excelRowsToManualRows(excel, materialType));
+      onRowsChange(excelRowsToManualQuoteRows(excel, materialType));
     },
     [materialType, onRowsChange]
   );
@@ -60,6 +42,11 @@ export function ExcelImportQuotePhase({
       onDataApproved={sync}
       onQuoteImportRowsChange={sync}
       quoteImportDensityKgPerM3={densityKgPerM3}
+      quoteImportPlateTypeLabel={MATERIAL_TYPE_LABELS[materialType]}
+      quoteImportMaterialType={materialType}
+      onPhaseBack={onBack}
+      onPhaseComplete={onComplete}
+      quoteImportRestoredRows={savedRows}
     />
   );
 }

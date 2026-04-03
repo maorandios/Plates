@@ -10,8 +10,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { MaterialType } from "@/types/materials";
+import type { DxfPartGeometry } from "@/types";
 import type { BendPlateQuoteItem } from "../bend-plate/types";
-import type { ManualQuotePartRow, QuoteCreationMethod } from "../types/quickQuote";
+import type {
+  DxfMethodExcelSnapshot,
+  ManualQuotePartRow,
+  QuoteCreationMethod,
+} from "../types/quickQuote";
 import { BendPlateQuotePhase } from "./method-phases/BendPlateQuotePhase";
 import { DxfQuotePhase } from "./method-phases/DxfQuotePhase";
 import { ExcelImportQuotePhase } from "./method-phases/ExcelImportQuotePhase";
@@ -24,10 +29,15 @@ interface MethodDetailsRouterProps {
   manualQuoteRows: ManualQuotePartRow[];
   onManualQuoteRowsChange: (rows: ManualQuotePartRow[]) => void;
   onExcelImportQuoteRowsChange: (rows: ManualQuotePartRow[]) => void;
+  excelImportQuoteRows: ManualQuotePartRow[];
   bendPlateQuoteItems: BendPlateQuoteItem[];
   onBendPlateAddItem: (item: BendPlateQuoteItem) => void;
   onBendPlateUpdateItem: (item: BendPlateQuoteItem) => void;
   onBendPlateRemoveItem: (id: string) => void;
+  onDxfMethodGeometriesChange: (geometries: DxfPartGeometry[]) => void;
+  dxfMethodGeometries: DxfPartGeometry[];
+  dxfMethodExcel: DxfMethodExcelSnapshot | null;
+  onDxfMethodExcelChange: (payload: DxfMethodExcelSnapshot | null) => void;
 }
 
 export function MethodDetailsRouter({
@@ -37,10 +47,15 @@ export function MethodDetailsRouter({
   manualQuoteRows,
   onManualQuoteRowsChange,
   onExcelImportQuoteRowsChange,
+  excelImportQuoteRows,
   bendPlateQuoteItems,
   onBendPlateAddItem,
   onBendPlateUpdateItem,
   onBendPlateRemoveItem,
+  onDxfMethodGeometriesChange,
+  dxfMethodGeometries,
+  dxfMethodExcel,
+  onDxfMethodExcelChange,
 }: MethodDetailsRouterProps) {
   if (!method) {
     return (
@@ -64,7 +79,17 @@ export function MethodDetailsRouter({
 
   switch (method) {
     case "dxf":
-      return shell(<DxfQuotePhase />);
+      return shell(
+        <DxfQuotePhase
+          materialType={materialType}
+          savedDxfGeometries={dxfMethodGeometries}
+          savedDxfExcel={dxfMethodExcel}
+          onSavedDxfExcelChange={onDxfMethodExcelChange}
+          onGeometriesApproved={onDxfMethodGeometriesChange}
+          onBack={onBackToMethodPicker}
+          onComplete={onBackToMethodPicker}
+        />
+      );
     case "manualAdd":
       return shell(
         <ManualQuotePhase
@@ -80,6 +105,9 @@ export function MethodDetailsRouter({
         <ExcelImportQuotePhase
           materialType={materialType}
           onRowsChange={onExcelImportQuoteRowsChange}
+          savedRows={excelImportQuoteRows}
+          onBack={onBackToMethodPicker}
+          onComplete={onBackToMethodPicker}
         />
       );
     case "bendPlate":

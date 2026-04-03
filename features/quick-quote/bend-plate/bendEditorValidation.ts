@@ -41,6 +41,32 @@ export function getBendEditorValidationIssues(form: BendPlateFormState): string[
       if (!angleOk(z.angle2Deg)) issues.push("included angle 2 (°)");
       break;
     }
+    case "omega": {
+      const o = form.omega;
+      if (!(o.aMm > 0)) issues.push("segment A (mm)");
+      if (!(o.bMm > 0)) issues.push("segment B (mm)");
+      if (!(o.cMm > 0)) issues.push("segment C (mm)");
+      if (!(o.dMm > 0)) issues.push("segment D (mm)");
+      if (!(o.eMm > 0)) issues.push("segment E (mm)");
+      if (!angleOk(o.angle1Deg)) issues.push("included angle 1 (°)");
+      if (!angleOk(o.angle2Deg)) issues.push("included angle 2 (°)");
+      if (!angleOk(o.angle3Deg)) issues.push("included angle 3 (°)");
+      if (!angleOk(o.angle4Deg)) issues.push("included angle 4 (°)");
+      break;
+    }
+    case "gutter": {
+      const g = form.gutter;
+      if (!(g.aMm > 0)) issues.push("segment A (mm)");
+      if (!(g.bMm > 0)) issues.push("segment B (mm)");
+      if (!(g.cMm > 0)) issues.push("segment C (mm)");
+      if (!(g.dMm > 0)) issues.push("segment D (mm)");
+      if (!(g.eMm > 0)) issues.push("segment E (mm)");
+      if (!angleOk(g.angle1Deg)) issues.push("included angle 1 (°)");
+      if (!angleOk(g.angle2Deg)) issues.push("included angle 2 (°)");
+      if (!angleOk(g.angle3Deg)) issues.push("included angle 3 (°)");
+      if (!angleOk(g.angle4Deg)) issues.push("included angle 4 (°)");
+      break;
+    }
     case "custom": {
       const c = form.custom;
       const n = Math.min(7, Math.max(2, Math.floor(c.segmentCount) || 2));
@@ -49,9 +75,9 @@ export function getBendEditorValidationIssues(form: BendPlateFormState): string[
         if (!(len > 0)) issues.push(`segment ${i + 1} length (mm)`);
       }
       for (let i = 0; i < n - 1; i++) {
-        const a = c.anglesDeg[i] ?? 180;
-        if (!Number.isFinite(a) || a < 0 || a > 180) {
-          issues.push(`angle after segment ${i + 1} (°)`);
+        const a = c.anglesDeg[i] ?? 0;
+        if (!Number.isFinite(a) || a < -360 || a > 360) {
+          issues.push(`turn after segment ${i + 1} (°)`);
         }
       }
       break;

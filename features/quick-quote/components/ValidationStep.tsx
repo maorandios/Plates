@@ -83,6 +83,8 @@ interface ValidationStepProps {
   rows: ValidationRow[];
   onBack: () => void;
   onContinue: (selectedRows: ValidationRow[]) => void;
+  /** When `dxfUpload`, CTA copy targets the DXF review step instead of stock/pricing. */
+  embedMode?: "dxfUpload";
 }
 
 export function ValidationStep({
@@ -90,6 +92,7 @@ export function ValidationStep({
   rows,
   onBack,
   onContinue,
+  embedMode,
 }: ValidationStepProps) {
   const [reportOpen, setReportOpen] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
@@ -238,7 +241,9 @@ export function ValidationStep({
             Back to upload
           </Button>
           <Button type="button" onClick={() => setCalcOpen(true)}>
-            Continue to stock & pricing
+            {embedMode === "dxfUpload"
+              ? "Continue to DXF review"
+              : "Continue to stock & pricing"}
           </Button>
         </div>
       </div>
@@ -263,14 +268,22 @@ export function ValidationStep({
         open={calcOpen}
         onOpenChange={setCalcOpen}
         rows={rows}
-        title="Plates for calculation"
-        description="Choose which plates to include in this quote run. You can skip errors or warnings, or pick specific parts only. Next you will enter stock sheet sizes and purchase price per kg before calculation."
-        countMessage={(n) =>
-          n === 1
-            ? "1 plate will be included in this calculation."
-            : `${n} plates will be included in this calculation.`
+        title={embedMode === "dxfUpload" ? "Plates for review" : "Plates for calculation"}
+        description={
+          embedMode === "dxfUpload"
+            ? "Choose which BOM lines to carry into the DXF part review. You can exclude errors or warnings, or pick specific parts only."
+            : "Choose which plates to include in this quote run. You can skip errors or warnings, or pick specific parts only. Next you will enter stock sheet sizes and purchase price per kg before calculation."
         }
-        confirmLabel="Start calculation"
+        countMessage={(n) =>
+          embedMode === "dxfUpload"
+            ? n === 1
+              ? "1 plate will continue to DXF review."
+              : `${n} plates will continue to DXF review.`
+            : n === 1
+              ? "1 plate will be included in this calculation."
+              : `${n} plates will be included in this calculation.`
+        }
+        confirmLabel={embedMode === "dxfUpload" ? "Continue" : "Start calculation"}
         onConfirm={onContinue}
       />
     </div>

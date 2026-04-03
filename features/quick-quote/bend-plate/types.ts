@@ -1,6 +1,6 @@
 import type { PlateFinish } from "../lib/plateFields";
 
-export type BendTemplateId = "l" | "u" | "z" | "custom";
+export type BendTemplateId = "l" | "u" | "z" | "omega" | "gutter" | "custom";
 
 export interface BendPlateGlobalParams {
   /** Steel grade / designation (e.g. S235). */
@@ -37,11 +37,46 @@ export interface ZTemplateParams {
   angle2Deg: number;
 }
 
+/**
+ * Ω-shaped profile (5 segments, 4 bends): left flange → up → across → down → right flange.
+ * Path: right → up → right → down → right; defaults 90° included angles.
+ */
+export interface OmegaTemplateParams {
+  aMm: number;
+  bMm: number;
+  cMm: number;
+  dMm: number;
+  eMm: number;
+  angle1Deg: number;
+  angle2Deg: number;
+  angle3Deg: number;
+  angle4Deg: number;
+}
+
+/**
+ * Gutter (5 segments, 4 bends): left lip → left wall → floor → right wall → right lip.
+ * Path: west → south → east → north → east (outward-facing top flanges); defaults 90° included angles.
+ */
+export interface GutterTemplateParams {
+  aMm: number;
+  bMm: number;
+  cMm: number;
+  dMm: number;
+  eMm: number;
+  angle1Deg: number;
+  angle2Deg: number;
+  angle3Deg: number;
+  angle4Deg: number;
+}
+
 /** Up to 7 straight segments; `anglesDeg` has length `segmentCount − 1` (max 6). */
 export interface CustomTemplateParams {
   segmentCount: number;
   segmentsMm: number[];
-  /** Included angle between legs after each segment (°), 0–180 — same as L/U/Z. */
+  /**
+   * Path turn after each segment (°): positive = CCW, negative = CW; 0 = straight.
+   * Quotes with `bendAngleSemantic: "internal"` store legacy included angles (0–180) until migrated on load.
+   */
   anglesDeg: number[];
 }
 
@@ -61,20 +96,27 @@ export interface BendPlateFormState {
   l: LTemplateParams;
   u: UTemplateParams;
   z: ZTemplateParams;
+  omega: OmegaTemplateParams;
+  gutter: GutterTemplateParams;
   custom: CustomTemplateParams;
 }
 
 export interface BendPlateQuoteItem {
   id: string;
   inputMethod: "bend_plate";
-  /** When set, L/U/Z/custom angle fields are included angles (°); omit = legacy path-turn values. */
-  bendAngleSemantic?: "internal";
+  /**
+   * `internal` — L/U/Z/Ω/gutter use included angle (°) in saved fields.
+   * `path_turn` — custom template `anglesDeg` are signed path turns (saved after migration).
+   */
+  bendAngleSemantic?: "internal" | "path_turn";
   template: BendTemplateId;
   global: BendPlateGlobalParams;
   /** Snapshot of the template-specific params that were active */
   l: LTemplateParams;
   u: UTemplateParams;
   z: ZTemplateParams;
+  omega: OmegaTemplateParams;
+  gutter: GutterTemplateParams;
   custom: CustomTemplateParams;
   calc: BendPlateCalculation;
 }

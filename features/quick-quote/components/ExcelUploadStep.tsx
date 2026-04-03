@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Check,
   Trash2,
+  ArrowLeft,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { MaterialType } from "@/types/materials";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
+import { MethodPhaseMetricStrip } from "./method-phases/MethodPhaseMetricStrip";
 import { readExcelHeaders, parseExcelFileWithMapping } from "@/lib/parsers/excelParser";
 import type { ColumnMapping, ExcelRow } from "@/types";
 import type { ExcelHeadersResult } from "@/lib/parsers/excelParser";
@@ -40,6 +51,12 @@ import {
   PLATE_FINISH_OPTIONS,
   type PlateFinish,
 } from "../lib/plateFields";
+import type { ManualQuotePartRow } from "../types/quickQuote";
+import {
+  excelRowsToManualQuoteRows,
+  getManualQuoteValidationLines,
+  manualQuoteRowsToRestoredExcelRows,
+} from "../lib/manualQuoteParts";
 
 const NONE = "__none__";
 
@@ -52,6 +69,14 @@ interface ExcelUploadStepProps {
   onQuoteImportRowsChange?: (data: ExcelRow[]) => void;
   /** Quote import: material density from General — used for estimated total weight. */
   quoteImportDensityKgPerM3?: number;
+  /** Quote import: plate family label from General (split sidebar). */
+  quoteImportPlateTypeLabel?: string;
+  /** Quote import: validates Complete against manual-quote rules. */
+  quoteImportMaterialType?: MaterialType;
+  onPhaseBack?: () => void;
+  onPhaseComplete?: () => void;
+  /** Saved quote lines — reopening Import Excel list starts at review with this data. */
+  quoteImportRestoredRows?: ManualQuotePartRow[];
 }
 
 interface ExcelMetrics {
@@ -112,21 +137,50 @@ function finishStringToPlateFinish(s: string | undefined): PlateFinish {
   return DEFAULT_PLATE_FINISH;
 }
 
+const QUOTE_IMPORT_PHASE_VIEWPORT =
+  "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
+
 export function ExcelUploadStep({
   onDataApproved,
   variant = "dxf",
   onQuoteImportRowsChange,
   quoteImportDensityKgPerM3,
+  quoteImportPlateTypeLabel,
+  quoteImportMaterialType,
+  onPhaseBack,
+  onPhaseComplete,
+  quoteImportRestoredRows,
 }: ExcelUploadStepProps) {
-  const [subStep, setSubStep] = useState<ExcelSubStep>(1);
+  const [subStep, setSubStep] = useState<ExcelSubStep>(() => {
+    if (
+      variant === "quoteImport" &&
+      quoteImportRestoredRows &&
+      quoteImportRestoredRows.length > 0
+    ) {
+      return 3;
+    }
+    return 1;
+  });
   const [file, setFile] = useState<File | null>(null);
   const [arrayBuffer, setArrayBuffer] = useState<ArrayBuffer | null>(null);
   const [headersResult, setHeadersResult] = useState<ExcelHeadersResult | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
-  const [parsedRows, setParsedRows] = useState<ExcelRow[] | null>(null);
+  const [parsedRows, setParsedRows] = useState<ExcelRow[] | null>(() => {
+    if (
+      variant === "quoteImport" &&
+      quoteImportRestoredRows &&
+      quoteImportRestoredRows.length > 0
+    ) {
+      return manualQuoteRowsToRestoredExcelRows(quoteImportRestoredRows);
+    }
+    return null;
+  });
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [phaseBackConfirmOpen, setPhaseBackConfirmOpen] = useState(false);
+  const [phaseCompleteDialogOpen, setPhaseCompleteDialogOpen] = useState(false);
+  const [phaseCompleteLines, setPhaseCompleteLines] = useState<string[]>([]);
 
   const activeMappingFields = useMemo(
     () => (variant === "quoteImport" ? QUOTE_IMPORT_MAPPING_FIELDS : MAPPING_FIELDS),
@@ -269,6 +323,41 @@ export function ExcelUploadStep({
     }
   }, [variant, onQuoteImportRowsChange]);
 
+  const handleQuotePhaseBack = useCallback(() => {
+    if (variant !== "quoteImport" || !onPhaseBack) return;
+    if (subStep === 1 && !file) {
+      onQuoteImportRowsChange?.([]);
+      onPhaseBack();
+      return;
+    }
+    setPhaseBackConfirmOpen(true);
+  }, [variant, onPhaseBack, onQuoteImportRowsChange, subStep, file]);
+
+  const confirmQuotePhaseBack = useCallback(() => {
+    handleRemoveFile();
+    setPhaseBackConfirmOpen(false);
+    onPhaseBack?.();
+  }, [handleRemoveFile, onPhaseBack]);
+
+  const handleQuotePhaseComplete = useCallback(() => {
+    if (variant !== "quoteImport" || !onPhaseComplete || !quoteImportMaterialType) return;
+    if (subStep !== 3 || !parsedRows?.length) {
+      setPhaseCompleteLines([
+        "Finish upload, column mapping, and review so at least one row is in the table before completing.",
+      ]);
+      setPhaseCompleteDialogOpen(true);
+      return;
+    }
+    const manualRows = excelRowsToManualQuoteRows(parsedRows, quoteImportMaterialType);
+    const lines = getManualQuoteValidationLines(manualRows);
+    if (lines) {
+      setPhaseCompleteLines(lines);
+      setPhaseCompleteDialogOpen(true);
+      return;
+    }
+    onPhaseComplete();
+  }, [variant, onPhaseComplete, quoteImportMaterialType, subStep, parsedRows]);
+
   const patchParsedRow = useCallback((id: string, patch: Partial<ExcelRow>) => {
     setParsedRows((prev) =>
       prev ? prev.map((r) => (r.id === id ? { ...r, ...patch } : r)) : null
@@ -370,8 +459,31 @@ export function ExcelUploadStep({
   const uploadInputId =
     variant === "quoteImport" ? "excel-upload-quote-import" : "excel-upload";
 
-  return (
-    <div className="space-y-6">
+  const quoteImportRightHeader = useMemo(() => {
+    if (variant !== "quoteImport") return { title: "", desc: "" };
+    switch (subStep) {
+      case 1:
+        return {
+          title: "Upload spreadsheet",
+          desc: "Drop an Excel or CSV file, or browse. Column mapping follows on the next step.",
+        };
+      case 2:
+        return {
+          title: "Map columns",
+          desc: "Match each field to a workbook column. Part number is required.",
+        };
+      case 3:
+        return {
+          title: "Review data",
+          desc: "Edit values or remove lines. Tables below stay in sync with the summary on the left.",
+        };
+      default:
+        return { title: "", desc: "" };
+    }
+  }, [variant, subStep]);
+
+  const mainColumn = (
+    <div className={cn(variant === "quoteImport" ? "space-y-4" : "space-y-6")}>
       <Card className="border-primary/20">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between gap-2">
@@ -420,17 +532,15 @@ export function ExcelUploadStep({
 
       {subStep === 1 && (
         <Card>
-          <CardHeader>
-            <CardTitle>
-              {variant === "quoteImport" ? "Import Excel list" : "Upload Excel/CSV"}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {variant === "quoteImport"
-                ? "Upload a spreadsheet with part dimensions and quantities for this quote."
-                : "Upload your bill of materials with part details"}
-            </p>
-          </CardHeader>
-          <CardContent>
+          {variant !== "quoteImport" ? (
+            <CardHeader>
+              <CardTitle>Upload Excel/CSV</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Upload your bill of materials with part details
+              </p>
+            </CardHeader>
+          ) : null}
+          <CardContent className={variant === "quoteImport" ? "pt-6" : undefined}>
             <div
               onDrop={handleDrop}
               onDragOver={handleDragOver}
@@ -636,46 +746,6 @@ export function ExcelUploadStep({
         <>
           <Card>
             <CardHeader>
-              <CardTitle>List metrics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="space-y-1 rounded-lg border bg-card p-4">
-                  <p className="text-sm text-muted-foreground">Plates</p>
-                  <p className="text-2xl font-semibold">
-                    {formatInteger(quoteImportMetrics.plateLines)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Line items</p>
-                </div>
-                <div className="space-y-1 rounded-lg border bg-card p-4">
-                  <p className="text-sm text-muted-foreground">Quantity</p>
-                  <p className="text-2xl font-semibold">
-                    {formatInteger(quoteImportMetrics.totalQty)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Total pieces</p>
-                </div>
-                <div className="space-y-1 rounded-lg border bg-card p-4">
-                  <p className="text-sm text-muted-foreground">Area (m²)</p>
-                  <p className="text-2xl font-semibold">
-                    {formatDecimal(quoteImportMetrics.totalAreaM2, 3)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Σ width × length × qty</p>
-                </div>
-                <div className="space-y-1 rounded-lg border bg-card p-4">
-                  <p className="text-sm text-muted-foreground">Weight (kg)</p>
-                  <p className="text-2xl font-semibold">
-                    {formatDecimal(quoteImportMetrics.totalWeightKg, 1)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Σ area × thickness × density (General)
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>Review and edit</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 {formatInteger(parsedRows.length)} rows — adjust values or remove lines as needed.
@@ -811,17 +881,26 @@ export function ExcelUploadStep({
                 </Table>
               </div>
               <p className="text-xs text-muted-foreground mt-4">
-                When finished, use <span className="font-medium text-foreground">Continue</span> at the
-                bottom of the page to proceed to stock and pricing.
+                Use <span className="font-medium text-foreground">Complete</span> above to save the list
+                and return to quote method. Use the stepper{" "}
+                <span className="font-medium text-foreground">Continue</span> when you are ready for
+                stock and pricing.
               </p>
             </CardContent>
           </Card>
 
-          <div className="flex items-center justify-between">
-            <Button variant="outline" onClick={handleBackToMapping}>
-              Back to Mapping
-            </Button>
-          </div>
+          {file ? (
+            <div className="flex items-center justify-between">
+              <Button variant="outline" onClick={handleBackToMapping}>
+                Back to Mapping
+              </Button>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-2 max-w-xl">
+              This table was restored from your saved quote. To change column mapping, upload a new
+              file from step 1 — that replaces the list.
+            </p>
+          )}
         </>
       )}
 
@@ -935,6 +1014,132 @@ export function ExcelUploadStep({
           </div>
         </>
       )}
+    </div>
+  );
+
+  if (variant !== "quoteImport") {
+    return mainColumn;
+  }
+
+  const m = quoteImportMetrics;
+  const qtySidebar = m ? formatInteger(m.totalQty) : "—";
+  const areaSidebar = m ? formatDecimal(m.totalAreaM2, 2) : "—";
+  const wtSidebar = m ? formatDecimal(m.totalWeightKg, 1) : "—";
+  const pendingSub = "Totals appear after you review the mapped list";
+
+  return (
+    <div
+      className={cn(
+        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
+        QUOTE_IMPORT_PHASE_VIEWPORT
+      )}
+    >
+      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-border/80">
+          <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
+              Import Excel list
+            </h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Upload a spreadsheet with part dimensions and quantities for this quote.
+            </p>
+            {quoteImportPlateTypeLabel ? (
+              <p className="text-xs text-muted-foreground pt-1">
+                Plate type from General:{" "}
+                <span className="font-medium text-foreground">{quoteImportPlateTypeLabel}</span>
+              </p>
+            ) : null}
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/70">
+            <MethodPhaseMetricStrip
+              label="Quantity"
+              value={qtySidebar}
+              sub={m ? "Sum of line quantities" : pendingSub}
+            />
+            <MethodPhaseMetricStrip
+              label="Area (m²)"
+              value={areaSidebar}
+              sub={m ? "Width × length × qty" : pendingSub}
+            />
+            <MethodPhaseMetricStrip
+              label="Weight (kg)"
+              value={wtSidebar}
+              sub={m ? "Thickness × area × density (General)" : pendingSub}
+            />
+          </div>
+        </aside>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-foreground">
+                  {quoteImportRightHeader.title}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">{quoteImportRightHeader.desc}</p>
+              </div>
+              {onPhaseBack && onPhaseComplete ? (
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={handleQuotePhaseBack}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back
+                  </Button>
+                  <Button type="button" className="gap-2" onClick={handleQuotePhaseComplete}>
+                    <Check className="h-4 w-4" />
+                    Complete
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{mainColumn}</div>
+        </div>
+      </div>
+
+      <Dialog open={phaseBackConfirmOpen} onOpenChange={setPhaseBackConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leave Import Excel list?</DialogTitle>
+            <DialogDescription>
+              A file or mapping is in progress. Going back clears this import and removes lines added
+              from this step until you import again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setPhaseBackConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmQuotePhaseBack}>
+              Leave and go back
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={phaseCompleteDialogOpen} onOpenChange={setPhaseCompleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete import first</DialogTitle>
+            <DialogDescription>
+              Fix the following before you can complete and return to quote method.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-foreground">
+            {phaseCompleteLines.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button type="button" onClick={() => setPhaseCompleteDialogOpen(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

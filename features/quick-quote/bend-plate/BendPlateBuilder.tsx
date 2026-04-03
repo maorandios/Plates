@@ -64,6 +64,7 @@ import {
   formStateFromQuoteItem,
 } from "./defaults";
 import { getBendEditorValidationLines } from "./bendEditorValidation";
+import { OmegaProfileGlyph } from "./BendTemplateShapeGlyph";
 import { ProfilePreview2D } from "./ProfilePreview2D";
 import { ProfilePreview3D } from "./ProfilePreview3D";
 
@@ -71,7 +72,9 @@ const TEMPLATE_OPTIONS: { id: BendTemplateId; label: string; hint: string }[] = 
   { id: "l", label: "L", hint: "Two legs" },
   { id: "u", label: "U", hint: "Channel" },
   { id: "z", label: "Z", hint: "Zig-zag" },
-  { id: "custom", label: "Custom", hint: "≤ 7 segments" },
+  { id: "omega", label: "Omega", hint: "5 segments · Ω profile" },
+  { id: "gutter", label: "Gutter", hint: "5 segments · U-tray, outward lips" },
+  { id: "custom", label: "Custom", hint: "≤ 7 segments · signed path turns" },
 ];
 
 function templateLabel(id: BendTemplateId): string {
@@ -168,12 +171,14 @@ function snapshotItem(
   return {
     id: existingId ?? nanoid(),
     inputMethod: "bend_plate",
-    bendAngleSemantic: "internal",
+    bendAngleSemantic: state.template === "custom" ? "path_turn" : "internal",
     template: state.template,
     global: { ...state.global },
     l: { ...state.l },
     u: { ...state.u },
     z: { ...state.z },
+    omega: { ...state.omega },
+    gutter: { ...state.gutter },
     custom: {
       segmentCount: state.custom.segmentCount,
       segmentsMm: [...state.custom.segmentsMm],
@@ -614,17 +619,37 @@ function BendPlateHub({
                     type="button"
                     onClick={() => pickShape(t.id)}
                     className={cn(
-                      "rounded-xl border-2 px-4 py-4 text-left transition-all",
+                      "rounded-xl border-2 text-left transition-all",
+                      t.id === "omega" ? "px-3 py-3" : "px-4 py-4",
                       "border-border bg-card hover:border-primary/50 hover:bg-muted/40 hover:shadow-sm",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     )}
                   >
-                    <span className="block text-lg font-bold text-foreground leading-tight tracking-tight">
-                      {t.label}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground leading-snug block mt-1">
-                      {t.hint}
-                    </span>
+                    {t.id === "omega" ? (
+                      <>
+                        <div
+                          className="mb-2 flex h-[4.25rem] items-center justify-center rounded-lg bg-muted/60 px-1"
+                          aria-hidden
+                        >
+                          <OmegaProfileGlyph className="h-11 w-[4.75rem] text-foreground" />
+                        </div>
+                        <span className="block text-lg font-bold text-foreground leading-tight tracking-tight">
+                          {t.label}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground leading-snug block mt-1">
+                          {t.hint}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block text-lg font-bold text-foreground leading-tight tracking-tight">
+                          {t.label}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground leading-snug block mt-1">
+                          {t.hint}
+                        </span>
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
@@ -681,6 +706,10 @@ function BendPlateShapeEditor({
           return { ...s, u: { ...d.u } };
         case "z":
           return { ...s, z: { ...d.z } };
+        case "omega":
+          return { ...s, omega: { ...d.omega } };
+        case "gutter":
+          return { ...s, gutter: { ...d.gutter } };
         case "custom":
           return { ...s, custom: { ...d.custom } };
         default:
@@ -796,7 +825,9 @@ function BendPlateShapeEditor({
                       Template dimensions
                     </h2>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      mm · included angle between legs (side view); 180° = straight
+                      {form.template === "custom"
+                        ? "mm · turn after each segment (+ = CCW, − = CW); 0° = straight"
+                        : "mm · included angle between legs (side view); 180° = straight"}
                     </p>
                   </div>
                   <Button
@@ -1120,6 +1151,256 @@ function TemplateFields({
     );
   }
 
+  if (t === "omega") {
+    const o = form.omega;
+    return (
+      <div className="space-y-3">
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Left flange A — bend 1
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="A (mm)"
+              value={o.aMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, omega: { ...s.omega, aMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 1 (°)"
+              value={o.angle1Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  omega: { ...s.omega, angle1Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Left wall B — bend 2
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="B (mm)"
+              value={o.bMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, omega: { ...s.omega, bMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 2 (°)"
+              value={o.angle2Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  omega: { ...s.omega, angle2Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Top C — bend 3
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="C (mm)"
+              value={o.cMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, omega: { ...s.omega, cMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 3 (°)"
+              value={o.angle3Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  omega: { ...s.omega, angle3Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Right wall D — bend 4
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="D (mm)"
+              value={o.dMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, omega: { ...s.omega, dMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 4 (°)"
+              value={o.angle4Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  omega: { ...s.omega, angle4Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Right flange E
+          </p>
+          <NumField
+            label="E (mm)"
+            value={o.eMm}
+            onChange={(n) =>
+              setForm((s) => ({ ...s, omega: { ...s.omega, eMm: Math.max(0, n) } }))
+            }
+            min={0}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (t === "gutter") {
+    const g = form.gutter;
+    return (
+      <div className="space-y-3">
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Left lip A — bend 1
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="A (mm)"
+              value={g.aMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, gutter: { ...s.gutter, aMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 1 (°)"
+              value={g.angle1Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  gutter: { ...s.gutter, angle1Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Left wall B — bend 2
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="B (mm)"
+              value={g.bMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, gutter: { ...s.gutter, bMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 2 (°)"
+              value={g.angle2Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  gutter: { ...s.gutter, angle2Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Floor C — bend 3
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="C (mm)"
+              value={g.cMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, gutter: { ...s.gutter, cMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 3 (°)"
+              value={g.angle3Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  gutter: { ...s.gutter, angle3Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Right wall D — bend 4
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="D (mm)"
+              value={g.dMm}
+              onChange={(n) =>
+                setForm((s) => ({ ...s, gutter: { ...s.gutter, dMm: Math.max(0, n) } }))
+              }
+              min={0}
+            />
+            <NumField
+              label="Included angle 4 (°)"
+              value={g.angle4Deg}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  gutter: { ...s.gutter, angle4Deg: Math.min(180, Math.max(0, n)) },
+                }))
+              }
+              step={0.1}
+            />
+          </div>
+        </div>
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Right lip E
+          </p>
+          <NumField
+            label="E (mm)"
+            value={g.eMm}
+            onChange={(n) =>
+              setForm((s) => ({ ...s, gutter: { ...s.gutter, eMm: Math.max(0, n) } }))
+            }
+            min={0}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (t === "custom") {
     const c = form.custom;
     const n = Math.min(7, Math.max(2, c.segmentCount));
@@ -1187,12 +1468,12 @@ function TemplateFields({
                       min={0}
                     />
                     <NumField
-                      label={`Angle after (${i + 1}) (°)`}
-                      value={c.anglesDeg[i] ?? 180}
+                      label={`Turn after (${i + 1}) (°)`}
+                      value={c.anglesDeg[i] ?? 0}
                       onChange={(v) =>
                         setForm((s) => {
                           const next = [...s.custom.anglesDeg];
-                          while (next.length < 6) next.push(180);
+                          while (next.length < 6) next.push(0);
                           next[i] = v;
                           return { ...s, custom: { ...s.custom, anglesDeg: next } };
                         })

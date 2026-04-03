@@ -173,6 +173,10 @@ export interface DxfPartGeometry {
   };
   /** Phase 2A: fully processed geometry — null if processing failed or not yet run */
   processedGeometry: ProcessedGeometry | null;
+  /** Quick Quote DXF review step: BOM quantity (default 1 when omitted). */
+  reviewQuantity?: number;
+  /** Quick Quote DXF review step: plate finish (default carbon when omitted). */
+  reviewFinish?: "carbon" | "galvanized" | "paint";
 }
 
 // ─── Match Status ─────────────────────────────────────────────────────────────
