@@ -10,8 +10,8 @@ import {
   Settings,
   ContactRound,
   FileText,
+  ClipboardList,
   UserCircle,
-  Ruler,
   Layers,
   ChevronDown,
   Receipt,
@@ -23,11 +23,6 @@ const SETTINGS_SUB = [
     label: "Account settings",
     href: "/settings/account",
     icon: UserCircle,
-  },
-  {
-    label: "Unit system",
-    href: "/settings/units",
-    icon: Ruler,
   },
   {
     label: "Materials configuration",
@@ -46,6 +41,11 @@ const mainNavItems = [
     label: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Quotes",
+    href: "/quotes",
+    icon: ClipboardList,
   },
   {
     label: "Quote",
@@ -101,9 +101,11 @@ export function Sidebar() {
           const isActive =
             item.href === "/"
               ? pathname === "/"
-              : item.href === "/quick-quote"
-                ? pathname === "/quick-quote" || pathname.startsWith("/quick-quote/")
-                : pathname === item.href || pathname.startsWith(item.href + "/");
+              : item.href === "/quotes"
+                ? pathname === "/quotes" || pathname.startsWith("/quotes/")
+                : item.href === "/quick-quote"
+                  ? pathname === "/quick-quote" || pathname.startsWith("/quick-quote/")
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
 
           return (
             <Link

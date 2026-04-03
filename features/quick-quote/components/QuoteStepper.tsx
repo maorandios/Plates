@@ -9,14 +9,10 @@ const STEPS: { step: QuickQuoteStep; label: string }[] = [
   { step: 1, label: "General" },
   { step: 2, label: "Quote method" },
   { step: 3, label: "Parts" },
-  { step: 4, label: "Method setup" },
-  { step: 5, label: "Upload Excel" },
-  { step: 6, label: "Upload DXF" },
-  { step: 7, label: "Analyze" },
-  { step: 8, label: "Stock & pricing" },
-  { step: 9, label: "Calculation" },
-  { step: 10, label: "Quote" },
-  { step: 11, label: "Finalize" },
+  { step: 4, label: "Stock & pricing" },
+  { step: 5, label: "Calculation" },
+  { step: 6, label: "Quote" },
+  { step: 7, label: "Finalize" },
 ];
 
 interface QuoteStepperProps {
@@ -122,7 +118,7 @@ export function QuoteStepper({
               Back
             </Button>
           )}
-          {showContinue && currentStep < 11 && onContinue && (
+          {showContinue && currentStep < 7 && onContinue && (
             <Button
               type="button"
               size="sm"

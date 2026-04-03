@@ -10,7 +10,7 @@ export default function SettingsMaterialsPage() {
     <PageContainer>
       <PageHeader
         title="Materials configuration"
-        description="Define pricing, cutting behavior, and default stock sheets for the materials you quote most often."
+        description="Define basic parameters and default stock sheet sizes for the materials you quote most often."
         actions={
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted shrink-0">
             <Layers className="h-5 w-5 text-muted-foreground" />

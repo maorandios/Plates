@@ -7,7 +7,6 @@ import {
   defaultCarbonSteelConfig,
   defaultStainlessSteelConfig,
   defaultAluminumConfig,
-  DEFAULT_STOCK_THICKNESSES_MM,
 } from "@/types/materials";
 
 const STORAGE_KEY_PREFIX = "plate_material_config_";
@@ -23,30 +22,12 @@ function defaultForType(materialType: MaterialType): MaterialConfig {
   return defaultCarbonSteelConfig();
 }
 
-type LegacyThicknessRule = {
-  thicknessMm?: number;
-  enabled?: boolean;
-};
-
-/** Normalize configs saved before thicknessesMm / after removing thickness rules. */
+/** Normalize configs from localStorage (legacy fields may be present). */
 function normalizeMaterialConfig(raw: unknown, materialType: MaterialType): MaterialConfig {
   const base = defaultForType(materialType);
   if (!raw || typeof raw !== "object") return base;
 
   const o = raw as Record<string, unknown>;
-  const legacyRules = o.thicknessRules as LegacyThicknessRule[] | undefined;
-  const fromRules =
-    Array.isArray(legacyRules) && legacyRules.length > 0
-      ? [
-          ...new Set(
-            legacyRules
-              .filter((r) => r && r.enabled !== false && typeof r.thicknessMm === "number")
-              .map((r) => r.thicknessMm as number)
-          ),
-        ].sort((a, b) => a - b)
-      : [...DEFAULT_STOCK_THICKNESSES_MM];
-
-  const fallbackThicknesses = fromRules.length > 0 ? fromRules : [...DEFAULT_STOCK_THICKNESSES_MM];
 
   const sheetsIn = o.stockSheets;
   let stockSheets: MaterialStockSheet[];
@@ -61,24 +42,10 @@ function normalizeMaterialConfig(raw: unknown, materialType: MaterialType): Mate
       const enabled = s.enabled !== false;
       const updatedAt = typeof s.updatedAt === "string" ? s.updatedAt : new Date().toISOString();
 
-      let thicknessesMm: number[] = [];
-      const tm = s.thicknessesMm;
-      if (Array.isArray(tm)) {
-        thicknessesMm = tm
-          .filter((x): x is number => typeof x === "number" && Number.isFinite(x) && x > 0)
-          .map((x) => x);
-      }
-      if (thicknessesMm.length === 0) {
-        thicknessesMm = [...fallbackThicknesses];
-      } else {
-        thicknessesMm = [...new Set(thicknessesMm)].sort((a, b) => a - b);
-      }
-
       return {
         id,
         widthMm,
         lengthMm,
-        thicknessesMm,
         enabled,
         updatedAt,
       };
@@ -91,7 +58,7 @@ function normalizeMaterialConfig(raw: unknown, materialType: MaterialType): Mate
     densityKgPerM3: typeof o.densityKgPerM3 === "number" ? o.densityKgPerM3 : base.densityKgPerM3,
     defaultMarkupPercent:
       typeof o.defaultMarkupPercent === "number" ? o.defaultMarkupPercent : base.defaultMarkupPercent,
-    pricingMode: o.pricingMode === "perM2" || o.pricingMode === "perKg" ? o.pricingMode : base.pricingMode,
+    pricingMode: "perKg",
     materialPrice: typeof o.materialPrice === "number" ? o.materialPrice : base.materialPrice,
     defaultScrapPercent:
       typeof o.defaultScrapPercent === "number" ? o.defaultScrapPercent : base.defaultScrapPercent,
@@ -120,7 +87,11 @@ export function getMaterialConfig(materialType: MaterialType): MaterialConfig {
 export function saveMaterialConfig(config: MaterialConfig): void {
   if (typeof window === "undefined") return;
   try {
-    const updated = { ...config, updatedAt: new Date().toISOString() };
+    const updated: MaterialConfig = {
+      ...config,
+      pricingMode: "perKg",
+      updatedAt: new Date().toISOString(),
+    };
     localStorage.setItem(materialStorageKey(config.materialType), JSON.stringify(updated));
     window.dispatchEvent(
       new CustomEvent("plate-material-config-changed", { detail: { materialType: config.materialType } })
@@ -152,11 +123,6 @@ export function getDefaultSheetForMaterial(materialType: MaterialType): Material
     (a, b) => b.widthMm * b.lengthMm - a.widthMm * a.lengthMm
   );
   return sorted[0];
-}
-
-/** Thicknesses available on a stock sheet (mm), deduped and sorted. */
-export function getThicknessesForStockSheet(sheet: MaterialStockSheet): number[] {
-  return [...new Set(sheet.thicknessesMm.filter((t) => t > 0))].sort((a, b) => a - b);
 }
 
 /** Subscribe to material config changes. */

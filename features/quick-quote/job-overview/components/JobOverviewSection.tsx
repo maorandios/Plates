@@ -37,8 +37,13 @@ export function JobOverviewSection({
 
   const sheetSubtext =
     model.estimatedSheetCount === 1
-      ? "Approx. 1 sheet (from stock + utilization estimate)"
-      : `Approx. ${formatInteger(model.estimatedSheetCount)} sheets`;
+      ? "Approx. 1 sheet (rect-pack estimate)"
+      : `Approx. ${formatInteger(model.estimatedSheetCount)} sheets (rect-pack)`;
+
+  const wasteSubtext =
+    model.grossMaterialAreaM2 > 0
+      ? `${formatDecimal((model.wasteAreaM2 / model.grossMaterialAreaM2) * 100, 1)}% of gross sheet area`
+      : "Configure stock to see waste estimate";
 
   return (
     <section className="space-y-6">
@@ -77,6 +82,11 @@ export function JobOverviewSection({
           title="Utilization"
           value={`${formatDecimal(model.utilizationPct, 1)}%`}
           subtext={model.utilizationBand}
+        />
+        <JobOverviewCard
+          title="Waste area"
+          value={formatAreaM2(model.wasteAreaM2)}
+          subtext={wasteSubtext}
         />
         <JobOverviewCard
           title="Cut length"

@@ -1,4 +1,5 @@
 import { thicknessGroupKey } from "@/lib/nesting/stockConfiguration";
+import { rectPackEstimate } from "@/lib/quotes/rectPackNesting";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -13,8 +14,6 @@ import type {
   UtilizationBand,
 } from "./jobOverview.types";
 
-/** Same yield assumption as `deriveQuoteSelection` sheet estimate. */
-const NEST_YIELD_ASSUMPTION = 0.67;
 
 function safeFinite(n: number, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
@@ -81,25 +80,50 @@ export function stockLinesForThickness(
 }
 
 /**
- * Pick the stock size that needs the fewest sheets for this net area (matches quote logic).
+ * Pick the stock size that needs the fewest sheets for this net area.
+ * Uses rect-pack when individual part dimensions are available, otherwise
+ * falls back to a single-rectangle proxy for the aggregate area.
  */
 export function estimateSheetsForNetArea(
   netAreaM2: number,
-  stockLines: { sheetLengthMm: number; sheetWidthMm: number }[]
+  stockLines: { sheetLengthMm: number; sheetWidthMm: number }[],
+  parts?: QuotePartRow[]
 ): { sheetCount: number; lengthMm: number; widthMm: number } | null {
   const net = Math.max(0, safeFinite(netAreaM2));
   if (net <= 0 || stockLines.length === 0) return null;
 
+  // Use rect-pack when part-level data is available
+  if (parts && parts.length > 0) {
+    const packParts = parts.map((p) => ({
+      thicknessMm: p.thicknessMm,
+      widthMm: p.widthMm,
+      lengthMm: p.lengthMm,
+      areaM2: p.areaM2,
+      qty: p.qty,
+    }));
+    const result = rectPackEstimate(packParts, stockLines);
+
+    // Find which sheet size was picked most (best result)
+    if (result.perThickness.length > 0) {
+      // Return the single thickness result (this fn is called per-thickness)
+      const th = result.perThickness[0];
+      return {
+        sheetCount: th.sheetCount,
+        lengthMm: th.sheetLengthMm,
+        widthMm: th.sheetWidthMm,
+      };
+    }
+  }
+
+  // Fallback: treat entire net area as one rectangle proxy, pick best sheet size
   let bestSheets = Infinity;
   let best: { sheetCount: number; lengthMm: number; widthMm: number } | null = null;
 
   for (const line of stockLines) {
     const sheetM2 = (line.sheetLengthMm * line.sheetWidthMm) / 1_000_000;
     if (sheetM2 <= 0) continue;
-    const sheets = Math.max(
-      1,
-      Math.ceil(net / (sheetM2 * NEST_YIELD_ASSUMPTION))
-    );
+    // Use a generous 75% area estimate as fallback (better than the old 67%)
+    const sheets = Math.max(1, Math.ceil(net / (sheetM2 * 0.75)));
     if (sheets < bestSheets) {
       bestSheets = sheets;
       best = {
@@ -187,7 +211,9 @@ export function buildMaterialBreakdown(
       r.stockSheetsCaption = "No sheet sizes for this thickness in the quote";
       continue;
     }
-    const est = estimateSheetsForNetArea(r.netAreaM2, lines);
+    // Pass the parts for this thickness so rect-pack can use exact dimensions
+    const thicknessParts = parts.filter((p) => p.thicknessMm === r.thicknessMm);
+    const est = estimateSheetsForNetArea(r.netAreaM2, lines, thicknessParts.length > 0 ? thicknessParts : undefined);
     r.stockSheetsCaption = est
       ? formatStockSheetsCaption(est)
       : "Could not estimate sheets for this line";
@@ -279,6 +305,7 @@ export function buildJobOverview(input: BuildJobOverviewInput): JobOverviewModel
     estimatedSheetCount: Math.max(0, Math.round(safeFinite(mfgParams.estimatedSheetCount))),
     utilizationPct,
     utilizationBand: utilizationToBand(utilizationPct),
+    wasteAreaM2: Math.max(0, safeFinite(mfgParams.wasteAreaM2)),
     totalCutLengthMm: safeFinite(jobSummary.totalCutLengthMm),
     totalPierceCount: Math.max(0, Math.round(safeFinite(jobSummary.totalPierceCount))),
     complexity,

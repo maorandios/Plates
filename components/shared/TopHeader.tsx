@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils";
 
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Dashboard",
+  "/quotes": "Quotes",
   "/quick-quote": "Quote",
   "/settings": "Settings",
   "/settings/account": "Account settings",
-  "/settings/units": "Unit system",
   "/settings/materials": "Materials configuration",
   "/settings/bill-and-usage": "Bill and usage",
   "/clients": "Clients",
@@ -18,12 +18,12 @@ const ROUTE_LABELS: Record<string, string> = {
 
 function getPageLabel(pathname: string): string {
   if (ROUTE_LABELS[pathname]) return ROUTE_LABELS[pathname];
+  if (pathname.startsWith("/quotes")) return "Quotes";
   if (pathname.startsWith("/quick-quote")) return "Quote";
   if (pathname.match(/\/clients\//)) return "Client";
   if (pathname.startsWith("/settings/")) {
     const seg = pathname.replace(/\/$/, "").split("/")[2];
     if (seg === "account") return "Account settings";
-    if (seg === "units") return "Unit system";
     if (seg === "materials") return "Materials configuration";
     if (seg === "bill-and-usage") return "Bill and usage";
   }

@@ -36,6 +36,8 @@ export interface JobOverviewModel {
   estimatedSheetCount: number;
   utilizationPct: number;
   utilizationBand: UtilizationBand;
+  /** Gross sheet area minus net plate area — actual material waste from rect-pack. */
+  wasteAreaM2: number;
   totalCutLengthMm: number;
   totalPierceCount: number;
   complexity: ComplexityLevel;

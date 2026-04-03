@@ -24,10 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getClients } from "@/lib/store";
-import { getAppPreferences } from "@/lib/settings/appPreferences";
 import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import type { QuickQuoteJobDetails } from "../types/quickQuote";
-import { QUICK_QUOTE_CURRENCY_OPTIONS } from "../lib/quickQuoteCurrencies";
 
 interface GeneralSectionProps {
   value: QuickQuoteJobDetails;
@@ -48,9 +46,6 @@ export function GeneralSection({
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [copied, setCopied] = useState(false);
-
-  const prefs = getAppPreferences();
-  const unitSystemLabel = prefs.unitSystem === "metric" ? "Metric (mm, m², kg)" : "Imperial (in, ft², lb)";
 
   const clientsSorted = getClients()
     .filter((c) => c.status === "active")
@@ -166,32 +161,6 @@ export function GeneralSection({
             <SelectItem value="aluminum">{MATERIAL_TYPE_LABELS.aluminum}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-
-      {/* Currency (read-only display) */}
-      <div className="space-y-2">
-        <Label htmlFor="currency-display" className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-          Currency
-        </Label>
-        <Input
-          id="currency-display"
-          readOnly
-          value={value.currency}
-          className="bg-muted/40 cursor-default border-muted-foreground/20 text-muted-foreground"
-        />
-      </div>
-
-      {/* Unit system (read-only display) */}
-      <div className="space-y-2">
-        <Label htmlFor="unit-system-display" className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-          Unit system
-        </Label>
-        <Input
-          id="unit-system-display"
-          readOnly
-          value={unitSystemLabel}
-          className="bg-muted/40 cursor-default border-muted-foreground/20 text-muted-foreground"
-        />
       </div>
 
       {/* Notes */}

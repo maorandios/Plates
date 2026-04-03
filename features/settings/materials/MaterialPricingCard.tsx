@@ -10,14 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { MaterialConfig, MaterialPricingMode } from "@/types/materials";
+import type { MaterialConfig } from "@/types/materials";
 
 interface MaterialPricingCardProps {
   config: MaterialConfig;
@@ -39,7 +32,7 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
 
   const persist = useCallback(
     (patch: Partial<MaterialConfig>) => {
-      onUpdate(patch);
+      onUpdate({ ...patch, pricingMode: "perKg" });
     },
     [onUpdate]
   );
@@ -83,7 +76,7 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
   return (
     <Card className="border border-border shadow-none">
       <CardHeader>
-        <CardTitle className="text-base">Pricing</CardTitle>
+        <CardTitle className="text-base">Basics Parameters</CardTitle>
         <CardDescription>
           Material cost, markup, and scrap defaults for {config.displayName}.
         </CardDescription>
@@ -91,24 +84,7 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
       <CardContent className="space-y-4 max-w-lg">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor={`${config.materialType}-pricing-mode`}>Pricing mode</Label>
-            <Select
-              value={config.pricingMode}
-              onValueChange={(v) => persist({ pricingMode: v as MaterialPricingMode })}
-            >
-              <SelectTrigger id={`${config.materialType}-pricing-mode`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="perKg">Price per kg</SelectItem>
-                <SelectItem value="perM2">Price per m²</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`${config.materialType}-price`}>
-              Material price ({config.pricingMode === "perKg" ? "per kg" : "per m²"})
-            </Label>
+            <Label htmlFor={`${config.materialType}-price`}>Material price (per kg)</Label>
             <Input
               id={`${config.materialType}-price`}
               type="number"
@@ -120,9 +96,6 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
               placeholder="0.00"
             />
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor={`${config.materialType}-density`}>
               Density (kg/m³)
@@ -138,9 +111,12 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
               placeholder="7850"
             />
             <p className="text-[11px] text-muted-foreground">
-              Used when pricing mode is per kg to estimate weight from area.
+              Used to estimate weight from plate area.
             </p>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor={`${config.materialType}-markup`}>Default markup (%)</Label>
             <Input

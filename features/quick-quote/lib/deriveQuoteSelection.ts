@@ -5,6 +5,7 @@ import {
   hasDuplicateSheetSizes,
   seedSheetsForThickness,
 } from "./quoteStockAvailability";
+import { rectPackEstimate } from "@/lib/quotes/rectPackNesting";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -122,9 +123,6 @@ function scaleByWeightFactor(
   return Math.min(1, selectedWeight / baseWeight);
 }
 
-/** Assumed nesting yield per sheet when estimating sheet count from purchased stock (UI mock). */
-const NEST_YIELD_ASSUMPTION = 0.67;
-
 function hasSheetsArray(r: ThicknessStockInput | unknown): r is ThicknessStockInput {
   return (
     typeof r === "object" &&
@@ -239,57 +237,57 @@ function formatStockSummary(rows: ThicknessStockInput[], pricePerKg: number): st
 }
 
 /**
- * For each thickness, pick the stock line that needs the fewest sheets (best fit among listed sizes).
+ * Runs a shelf/row rect-pack simulation to estimate sheet count, gross area,
+ * and true waste for the given parts against the configured stock sheet sizes.
+ *
+ * Each thickness in `stockRows` shares the same candidate sheet sizes (we pick
+ * whichever size minimises the sheet count for that thickness's parts).
  */
 function estimateSheetUsageFromStock(
   parts: QuotePartRow[],
   stockRows: ThicknessStockInput[]
 ): Pick<
   ManufacturingParameters,
-  "totalSheetAreaM2" | "estimatedSheetCount" | "utilizationPct"
+  "totalSheetAreaM2" | "estimatedSheetCount" | "utilizationPct" | "wasteAreaM2"
 > {
-  const netByTh = new Map<number, number>();
-  for (const p of parts) {
-    const a = p.areaM2 * p.qty;
-    netByTh.set(p.thicknessMm, (netByTh.get(p.thicknessMm) ?? 0) + a);
-  }
-  let totalSheetAreaM2 = 0;
-  let estimatedSheetCount = 0;
-  const totalNet = parts.reduce((a, p) => a + p.areaM2 * p.qty, 0);
-
+  // Collect all unique sheet sizes across all thickness rows
+  const allSheetSizes = new Map<string, { sheetWidthMm: number; sheetLengthMm: number }>();
   for (const row of stockRows) {
-    const net = netByTh.get(row.thicknessMm) ?? 0;
-    if (row.sheets.length === 0) continue;
-
-    let bestSheets = Infinity;
-    let bestSheetM2 = 0;
-    for (const line of row.sheets) {
-      const sheetM2 =
-        (line.sheetLengthMm * line.sheetWidthMm) / 1_000_000;
-      if (sheetM2 <= 0) continue;
-      const sheets = Math.max(
-        1,
-        Math.ceil(net / (sheetM2 * NEST_YIELD_ASSUMPTION))
-      );
-      if (sheets < bestSheets) {
-        bestSheets = sheets;
-        bestSheetM2 = sheetM2;
+    for (const s of row.sheets) {
+      if (s.sheetLengthMm > 0 && s.sheetWidthMm > 0) {
+        const key = `${s.sheetWidthMm}x${s.sheetLengthMm}`;
+        if (!allSheetSizes.has(key)) {
+          allSheetSizes.set(key, { sheetWidthMm: s.sheetWidthMm, sheetLengthMm: s.sheetLengthMm });
+        }
       }
     }
-    if (bestSheets === Infinity || bestSheetM2 <= 0) continue;
-    totalSheetAreaM2 += bestSheets * bestSheetM2;
-    estimatedSheetCount += bestSheets;
   }
 
-  const utilizationPct =
-    totalSheetAreaM2 > 0
-      ? roundN((totalNet / totalSheetAreaM2) * 100, 1)
-      : MOCK_MFG_PARAMETERS.utilizationPct;
+  const stockLines = [...allSheetSizes.values()];
+  if (stockLines.length === 0 || parts.length === 0) {
+    return {
+      totalSheetAreaM2: 0,
+      estimatedSheetCount: 0,
+      utilizationPct: MOCK_MFG_PARAMETERS.utilizationPct,
+      wasteAreaM2: 0,
+    };
+  }
+
+  const packParts = parts.map((p) => ({
+    thicknessMm: p.thicknessMm,
+    widthMm: p.widthMm,
+    lengthMm: p.lengthMm,
+    areaM2: p.areaM2,
+    qty: p.qty,
+  }));
+
+  const result = rectPackEstimate(packParts, stockLines);
 
   return {
-    totalSheetAreaM2: roundN(totalSheetAreaM2, 2),
-    estimatedSheetCount,
-    utilizationPct,
+    totalSheetAreaM2: result.totalSheetAreaM2,
+    estimatedSheetCount: result.estimatedSheetCount,
+    utilizationPct: result.utilizationPct > 0 ? result.utilizationPct : MOCK_MFG_PARAMETERS.utilizationPct,
+    wasteAreaM2: result.totalWasteAreaM2,
   };
 }
 
@@ -320,6 +318,10 @@ export function scaleManufacturingAndPricing(
     ),
     totalSheetAreaM2: roundN(
       Math.max(baseMfg.totalSheetAreaM2 * f, baseMfg.totalSheetAreaM2 * 0.12),
+      2
+    ),
+    wasteAreaM2: roundN(
+      Math.max(baseMfg.wasteAreaM2 * f, 0),
       2
     ),
     estimatedSheetCount: Math.max(

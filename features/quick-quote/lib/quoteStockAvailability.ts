@@ -2,7 +2,6 @@ import type { MaterialType } from "@/types/materials";
 import type { PurchasedSheetSize } from "@/types/settings";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import { filterCatalogForThickness } from "@/lib/settings/purchasedSheetsCatalog";
-import { thicknessGroupKey } from "@/lib/nesting/stockConfiguration";
 import { nanoid } from "@/lib/utils/nanoid";
 import type { QuoteSheetStockLine } from "../types/quickQuote";
 
@@ -11,14 +10,6 @@ export function sheetFootprintKey(widthMm: number, lengthMm: number): string {
   const a = Math.min(widthMm, lengthMm);
   const b = Math.max(widthMm, lengthMm);
   return `${Math.round(a * 1000) / 1000}x${Math.round(b * 1000) / 1000}`;
-}
-
-export function thicknessMatchesStockList(
-  thicknessMm: number,
-  thicknessesMm: number[]
-): boolean {
-  const key = thicknessGroupKey(thicknessMm);
-  return thicknessesMm.some((t) => thicknessGroupKey(t) === key);
 }
 
 export function hasDuplicateSheetSizes(sheets: QuoteSheetStockLine[]): boolean {
@@ -33,7 +24,7 @@ export function hasDuplicateSheetSizes(sheets: QuoteSheetStockLine[]): boolean {
 }
 
 /**
- * Seeds quote lines from material settings (stock sheets that include this thickness)
+ * Seeds quote lines from material settings (all enabled stock sheet sizes apply to every thickness)
  * plus the global purchased-sheet catalog for this thickness. Dedupes by footprint.
  */
 export function seedSheetsForThickness(
@@ -65,7 +56,6 @@ export function seedSheetsForThickness(
 
   for (const stock of cfg.stockSheets) {
     if (!stock.enabled) continue;
-    if (!thicknessMatchesStockList(thicknessMm, stock.thicknessesMm)) continue;
     push(stock.widthMm, stock.lengthMm, { materialSheetId: stock.id });
   }
 

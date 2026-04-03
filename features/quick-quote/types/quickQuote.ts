@@ -11,18 +11,7 @@ export type DxfMethodExcelSnapshot = {
   rows: ExcelRow[];
 };
 
-export type QuickQuoteStep =
-  | 1
-  | 2
-  | 3
-  | 4
-  | 5
-  | 6
-  | 7
-  | 8
-  | 9
-  | 10
-  | 11;
+export type QuickQuoteStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 /** How the user builds this quote after General — set in phase 2, details in phase 3. */
 export type QuoteCreationMethod =
@@ -175,6 +164,8 @@ export interface ManufacturingParameters {
   utilizationPct: number;
   estimatedSheetCount: number;
   totalNetPlateAreaM2: number;
+  /** Gross sheet area minus net plate area (m²); result of rect-pack estimate. */
+  wasteAreaM2: number;
   scrapAllowancePct: number;
   totalCutLengthMm: number;
   totalPierceCount: number;

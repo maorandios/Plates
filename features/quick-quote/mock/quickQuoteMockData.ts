@@ -342,6 +342,7 @@ export const MOCK_MFG_PARAMETERS: ManufacturingParameters = {
   utilizationPct: 67.4,
   estimatedSheetCount: 5,
   totalNetPlateAreaM2: 8.42,
+  wasteAreaM2: 4.08,
   scrapAllowancePct: 8.5,
   totalCutLengthMm: 28450,
   totalPierceCount: 312,

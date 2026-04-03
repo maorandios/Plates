@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { PartBreakdownTable } from "./PartBreakdownTable";
 import { JobOverviewSection } from "../job-overview/components/JobOverviewSection";
 import { MaterialBreakdownSection } from "../job-overview/components/MaterialBreakdownSection";
+import { NestingPreviewSection } from "../job-overview/components/NestingPreviewSection";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -114,6 +115,13 @@ export function QuoteSummaryStep({
 
           <Separator />
 
+          <NestingPreviewSection
+            parts={parts}
+            thicknessStock={thicknessStock}
+          />
+
+          <Separator />
+
           <MaterialBreakdownSection
             parts={parts}
             thicknessStock={thicknessStock}
@@ -144,7 +152,7 @@ export function QuoteSummaryStep({
 
       <div className="flex flex-wrap justify-between gap-3">
         <Button type="button" variant="ghost" className="text-muted-foreground" onClick={onBackToValidation}>
-          ← Back to validation
+          ← Back to quote setup
         </Button>
         <p className="text-xs text-muted-foreground">
           This quote workspace is a UI prototype. Actions and figures are not persisted or sent

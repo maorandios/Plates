@@ -18,10 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import type { MaterialConfig, MaterialStockSheet } from "@/types/materials";
-import { DEFAULT_STOCK_THICKNESSES_MM } from "@/types/materials";
 import { StockSheetForm } from "./StockSheetForm";
 import { nanoid } from "@/lib/utils/nanoid";
 
@@ -39,9 +37,8 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
     const now = new Date().toISOString();
     const newSheet: MaterialStockSheet = {
       id: nanoid(),
-      widthMm: 1250,
-      lengthMm: 2500,
-      thicknessesMm: [...DEFAULT_STOCK_THICKNESSES_MM],
+      widthMm: 1000,
+      lengthMm: 2000,
       enabled: true,
       updatedAt: now,
     };
@@ -92,7 +89,7 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
             <div>
               <CardTitle className="text-base">Stock sheets</CardTitle>
               <CardDescription>
-                For each size, list which thicknesses you stock. Used for quote sheet estimation.
+                Sheet sizes you purchase. These apply to every plate thickness in the quote stock step.
               </CardDescription>
             </div>
             <Button type="button" size="sm" onClick={handleAdd} disabled={isAdding || !!editingSheet}>
@@ -113,7 +110,6 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
                   <TableRow>
                     <TableHead className="w-[100px]">Width</TableHead>
                     <TableHead className="w-[100px]">Length</TableHead>
-                    <TableHead className="min-w-[200px]">Thicknesses</TableHead>
                     <TableHead className="w-[120px]">Area</TableHead>
                     <TableHead className="w-[88px] text-right">Actions</TableHead>
                   </TableRow>
@@ -121,9 +117,6 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
                 <TableBody>
                   {sorted.map((sheet) => {
                     const areaM2 = (sheet.widthMm * sheet.lengthMm) / 1_000_000;
-                    const th = [...new Set(sheet.thicknessesMm ?? [])]
-                      .filter((t) => t > 0)
-                      .sort((a, b) => a - b);
                     return (
                       <TableRow key={sheet.id}>
                         <TableCell className="font-medium whitespace-nowrap">
@@ -131,19 +124,6 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
                         </TableCell>
                         <TableCell className="font-medium whitespace-nowrap">
                           {formatLengthValue(sheet.lengthMm)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1.5 py-0.5">
-                            {th.map((mm) => (
-                              <Badge
-                                key={mm}
-                                variant="secondary"
-                                className="text-xs font-medium tabular-nums"
-                              >
-                                {formatLengthValue(mm)}
-                              </Badge>
-                            ))}
-                          </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {formatAreaValue(areaM2)}
