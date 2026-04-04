@@ -282,7 +282,7 @@ export function bendProfileBendAngles(state: BendPlateFormState): number[] {
   return [];
 }
 
-function buildForTemplate(
+export function buildForTemplate(
   template: BendTemplateId,
   s: BendPlateFormState
 ): { pts: Point2[]; straights: number[]; bends: number[] } {

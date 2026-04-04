@@ -559,20 +559,30 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   );
 
   const handleContinueToNextPhase = useCallback(() => {
-    const validGeometries = uploadedFiles
-      .filter((u) => u.parsed !== null)
-      .map((u) => {
-        const p = u.parsed!;
-        const qty = Math.max(1, Math.floor(Number(u.quantity)) || 1);
-        return {
-          ...p,
-          materialGrade: u.materialGrade.trim() || p.materialGrade,
-          reviewQuantity: qty,
-          reviewFinish: u.finish,
-        };
-      });
+    const validUploads = uploadedFiles.filter((u) => u.parsed !== null);
+    const validGeometries = validUploads.map((u) => {
+      const p = u.parsed!;
+      const qty = Math.max(1, Math.floor(Number(u.quantity)) || 1);
+      return {
+        ...p,
+        materialGrade: u.materialGrade.trim() || p.materialGrade,
+        reviewQuantity: qty,
+        reviewFinish: u.finish,
+      };
+    });
 
     if (validGeometries.length > 0) {
+      // Persist raw DXF text keyed by geometry ID so the export package can
+      // include the original file as-is (preserving holes and all entities).
+      validUploads.forEach((u) => {
+        if (u.parsed?.id && u.content) {
+          try {
+            localStorage.setItem(`dxf_raw_${u.parsed.id}`, u.content);
+          } catch {
+            // localStorage full — export will fall back to generated DXF
+          }
+        }
+      });
       onDataApproved(validGeometries);
     }
   }, [uploadedFiles, onDataApproved]);

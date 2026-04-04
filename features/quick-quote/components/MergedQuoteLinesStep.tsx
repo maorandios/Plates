@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, Check, RotateCcw } from "lucide-react";
+import { useCallback, useState } from "react";
+import { ArrowLeft, Check, Package, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,14 +12,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import type { DxfPartGeometry } from "@/types";
+import type { BendPlateQuoteItem } from "../bend-plate/types";
 import type { QuotePartRow } from "../types/quickQuote";
 import { PartBreakdownTable } from "./PartBreakdownTable";
+import { exportPartsPackage } from "@/lib/quotes/exportPartsPackage";
 
 const VIEWPORT = "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
 
 interface MergedQuoteLinesStepProps {
   parts: QuotePartRow[];
   currency: string;
+  referenceNumber: string;
+  dxfMethodGeometries: DxfPartGeometry[];
+  bendPlateQuoteItems: BendPlateQuoteItem[];
   onDeletePart: (row: QuotePartRow) => void;
   onBack: () => void;
   onReset: () => void;
@@ -31,6 +37,9 @@ interface MergedQuoteLinesStepProps {
 export function MergedQuoteLinesStep({
   parts,
   currency,
+  referenceNumber,
+  dxfMethodGeometries,
+  bendPlateQuoteItems,
   onDeletePart,
   onBack,
   onReset,
@@ -39,6 +48,22 @@ export function MergedQuoteLinesStep({
   canReset,
 }: MergedQuoteLinesStepProps) {
   const [resetOpen, setResetOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportPackage = useCallback(async () => {
+    if (parts.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      await exportPartsPackage(
+        parts,
+        dxfMethodGeometries,
+        bendPlateQuoteItems,
+        referenceNumber
+      );
+    } finally {
+      setExporting(false);
+    }
+  }, [parts, dxfMethodGeometries, bendPlateQuoteItems, referenceNumber, exporting]);
 
   return (
     <div
@@ -70,6 +95,16 @@ export function MergedQuoteLinesStep({
               >
                 <RotateCcw className="h-4 w-4" />
                 Reset
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                disabled={parts.length === 0 || exporting}
+                onClick={handleExportPackage}
+              >
+                <Package className="h-4 w-4" />
+                {exporting ? "Building…" : "Export package"}
               </Button>
               <Button
                 type="button"
