@@ -1,34 +1,43 @@
 /**
  * Lightweight rectangle-pack sheet estimator for Quick Quote.
  *
- * Replaces the fixed 67% yield assumption with an actual shelf/row packing
- * of part bounding boxes. Runs synchronously in < 150 ms for ~20 000 instances
- * (2 000 unique parts × qty 10), which is fine inside a useMemo.
+ * Algorithm: Maximal Rectangles (MaxRects) with multi-heuristic search.
  *
- * Algorithm: "First Fit Decreasing Height" shelf packing, largest-first sort,
- * with 0° / 90° rotation tried per part.  Two bin orientations (portrait and
- * landscape) are compared; the one that needs fewer sheets wins.
+ * For each thickness the packer automatically tries 6 combinations of:
+ *   Sort order  × Scoring heuristic:
+ *     - area   × BSSF  (Best Short Side Fit)
+ *     - area   × BAF   (Best Area Fit)
+ *     - long   × BSSF
+ *     - long   × BAF
+ *     - short  × BSSF
+ *     - short  × BAF
+ * …in both portrait and landscape bin orientations (12 runs total per stock
+ * size per thickness).  The combination that needs the fewest sheets wins.
  *
- * Safety: if a part is larger than the sheet it is counted as one extra sheet
- * (oversize flag) so the total is always >= the actual requirement.
+ * This removes two classes of failure from the earlier single-heuristic build:
+ *   1. "Staircase" columns of tall/narrow plates — long-side sort groups same-
+ *      height plates together so they fill a row before starting the next.
+ *   2. Interior holes — BAF scoring prefers the tightest-area free rect, which
+ *      keeps the waste consolidated at one edge rather than scattered.
+ *
+ * Performance: for ≤ 2 000 expanded instances all 12 runs are tried; above
+ * that threshold only the 2 most reliable combos run to stay under ~200 ms.
  */
+
+// ---------------------------------------------------------------------------
+// Public types (unchanged interface)
+// ---------------------------------------------------------------------------
 
 export interface RectPackPart {
   thicknessMm: number;
-  /** Bounding-box width of one instance (mm). */
   widthMm: number;
-  /** Bounding-box length of one instance (mm). */
   lengthMm: number;
-  /** Gross area of one instance in m² (width × length / 1e6). */
   areaM2: number;
-  /** Number of identical instances. */
   qty: number;
 }
 
 export interface RectPackStockLine {
-  /** Stock sheet width (mm), smaller dimension. */
   sheetWidthMm: number;
-  /** Stock sheet length (mm), larger dimension. */
   sheetLengthMm: number;
 }
 
@@ -53,45 +62,32 @@ export interface RectPackResult {
   perThickness: RectPackThicknessResult[];
 }
 
-/** One placed rectangle on a sheet (all values in mm). */
 export interface PlacedRect {
-  /** Distance from sheet left edge (mm). */
   x: number;
-  /** Distance from sheet top edge (mm). */
   y: number;
-  /** Placed width (may differ from original if rotated, mm). */
   w: number;
-  /** Placed height (may differ from original if rotated, mm). */
   h: number;
 }
 
-/** Visual layout for one sheet (for display/preview purposes). */
 export interface SheetLayout {
   thicknessMm: number;
   sheetWidthMm: number;
   sheetLengthMm: number;
-  /** 0-based index within the sequence for this thickness. */
   sheetIndex: number;
-  /** Total number of sheets needed for this thickness. */
   totalSheetsForThickness: number;
   placements: PlacedRect[];
-  /** Net plate area on this sheet (m²). */
   netAreaM2: number;
-  /** 0–100 utilization of this individual sheet. */
   utilizationPct: number;
 }
 
 export interface RectPackWithPlacementsResult {
   summary: RectPackResult;
-  /** Per-thickness layouts, up to maxSheetsPerThickness sheets each. */
   layouts: SheetLayout[];
 }
 
-/** Floating-point tolerance in mm for shelf edge comparisons. */
-const EPS_MM = 0.5;
-
-/** Extra gap / kerf allowance between parts (mm). */
-const DEFAULT_SPACING_MM = 5;
+// ---------------------------------------------------------------------------
+// Internal types
+// ---------------------------------------------------------------------------
 
 interface Instance {
   w: number;
@@ -99,162 +95,344 @@ interface Instance {
   areaMm2: number;
 }
 
+interface PlacedInstance extends Instance {
+  px: number;
+  py: number;
+  pw: number;
+  ph: number;
+}
+
+interface FreeRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const EPS_MM = 0.5;
+const DEFAULT_SPACING_MM = 0;
+
+/** Heuristics tried per bin orientation per stock size. */
+type ScoreMode = 'bssf' | 'baf';
+type SortMode  = 'area' | 'longSide' | 'shortSide';
+
+const ALL_SORT_MODES:  SortMode[]  = ['area', 'longSide', 'shortSide'];
+const ALL_SCORE_MODES: ScoreMode[] = ['bssf', 'baf'];
+
+/** Above this count only the 2 most reliable combos run. */
+const FAST_THRESHOLD = 2_000;
+
+// ---------------------------------------------------------------------------
+// Sorting
+// ---------------------------------------------------------------------------
+
+/** Sort by area descending */
+function sortByArea(arr: Instance[]): void {
+  arr.sort((a, b) => b.areaMm2 - a.areaMm2);
+}
+
+/** Sort by longer side descending — groups same-height plates together */
+function sortByLong(arr: Instance[]): void {
+  arr.sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h));
+}
+
+/** Sort by shorter side descending — fills wide rows first */
+function sortByShort(arr: Instance[]): void {
+  arr.sort((a, b) => Math.min(b.w, b.h) - Math.min(a.w, a.h));
+}
+
+function applySortMode(instances: Instance[], mode: SortMode): Instance[] {
+  const arr = [...instances];
+  if (mode === 'area')      sortByArea(arr);
+  else if (mode === 'longSide')  sortByLong(arr);
+  else                     sortByShort(arr);
+  return arr;
+}
+
+// ---------------------------------------------------------------------------
+// Scoring
+// ---------------------------------------------------------------------------
+
 /**
- * Expand `parts` (for one thickness) into a flat list of individual instances.
- * Clamps qty to a reasonable upper bound to avoid degenerate inputs.
+ * Returns a "fit quality" score; lower = better placement for the given part
+ * (fw × fh = part dimensions only) inside free rect `fr`.
+ *
+ * BSSF – Best Short Side Fit: minimize the shorter remaining dimension.
+ *         Avoids narrow slivers that become unusable.
+ * BAF  – Best Area Fit: minimize remaining free area.
+ *         Keeps waste consolidated → fewer interior holes.
  */
-function expandInstances(parts: RectPackPart[]): Instance[] {
+function fitScore(fr: FreeRect, fw: number, fh: number, mode: ScoreMode): number {
+  if (mode === 'bssf') return Math.min(fr.w - fw, fr.h - fh);
+  return fr.w * fr.h - fw * fh; // BAF
+}
+
+// ---------------------------------------------------------------------------
+// Instance expansion
+// ---------------------------------------------------------------------------
+
+function expandInstances(parts: RectPackPart[], mode: SortMode): Instance[] {
   const out: Instance[] = [];
   for (const p of parts) {
     const qty = Math.max(0, Math.min(Math.round(p.qty), 50_000));
     const w = Math.max(0, p.widthMm);
     const h = Math.max(0, p.lengthMm);
-    const areaMm2 = w * h;
-    for (let i = 0; i < qty; i++) {
-      out.push({ w, h, areaMm2 });
-    }
+    for (let i = 0; i < qty; i++) out.push({ w, h, areaMm2: w * h });
   }
-  // Sort largest first (max side descending) — FFD heuristic
-  out.sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h));
-  return out;
+  return applySortMode(out, mode);
 }
 
-/**
- * Pack as many instances as possible into a single sheet using shelf/row packing.
- * Tries 0° and 90° per part.
- * Returns which instances were placed and which remain for the next sheet.
- */
-function packOneSheet(
+// ---------------------------------------------------------------------------
+// MaxRects free-rect maintenance
+// ---------------------------------------------------------------------------
+
+function pruneFreeRects(rects: FreeRect[]): void {
+  for (let i = rects.length - 1; i >= 0; i--) {
+    const a = rects[i];
+    for (let j = 0; j < rects.length; j++) {
+      if (i === j) continue;
+      const b = rects[j];
+      if (
+        b.x <= a.x + EPS_MM &&
+        b.y <= a.y + EPS_MM &&
+        b.x + b.w >= a.x + a.w - EPS_MM &&
+        b.y + b.h >= a.y + a.h - EPS_MM
+      ) {
+        rects.splice(i, 1);
+        break;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Core MaxRects placer (one sheet)
+// ---------------------------------------------------------------------------
+
+/** Result when trackPositions=false */
+interface PackResult {
+  placed: Instance[];
+  remaining: Instance[];
+  usedAreaMm2: number;
+}
+/** Result when trackPositions=true */
+interface PackResultWithPos {
+  placed: PlacedInstance[];
+  remaining: Instance[];
+}
+
+function maxRectsOneSheet(
   instances: Instance[],
   binW: number,
   binH: number,
-  spacing: number
-): { placed: Instance[]; remaining: Instance[]; usedAreaMm2: number } {
-  const placed: Instance[] = [];
+  spacing: number,
+  scoreMode: ScoreMode,
+  trackPositions: false
+): PackResult;
+function maxRectsOneSheet(
+  instances: Instance[],
+  binW: number,
+  binH: number,
+  spacing: number,
+  scoreMode: ScoreMode,
+  trackPositions: true
+): PackResultWithPos;
+function maxRectsOneSheet(
+  instances: Instance[],
+  binW: number,
+  binH: number,
+  spacing: number,
+  scoreMode: ScoreMode,
+  trackPositions: boolean
+): PackResult | PackResultWithPos {
+  const placed: (Instance | PlacedInstance)[] = [];
   const remaining: Instance[] = [];
   let usedAreaMm2 = 0;
 
-  let x = 0;
-  let y = 0;
-  let rowH = 0;
+  const freeRects: FreeRect[] = [{ x: 0, y: 0, w: binW, h: binH }];
 
   for (const inst of instances) {
-    let didPlace = false;
+    // Try original orientation and 90° rotation
+    const orientations: [number, number][] =
+      Math.abs(inst.w - inst.h) < EPS_MM
+        ? [[inst.w, inst.h]]
+        : [[inst.w, inst.h], [inst.h, inst.w]];
 
-    // Try both orientations: original (w × h) and rotated (h × w)
-    for (const [iw, ih] of [
-      [inst.w, inst.h],
-      [inst.h, inst.w],
-    ] as [number, number][]) {
-      const fw = iw + spacing;
-      const fh = ih + spacing;
+    let bestScore = Infinity;
+    let bestFri   = -1;
+    let bestIw    = 0;
+    let bestIh    = 0;
 
-      // Try current shelf position
-      if (
-        x + fw <= binW + EPS_MM &&
-        y + fh <= binH + EPS_MM
-      ) {
-        x += fw;
-        rowH = Math.max(rowH, fh);
-        placed.push(inst);
-        usedAreaMm2 += inst.areaMm2;
-        didPlace = true;
-        break;
-      }
-
-      // Try opening a new row below current one
-      const newY = y + rowH;
-      if (
-        fw <= binW + EPS_MM &&
-        newY + fh <= binH + EPS_MM
-      ) {
-        y = newY;
-        rowH = fh;
-        x = fw;
-        placed.push(inst);
-        usedAreaMm2 += inst.areaMm2;
-        didPlace = true;
-        break;
+    for (let fri = 0; fri < freeRects.length; fri++) {
+      const fr = freeRects[fri];
+      for (const [iw, ih] of orientations) {
+        // Fit by raw size so parts can touch sheet edges.
+        // Inter-part gap is applied in split-space step below.
+        const fw = iw;
+        const fh = ih;
+        if (fw <= fr.w + EPS_MM && fh <= fr.h + EPS_MM) {
+          const s = fitScore(fr, fw, fh, scoreMode);
+          if (s < bestScore) {
+            bestScore = s;
+            bestFri   = fri;
+            bestIw    = iw;
+            bestIh    = ih;
+          }
+        }
       }
     }
 
-    if (!didPlace) {
+    if (bestFri === -1) {
       remaining.push(inst);
+      continue;
     }
+
+    const fr = freeRects[bestFri];
+    const px = fr.x;
+    const py = fr.y;
+    // Keep exactly `spacing` only between parts (right/bottom side),
+    // but never force a gap to the sheet edge.
+    const pr = Math.min(binW, px + bestIw + spacing);
+    const pb = Math.min(binH, py + bestIh + spacing);
+
+    if (trackPositions) {
+      (placed as PlacedInstance[]).push({ ...inst, px, py, pw: bestIw, ph: bestIh });
+    } else {
+      placed.push(inst);
+    }
+    usedAreaMm2 += inst.areaMm2;
+
+    // Split all overlapping free rects
+    const toAdd: FreeRect[] = [];
+    for (let i = freeRects.length - 1; i >= 0; i--) {
+      const r = freeRects[i];
+      const overlaps =
+        px < r.x + r.w - EPS_MM && pr > r.x + EPS_MM &&
+        py < r.y + r.h - EPS_MM && pb > r.y + EPS_MM;
+      if (!overlaps) continue;
+
+      freeRects.splice(i, 1);
+      if (r.x < px)      toAdd.push({ x: r.x, y: r.y, w: px - r.x,           h: r.h });
+      if (pr < r.x + r.w) toAdd.push({ x: pr,  y: r.y, w: r.x + r.w - pr,    h: r.h });
+      if (r.y < py)      toAdd.push({ x: r.x, y: r.y, w: r.w, h: py - r.y });
+      if (pb < r.y + r.h) toAdd.push({ x: r.x, y: pb,  w: r.w, h: r.y + r.h - pb });
+    }
+    freeRects.push(...toAdd);
+    pruneFreeRects(freeRects);
   }
 
-  return { placed, remaining, usedAreaMm2 };
+  if (trackPositions) {
+    return { placed: placed as PlacedInstance[], remaining };
+  }
+  return { placed: placed as Instance[], remaining, usedAreaMm2 };
 }
 
-/**
- * Pack all instances into as many sheets as needed.
- * Returns the number of sheets used and total gross area.
- */
+// ---------------------------------------------------------------------------
+// Multi-sheet packing for one combination
+// ---------------------------------------------------------------------------
+
 function packAllIntoSheets(
-  instances: Instance[],
+  sortedInstances: Instance[],
   binW: number,
   binH: number,
-  spacing: number
+  spacing: number,
+  scoreMode: ScoreMode
 ): { sheetCount: number; totalSheetAreaMm2: number; oversizeParts: number } {
   const sheetAreaMm2 = binW * binH;
-  let remaining = instances;
+  let remaining = sortedInstances;
   let sheetCount = 0;
   let oversizeParts = 0;
 
   while (remaining.length > 0) {
-    const { placed, remaining: next } = packOneSheet(remaining, binW, binH, spacing);
-
+    const { placed, remaining: next } = maxRectsOneSheet(
+      remaining, binW, binH, spacing, scoreMode, false
+    );
     if (placed.length === 0) {
-      // Every item left is oversize — allocate one sheet each
       oversizeParts += remaining.length;
       sheetCount += remaining.length;
       break;
     }
-
     sheetCount++;
     remaining = next;
   }
 
-  return {
-    sheetCount,
-    totalSheetAreaMm2: sheetCount * sheetAreaMm2,
-    oversizeParts,
-  };
+  return { sheetCount, totalSheetAreaMm2: sheetCount * sheetAreaMm2, oversizeParts };
+}
+
+// ---------------------------------------------------------------------------
+// Best-combination search
+// ---------------------------------------------------------------------------
+
+interface BestPackResult {
+  sheetCount: number;
+  totalSheetAreaMm2: number;
+  oversizeParts: number;
+  binW: number;
+  binH: number;
+  sortMode: SortMode;
+  scoreMode: ScoreMode;
 }
 
 /**
- * Try packing with a given bin size AND its 90°-swapped orientation;
- * return the result that uses fewer sheets.
+ * Try all sort × score combinations in both orientations.
+ * For large instance sets only the two most reliable combos run.
  */
-function bestPackForSheetSize(
-  instances: Instance[],
+function findBestPack(
+  rawInstances: Instance[],
   sheetWidthMm: number,
   sheetLengthMm: number,
   spacing: number
-): ReturnType<typeof packAllIntoSheets> {
-  const portrait = packAllIntoSheets(
-    instances,
-    sheetWidthMm,
-    sheetLengthMm,
-    spacing
-  );
-  if (Math.abs(sheetWidthMm - sheetLengthMm) < EPS_MM) {
-    // Square sheet — orientation doesn't matter
-    return portrait;
+): BestPackResult {
+  const large = rawInstances.length > FAST_THRESHOLD;
+  const sortModes:  SortMode[]  = large ? ['area', 'longSide']   : ALL_SORT_MODES;
+  const scoreModes: ScoreMode[] = large ? ['bssf', 'baf']        : ALL_SCORE_MODES;
+  const isSquare = Math.abs(sheetWidthMm - sheetLengthMm) < EPS_MM;
+  const orientations: [number, number][] = isSquare
+    ? [[sheetWidthMm, sheetLengthMm]]
+    : [[sheetWidthMm, sheetLengthMm], [sheetLengthMm, sheetWidthMm]];
+
+  let best: BestPackResult | null = null;
+
+  for (const [binW, binH] of orientations) {
+    for (const sortMode of sortModes) {
+      const sorted = applySortMode(rawInstances, sortMode);
+      for (const scoreMode of scoreModes) {
+        const res = packAllIntoSheets(sorted, binW, binH, spacing, scoreMode);
+        if (
+          best === null ||
+          res.sheetCount < best.sheetCount ||
+          (res.sheetCount === best.sheetCount &&
+            res.totalSheetAreaMm2 < best.totalSheetAreaMm2)
+        ) {
+          best = { ...res, binW, binH, sortMode, scoreMode };
+        }
+      }
+    }
   }
-  const landscape = packAllIntoSheets(
-    instances,
-    sheetLengthMm,
-    sheetWidthMm,
-    spacing
-  );
-  return portrait.sheetCount <= landscape.sheetCount ? portrait : landscape;
+
+  // Should never be null (rawInstances > 0 is checked by callers)
+  return best!;
 }
 
-/**
- * For one thickness, try every configured sheet size and pick the one that
- * needs the fewest sheets.
- */
+// ---------------------------------------------------------------------------
+// Per-thickness estimation
+// ---------------------------------------------------------------------------
+
+function buildBaseInstances(parts: RectPackPart[]): Instance[] {
+  const out: Instance[] = [];
+  for (const p of parts) {
+    const qty = Math.max(0, Math.min(Math.round(p.qty), 50_000));
+    const w = Math.max(0, p.widthMm);
+    const h = Math.max(0, p.lengthMm);
+    for (let i = 0; i < qty; i++) out.push({ w, h, areaMm2: w * h });
+  }
+  return out;
+}
+
 function estimateForThickness(
   thicknessMm: number,
   parts: RectPackPart[],
@@ -263,11 +441,11 @@ function estimateForThickness(
 ): RectPackThicknessResult | null {
   if (stockLines.length === 0) return null;
 
-  const instances = expandInstances(parts);
-  if (instances.length === 0) return null;
+  const baseInstances = buildBaseInstances(parts);
+  if (baseInstances.length === 0) return null;
 
-  const totalNetMm2 = instances.reduce((s, i) => s + i.areaMm2, 0);
-  const totalNetM2 = totalNetMm2 / 1_000_000;
+  const totalNetMm2 = baseInstances.reduce((s, i) => s + i.areaMm2, 0);
+  const totalNetM2  = totalNetMm2 / 1_000_000;
 
   let bestResult: RectPackThicknessResult | null = null;
 
@@ -275,17 +453,12 @@ function estimateForThickness(
     const { sheetWidthMm, sheetLengthMm } = line;
     if (sheetWidthMm <= 0 || sheetLengthMm <= 0) continue;
 
-    const pack = bestPackForSheetSize(
-      instances,
-      sheetWidthMm,
-      sheetLengthMm,
-      spacing
-    );
+    const pack = findBestPack(baseInstances, sheetWidthMm, sheetLengthMm, spacing);
 
-    const sheetAreaM2 = (sheetWidthMm * sheetLengthMm) / 1_000_000;
-    const totalSheetAreaM2 = (pack.totalSheetAreaMm2) / 1_000_000;
-    const wasteAreaM2 = Math.max(0, totalSheetAreaM2 - totalNetM2);
-    const utilizationPct =
+    const sheetAreaM2      = (sheetWidthMm * sheetLengthMm) / 1_000_000;
+    const totalSheetAreaM2 = pack.totalSheetAreaMm2 / 1_000_000;
+    const wasteAreaM2      = Math.max(0, totalSheetAreaM2 - totalNetM2);
+    const utilizationPct   =
       totalSheetAreaM2 > 0
         ? Math.round((totalNetM2 / totalSheetAreaM2) * 1000) / 10
         : 0;
@@ -315,45 +488,29 @@ function estimateForThickness(
   return bestResult;
 }
 
-/**
- * Main entry point. Groups parts by thickness, runs shelf packing against
- * each configured stock sheet size, and returns aggregate totals.
- *
- * @param parts         All quote part rows (any thickness mix).
- * @param stockLines    Sheet sizes available (applies to all thicknesses).
- * @param spacingMm     Kerf / clearance gap between parts (default 5 mm).
- */
+// ---------------------------------------------------------------------------
+// Public API — aggregate estimate
+// ---------------------------------------------------------------------------
+
 export function rectPackEstimate(
   parts: RectPackPart[],
   stockLines: RectPackStockLine[],
   spacingMm = DEFAULT_SPACING_MM
 ): RectPackResult {
-  // Group parts by thickness
   const byThickness = new Map<number, RectPackPart[]>();
   for (const p of parts) {
-    const th = p.thicknessMm;
-    const existing = byThickness.get(th);
-    if (existing) {
-      existing.push(p);
-    } else {
-      byThickness.set(th, [p]);
-    }
+    const ex = byThickness.get(p.thicknessMm);
+    if (ex) ex.push(p); else byThickness.set(p.thicknessMm, [p]);
   }
 
   const perThickness: RectPackThicknessResult[] = [];
-
   for (const [thicknessMm, thParts] of byThickness) {
-    const result = estimateForThickness(
-      thicknessMm,
-      thParts,
-      stockLines,
-      spacingMm
-    );
-    if (result) perThickness.push(result);
+    const r = estimateForThickness(thicknessMm, thParts, stockLines, spacingMm);
+    if (r) perThickness.push(r);
   }
 
   const totalSheetAreaM2 = perThickness.reduce((s, r) => s + r.sheetCount * r.sheetAreaM2, 0);
-  const totalNetAreaM2 = perThickness.reduce((s, r) => s + r.netAreaM2, 0);
+  const totalNetAreaM2   = perThickness.reduce((s, r) => s + r.netAreaM2, 0);
   const totalWasteAreaM2 = Math.max(0, totalSheetAreaM2 - totalNetAreaM2);
   const estimatedSheetCount = perThickness.reduce((s, r) => s + r.sheetCount, 0);
   const utilizationPct =
@@ -362,9 +519,9 @@ export function rectPackEstimate(
       : 0;
 
   return {
-    totalSheetAreaM2: Math.round(totalSheetAreaM2 * 100) / 100,
-    totalNetAreaM2: Math.round(totalNetAreaM2 * 100) / 100,
-    totalWasteAreaM2: Math.round(totalWasteAreaM2 * 100) / 100,
+    totalSheetAreaM2:   Math.round(totalSheetAreaM2 * 100) / 100,
+    totalNetAreaM2:     Math.round(totalNetAreaM2 * 100) / 100,
+    totalWasteAreaM2:   Math.round(totalWasteAreaM2 * 100) / 100,
     estimatedSheetCount,
     utilizationPct,
     perThickness,
@@ -372,73 +529,9 @@ export function rectPackEstimate(
 }
 
 // ---------------------------------------------------------------------------
-// Placement-tracking variant (for visual preview only)
+// Placement-tracking variant (visual preview)
 // ---------------------------------------------------------------------------
 
-interface PlacedInstance extends Instance {
-  px: number;  // placed x (mm)
-  py: number;  // placed y (mm)
-  pw: number;  // placed width (mm, respects rotation)
-  ph: number;  // placed height (mm, respects rotation)
-}
-
-/**
- * Like `packOneSheet` but records x/y position for every placed rectangle.
- */
-function packOneSheetWithPositions(
-  instances: Instance[],
-  binW: number,
-  binH: number,
-  spacing: number
-): { placed: PlacedInstance[]; remaining: Instance[] } {
-  const placed: PlacedInstance[] = [];
-  const remaining: Instance[] = [];
-
-  let x = 0;
-  let y = 0;
-  let rowH = 0;
-
-  for (const inst of instances) {
-    let didPlace = false;
-
-    for (const [iw, ih] of [
-      [inst.w, inst.h],
-      [inst.h, inst.w],
-    ] as [number, number][]) {
-      const fw = iw + spacing;
-      const fh = ih + spacing;
-
-      if (x + fw <= binW + EPS_MM && y + fh <= binH + EPS_MM) {
-        placed.push({ ...inst, px: x, py: y, pw: iw, ph: ih });
-        x += fw;
-        rowH = Math.max(rowH, fh);
-        didPlace = true;
-        break;
-      }
-
-      const newY = y + rowH;
-      if (fw <= binW + EPS_MM && newY + fh <= binH + EPS_MM) {
-        placed.push({ ...inst, px: 0, py: newY, pw: iw, ph: ih });
-        y = newY;
-        rowH = fh;
-        x = fw;
-        didPlace = true;
-        break;
-      }
-    }
-
-    if (!didPlace) {
-      remaining.push(inst);
-    }
-  }
-
-  return { placed, remaining };
-}
-
-/**
- * Run placement-tracking packing for one thickness against its best sheet size.
- * Returns `SheetLayout[]` for the first `maxSheets` sheets only.
- */
 function layoutForThickness(
   thicknessMm: number,
   parts: RectPackPart[],
@@ -447,34 +540,23 @@ function layoutForThickness(
   maxSheets: number
 ): SheetLayout[] {
   const { sheetWidthMm, sheetLengthMm } = bestLine;
-  const sheetAreaMm2 = sheetWidthMm * sheetLengthMm;
+  const baseInstances = buildBaseInstances(parts);
+  if (baseInstances.length === 0) return [];
 
-  // Determine which orientation (portrait vs landscape) the main estimate used
-  // by comparing sheet counts — mirror the same choice as bestPackForSheetSize.
-  const instances = expandInstances(parts);
-  if (instances.length === 0) return [];
+  // Re-run best-combination search to find the winning sort+score+orientation
+  const pack = findBestPack(baseInstances, sheetWidthMm, sheetLengthMm, spacing);
+  const { binW, binH, sortMode, scoreMode } = pack;
+  const sheetAreaMm2 = binW * binH;
+  const totalSheetsForThickness = pack.sheetCount;
 
-  const portraitCount = packAllIntoSheets(instances, sheetWidthMm, sheetLengthMm, spacing).sheetCount;
-  const landscapeCount = sheetWidthMm !== sheetLengthMm
-    ? packAllIntoSheets(instances, sheetLengthMm, sheetWidthMm, spacing).sheetCount
-    : portraitCount;
-  const useLandscape = landscapeCount < portraitCount;
-  const binW = useLandscape ? sheetLengthMm : sheetWidthMm;
-  const binH = useLandscape ? sheetWidthMm : sheetLengthMm;
-
-  const totalSheetsForThickness = Math.min(portraitCount, landscapeCount);
   const layouts: SheetLayout[] = [];
-  let remaining: Instance[] = [...instances];
+  let remaining: Instance[] = applySortMode(baseInstances, sortMode);
   let sheetIndex = 0;
 
   while (remaining.length > 0 && sheetIndex < maxSheets) {
-    const { placed, remaining: next } = packOneSheetWithPositions(
-      remaining,
-      binW,
-      binH,
-      spacing
+    const { placed, remaining: next } = maxRectsOneSheet(
+      remaining, binW, binH, spacing, scoreMode, true
     );
-
     if (placed.length === 0) break;
 
     const sheetNetMm2 = placed.reduce((s, p) => s + p.areaMm2, 0);
@@ -499,15 +581,6 @@ function layoutForThickness(
   return layouts;
 }
 
-/**
- * Same as `rectPackEstimate` but also returns per-sheet placement data for
- * the first `maxSheetsPerThickness` sheets of each thickness (for visual preview).
- *
- * @param parts                   All quote part rows.
- * @param stockLines              Available sheet sizes.
- * @param spacingMm               Gap between parts (default 5 mm).
- * @param maxSheetsPerThickness   Max sheets to generate placement data for (default 3).
- */
 export function rectPackWithPlacements(
   parts: RectPackPart[],
   stockLines: RectPackStockLine[],
@@ -516,34 +589,25 @@ export function rectPackWithPlacements(
 ): RectPackWithPlacementsResult {
   const summary = rectPackEstimate(parts, stockLines, spacingMm);
 
-  // Build a lookup: thicknessMm → best sheet line used by the estimator
   const byThickness = new Map<number, RectPackPart[]>();
   for (const p of parts) {
-    const th = p.thicknessMm;
-    const existing = byThickness.get(th);
-    if (existing) existing.push(p);
-    else byThickness.set(th, [p]);
+    const ex = byThickness.get(p.thicknessMm);
+    if (ex) ex.push(p); else byThickness.set(p.thicknessMm, [p]);
   }
 
   const layouts: SheetLayout[] = [];
-
   for (const th of summary.perThickness) {
     const thParts = byThickness.get(th.thicknessMm);
     if (!thParts) continue;
-
-    const bestLine: RectPackStockLine = {
-      sheetWidthMm: th.sheetWidthMm,
-      sheetLengthMm: th.sheetLengthMm,
-    };
-
-    const thLayouts = layoutForThickness(
-      th.thicknessMm,
-      thParts,
-      bestLine,
-      spacingMm,
-      maxSheetsPerThickness
+    layouts.push(
+      ...layoutForThickness(
+        th.thicknessMm,
+        thParts,
+        { sheetWidthMm: th.sheetWidthMm, sheetLengthMm: th.sheetLengthMm },
+        spacingMm,
+        maxSheetsPerThickness
+      )
     );
-    layouts.push(...thLayouts);
   }
 
   return { summary, layouts };

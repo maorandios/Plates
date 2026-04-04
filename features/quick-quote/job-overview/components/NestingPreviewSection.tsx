@@ -199,7 +199,7 @@ export function NestingPreviewSection({
       qty: p.qty,
     }));
 
-    return rectPackWithPlacements(packParts, stockLines, 5, 3);
+    return rectPackWithPlacements(packParts, stockLines, 0, 3);
   }, [parts, thicknessStock]);
 
   if (!result || result.layouts.length === 0) return null;
@@ -229,8 +229,8 @@ export function NestingPreviewSection({
             Nesting layout
           </h2>
           <p className="text-xs text-muted-foreground max-w-prose">
-            Bounding-box shelf-pack — parts sorted largest first, 0°/90°
-            rotation allowed, 5 mm gap between plates. Showing up to 3 sheets
+            Bounding-box nest estimate — parts sorted and rotated (0°/90°)
+            automatically, 0 mm gap between plates and sheet edges. Showing up to 3 sheets
             per thickness.
           </p>
         </div>
