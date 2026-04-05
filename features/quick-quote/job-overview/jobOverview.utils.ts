@@ -1,5 +1,9 @@
 import { thicknessGroupKey } from "@/lib/nesting/stockConfiguration";
-import { rectPackEstimate } from "@/lib/quotes/rectPackNesting";
+import {
+  rectPackEstimate,
+  type RectPackPart,
+  type RectPackStockLine,
+} from "@/lib/quotes/rectPackNesting";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -11,6 +15,7 @@ import type {
   ComplexityLevel,
   JobOverviewModel,
   MaterialBreakdownRow,
+  StockSheetSizeBreakdownRow,
   UtilizationBand,
 } from "./jobOverview.types";
 
@@ -222,28 +227,162 @@ export function buildMaterialBreakdown(
   return rows;
 }
 
-/** Recharts treemap leaves: area ∝ job share (mass or net area proxy). */
-export function buildMaterialTreemapLeaves(
-  rows: MaterialBreakdownRow[]
-): Array<{
-  name: string;
-  value: number;
-  sharePct: number;
-  netAreaM2: number;
-  massKg: number;
-  stockSheetsCaption: string | null;
-}> {
-  return rows.map((r) => ({
-    name: r.label,
-    value: Math.max(
-      r.massKg > 0 ? r.massKg : r.netAreaM2 * 100,
-      1e-6
-    ),
-    sharePct: r.share * 100,
-    netAreaM2: r.netAreaM2,
-    massKg: r.massKg,
-    stockSheetsCaption: r.stockSheetsCaption,
-  }));
+/** Unique stock sheet sizes from quote stock (same rule as nesting preview). */
+export function stockLinesFromThicknessStock(
+  thicknessStock?: ThicknessStockInput[] | null
+): RectPackStockLine[] {
+  if (!thicknessStock?.length) return [];
+  const sizeMap = new Map<string, RectPackStockLine>();
+  for (const row of thicknessStock) {
+    for (const s of row.sheets) {
+      if (s.sheetLengthMm > 0 && s.sheetWidthMm > 0) {
+        const key = `${s.sheetWidthMm}x${s.sheetLengthMm}`;
+        if (!sizeMap.has(key)) {
+          sizeMap.set(key, {
+            sheetWidthMm: s.sheetWidthMm,
+            sheetLengthMm: s.sheetLengthMm,
+          });
+        }
+      }
+    }
+  }
+  return [...sizeMap.values()];
+}
+
+/**
+ * Nesting run **per material × thickness** (not merged). Each line is the chosen stock sheet
+ * size for that grade/thickness group plus gross / net / waste / utilization.
+ */
+export function buildStockSheetSizeBreakdown(
+  parts: QuotePartRow[],
+  thicknessStock?: ThicknessStockInput[] | null
+): StockSheetSizeBreakdownRow[] {
+  const stockLines = stockLinesFromThicknessStock(thicknessStock);
+  if (stockLines.length === 0 || parts.length === 0) return [];
+
+  const byMatTh = new Map<string, QuotePartRow[]>();
+  for (const p of parts) {
+    const mat = (p.material || "—").trim() || "—";
+    const tk = thicknessGroupKey(p.thicknessMm);
+    const key = `${mat}\u0000${tk}`;
+    const list = byMatTh.get(key);
+    if (list) list.push(p);
+    else byMatTh.set(key, [p]);
+  }
+
+  const rows: StockSheetSizeBreakdownRow[] = [];
+
+  for (const [, groupParts] of byMatTh) {
+    const first = groupParts[0];
+    const material = (first.material || "—").trim() || "—";
+    const thicknessMm = safeFinite(first.thicknessMm);
+
+    const packParts: RectPackPart[] = groupParts.map((p) => ({
+      thicknessMm: p.thicknessMm,
+      widthMm: p.widthMm,
+      lengthMm: p.lengthMm,
+      areaM2: p.areaM2,
+      qty: p.qty,
+    }));
+
+    const result = rectPackEstimate(packParts, stockLines, 0);
+    const th = result.perThickness[0];
+    if (!th) continue;
+
+    const gross = th.sheetCount * th.sheetAreaM2;
+    const waste = Math.max(0, gross - th.netAreaM2);
+    const util =
+      gross > 0 ? Math.round((th.netAreaM2 / gross) * 1000) / 10 : 0;
+    const w = Math.round(safeFinite(th.sheetWidthMm));
+    const l = Math.round(safeFinite(th.sheetLengthMm));
+    const thRounded = Math.round(thicknessMm * 100) / 100;
+
+    rows.push({
+      label: `${material} · ${thRounded} mm · ${w.toLocaleString()} × ${l.toLocaleString()} mm`,
+      material,
+      thicknessMm: thRounded,
+      sheetWidthMm: th.sheetWidthMm,
+      sheetLengthMm: th.sheetLengthMm,
+      sheetAreaM2: th.sheetAreaM2,
+      sheetCount: th.sheetCount,
+      grossStockAreaM2: gross,
+      netPlateAreaM2: th.netAreaM2,
+      wasteAreaM2: waste,
+      utilizationPct: util,
+    });
+  }
+
+  rows.sort((a, b) => b.grossStockAreaM2 - a.grossStockAreaM2);
+  return rows;
+}
+
+const AGG_ALL_MATERIALS_LABEL = "All materials";
+
+/**
+ * Collapse nested stock lines to one row per thickness (sums gross / net / waste / sheets across
+ * materials and sheet sizes). Used when the breakdown filters are at default (full job view).
+ */
+export function aggregateStockSheetBreakdownByThickness(
+  rows: StockSheetSizeBreakdownRow[]
+): StockSheetSizeBreakdownRow[] {
+  if (rows.length === 0) return [];
+
+  const byKey = new Map<
+    string,
+    {
+      thicknessMm: number;
+      grossStockAreaM2: number;
+      netPlateAreaM2: number;
+      sheetCount: number;
+    }
+  >();
+
+  for (const r of rows) {
+    const key = thicknessGroupKey(r.thicknessMm);
+    const cur = byKey.get(key);
+    if (cur) {
+      cur.grossStockAreaM2 += r.grossStockAreaM2;
+      cur.netPlateAreaM2 += r.netPlateAreaM2;
+      cur.sheetCount += r.sheetCount;
+    } else {
+      byKey.set(key, {
+        thicknessMm: r.thicknessMm,
+        grossStockAreaM2: r.grossStockAreaM2,
+        netPlateAreaM2: r.netPlateAreaM2,
+        sheetCount: r.sheetCount,
+      });
+    }
+  }
+
+  const out: StockSheetSizeBreakdownRow[] = [];
+  for (const [, v] of byKey) {
+    const gross = v.grossStockAreaM2;
+    const net = v.netPlateAreaM2;
+    const waste = Math.max(0, gross - net);
+    const util =
+      gross > 0 ? Math.round((net / gross) * 1000) / 10 : 0;
+    const thRounded = Math.round(v.thicknessMm * 100) / 100;
+    const sheetCount = v.sheetCount;
+    const sheetAreaM2 =
+      sheetCount > 0 && gross > 0 ? gross / sheetCount : 0;
+
+    out.push({
+      label: `${thRounded} mm`,
+      material: AGG_ALL_MATERIALS_LABEL,
+      thicknessMm: thRounded,
+      sheetWidthMm: 0,
+      sheetLengthMm: 0,
+      sheetAreaM2,
+      sheetCount,
+      grossStockAreaM2: gross,
+      netPlateAreaM2: net,
+      wasteAreaM2: waste,
+      utilizationPct: util,
+    });
+  }
+
+  out.sort((a, b) => a.thicknessMm - b.thicknessMm);
+  return out;
 }
 
 function classifyComplexity(

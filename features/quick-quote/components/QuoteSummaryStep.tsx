@@ -15,6 +15,7 @@ import { PartBreakdownTable } from "./PartBreakdownTable";
 import { JobOverviewSection } from "../job-overview/components/JobOverviewSection";
 import { MaterialBreakdownSection } from "../job-overview/components/MaterialBreakdownSection";
 import { NestingPreviewSection } from "../job-overview/components/NestingPreviewSection";
+import type { MaterialType } from "@/types/materials";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -24,6 +25,7 @@ import type {
   ThicknessStockInput,
 } from "../types/quickQuote";
 import { QuoteInsightsSection } from "../insights/components/QuoteInsightsSection";
+import { CalculationsSection } from "../job-overview/components/CalculationsSection";
 
 interface QuoteSummaryStepProps {
   jobDetails: QuickQuoteJobDetails;
@@ -32,6 +34,8 @@ interface QuoteSummaryStepProps {
   mfgParams: ManufacturingParameters;
   pricing: PricingSummary;
   thicknessStock?: ThicknessStockInput[];
+  /** Main steel family chosen for this quote (carbon / stainless / aluminum). */
+  materialType: MaterialType;
   onBack: () => void;
   onBackToValidation: () => void;
   onContinueToFinalize: () => void;
@@ -44,6 +48,7 @@ export function QuoteSummaryStep({
   mfgParams,
   pricing,
   thicknessStock,
+  materialType,
   onBack,
   onBackToValidation,
   onContinueToFinalize,
@@ -126,6 +131,14 @@ export function QuoteSummaryStep({
             parts={parts}
             thicknessStock={thicknessStock}
             thicknessStockProvided={thicknessStockProvided}
+            currencyCode={jobDetails.currency}
+          />
+
+          <Separator />
+
+          <CalculationsSection
+            parts={parts}
+            materialType={materialType}
             currencyCode={jobDetails.currency}
           />
 

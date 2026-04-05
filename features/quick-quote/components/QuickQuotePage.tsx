@@ -559,6 +559,7 @@ export function QuickQuotePage() {
               thicknessStock={
                 thicknessStock.length > 0 ? thicknessStock : undefined
               }
+              materialType={materialType}
               onBack={handleBackFromQuote}
               onBackToValidation={handleBackToValidationFromQuote}
               onContinueToFinalize={handleContinueToFinalize}

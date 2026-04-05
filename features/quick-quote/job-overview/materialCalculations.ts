@@ -1,0 +1,77 @@
+import { thicknessGroupKey } from "@/lib/nesting/stockConfiguration";
+import type { MaterialType } from "@/types/materials";
+import { MATERIAL_TYPE_LABELS } from "@/types/materials";
+import { splitMaterialGradeAndFinish } from "../lib/plateFields";
+import type { QuotePartRow } from "../types/quickQuote";
+
+export interface MaterialPricingLine {
+  /** Stable key for inputs / React (family + thickness + grade + finish). */
+  rowKey: string;
+  steelFamily: MaterialType;
+  steelFamilyLabel: string;
+  thicknessMm: number;
+  grade: string;
+  finish: string;
+  /** Total net weight for this combination (all parts × qty). */
+  totalWeightKg: number;
+}
+
+/**
+ * Unique material pricing lines for the job: steel family (from quote settings) × thickness ×
+ * grade × finish (parsed from each line’s material string), with summed weight.
+ */
+export function buildMaterialPricingLines(
+  parts: QuotePartRow[],
+  materialType: MaterialType
+): MaterialPricingLine[] {
+  if (parts.length === 0) return [];
+
+  const map = new Map<
+    string,
+    { thicknessMm: number; grade: string; finish: string; weightKg: number }
+  >();
+
+  for (const p of parts) {
+    const { grade, finish } = splitMaterialGradeAndFinish(p.material);
+    const g = grade.trim() || "—";
+    const f = finish.trim() || "—";
+    const rowKey = `${materialType}|${thicknessGroupKey(p.thicknessMm)}|${g.toLowerCase()}|${f.toLowerCase()}`;
+    const qty = Math.max(0, Math.round(p.qty));
+    const lineKg = Math.max(0, p.weightKg) * qty;
+
+    const prev = map.get(rowKey);
+    if (prev) {
+      prev.weightKg += lineKg;
+    } else {
+      map.set(rowKey, {
+        thicknessMm: p.thicknessMm,
+        grade: g,
+        finish: f,
+        weightKg: lineKg,
+      });
+    }
+  }
+
+  const out: MaterialPricingLine[] = [];
+  for (const [rowKey, v] of map) {
+    out.push({
+      rowKey,
+      steelFamily: materialType,
+      steelFamilyLabel: MATERIAL_TYPE_LABELS[materialType],
+      thicknessMm: Math.round(v.thicknessMm * 100) / 100,
+      grade: v.grade,
+      finish: v.finish,
+      totalWeightKg: v.weightKg,
+    });
+  }
+
+  out.sort((a, b) => {
+    const d = a.thicknessMm - b.thicknessMm;
+    if (d !== 0) return d;
+    const g = a.grade.localeCompare(b.grade, undefined, { sensitivity: "base" });
+    if (g !== 0) return g;
+    return a.finish.localeCompare(b.finish, undefined, { sensitivity: "base" });
+  });
+
+  return out;
+}

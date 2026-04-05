@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { BarChart3, RotateCcw, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -11,20 +11,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatQuickQuoteCurrency } from "../../lib/quickQuoteCurrencies";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { QuotePartRow, ThicknessStockInput } from "../../types/quickQuote";
-import { buildMaterialBreakdown } from "../jobOverview.utils";
+import {
+  aggregateStockSheetBreakdownByThickness,
+  buildStockSheetSizeBreakdown,
+  formatAreaM2,
+} from "../jobOverview.utils";
 import {
   filterPartsForMaterialBreakdown,
   isMaterialBreakdownFiltered,
   MATERIAL_FILTER_ALL,
-  summarizeMaterialSelection,
   uniqueMaterialGrades,
   uniqueSheetSizeOptions,
   uniqueThicknessOptions,
   type MaterialBreakdownViewFilters,
 } from "../materialBreakdownFilters";
-import { MaterialTreemapChart } from "./MaterialTreemapChart";
+import { MaterialBreakdownBarChart } from "./MaterialBreakdownBarChart";
+import { MaterialBreakdownTable } from "./MaterialBreakdownTable";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_FILTERS: MaterialBreakdownViewFilters = {
@@ -66,7 +70,7 @@ export function MaterialBreakdownSection({
   parts,
   thicknessStock,
   thicknessStockProvided,
-  currencyCode,
+  currencyCode: _currencyCode,
 }: MaterialBreakdownSectionProps) {
   const [filters, setFilters] = useState<MaterialBreakdownViewFilters>(DEFAULT_FILTERS);
 
@@ -82,17 +86,35 @@ export function MaterialBreakdownSection({
     [parts, filters, thicknessStock]
   );
 
-  const displayRows = useMemo(
-    () => buildMaterialBreakdown(filteredParts, thicknessStock),
+  const detailStockRows = useMemo(
+    () => buildStockSheetSizeBreakdown(filteredParts, thicknessStock),
     [filteredParts, thicknessStock]
   );
 
-  const summary = useMemo(
-    () => summarizeMaterialSelection(filteredParts, thicknessStock),
-    [filteredParts, thicknessStock]
-  );
+  const filtersActive = isMaterialBreakdownFiltered(filters);
 
-  const filtered = isMaterialBreakdownFiltered(filters);
+  const stockRows = useMemo(() => {
+    if (!filtersActive) {
+      return aggregateStockSheetBreakdownByThickness(detailStockRows);
+    }
+    return detailStockRows;
+  }, [detailStockRows, filtersActive]);
+
+  const stockTotals = useMemo(() => {
+    let gross = 0;
+    let sheets = 0;
+    for (const r of stockRows) {
+      gross += r.grossStockAreaM2;
+      sheets += r.sheetCount;
+    }
+    return {
+      grossStockAreaM2: gross,
+      sheetCount: sheets,
+      sizeCount: stockRows.length,
+    };
+  }, [stockRows]);
+
+  const filtered = filtersActive;
 
   function resetFilters() {
     setFilters(DEFAULT_FILTERS);
@@ -105,26 +127,37 @@ export function MaterialBreakdownSection({
           Material breakdown
         </h2>
         <p className="text-sm text-muted-foreground">
-          Treemap by grade and thickness. Use the filters to slice the job; tiles and summary
-          cards update for the current selection. Reset clears all filters.
+          With no filters, charts roll up to{" "}
+          <span className="font-medium text-foreground">one row per thickness</span>{" "}
+          (all materials and sheet sizes combined). When you filter material, thickness, or sheet size,
+          each line is one nesting run: grade × thickness × chosen stock (same rect-pack rules as the
+          quote). Reset clears filters.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
-          title="Types"
-          value={String(summary.typeCount)}
-          subtext="Grade × thickness lines in view"
+          title="Stock lines"
+          value={String(stockTotals.sizeCount)}
+          subtext={
+            filtered
+              ? "Material × thickness × sheet size (nesting each)"
+              : "Per thickness (all materials & sizes combined)"
+          }
         />
         <StatCard
-          title="Quantity"
-          value={summary.totalQuantity.toLocaleString()}
-          subtext="Total plates (line qty sum)"
+          title="Total sheets"
+          value={stockTotals.sheetCount.toLocaleString()}
+          subtext={
+            filtered
+              ? "Sheets to buy for the filtered selection"
+              : "Sheets to buy (full job, all sizes)"
+          }
         />
         <StatCard
-          title="Est. cost"
-          value={formatQuickQuoteCurrency(summary.estimatedCost, currencyCode)}
-          subtext="Mock line costs × qty (filtered)"
+          title="Gross stock"
+          value={formatAreaM2(stockTotals.grossStockAreaM2)}
+          subtext="Purchased sheet area (rect-pack)"
         />
       </div>
 
@@ -244,19 +277,43 @@ export function MaterialBreakdownSection({
 
       <Card className="border-border shadow-sm overflow-hidden">
         <CardContent className="p-3 sm:p-4">
-          {displayRows.length === 0 ? (
+          {stockRows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-border rounded-lg">
               {filteredParts.length === 0
                 ? "No parts match the current filters. Change or reset filters."
-                : "No breakdown rows for this selection."}
+                : !thicknessStockProvided
+                  ? "Complete Stock & pricing so we can estimate sheet sizes, nesting, and waste."
+                  : "No nesting data for this selection."}
             </p>
           ) : (
-            <MaterialTreemapChart
-              key={`${filters.materialKey}-${filters.thicknessKey}-${filters.sheetKey}`}
-              rows={displayRows}
-              thicknessStockProvided={thicknessStockProvided}
-              shareScopeLabel={filtered ? "filtered selection" : "full job"}
-            />
+            <Tabs defaultValue="bars" className="w-full">
+              <TabsList className="mb-3 grid w-full grid-cols-2 sm:inline-flex sm:w-auto sm:max-w-full">
+                <TabsTrigger value="bars" className="gap-2">
+                  <BarChart3 className="h-4 w-4 shrink-0" aria-hidden />
+                  Columns
+                </TabsTrigger>
+                <TabsTrigger value="table" className="gap-2">
+                  <Table2 className="h-4 w-4 shrink-0" aria-hidden />
+                  Table
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="bars" className="mt-0">
+                <MaterialBreakdownBarChart
+                  key={`bars-${filters.materialKey}-${filters.thicknessKey}-${filters.sheetKey}`}
+                  rows={stockRows}
+                  shareScopeLabel={filtered ? "filtered selection" : "full job"}
+                  groupedByThickness={!filtered}
+                />
+              </TabsContent>
+              <TabsContent value="table" className="mt-0">
+                <MaterialBreakdownTable
+                  key={`table-${filters.materialKey}-${filters.thicknessKey}-${filters.sheetKey}`}
+                  rows={stockRows}
+                  shareScopeLabel={filtered ? "filtered selection" : "full job"}
+                  groupedByThickness={!filtered}
+                />
+              </TabsContent>
+            </Tabs>
           )}
         </CardContent>
       </Card>
