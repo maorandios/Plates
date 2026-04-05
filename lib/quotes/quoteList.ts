@@ -9,7 +9,7 @@ export interface QuoteListRecord {
   referenceNumber: string;
   customerName: string;
   status: QuoteListStatus;
-  /** Wizard step 1–7 when last updated. */
+  /** Wizard step 1–8 when last updated. */
   currentStep: number;
   createdAt: string;
   updatedAt: string;
@@ -46,7 +46,7 @@ function normalizeRecord(r: QuoteListRecord): QuoteListRecord {
     customerName: typeof r.customerName === "string" ? r.customerName : "",
     status: r.status === "complete" ? "complete" : "in_progress",
     currentStep:
-      typeof r.currentStep === "number" && r.currentStep >= 1 && r.currentStep <= 7
+      typeof r.currentStep === "number" && r.currentStep >= 1 && r.currentStep <= 8
         ? r.currentStep
         : 1,
     createdAt: typeof r.createdAt === "string" ? r.createdAt : new Date().toISOString(),
@@ -130,7 +130,7 @@ export function markQuoteComplete(id: string): void {
   list[i] = {
     ...list[i],
     status: "complete",
-    currentStep: 7,
+    currentStep: 8,
     updatedAt: now,
   };
   save(list);

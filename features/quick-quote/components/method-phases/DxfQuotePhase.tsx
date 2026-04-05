@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 import type { DxfPartGeometry } from "@/types";
 import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import type { DxfMethodExcelSnapshot } from "../../types/quickQuote";
-import { DXF_QUOTE_DEFAULT_THICKNESS_MM } from "../../lib/dxfQuoteParts";
 import {
   DxfUploadStep,
   type DxfPhaseMetricsPayload,
@@ -188,7 +187,7 @@ export function DxfQuotePhase({
             <MethodPhaseMetricStrip
               label="Weight (kg)"
               value={asideMetrics.weightLabel}
-              sub={`Thickness ${DXF_QUOTE_DEFAULT_THICKNESS_MM} mm × area × density (General)`}
+              sub="Per-part thickness (review table) × area × density (General)"
             />
           </div>
         </aside>
@@ -254,7 +253,6 @@ export function DxfQuotePhase({
               <DxfUploadStep
                 ref={dxfRef}
                 materialType={materialType}
-                defaultThickness={DXF_QUOTE_DEFAULT_THICKNESS_MM}
                 onDataApproved={onGeometriesApproved}
                 onPhaseMetricsChange={handlePhaseMetricsChange}
                 restoredGeometries={

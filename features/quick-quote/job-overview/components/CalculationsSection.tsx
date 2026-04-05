@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Calculator } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,34 +19,32 @@ import {
   formatQuickQuoteCurrency,
   quickQuoteCurrencySymbol,
 } from "../../lib/quickQuoteCurrencies";
-import { buildMaterialPricingLines } from "../materialCalculations";
+import {
+  buildMaterialPricingLines,
+  parseMaterialPricePerKg,
+} from "../materialCalculations";
 import type { QuotePartRow } from "../../types/quickQuote";
 
 interface CalculationsSectionProps {
   parts: QuotePartRow[];
   materialType: MaterialType;
   currencyCode: string;
-}
-
-function parsePricePerKg(raw: string): number {
-  const t = raw.trim();
-  if (!t) return 0;
-  const n = Number(t.replace(",", "."));
-  return Number.isFinite(n) && n >= 0 ? n : 0;
+  pricePerKgByRow: Record<string, string>;
+  onPricePerKgByRowChange: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >;
 }
 
 export function CalculationsSection({
   parts,
   materialType,
   currencyCode,
+  pricePerKgByRow,
+  onPricePerKgByRowChange,
 }: CalculationsSectionProps) {
   const lines = useMemo(
     () => buildMaterialPricingLines(parts, materialType),
     [parts, materialType]
-  );
-
-  const [pricePerKgByRow, setPricePerKgByRow] = useState<Record<string, string>>(
-    {}
   );
 
   const currencySymbol = quickQuoteCurrencySymbol(currencyCode);
@@ -55,7 +53,7 @@ export function CalculationsSection({
     let sum = 0;
     const lineTotals: Record<string, number> = {};
     for (const line of lines) {
-      const p = parsePricePerKg(pricePerKgByRow[line.rowKey] ?? "");
+      const p = parseMaterialPricePerKg(pricePerKgByRow[line.rowKey] ?? "");
       const t = line.totalWeightKg * p;
       lineTotals[line.rowKey] = t;
       sum += t;
@@ -147,7 +145,7 @@ export function CalculationsSection({
                         className="h-9 max-w-[140px] ml-auto tabular-nums text-right"
                         value={pricePerKgByRow[line.rowKey] ?? ""}
                         onChange={(e) =>
-                          setPricePerKgByRow((prev) => ({
+                          onPricePerKgByRowChange((prev) => ({
                             ...prev,
                             [line.rowKey]: e.target.value,
                           }))

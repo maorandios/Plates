@@ -11,34 +11,25 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { PartBreakdownTable } from "./PartBreakdownTable";
 import { JobOverviewSection } from "../job-overview/components/JobOverviewSection";
 import { MaterialBreakdownSection } from "../job-overview/components/MaterialBreakdownSection";
 import { NestingPreviewSection } from "../job-overview/components/NestingPreviewSection";
-import type { MaterialType } from "@/types/materials";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
-  PricingSummary,
   QuickQuoteJobDetails,
   QuotePartRow,
   ThicknessStockInput,
 } from "../types/quickQuote";
-import { QuoteInsightsSection } from "../insights/components/QuoteInsightsSection";
-import { CalculationsSection } from "../job-overview/components/CalculationsSection";
-
 interface QuoteSummaryStepProps {
   jobDetails: QuickQuoteJobDetails;
   jobSummary: JobSummaryMetrics;
   parts: QuotePartRow[];
   mfgParams: ManufacturingParameters;
-  pricing: PricingSummary;
   thicknessStock?: ThicknessStockInput[];
-  /** Main steel family chosen for this quote (carbon / stainless / aluminum). */
-  materialType: MaterialType;
   onBack: () => void;
   onBackToValidation: () => void;
-  onContinueToFinalize: () => void;
+  onContinueToPricing: () => void;
 }
 
 export function QuoteSummaryStep({
@@ -46,12 +37,10 @@ export function QuoteSummaryStep({
   jobSummary,
   parts,
   mfgParams,
-  pricing,
   thicknessStock,
-  materialType,
   onBack,
   onBackToValidation,
-  onContinueToFinalize,
+  onContinueToPricing,
 }: QuoteSummaryStepProps) {
   const thicknessStockProvided = Boolean(thicknessStock?.length);
 
@@ -90,9 +79,9 @@ export function QuoteSummaryStep({
               type="button"
               size="sm"
               disabled={parts.length === 0}
-              onClick={onContinueToFinalize}
+              onClick={onContinueToPricing}
             >
-              Continue to finalize
+              Continue to pricing
               <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
             <Button type="button" variant="outline" size="sm" disabled>
@@ -131,33 +120,6 @@ export function QuoteSummaryStep({
             parts={parts}
             thicknessStock={thicknessStock}
             thicknessStockProvided={thicknessStockProvided}
-            currencyCode={jobDetails.currency}
-          />
-
-          <Separator />
-
-          <CalculationsSection
-            parts={parts}
-            materialType={materialType}
-            currencyCode={jobDetails.currency}
-          />
-
-          <Separator />
-
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Parts
-            </h2>
-            <PartBreakdownTable parts={parts} currency={jobDetails.currency} />
-          </section>
-
-          <Separator />
-
-          <QuoteInsightsSection
-            key={`${jobDetails.referenceNumber}-${pricing.finalEstimatedPrice}`}
-            pricing={pricing}
-            mfgParams={mfgParams}
-            jobSummary={jobSummary}
             currencyCode={jobDetails.currency}
           />
         </div>

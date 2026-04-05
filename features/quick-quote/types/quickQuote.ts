@@ -11,7 +11,7 @@ export type DxfMethodExcelSnapshot = {
   rows: ExcelRow[];
 };
 
-export type QuickQuoteStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type QuickQuoteStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 /** How the user builds this quote after General — set in phase 2, details in phase 3. */
 export type QuoteCreationMethod =

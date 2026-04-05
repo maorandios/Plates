@@ -59,6 +59,12 @@ def format_thickness_mm(mm: float | int) -> str:
     return f"{q.normalize()} mm".replace(".0 mm", " mm")
 
 
+def format_mm_one(mm: float | int) -> str:
+    """Single dimension in millimetres (for part breakdown columns)."""
+    q = int(round(float(mm)))
+    return f"{q:,} mm".replace(",", " ")
+
+
 def format_size_mm(length_mm: float | int, width_mm: float | int) -> str:
     lq = int(round(float(length_mm)))
     wq = int(round(float(width_mm)))

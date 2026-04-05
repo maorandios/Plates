@@ -241,45 +241,6 @@ export function QuoteFinalizeExportStep({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="q-cur">Currency code</Label>
-                <Input
-                  id="q-cur"
-                  value={draft.quote.currency}
-                  onChange={(e) =>
-                    setDraft((d) => ({
-                      ...d,
-                      quote: { ...d.quote, currency: e.target.value.toUpperCase().slice(0, 8) },
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="q-prep">Prepared by</Label>
-                <Input
-                  id="q-prep"
-                  value={draft.quote.prepared_by ?? ""}
-                  onChange={(e) =>
-                    setDraft((d) => ({
-                      ...d,
-                      quote: { ...d.quote, prepared_by: e.target.value || null },
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="q-ref">Reference number</Label>
-                <Input
-                  id="q-ref"
-                  value={draft.quote.reference_number ?? ""}
-                  onChange={(e) =>
-                    setDraft((d) => ({
-                      ...d,
-                      quote: { ...d.quote, reference_number: e.target.value || null },
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="q-cust">Customer name</Label>
                 <Input
                   id="q-cust"
@@ -288,19 +249,6 @@ export function QuoteFinalizeExportStep({
                     setDraft((d) => ({
                       ...d,
                       quote: { ...d.quote, customer_name: e.target.value || null },
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="q-comp">Customer company</Label>
-                <Input
-                  id="q-comp"
-                  value={draft.quote.customer_company ?? ""}
-                  onChange={(e) =>
-                    setDraft((d) => ({
-                      ...d,
-                      quote: { ...d.quote, customer_company: e.target.value || null },
                     }))
                   }
                 />
@@ -318,21 +266,6 @@ export function QuoteFinalizeExportStep({
                   }
                 />
               </div>
-              <div className="space-y-2 sm:col-span-2 lg:col-span-3">
-                <Label htmlFor="q-scope">Scope of work (optional override)</Label>
-                <Textarea
-                  id="q-scope"
-                  rows={3}
-                  value={draft.quote.scope_text ?? ""}
-                  onChange={(e) =>
-                    setDraft((d) => ({
-                      ...d,
-                      quote: { ...d.quote, scope_text: e.target.value || null },
-                    }))
-                  }
-                  placeholder="Leave blank to use default scope text on the PDF."
-                />
-              </div>
             </CardContent>
           </Card>
 
@@ -346,19 +279,6 @@ export function QuoteFinalizeExportStep({
                   ["total_parts", "Total parts", draft.summary.total_parts, "int"] as const,
                   ["total_quantity", "Total quantity", draft.summary.total_quantity, "int"] as const,
                   ["total_weight_kg", "Total weight (kg)", draft.summary.total_weight_kg, "num"] as const,
-                  ["net_plate_area_m2", "Net plate area (m²)", draft.summary.net_plate_area_m2, "num"] as const,
-                  [
-                    "gross_material_area_m2",
-                    "Gross material (m²)",
-                    draft.summary.gross_material_area_m2,
-                    "num",
-                  ] as const,
-                  [
-                    "estimated_sheet_count",
-                    "Est. sheets (optional)",
-                    draft.summary.estimated_sheet_count,
-                    "int-null",
-                  ] as const,
                 ] as const
               ).map(([key, label, val, kind]) => (
                 <div key={key} className="space-y-2">
@@ -367,25 +287,12 @@ export function QuoteFinalizeExportStep({
                     id={`sum-${key}`}
                     type="text"
                     inputMode="decimal"
-                    value={
-                      kind === "int-null"
-                        ? val == null
-                          ? ""
-                          : String(val)
-                        : String(val)
-                    }
+                    value={String(val)}
                     onChange={(e) => {
                       const raw = e.target.value;
                       setDraft((d) => {
                         const next = { ...d.summary };
-                        if (kind === "int-null") {
-                          if (raw.trim() === "") {
-                            (next as typeof next & { estimated_sheet_count: number | null }).estimated_sheet_count =
-                              null;
-                          } else {
-                            next.estimated_sheet_count = int(raw);
-                          }
-                        } else if (kind === "int") {
+                        if (kind === "int") {
                           (next as Record<string, number>)[key] = int(raw);
                         } else {
                           (next as Record<string, number>)[key] = num(raw);
@@ -402,20 +309,25 @@ export function QuoteFinalizeExportStep({
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Part breakdown</CardTitle>
-              <CardDescription>Line totals in {draft.quote.currency}.</CardDescription>
+              <CardDescription>
+                All columns are editable. Price is in {draft.quote.currency}.
+              </CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Part</TableHead>
-                    <TableHead className="w-16">Qty</TableHead>
-                    <TableHead>Material</TableHead>
-                    <TableHead className="w-20">Thk mm</TableHead>
-                    <TableHead className="w-20">L mm</TableHead>
-                    <TableHead className="w-20">W mm</TableHead>
-                    <TableHead className="w-24">Weight kg</TableHead>
-                    <TableHead className="w-28 text-right">Line total</TableHead>
+                  <TableRow className="text-xs whitespace-nowrap">
+                    <TableHead className="min-w-[7rem]">Part number</TableHead>
+                    <TableHead className="w-16">Quantity</TableHead>
+                    <TableHead className="w-20">Thickness</TableHead>
+                    <TableHead className="min-w-[8rem]">Material type</TableHead>
+                    <TableHead className="min-w-[6rem]">Material grade</TableHead>
+                    <TableHead className="min-w-[5rem]">Finish</TableHead>
+                    <TableHead className="w-20">Width (mm)</TableHead>
+                    <TableHead className="w-20">Length (mm)</TableHead>
+                    <TableHead className="w-24">Area (m²)</TableHead>
+                    <TableHead className="w-24">Weight (kg)</TableHead>
+                    <TableHead className="w-24 text-right">Price</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -424,12 +336,12 @@ export function QuoteFinalizeExportStep({
                       <TableCell className="p-1">
                         <Input
                           className="h-8 min-w-[100px]"
-                          value={row.part_name}
+                          value={row.part_number}
                           onChange={(e) =>
                             setDraft((d) => ({
                               ...d,
                               items: d.items.map((it, j) =>
-                                j === i ? { ...it, part_name: e.target.value } : it
+                                j === i ? { ...it, part_number: e.target.value } : it
                               ),
                             }))
                           }
@@ -452,13 +364,56 @@ export function QuoteFinalizeExportStep({
                       </TableCell>
                       <TableCell className="p-1">
                         <Input
-                          className="h-8 min-w-[80px]"
-                          value={row.material}
+                          className="h-8 w-20"
+                          inputMode="decimal"
+                          value={row.thickness_mm}
                           onChange={(e) =>
                             setDraft((d) => ({
                               ...d,
                               items: d.items.map((it, j) =>
-                                j === i ? { ...it, material: e.target.value } : it
+                                j === i ? { ...it, thickness_mm: num(e.target.value, it.thickness_mm) } : it
+                              ),
+                            }))
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="p-1">
+                        <Input
+                          className="h-8 min-w-[120px]"
+                          value={row.material_type}
+                          onChange={(e) =>
+                            setDraft((d) => ({
+                              ...d,
+                              items: d.items.map((it, j) =>
+                                j === i ? { ...it, material_type: e.target.value } : it
+                              ),
+                            }))
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="p-1">
+                        <Input
+                          className="h-8 min-w-[88px]"
+                          value={row.material_grade}
+                          onChange={(e) =>
+                            setDraft((d) => ({
+                              ...d,
+                              items: d.items.map((it, j) =>
+                                j === i ? { ...it, material_grade: e.target.value } : it
+                              ),
+                            }))
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="p-1">
+                        <Input
+                          className="h-8 min-w-[88px]"
+                          value={row.finish}
+                          onChange={(e) =>
+                            setDraft((d) => ({
+                              ...d,
+                              items: d.items.map((it, j) =>
+                                j === i ? { ...it, finish: e.target.value } : it
                               ),
                             }))
                           }
@@ -467,13 +422,13 @@ export function QuoteFinalizeExportStep({
                       <TableCell className="p-1">
                         <Input
                           className="h-8 w-16"
-                          inputMode="decimal"
-                          value={row.thickness_mm}
+                          inputMode="numeric"
+                          value={row.width_mm}
                           onChange={(e) =>
                             setDraft((d) => ({
                               ...d,
                               items: d.items.map((it, j) =>
-                                j === i ? { ...it, thickness_mm: num(e.target.value, it.thickness_mm) } : it
+                                j === i ? { ...it, width_mm: num(e.target.value, it.width_mm) } : it
                               ),
                             }))
                           }
@@ -496,14 +451,14 @@ export function QuoteFinalizeExportStep({
                       </TableCell>
                       <TableCell className="p-1">
                         <Input
-                          className="h-8 w-16"
-                          inputMode="numeric"
-                          value={row.width_mm}
+                          className="h-8 w-20"
+                          inputMode="decimal"
+                          value={row.area_m2}
                           onChange={(e) =>
                             setDraft((d) => ({
                               ...d,
                               items: d.items.map((it, j) =>
-                                j === i ? { ...it, width_mm: num(e.target.value, it.width_mm) } : it
+                                j === i ? { ...it, area_m2: num(e.target.value, it.area_m2) } : it
                               ),
                             }))
                           }

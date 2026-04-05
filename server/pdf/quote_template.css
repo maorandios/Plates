@@ -216,7 +216,7 @@ body {
 table.parts {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: 0.68rem;
 }
 
 table.parts thead {
@@ -225,7 +225,7 @@ table.parts thead {
 
 table.parts th,
 table.parts td {
-  padding: 10px 10px;
+  padding: 6px 5px;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid #e8e8e8;

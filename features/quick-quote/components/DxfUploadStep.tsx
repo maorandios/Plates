@@ -73,6 +73,7 @@ import type {
 } from "../types/quickQuote";
 import { buildValidationData } from "../lib/buildValidationData";
 import { mergeExcelIntoDxfUploads } from "../lib/dxfUploadExcelMerge";
+import { DXF_QUOTE_DEFAULT_THICKNESS_MM } from "../lib/dxfQuoteParts";
 import { ExcelColumnMappingModal } from "./ExcelColumnMappingModal";
 import { DxfExcelCompareModal } from "./DxfExcelCompareModal";
 
@@ -85,6 +86,12 @@ const SUB_STEPS = [
   { step: 3 as DxfSubStep, label: "Review" },
 ] as const;
 
+function clampPositiveThicknessMm(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (Number.isFinite(n) && n > 0) return n;
+  return DXF_QUOTE_DEFAULT_THICKNESS_MM;
+}
+
 interface DxfFileUpload {
   file: File;
   content: string;
@@ -92,6 +99,8 @@ interface DxfFileUpload {
   parseError: string | null;
   /** Review table: BOM quantity (initial 1). */
   quantity: number;
+  /** Review table: plate thickness (mm); default 2; Excel BOM can prefill when matched. */
+  thicknessMm: number;
   /** Review table: material grade (editable; seeded from DXF after parse). */
   materialGrade: string;
   /** Review table: finish (editable; default carbon = “Carbon steel”). */
@@ -128,6 +137,7 @@ function restoredGeometriesToUploads(
       parsed: g,
       parseError: null,
       quantity: qty,
+      thicknessMm: clampPositiveThicknessMm(g.reviewThicknessMm),
       materialGrade: g.materialGrade?.trim() || defaultMaterialGradeForFamily(materialType),
       finish,
     };
@@ -212,7 +222,6 @@ export type DxfUploadNavState = {
 
 interface DxfUploadStepProps {
   materialType: MaterialType;
-  defaultThickness?: number;
   onDataApproved: (data: DxfPartGeometry[]) => void;
   /** Optional BOM after upload + column mapping in the modal. */
   onOptionalExcelChange?: (
@@ -241,7 +250,6 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   function DxfUploadStep(
     {
       materialType,
-      defaultThickness = 10,
       onDataApproved,
       onOptionalExcelChange,
       onPhaseMetricsChange,
@@ -344,6 +352,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
             parsed: null,
             parseError: null,
             quantity: 1,
+            thicknessMm: DXF_QUOTE_DEFAULT_THICKNESS_MM,
             materialGrade: "",
             finish: "carbon" satisfies PlateFinish,
           };
@@ -549,7 +558,9 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   const updateUploadRow = useCallback(
     (
       index: number,
-      patch: Partial<Pick<DxfFileUpload, "quantity" | "materialGrade" | "finish">>
+      patch: Partial<
+        Pick<DxfFileUpload, "quantity" | "thicknessMm" | "materialGrade" | "finish">
+      >
     ) => {
       setUploadedFiles((prev) =>
         prev.map((row, i) => (i === index ? { ...row, ...patch } : row))
@@ -568,6 +579,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         materialGrade: u.materialGrade.trim() || p.materialGrade,
         reviewQuantity: qty,
         reviewFinish: u.finish,
+        reviewThicknessMm: clampPositiveThicknessMm(u.thicknessMm),
       };
     });
 
@@ -604,13 +616,12 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       totalQuantity += qty;
       const geom = u.parsed?.processedGeometry;
       if (geom) {
-        totalArea += geom.area / 1000000; // mm² to m²
-        totalPerimeter += geom.perimeter;
-        // Calculate weight: area (m²) × thickness (m) × density (kg/m³)
+        totalArea += (geom.area / 1000000) * qty; // m² × pieces
+        totalPerimeter += geom.perimeter * qty;
         const areaM2 = geom.area / 1000000;
-        const thicknessMm = defaultThickness;
+        const thicknessMm = clampPositiveThicknessMm(u.thicknessMm);
         const volumeM3 = areaM2 * (thicknessMm / 1000);
-        totalWeight += volumeM3 * densityKgPerM3;
+        totalWeight += volumeM3 * densityKgPerM3 * qty;
       }
     });
 
@@ -623,7 +634,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       totalWeight,
       totalPerimeter,
     };
-  }, [uploadedFiles, materialType, defaultThickness]);
+  }, [uploadedFiles, materialType]);
 
   useEffect(() => {
     onPhaseMetricsChange?.({
@@ -1055,7 +1066,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
               <p className="text-sm text-muted-foreground mt-1">
                 Parsed geometry and part information
                 {mappedExcelRows?.length
-                  ? " — quantity and material grade are taken from the Excel list where part names match; otherwise quantity is 1 and grade follows the DXF."
+                  ? " — quantity, material grade, and thickness (when mapped) are taken from the Excel list where part names match; otherwise quantity is 1, thickness defaults to 2 mm, and grade follows the DXF. All values stay editable."
                   : ""}
               </p>
             </CardHeader>
@@ -1066,6 +1077,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                     <TableRow>
                       <TableHead className="min-w-[120px]">Part Number</TableHead>
                       <TableHead className="min-w-[88px]">Quantity</TableHead>
+                      <TableHead className="min-w-[88px]">Thickness (mm)</TableHead>
                       <TableHead className="min-w-[88px]">Width (mm)</TableHead>
                       <TableHead className="min-w-[88px]">Length (mm)</TableHead>
                       <TableHead className="min-w-[88px]">Weight (kg)</TableHead>
@@ -1087,11 +1099,10 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
 
                       const materialConfig = getMaterialConfig(materialType);
                       const densityKgPerM3 = materialConfig.densityKgPerM3;
+                      const thMm = clampPositiveThicknessMm(upload.thicknessMm);
                       const unitWeightKg =
                         geom && geom.area > 0
-                          ? (geom.area / 1_000_000) *
-                            (defaultThickness / 1000) *
-                            densityKgPerM3
+                          ? (geom.area / 1_000_000) * (thMm / 1000) * densityKgPerM3
                           : 0;
 
                       const dim1 = bbox?.width ?? 0;
@@ -1120,6 +1131,24 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                                   Number.isFinite(v) && v >= 1
                                     ? { quantity: Math.floor(v) }
                                     : { quantity: 1 }
+                                );
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={0.1}
+                              step={0.1}
+                              className="h-8 w-[4.5rem] tabular-nums"
+                              value={Number.isFinite(upload.thicknessMm) ? upload.thicknessMm : ""}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                updateUploadRow(
+                                  index,
+                                  Number.isFinite(v) && v > 0
+                                    ? { thicknessMm: v }
+                                    : { thicknessMm: DXF_QUOTE_DEFAULT_THICKNESS_MM }
                                 );
                               }}
                             />

@@ -36,12 +36,15 @@ const summarySchema = z.object({
 });
 
 const itemSchema = z.object({
-  part_name: z.string().min(1),
+  part_number: z.string().min(1),
   qty: z.number().int().nonnegative(),
-  material: z.string(),
   thickness_mm: z.number().nonnegative(),
-  length_mm: z.number().nonnegative(),
+  material_type: z.string(),
+  material_grade: z.string(),
+  finish: z.string(),
   width_mm: z.number().nonnegative(),
+  length_mm: z.number().nonnegative(),
+  area_m2: z.number().nonnegative(),
   weight_kg: z.number().nonnegative(),
   line_total: z.number().nonnegative(),
 });

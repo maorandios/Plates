@@ -4,6 +4,25 @@ import { MATERIAL_TYPE_LABELS } from "@/types/materials";
 import { splitMaterialGradeAndFinish } from "../lib/plateFields";
 import type { QuotePartRow } from "../types/quickQuote";
 
+/** Parse user-entered price/kg (empty → 0). */
+export function parseMaterialPricePerKg(raw: string): number {
+  const t = raw.trim();
+  if (!t) return 0;
+  const n = Number(t.replace(",", "."));
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+/** Same key as {@link buildMaterialPricingLines} rows — maps a BOM line to its pricing bucket. */
+export function materialPricingRowKey(
+  part: QuotePartRow,
+  materialType: MaterialType
+): string {
+  const { grade, finish } = splitMaterialGradeAndFinish(part.material);
+  const g = grade.trim() || "—";
+  const f = finish.trim() || "—";
+  return `${materialType}|${thicknessGroupKey(part.thicknessMm)}|${g.toLowerCase()}|${f.toLowerCase()}`;
+}
+
 export interface MaterialPricingLine {
   /** Stable key for inputs / React (family + thickness + grade + finish). */
   rowKey: string;
@@ -32,10 +51,10 @@ export function buildMaterialPricingLines(
   >();
 
   for (const p of parts) {
+    const rowKey = materialPricingRowKey(p, materialType);
     const { grade, finish } = splitMaterialGradeAndFinish(p.material);
     const g = grade.trim() || "—";
     const f = finish.trim() || "—";
-    const rowKey = `${materialType}|${thicknessGroupKey(p.thicknessMm)}|${g.toLowerCase()}|${f.toLowerCase()}`;
     const qty = Math.max(0, Math.round(p.qty));
     const lineKg = Math.max(0, p.weightKg) * qty;
 

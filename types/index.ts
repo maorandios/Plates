@@ -177,6 +177,8 @@ export interface DxfPartGeometry {
   reviewQuantity?: number;
   /** Quick Quote DXF review step: plate finish (default carbon when omitted). */
   reviewFinish?: "carbon" | "galvanized" | "paint";
+  /** Quick Quote DXF review step: plate thickness (mm); merged from Excel BOM when mapped. */
+  reviewThicknessMm?: number;
 }
 
 // ─── Match Status ─────────────────────────────────────────────────────────────

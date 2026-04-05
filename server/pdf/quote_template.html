@@ -94,23 +94,31 @@
         <table class="parts">
           <thead>
             <tr>
-              <th class="part-name">Part name</th>
-              <th class="qty">Qty</th>
-              <th>Material</th>
+              <th class="part-name">Part number</th>
+              <th class="qty">Quantity</th>
               <th>Thickness</th>
-              <th>Size</th>
-              <th class="num">Weight</th>
-              <th class="num">Line total</th>
+              <th>Material type</th>
+              <th>Material grade</th>
+              <th>Finish</th>
+              <th class="num">Width (mm)</th>
+              <th class="num">Length (mm)</th>
+              <th class="num">Area (m²)</th>
+              <th class="num">Weight (kg)</th>
+              <th class="num">Price</th>
             </tr>
           </thead>
           <tbody>
             {% for row in item_rows %}
             <tr>
-              <td class="part-name">{{ row.part_name }}</td>
+              <td class="part-name">{{ row.part_number }}</td>
               <td class="qty">{{ row.qty }}</td>
-              <td>{{ row.material }}</td>
               <td>{{ row.thickness }}</td>
-              <td>{{ row.size }}</td>
+              <td>{{ row.material_type }}</td>
+              <td>{{ row.material_grade }}</td>
+              <td>{{ row.finish }}</td>
+              <td class="num">{{ row.width_mm }}</td>
+              <td class="num">{{ row.length_mm }}</td>
+              <td class="num">{{ row.area_m2 }}</td>
               <td class="num">{{ row.weight }}</td>
               <td class="num">{{ row.line_total }}</td>
             </tr>

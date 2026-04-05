@@ -38,15 +38,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
+import type { DxfPartGeometry } from "@/types";
 import { cn } from "@/lib/utils";
 import { jobSummaryFromParts } from "../lib/deriveQuoteSelection";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import {
+  formatQuickQuoteCurrency,
   formatQuickQuoteCurrencyAmount,
   quickQuoteCurrencySymbol,
 } from "../lib/quickQuoteCurrencies";
+import type { MaterialType } from "@/types/materials";
+import {
+  materialPricingRowKey,
+  parseMaterialPricePerKg,
+} from "../job-overview/materialCalculations";
 import { splitMaterialGradeAndFinish } from "../lib/plateFields";
 import type { QuotePartRow } from "../types/quickQuote";
+import { QuotePartGeometryPreview } from "./QuotePartGeometryPreview";
 
 type SortDir = "asc" | "desc";
 
@@ -179,9 +187,14 @@ const SORT_BUTTON_ARIA: Record<PartBreakdownSortKey, string> = {
   preview: "preview",
 };
 
-/** Part (5) + Dimensions (4) + Preview (1) + optional Delete (1). */
-function columnCount(showRef: boolean, showDelete: boolean): number {
-  return (showRef ? 1 : 0) + 5 + 4 + 1 + (showDelete ? 1 : 0);
+/** Part (5) + Dimensions (4 or 5 with material sell) + Preview (1) + optional Delete (1). */
+function columnCount(
+  showRef: boolean,
+  showDelete: boolean,
+  showMaterialPricing: boolean
+): number {
+  const dim = showMaterialPricing ? 5 : 4;
+  return (showRef ? 1 : 0) + 5 + dim + 1 + (showDelete ? 1 : 0);
 }
 
 /** Equal-width columns: share 100% across n columns (handles rounding). */
@@ -343,12 +356,20 @@ interface PartBreakdownTableProps {
   currency: string;
   /** When set, shows a delete action per row (e.g. merged quote lines step). */
   onDeletePart?: (row: QuotePartRow) => void;
+  /** With {@link materialPricePerKgByRow}, adds a material sell column from Pricing. */
+  materialType?: MaterialType;
+  materialPricePerKgByRow?: Record<string, string>;
+  /** DXF geometries from the quote session — used to show real outlines in the preview modal. */
+  dxfPartGeometries?: DxfPartGeometry[] | null;
 }
 
 export function PartBreakdownTable({
   parts,
   currency,
   onDeletePart,
+  materialType,
+  materialPricePerKgByRow,
+  dxfPartGeometries,
 }: PartBreakdownTableProps) {
   const [previewPart, setPreviewPart] = useState<QuotePartRow | null>(null);
   const [sortState, setSortState] = useState<{
@@ -367,10 +388,16 @@ export function PartBreakdownTable({
     [parts]
   );
   const showDelete = Boolean(onDeletePart);
+  const showMaterialPricing = Boolean(materialType && materialPricePerKgByRow);
+
+  const dimCols = showMaterialPricing ? 5 : 4;
 
   const columnWidthsPct = useMemo(
-    () => equalColumnWidthsPct(columnCount(showRefColumn, showDelete)),
-    [showRefColumn, showDelete]
+    () =>
+      equalColumnWidthsPct(
+        columnCount(showRefColumn, showDelete, showMaterialPricing)
+      ),
+    [showRefColumn, showDelete, showMaterialPricing]
   );
 
   const fmtAmount = (n: number) => formatQuickQuoteCurrencyAmount(n, currency);
@@ -442,7 +469,7 @@ export function PartBreakdownTable({
   }
 
   const showRefFilter = filterOptions.refs.length > 0;
-  const colSpanEmpty = columnCount(showRefColumn, showDelete);
+  const colSpanEmpty = columnCount(showRefColumn, showDelete, showMaterialPricing);
 
   function handleSort(key: PartBreakdownSortKey) {
     setSortState((prev) =>
@@ -456,9 +483,25 @@ export function PartBreakdownTable({
   const totalWeightLine = p ? p.weightKg * p.qty : 0;
   const cutLengthM = p ? p.cutLengthMm / 1000 : 0;
 
+  const pricingPreviewLayout =
+    Boolean(p) &&
+    showMaterialPricing &&
+    materialType != null &&
+    materialPricePerKgByRow != null;
+
+  const { grade: previewGradeLabel, finish: previewFinishLabel } =
+    splitMaterialGradeAndFinish(p?.material ?? "");
+
+  const lineMaterialSellPreview =
+    p && pricingPreviewLayout && materialType && materialPricePerKgByRow
+      ? totalWeightLine *
+        parseMaterialPricePerKg(
+          materialPricePerKgByRow[materialPricingRowKey(p, materialType)] ?? ""
+        )
+      : 0;
+
   const actionCols = showDelete ? 2 : 1;
   const partCols = 5;
-  const dimCols = 4;
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -582,10 +625,10 @@ export function PartBreakdownTable({
         <Table
           className={cn(
             "table-fixed w-full border-collapse",
-            showRefColumn && showDelete && "min-w-[1180px]",
-            showRefColumn && !showDelete && "min-w-[1100px]",
-            !showRefColumn && showDelete && "min-w-[1080px]",
-            !showRefColumn && !showDelete && "min-w-[980px]"
+            showRefColumn && showDelete && (showMaterialPricing ? "min-w-[1300px]" : "min-w-[1180px]"),
+            showRefColumn && !showDelete && (showMaterialPricing ? "min-w-[1220px]" : "min-w-[1100px]"),
+            !showRefColumn && showDelete && (showMaterialPricing ? "min-w-[1200px]" : "min-w-[1080px]"),
+            !showRefColumn && !showDelete && (showMaterialPricing ? "min-w-[1100px]" : "min-w-[980px]")
           )}
         >
           <colgroup>
@@ -603,7 +646,10 @@ export function PartBreakdownTable({
               <TableHead colSpan={partCols} className={cn(sectionHeadClass, sectionRule)}>
                 Part
               </TableHead>
-              <TableHead colSpan={dimCols} className={cn(sectionHeadClass, sectionRule)}>
+              <TableHead
+                colSpan={dimCols}
+                className={cn(sectionHeadClass, sectionRule)}
+              >
                 Dimensions
               </TableHead>
               <TableHead colSpan={actionCols} className={cn(sectionHeadClass, "border-r-0")}>
@@ -689,10 +735,23 @@ export function PartBreakdownTable({
                 sortKey="lineWeightKg"
                 sortState={sortState}
                 onSort={handleSort}
-                className={cn(subHeadClass, sectionRule, "whitespace-nowrap")}
+                className={cn(
+                  subHeadClass,
+                  showMaterialPricing ? colRule : sectionRule,
+                  "whitespace-nowrap"
+                )}
               >
                 Weight (kg)
               </SortableColumnHead>
+              {showMaterialPricing ? (
+                <TableHead
+                  scope="col"
+                  className={cn(subHeadClass, sectionRule, "whitespace-nowrap text-right tabular-nums")}
+                  title="Line weight × price/kg from Calculations"
+                >
+                  Material ({priceHeaderSymbol})
+                </TableHead>
+              ) : null}
               <SortableColumnHead
                 sortKey="preview"
                 sortState={sortState}
@@ -811,11 +870,27 @@ export function PartBreakdownTable({
                   <TableCell
                     className={cn(
                       "py-2 px-3 text-left align-middle tabular-nums text-xs",
-                      sectionRule
+                      showMaterialPricing ? colRule : sectionRule
                     )}
                   >
                     {formatDecimal(lineWeightKg, 2)}
                   </TableCell>
+                  {showMaterialPricing && materialType && materialPricePerKgByRow ? (
+                    <TableCell
+                      className={cn(
+                        "py-2 px-3 text-right align-middle tabular-nums text-xs font-medium text-foreground",
+                        sectionRule
+                      )}
+                    >
+                      {fmtAmount(
+                        lineWeightKg *
+                          parseMaterialPricePerKg(
+                            materialPricePerKgByRow[materialPricingRowKey(row, materialType)] ??
+                              ""
+                          )
+                      )}
+                    </TableCell>
+                  ) : null}
                   <TableCell
                     className={cn(
                       "py-1.5 px-3 text-left align-middle",
@@ -860,83 +935,175 @@ export function PartBreakdownTable({
           if (!open) setPreviewPart(null);
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent
+          className={cn(
+            pricingPreviewLayout
+              ? "w-[min(100vw-1.5rem,72rem)] max-w-[72rem] sm:max-w-[72rem] gap-0 p-0 overflow-hidden"
+              : "sm:max-w-lg"
+          )}
+        >
           {p && (
             <>
-              <DialogHeader>
-                <DialogTitle className="font-mono text-base">{p.partName}</DialogTitle>
-                <DialogDescription>Plate line detail from the quote breakdown.</DialogDescription>
+              <DialogHeader
+                className={cn(
+                  "px-6 pt-6 pb-2 text-left",
+                  pricingPreviewLayout && "border-b border-border bg-muted/20 px-6 py-4 sm:py-5"
+                )}
+              >
+                <DialogTitle className="font-mono text-base sm:text-lg">{p.partName}</DialogTitle>
+                <DialogDescription>
+                  {pricingPreviewLayout
+                    ? "Plate line detail — material pricing uses your price/kg for this grade, thickness, and finish."
+                    : "Plate line detail from the quote breakdown."}
+                </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 sm:grid-cols-2 text-sm">
-                <dl className="space-y-2 sm:col-span-2">
-                  {p.sourceRef ? (
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
-                      <dt className="text-muted-foreground">Ref</dt>
-                      <dd className="font-medium text-right">{p.sourceRef}</dd>
-                    </div>
-                  ) : null}
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Quantity</dt>
-                    <dd className="tabular-nums font-medium">{p.qty}</dd>
+
+              {pricingPreviewLayout ? (
+                <div className="grid md:grid-cols-2 md:divide-x md:divide-border min-h-[min(60vh,420px)]">
+                  <div className="p-6 min-w-0 flex flex-col">
+                    <dl className="space-y-2.5 text-sm flex-1">
+                      {p.sourceRef ? (
+                        <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                          <dt className="text-muted-foreground shrink-0">Ref</dt>
+                          <dd className="font-medium text-right min-w-0">{p.sourceRef}</dd>
+                        </div>
+                      ) : null}
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Quantity</dt>
+                        <dd className="tabular-nums font-medium">{p.qty}</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Material grade</dt>
+                        <dd className="font-medium text-right min-w-0">{previewGradeLabel}</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Finish</dt>
+                        <dd className="font-medium text-right min-w-0">{previewFinishLabel}</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Thickness</dt>
+                        <dd className="tabular-nums">
+                          {formatInteger(Math.round(p.thicknessMm))} mm
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Width</dt>
+                        <dd className="tabular-nums">{formatDecimal(p.widthMm, 2)} mm</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Length</dt>
+                        <dd className="tabular-nums">{formatDecimal(p.lengthMm, 2)} mm</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Area (per plate)</dt>
+                        <dd className="tabular-nums">{formatDecimal(p.areaM2, 3)} m²</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Total weight (line)</dt>
+                        <dd className="tabular-nums">{formatDecimal(totalWeightLine, 2)} kg</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Cut length (per plate)</dt>
+                        <dd className="tabular-nums">{formatDecimal(cutLengthM, 2)} m</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <dt className="text-muted-foreground shrink-0">Pierce count</dt>
+                        <dd className="tabular-nums">{p.pierceCount}</dd>
+                      </div>
+                      <div className="flex justify-between gap-6 pb-0">
+                        <dt className="text-muted-foreground shrink-0">Line price</dt>
+                        <dd className="tabular-nums font-semibold text-foreground">
+                          {formatQuickQuoteCurrency(lineMaterialSellPreview, currency)}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Material</dt>
-                    <dd className="font-medium text-right">{p.material}</dd>
+                  <div className="p-6 min-w-0 flex flex-col bg-muted/10">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
+                      Plate geometry
+                    </p>
+                    <QuotePartGeometryPreview
+                      part={p}
+                      dxfGeometries={dxfPartGeometries}
+                      className="flex-1 border-0 bg-transparent min-h-[240px]"
+                    />
                   </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Thickness</dt>
-                    <dd className="tabular-nums">
-                      {formatInteger(Math.round(p.thicknessMm))} mm
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Width × length</dt>
-                    <dd className="tabular-nums">
-                      {formatDecimal(p.widthMm, 2)} × {formatDecimal(p.lengthMm, 2)} mm
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Area (per plate)</dt>
-                    <dd className="tabular-nums">{formatDecimal(p.areaM2, 3)} m²</dd>
-                  </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Total weight (line)</dt>
-                    <dd className="tabular-nums">{formatDecimal(totalWeightLine, 2)} kg</dd>
-                  </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Cut length (per plate)</dt>
-                    <dd className="tabular-nums">{formatDecimal(cutLengthM, 2)} m</dd>
-                  </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Pierce count</dt>
-                    <dd className="tabular-nums">{p.pierceCount}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Line price (est.)</dt>
-                    <dd className="tabular-nums font-medium">
-                      <span className="tabular-nums text-foreground" aria-hidden>
-                        {priceHeaderSymbol}
-                      </span>{" "}
-                      {fmtAmount(p.estimatedLineCost)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">DXF file</dt>
-                    <dd className="font-mono text-xs text-right break-all">{p.dxfFileName}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4 border-b border-border pb-2">
-                    <dt className="text-muted-foreground">Excel ref</dt>
-                    <dd className="font-mono text-xs">{p.excelRowRef}</dd>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <dt className="text-muted-foreground mb-1">Notes</dt>
-                    <dd className="text-foreground leading-relaxed">{p.notes?.trim() || "—"}</dd>
-                  </div>
-                </dl>
-                <div className="sm:col-span-2 rounded-lg border border-dashed border-border bg-muted/20 aspect-video flex items-center justify-center text-sm text-muted-foreground">
-                  Geometry preview (placeholder)
                 </div>
-              </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 text-sm px-6 pb-6">
+                  <dl className="space-y-2 sm:col-span-2">
+                    {p.sourceRef ? (
+                      <div className="flex justify-between gap-4 border-b border-border pb-2">
+                        <dt className="text-muted-foreground">Ref</dt>
+                        <dd className="font-medium text-right">{p.sourceRef}</dd>
+                      </div>
+                    ) : null}
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Quantity</dt>
+                      <dd className="tabular-nums font-medium">{p.qty}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Material</dt>
+                      <dd className="font-medium text-right">{p.material}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Thickness</dt>
+                      <dd className="tabular-nums">
+                        {formatInteger(Math.round(p.thicknessMm))} mm
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Width × length</dt>
+                      <dd className="tabular-nums">
+                        {formatDecimal(p.widthMm, 2)} × {formatDecimal(p.lengthMm, 2)} mm
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Area (per plate)</dt>
+                      <dd className="tabular-nums">{formatDecimal(p.areaM2, 3)} m²</dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Total weight (line)</dt>
+                      <dd className="tabular-nums">{formatDecimal(totalWeightLine, 2)} kg</dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Cut length (per plate)</dt>
+                      <dd className="tabular-nums">{formatDecimal(cutLengthM, 2)} m</dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Pierce count</dt>
+                      <dd className="tabular-nums">{p.pierceCount}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Line price (est.)</dt>
+                      <dd className="tabular-nums font-medium">
+                        <span className="tabular-nums text-foreground" aria-hidden>
+                          {priceHeaderSymbol}
+                        </span>{" "}
+                        {fmtAmount(p.estimatedLineCost)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">DXF file</dt>
+                      <dd className="font-mono text-xs text-right break-all">{p.dxfFileName}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <dt className="text-muted-foreground">Excel ref</dt>
+                      <dd className="font-mono text-xs">{p.excelRowRef}</dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-muted-foreground mb-1">Notes</dt>
+                      <dd className="text-foreground leading-relaxed">{p.notes?.trim() || "—"}</dd>
+                    </div>
+                  </dl>
+                  <div className="sm:col-span-2">
+                    <QuotePartGeometryPreview
+                      part={p}
+                      dxfGeometries={dxfPartGeometries}
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
         </DialogContent>

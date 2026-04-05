@@ -11,6 +11,7 @@ import { QuoteMethodPickerPhase } from "./QuoteMethodPickerPhase";
 import { CalculationStep } from "./CalculationStep";
 import { QuoteStepper } from "./QuoteStepper";
 import { QuoteFinalizeExportStep } from "./QuoteFinalizeExportStep";
+import { PricingStep } from "./PricingStep";
 import { QuoteSummaryStep } from "./QuoteSummaryStep";
 import { StockPricingStep } from "./StockPricingStep";
 import type {
@@ -75,6 +76,10 @@ export function QuickQuotePage() {
   const [materialPricePerKg, setMaterialPricePerKg] = useState(
     () => MOCK_MFG_PARAMETERS.materialRatePerKg
   );
+  /** Pricing phase: per-kg sell prices keyed like {@link materialPricingRowKey}. */
+  const [materialPricePerKgByRow, setMaterialPricePerKgByRow] = useState<
+    Record<string, string>
+  >({});
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
 
   const [manualQuoteRows, setManualQuoteRows] = useState<ManualQuotePartRow[]>([]);
@@ -271,7 +276,13 @@ export function QuickQuotePage() {
 
   const handleBackFromCalculationToStock = () => advanceTo(4);
   const handleViewQuote = () => advanceTo(6);
+  const handleContinueFromQuoteToPricing = useCallback(() => {
+    advanceTo(7);
+  }, [advanceTo]);
   const handleBackFromQuote = () => advanceTo(5);
+  const handleBackFromPricing = useCallback(() => {
+    advanceTo(6);
+  }, [advanceTo]);
   const handleBackToValidationFromQuote = useCallback(() => {
     advanceTo(3);
   }, [advanceTo]);
@@ -294,15 +305,15 @@ export function QuickQuotePage() {
     if (qid) {
       markQuoteComplete(qid);
     }
-    advanceTo(7);
+    advanceTo(8);
   }, [advanceTo, buildFinalizeDraft]);
 
   const handleBackFromFinalize = useCallback(() => {
-    advanceTo(6);
+    advanceTo(7);
   }, [advanceTo]);
 
   useEffect(() => {
-    if (step === 7 && pdfExportDraft === null) {
+    if (step === 8 && pdfExportDraft === null) {
       setPdfExportDraft(buildFinalizeDraft());
     }
   }, [step, pdfExportDraft, buildFinalizeDraft]);
@@ -391,9 +402,17 @@ export function QuickQuotePage() {
           showContinue: true,
           canContinue: true,
           onBack: handleBackFromQuote,
-          onContinue: handleContinueToFinalize,
+          onContinue: handleContinueFromQuoteToPricing,
         };
       case 7:
+        return {
+          showBack: true,
+          showContinue: true,
+          canContinue: true,
+          onBack: handleBackFromPricing,
+          onContinue: handleContinueToFinalize,
+        };
+      case 8:
         return {
           showBack: true,
           showContinue: false,
@@ -417,6 +436,8 @@ export function QuickQuotePage() {
     handleBackFromCalculationToStock,
     handleViewQuote,
     handleBackFromQuote,
+    handleContinueFromQuoteToPricing,
+    handleBackFromPricing,
     handleContinueToFinalize,
     handleBackFromFinalize,
   ]);
@@ -555,18 +576,27 @@ export function QuickQuotePage() {
               jobSummary={selection.jobSummary}
               parts={selection.parts}
               mfgParams={selection.mfgParams}
-              pricing={selection.pricing}
               thicknessStock={
                 thicknessStock.length > 0 ? thicknessStock : undefined
               }
-              materialType={materialType}
               onBack={handleBackFromQuote}
               onBackToValidation={handleBackToValidationFromQuote}
-              onContinueToFinalize={handleContinueToFinalize}
+              onContinueToPricing={handleContinueFromQuoteToPricing}
             />
           )}
 
-          {step === 7 && pdfExportDraft && (
+          {step === 7 && (
+            <PricingStep
+              parts={selection.parts}
+              materialType={materialType}
+              currencyCode={jobDetails.currency}
+              pricePerKgByRow={materialPricePerKgByRow}
+              onPricePerKgByRowChange={setMaterialPricePerKgByRow}
+              dxfPartGeometries={dxfMethodGeometries}
+            />
+          )}
+
+          {step === 8 && pdfExportDraft && (
             <QuoteFinalizeExportStep
               draft={pdfExportDraft}
               setDraft={(action) => {

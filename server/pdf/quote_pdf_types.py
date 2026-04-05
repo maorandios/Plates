@@ -52,12 +52,15 @@ class SummaryBlock(BaseModel):
 
 
 class LineItem(BaseModel):
-    part_name: str = Field(..., min_length=1)
+    part_number: str = Field(..., min_length=1)
     qty: int = Field(..., ge=0)
-    material: str = ""
     thickness_mm: float = 0
-    length_mm: float = 0
+    material_type: str = ""
+    material_grade: str = ""
+    finish: str = ""
     width_mm: float = 0
+    length_mm: float = 0
+    area_m2: float = 0
     weight_kg: float = Field(..., ge=0, description="Line total weight (e.g. unit × qty)")
     line_total: float = Field(..., ge=0)
 

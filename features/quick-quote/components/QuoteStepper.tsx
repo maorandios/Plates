@@ -12,7 +12,8 @@ const STEPS: { step: QuickQuoteStep; label: string }[] = [
   { step: 4, label: "Stock & pricing" },
   { step: 5, label: "Calculation" },
   { step: 6, label: "Quote" },
-  { step: 7, label: "Finalize" },
+  { step: 7, label: "Pricing" },
+  { step: 8, label: "Finalize" },
 ];
 
 interface QuoteStepperProps {
@@ -118,7 +119,7 @@ export function QuoteStepper({
               Back
             </Button>
           )}
-          {showContinue && currentStep < 7 && onContinue && (
+          {showContinue && currentStep < 8 && onContinue && (
             <Button
               type="button"
               size="sm"

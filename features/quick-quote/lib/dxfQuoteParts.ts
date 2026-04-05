@@ -8,7 +8,7 @@ import {
 } from "./plateFields";
 
 /** Default plate thickness (mm) when quoting from DXF area only (matches {@link DxfUploadStep}). */
-export const DXF_QUOTE_DEFAULT_THICKNESS_MM = 10;
+export const DXF_QUOTE_DEFAULT_THICKNESS_MM = 2;
 
 function roundN(n: number, decimals: number): number {
   const p = 10 ** decimals;
@@ -26,13 +26,14 @@ export function dxfGeometriesToQuoteParts(
   densityKgPerM3: number
 ): QuotePartRow[] {
   const rho = densityKgPerM3;
-  const th = Math.max(0, defaultThicknessMm);
+  const fallbackTh = Math.max(0, defaultThicknessMm);
   const defaultGrade = defaultMaterialGradeForFamily(materialType);
 
   return geometries
     .filter((g) => g.processedGeometry?.isValid)
     .map((g, index) => {
       const geom = g.processedGeometry!;
+      const th = Math.max(0, g.reviewThicknessMm ?? fallbackTh);
       const bbox = geom.boundingBox;
       const dim1 = bbox.width;
       const dim2 = bbox.height;

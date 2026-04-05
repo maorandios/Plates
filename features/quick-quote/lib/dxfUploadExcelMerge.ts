@@ -9,6 +9,8 @@ export type DxfUploadRowForMerge = {
   parsed: { guessedPartName: string; materialGrade?: string } | null;
   materialGrade: string;
   quantity: number;
+  /** Plate thickness (mm); default before merge; Excel can overwrite when mapped. */
+  thicknessMm: number;
 };
 
 /**
@@ -27,7 +29,12 @@ export function mergeExcelIntoDxfUploads<T extends DxfUploadRowForMerge>(
     if (!parsed) {
       const grade =
         upload.materialGrade.trim() || defaultGrade;
-      return { ...upload, quantity: 1, materialGrade: grade } as T;
+      return {
+        ...upload,
+        quantity: 1,
+        materialGrade: grade,
+        thicknessMm: upload.thicknessMm,
+      } as T;
     }
 
     const dxfNorm = normalizeName(parsed.guessedPartName);
@@ -57,13 +64,25 @@ export function mergeExcelIntoDxfUploads<T extends DxfUploadRowForMerge>(
     if (best) {
       const qty = Math.max(1, Math.floor(Number(best.quantity)) || 1);
       const mat = (best.material || "").trim() || fromDxf;
-      return { ...upload, quantity: qty, materialGrade: mat } as T;
+      const thickFromExcel =
+        typeof best.thickness === "number" &&
+        Number.isFinite(best.thickness) &&
+        best.thickness > 0
+          ? best.thickness
+          : upload.thicknessMm;
+      return {
+        ...upload,
+        quantity: qty,
+        materialGrade: mat,
+        thicknessMm: thickFromExcel,
+      } as T;
     }
 
     return {
       ...upload,
       quantity: 1,
       materialGrade: upload.materialGrade.trim() || fromDxf,
+      thicknessMm: upload.thicknessMm,
     } as T;
   });
 }

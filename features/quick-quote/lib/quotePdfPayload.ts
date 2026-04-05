@@ -3,6 +3,7 @@
  */
 
 import { getAppPreferences } from "@/lib/settings/appPreferences";
+import { splitMaterialGradeAndFinish } from "./plateFields";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -48,13 +49,18 @@ export interface QuotePdfRequestBody {
     estimated_sheet_count: number | null;
   };
   items: Array<{
-    part_name: string;
+    part_number: string;
     qty: number;
-    material: string;
     thickness_mm: number;
-    length_mm: number;
+    material_type: string;
+    material_grade: string;
+    finish: string;
     width_mm: number;
+    length_mm: number;
+    area_m2: number;
+    /** Line weight (unit weight × quantity), kg */
     weight_kg: number;
+    /** Line price */
     line_total: number;
   }>;
   pricing: {
@@ -156,16 +162,22 @@ export function buildQuotePdfRequestBody(
     pricing.overhead;
   const subtotal = pricing.materialCost + processingCost;
 
-  const items = parts.map((p) => ({
-    part_name: p.partName,
-    qty: p.qty,
-    material: p.material,
-    thickness_mm: p.thicknessMm,
-    length_mm: p.lengthMm,
-    width_mm: p.widthMm,
-    weight_kg: p.weightKg * p.qty,
-    line_total: Math.max(0, p.estimatedLineCost),
-  }));
+  const items = parts.map((p) => {
+    const { grade, finish } = splitMaterialGradeAndFinish(p.material);
+    return {
+      part_number: p.partName,
+      qty: p.qty,
+      thickness_mm: p.thicknessMm,
+      material_type: mfgParams.materialType,
+      material_grade: grade === "—" ? "" : grade,
+      finish: finish === "—" ? "" : finish,
+      width_mm: p.widthMm,
+      length_mm: p.lengthMm,
+      area_m2: p.areaM2 * p.qty,
+      weight_kg: p.weightKg * p.qty,
+      line_total: Math.max(0, p.estimatedLineCost),
+    };
+  });
 
   const notes =
     options?.notes && options.notes.length > 0 ? options.notes : [...DEFAULT_NOTES];
