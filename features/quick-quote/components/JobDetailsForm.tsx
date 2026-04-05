@@ -92,7 +92,23 @@ export function JobDetailsForm({ value, onChange }: JobDetailsFormProps) {
           </p>
         </div>
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="qq-customer">Customer name</Label>
+          <Label htmlFor="qq-project">
+            Project name <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="qq-project"
+            value={value.projectName}
+            onChange={(e) => patch({ projectName: e.target.value })}
+            placeholder="Project or job title"
+            autoComplete="off"
+            required
+            aria-required="true"
+          />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="qq-customer">
+            Customer name <span className="text-destructive">*</span>
+          </Label>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
             <div className="relative flex-1 min-w-0">
               <Input
@@ -102,6 +118,8 @@ export function JobDetailsForm({ value, onChange }: JobDetailsFormProps) {
                 onChange={(e) => onCustomerInputChange(e.target.value)}
                 placeholder="Type a customer name or pick from your directory"
                 autoComplete="off"
+                required
+                aria-required="true"
               />
               <datalist id={CLIENT_DATALIST_ID}>
                 {clientsSorted.map((c) => (

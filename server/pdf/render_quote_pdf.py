@@ -42,12 +42,6 @@ DEFAULT_NOTES = [
     "Delivery is excluded unless explicitly stated.",
 ]
 
-DEFAULT_TERMS = [
-    "This quotation is valid for the period stated on the cover.",
-    "Prices exclude VAT unless stated otherwise.",
-    "Lead time is subject to final confirmation upon order.",
-]
-
 
 def _logo_data_uri(logo_path: str | None) -> str | None:
     if not logo_path:
@@ -112,6 +106,11 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
 
     pr = payload.pricing
     discount_fmt = format_currency(pr.discount, cur) if pr.discount else None
+    net = max(0.0, float(pr.total_price) - (float(pr.discount) if pr.discount else 0.0))
+    vat_rate = float(pr.vat_rate)
+    vat_amount = round(net * vat_rate, 2)
+    vat_pct = int(round(vat_rate * 100))
+    pricing_vat_label = f"VAT ({vat_pct}%)"
 
     raw_notes = list(q.notes) if q.notes else []
     notes_lines = [str(x).strip() for x in raw_notes if str(x).strip()]
@@ -119,8 +118,6 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
         notes_lines = list(DEFAULT_NOTES)
     raw_terms = list(q.terms) if q.terms else []
     terms_lines = [str(x).strip() for x in raw_terms if str(x).strip()]
-    if not terms_lines:
-        terms_lines = list(DEFAULT_TERMS)
 
     css_text = (DIR / "quote_template.css").read_text(encoding="utf-8")
 
@@ -148,11 +145,11 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
         "scope_primary": scope_primary,
         "scope_secondary": scope_secondary,
         "item_rows": item_rows,
-        "pricing_material": format_currency(pr.material_cost, cur),
-        "pricing_processing": format_currency(pr.processing_cost, cur),
-        "pricing_subtotal": format_currency(pr.subtotal, cur),
+        "pricing_total_price": format_currency(pr.total_price, cur),
         "pricing_discount": discount_fmt,
-        "pricing_final": format_currency(pr.final_total, cur),
+        "pricing_vat_label": pricing_vat_label,
+        "pricing_vat_amount": format_currency(vat_amount, cur),
+        "pricing_total_incl_vat": format_currency(pr.total_incl_vat, cur),
         "notes_lines": notes_lines,
         "terms_lines": terms_lines,
         "footer_generated": "Quotation document — generated electronically.",
@@ -245,6 +242,7 @@ def sample_payload() -> QuotePdfPayload:
                 "area_m2": 5.76,
                 "weight_kg": 543.6,
                 "line_total": 4200.0,
+                "plate_shape": "flat",
             },
             {
                 "part_number": "PL-002-B",
@@ -258,6 +256,7 @@ def sample_payload() -> QuotePdfPayload:
                 "area_m2": 6.27,
                 "weight_kg": 490.2,
                 "line_total": 3100.0,
+                "plate_shape": "flat",
             },
             {
                 "part_number": "PL-003-C",
@@ -271,14 +270,14 @@ def sample_payload() -> QuotePdfPayload:
                 "area_m2": 1.92,
                 "weight_kg": 120.0,
                 "line_total": 980.5,
+                "plate_shape": "flat",
             },
         ],
         pricing={
-            "material_cost": 5200.0,
-            "processing_cost": 2100.0,
-            "subtotal": 7300.0,
+            "total_price": 8280.5,
             "discount": None,
-            "final_total": 8280.5,
+            "vat_rate": 0.18,
+            "total_incl_vat": round(8280.5 * 1.18 * 100) / 100,
         },
     )
 

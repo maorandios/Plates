@@ -26,6 +26,7 @@ export function bendPlateQuoteItemsToQuoteParts(
       pierceCount: 0,
       validationStatus: "valid",
       estimatedLineCost: 0,
+      bendTemplateId: item.template,
       dxfFileName: "—",
       excelRowRef: "—",
       notes: "",

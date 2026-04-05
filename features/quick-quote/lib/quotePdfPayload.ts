@@ -3,6 +3,11 @@
  */
 
 import { getAppPreferences } from "@/lib/settings/appPreferences";
+import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
+import {
+  materialPricingRowKey,
+  parseMaterialPricePerKg,
+} from "../job-overview/materialCalculations";
 import { splitMaterialGradeAndFinish } from "./plateFields";
 import type {
   JobSummaryMetrics,
@@ -11,6 +16,18 @@ import type {
   QuickQuoteJobDetails,
   QuotePartRow,
 } from "../types/quickQuote";
+
+function lineMaterialSellFromPart(
+  p: QuotePartRow,
+  materialType: MaterialType,
+  pricePerKgByRow: Record<string, string>
+): number {
+  const lineWeightKg =
+    Math.max(0, p.weightKg) * Math.max(0, Math.floor(p.qty));
+  const key = materialPricingRowKey(p, materialType);
+  const pricePerKg = parseMaterialPricePerKg(pricePerKgByRow[key] ?? "");
+  return lineWeightKg * pricePerKg;
+}
 
 /** Sender / letterhead block (editable before PDF export). */
 export interface QuotePdfCompanyBlock {
@@ -62,14 +79,34 @@ export interface QuotePdfRequestBody {
     weight_kg: number;
     /** Line price */
     line_total: number;
+    /** `flat` or bend template id (l, u, z, omega, gutter, custom). */
+    plate_shape: string;
   }>;
+  /** Finalize-step pricing: total before VAT, optional discount, VAT rate, total incl. VAT. */
   pricing: {
-    material_cost: number;
-    processing_cost: number;
-    subtotal: number;
+    total_price: number;
     discount: number | null;
-    final_total: number;
+    vat_rate: number;
+    total_incl_vat: number;
   };
+}
+
+/** Net after optional discount; never negative. */
+export function computeNetBeforeVat(totalPrice: number, discount: number | null): number {
+  return Math.max(0, totalPrice - (discount ?? 0));
+}
+
+export function computeQuoteTotalInclVat(
+  totalPrice: number,
+  discount: number | null,
+  vatRate: number
+): number {
+  const net = computeNetBeforeVat(totalPrice, discount);
+  return Math.round(net * (1 + vatRate) * 100) / 100;
+}
+
+export function computeVatAmount(netBeforeVat: number, vatRate: number): number {
+  return Math.round(netBeforeVat * vatRate * 100) / 100;
 }
 
 function addDaysIso(isoDate: string, days: number): string {
@@ -77,12 +114,6 @@ function addDaysIso(isoDate: string, days: number): string {
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
-
-const DEFAULT_TERMS = [
-  "This quotation is valid for the period stated on the cover.",
-  "Prices exclude VAT unless stated otherwise.",
-  "Lead time is subject to final confirmation upon order.",
-];
 
 const DEFAULT_NOTES = [
   "Based on uploaded DXF files and provided quote information.",
@@ -121,7 +152,9 @@ export function buildQuotePdfFullPayload(
   parts: QuotePartRow[],
   mfgParams: ManufacturingParameters,
   pricing: PricingSummary,
-  options?: Parameters<typeof buildQuotePdfRequestBody>[5]
+  materialType: MaterialType,
+  materialPricePerKgByRow: Record<string, string>,
+  options?: Parameters<typeof buildQuotePdfRequestBody>[7]
 ): QuotePdfFullPayload {
   return {
     company: getDefaultPdfCompany(),
@@ -131,6 +164,8 @@ export function buildQuotePdfFullPayload(
       parts,
       mfgParams,
       pricing,
+      materialType,
+      materialPricePerKgByRow,
       options
     ),
   };
@@ -142,6 +177,8 @@ export function buildQuotePdfRequestBody(
   parts: QuotePartRow[],
   mfgParams: ManufacturingParameters,
   pricing: PricingSummary,
+  materialType: MaterialType,
+  materialPricePerKgByRow: Record<string, string>,
   options?: {
     quoteDateIso?: string;
     validDays?: number;
@@ -155,40 +192,48 @@ export function buildQuotePdfRequestBody(
   const validDays = options?.validDays ?? 14;
   const validUntil = addDaysIso(quoteDate, validDays);
 
-  const processingCost =
-    pricing.cuttingCost +
-    pricing.piercingCost +
-    pricing.setupCost +
-    pricing.overhead;
-  const subtotal = pricing.materialCost + processingCost;
+  const totalPrice = Math.max(0, pricing.finalEstimatedPrice);
+  const discountInitial: number | null = null;
+  const vatRate = 0.18;
+  const totalInclVat = computeQuoteTotalInclVat(totalPrice, discountInitial, vatRate);
+
+  const materialFamilyLabel = MATERIAL_TYPE_LABELS[materialType];
 
   const items = parts.map((p) => {
     const { grade, finish } = splitMaterialGradeAndFinish(p.material);
+    const lineSell = lineMaterialSellFromPart(
+      p,
+      materialType,
+      materialPricePerKgByRow
+    );
     return {
       part_number: p.partName,
       qty: p.qty,
       thickness_mm: p.thicknessMm,
-      material_type: mfgParams.materialType,
+      material_type: materialFamilyLabel,
       material_grade: grade === "—" ? "" : grade,
       finish: finish === "—" ? "" : finish,
       width_mm: p.widthMm,
       length_mm: p.lengthMm,
       area_m2: p.areaM2 * p.qty,
       weight_kg: p.weightKg * p.qty,
-      line_total: Math.max(0, p.estimatedLineCost),
+      line_total: Math.max(0, lineSell),
+      plate_shape: p.bendTemplateId ?? "flat",
     };
   });
 
   const notes =
     options?.notes && options.notes.length > 0 ? options.notes : [...DEFAULT_NOTES];
-  const terms =
-    options?.terms && options.terms.length > 0 ? options.terms : [...DEFAULT_TERMS];
+  const terms = options?.terms && options.terms.length > 0 ? options.terms : [];
 
   const rawNotes = jobDetails.notes?.trim() ?? "";
+  const projectFromGeneral = jobDetails.projectName?.trim() ?? "";
   const projectName =
-    rawNotes.length > 0 && rawNotes.length <= 120
-      ? rawNotes
-      : jobDetails.referenceNumber || null;
+    projectFromGeneral.length > 0
+      ? projectFromGeneral
+      : rawNotes.length > 0 && rawNotes.length <= 120
+        ? rawNotes
+        : jobDetails.referenceNumber || null;
 
   return {
     quote: {
@@ -215,11 +260,10 @@ export function buildQuotePdfRequestBody(
     },
     items,
     pricing: {
-      material_cost: pricing.materialCost,
-      processing_cost: processingCost,
-      subtotal,
-      discount: null,
-      final_total: pricing.finalEstimatedPrice,
+      total_price: totalPrice,
+      discount: discountInitial,
+      vat_rate: vatRate,
+      total_incl_vat: totalInclVat,
     },
   };
 }

@@ -295,6 +295,16 @@ table.parts td.part-name {
   text-align: right;
 }
 
+.pricing-row.muted {
+  opacity: 0.78;
+}
+
+.pricing-row.muted .plabel,
+.pricing-row.muted .pvalue {
+  font-weight: 500;
+  color: #6b7280;
+}
+
 .pricing-row.total-final {
   margin-top: 10px;
   padding-top: 12px;

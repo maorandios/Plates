@@ -63,14 +63,14 @@ class LineItem(BaseModel):
     area_m2: float = 0
     weight_kg: float = Field(..., ge=0, description="Line total weight (e.g. unit × qty)")
     line_total: float = Field(..., ge=0)
+    plate_shape: str = Field(default="flat")
 
 
 class PricingBlock(BaseModel):
-    material_cost: float = Field(..., ge=0)
-    processing_cost: float = Field(..., ge=0)
-    subtotal: float = Field(..., ge=0)
+    total_price: float = Field(..., ge=0)
     discount: float | None = Field(default=None, ge=0)
-    final_total: float = Field(..., ge=0)
+    vat_rate: float = Field(..., ge=0, le=1)
+    total_incl_vat: float = Field(..., ge=0)
 
     @field_validator("discount", mode="before")
     @classmethod

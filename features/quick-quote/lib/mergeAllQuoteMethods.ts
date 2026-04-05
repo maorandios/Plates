@@ -95,6 +95,11 @@ function mergeQuotePartGroup(rows: QuotePartRow[]): QuotePartRow {
   ].sort((a, b) => a.localeCompare(b));
   const sourceRef = refs.join(" · ");
   const estimatedLineCost = rows.reduce((s, p) => s + p.estimatedLineCost, 0);
+  const bendIds = rows.map((r) => r.bendTemplateId).filter((x): x is NonNullable<typeof x> => x != null);
+  const bendTemplateId =
+    bendIds.length === rows.length && bendIds.every((x) => x === bendIds[0])
+      ? bendIds[0]
+      : undefined;
   const first = rows[0];
   const lineSourceIds = rows.flatMap((r) =>
     r.lineSourceIds?.length ? r.lineSourceIds : [r.id]
@@ -115,6 +120,7 @@ function mergeQuotePartGroup(rows: QuotePartRow[]): QuotePartRow {
     pierceCount,
     validationStatus: worstValidationStatus(rows.map((r) => r.validationStatus)),
     estimatedLineCost,
+    bendTemplateId,
     dxfFileName: rows.map((r) => r.dxfFileName).filter((x) => x && x !== "—").join(" · ") || "—",
     excelRowRef: rows.map((r) => r.excelRowRef).filter(Boolean).join(" · ") || "—",
     notes: [...new Set(rows.map((r) => r.notes).filter(Boolean))].join(" · "),

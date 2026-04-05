@@ -115,9 +115,27 @@ export function GeneralSection({
         </div>
       </div>
 
+      {/* Project name */}
+      <div className="space-y-2">
+        <Label htmlFor="project-name">
+          Project name <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="project-name"
+          value={value.projectName}
+          onChange={(e) => patch({ projectName: e.target.value })}
+          placeholder="Project or job title"
+          autoComplete="off"
+          required
+          aria-required="true"
+        />
+      </div>
+
       {/* Client name */}
       <div className="space-y-2">
-        <Label htmlFor="client-name">Client name</Label>
+        <Label htmlFor="client-name">
+          Client name <span className="text-destructive">*</span>
+        </Label>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <div className="relative flex-1 min-w-0">
             <Input
@@ -126,6 +144,8 @@ export function GeneralSection({
               onChange={(e) => onCustomerInputChange(e.target.value)}
               placeholder="Type a client name or pick from directory"
               autoComplete="off"
+              required
+              aria-required="true"
             />
           </div>
           <Button

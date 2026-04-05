@@ -132,16 +132,8 @@
       <div class="pricing-wrap">
         <div class="pricing-box">
           <div class="pricing-row">
-            <span class="plabel">Material cost</span>
-            <span class="pvalue">{{ pricing_material }}</span>
-          </div>
-          <div class="pricing-row">
-            <span class="plabel">Processing cost</span>
-            <span class="pvalue">{{ pricing_processing }}</span>
-          </div>
-          <div class="pricing-row">
-            <span class="plabel">Subtotal</span>
-            <span class="pvalue">{{ pricing_subtotal }}</span>
+            <span class="plabel">Total price</span>
+            <span class="pvalue">{{ pricing_total_price }}</span>
           </div>
           {% if pricing_discount %}
           <div class="pricing-row">
@@ -149,9 +141,13 @@
             <span class="pvalue">{{ pricing_discount }}</span>
           </div>
           {% endif %}
+          <div class="pricing-row muted">
+            <span class="plabel">{{ pricing_vat_label }}</span>
+            <span class="pvalue">{{ pricing_vat_amount }}</span>
+          </div>
           <div class="pricing-row total-final">
-            <span class="plabel">Final total</span>
-            <span class="pvalue">{{ pricing_final }}</span>
+            <span class="plabel">Total incl. VAT</span>
+            <span class="pvalue">{{ pricing_total_incl_vat }}</span>
           </div>
         </div>
       </div>
@@ -166,6 +162,7 @@
       </ul>
     </section>
 
+    {% if terms_lines %}
     <section class="section">
       <h2 class="section-title">Terms</h2>
       <ul class="bullets">
@@ -174,6 +171,7 @@
         {% endfor %}
       </ul>
     </section>
+    {% endif %}
 
     <footer class="footer">
       <div class="footer-left">

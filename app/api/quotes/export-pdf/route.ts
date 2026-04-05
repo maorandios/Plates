@@ -47,14 +47,14 @@ const itemSchema = z.object({
   area_m2: z.number().nonnegative(),
   weight_kg: z.number().nonnegative(),
   line_total: z.number().nonnegative(),
+  plate_shape: z.string().optional(),
 });
 
 const pricingSchema = z.object({
-  material_cost: z.number().nonnegative(),
-  processing_cost: z.number().nonnegative(),
-  subtotal: z.number().nonnegative(),
+  total_price: z.number().nonnegative(),
   discount: z.number().nonnegative().nullable().optional(),
-  final_total: z.number().nonnegative(),
+  vat_rate: z.number().nonnegative(),
+  total_incl_vat: z.number().nonnegative(),
 });
 
 const companySchema = z.object({

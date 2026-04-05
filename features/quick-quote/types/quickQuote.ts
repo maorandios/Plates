@@ -1,4 +1,5 @@
 import type { ExcelRow } from "@/types";
+import type { BendTemplateId } from "../bend-plate/types";
 import type { PlateFinish } from "../lib/plateFields";
 
 /**
@@ -70,6 +71,8 @@ export interface UploadedFileMeta {
 export interface QuickQuoteJobDetails {
   /** Auto-generated unique quote id (e.g. QQ-20260327-AB12CD34). */
   referenceNumber: string;
+  /** Project or job title — required on General (used as PDF project name). */
+  projectName: string;
   /** Chosen in the Quote method step; drives method-specific details UI. */
   quoteCreationMethod?: QuoteCreationMethod;
   customerName: string;
@@ -151,6 +154,8 @@ export interface QuotePartRow {
   pierceCount: number;
   validationStatus: ValidationRowStatus;
   estimatedLineCost: number;
+  /** Set for bend-plate lines — used for finalize / PDF plate-type icons. */
+  bendTemplateId?: BendTemplateId;
   dxfFileName: string;
   excelRowRef: string;
   notes: string;

@@ -41,7 +41,7 @@ import { MOCK_MFG_PARAMETERS } from "../mock/quickQuoteMockData";
 import type { QuotePdfFullPayload } from "../lib/quotePdfPayload";
 import { buildQuotePdfFullPayload } from "../lib/quotePdfPayload";
 import type { DxfPartGeometry } from "@/types";
-import type { MaterialType } from "@/types/materials";
+import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import { getPurchasedSheetSizes } from "@/lib/store";
 import {
   markQuoteComplete,
@@ -52,6 +52,7 @@ import { nanoid } from "@/lib/utils/nanoid";
 
 const defaultJobDetails: QuickQuoteJobDetails = {
   referenceNumber: "",
+  projectName: "",
   customerName: "",
   currency: "EUR",
   notes: "",
@@ -294,9 +295,11 @@ export function QuickQuotePage() {
         selection.jobSummary,
         selection.parts,
         selection.mfgParams,
-        selection.pricing
+        selection.pricing,
+        materialType,
+        materialPricePerKgByRow
       ),
-    [jobDetails, selection]
+    [jobDetails, selection, materialType, materialPricePerKgByRow]
   );
 
   const handleContinueToFinalize = useCallback(() => {
@@ -336,8 +339,11 @@ export function QuickQuotePage() {
   );
 
   const canContinueFromGeneral = useMemo(() => {
-    return jobDetails.customerName.trim().length > 0;
-  }, [jobDetails.customerName]);
+    return (
+      jobDetails.projectName.trim().length > 0 &&
+      jobDetails.customerName.trim().length > 0
+    );
+  }, [jobDetails.projectName, jobDetails.customerName]);
 
   const mergedQuotePartsList = useMemo(
     () =>
@@ -473,7 +479,8 @@ export function QuickQuotePage() {
               <CardHeader>
                 <CardTitle className="text-xl">General</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Quote details and client information
+                  Quote details and client information. Fields marked{" "}
+                  <span className="text-destructive">*</span> are required to continue.
                 </p>
               </CardHeader>
               <CardContent>
@@ -605,6 +612,9 @@ export function QuickQuotePage() {
                   return typeof action === "function" ? action(prev) : action;
                 });
               }}
+              materialFamilyLabel={MATERIAL_TYPE_LABELS[materialType]}
+              materialType={materialType}
+              materialPricePerKgByRow={materialPricePerKgByRow}
               onBack={handleBackFromFinalize}
             />
           )}
