@@ -54,8 +54,8 @@ export function QuoteSummaryStep({
 
   return (
     <div className="space-y-8 pb-12">
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden print:shadow-none">
-        <div className="border-b border-border bg-muted/30 px-4 py-4 sm:px-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="ds-surface overflow-hidden print:shadow-none">
+        <div className="ds-surface-header py-4 sm:px-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-semibold tracking-tight font-mono truncate">

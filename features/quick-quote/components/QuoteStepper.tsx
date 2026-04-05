@@ -38,8 +38,8 @@ export function QuoteStepper({
   showContinue = true,
 }: QuoteStepperProps) {
   return (
-    <div className="sticky top-0 z-40 w-full border-b border-border bg-card shadow-sm">
-      <div className="px-4 py-4 sm:px-6 flex items-center gap-4">
+    <div className="sticky top-0 z-40 w-full border-b border-white/[0.08] bg-background/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
+      <div className="px-4 py-4 sm:px-6 lg:px-8 flex items-center gap-4">
         <div className="flex-1 min-w-0 overflow-x-auto">
           <div className="flex w-full items-center justify-between gap-2">
             {STEPS.map(({ step, label }, index) => {
@@ -62,17 +62,17 @@ export function QuoteStepper({
                   >
                     <span
                       className={cn(
-                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold tabular-nums transition-colors",
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold tabular-nums transition-all duration-150",
                         isComplete &&
-                          "border-emerald-600/80 bg-emerald-600/10 text-emerald-800 dark:text-emerald-200",
+                          "border-primary/70 bg-primary/15 text-primary",
                         isCurrent &&
                           !isComplete &&
-                          "border-primary bg-primary text-primary-foreground shadow-sm",
+                          "border-primary bg-primary text-primary-foreground shadow-[0_0_0_3px_hsl(var(--primary)/0.25)]",
                         !isCurrent &&
                           !isComplete &&
                           (isReachable
-                            ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
-                            : "border-border bg-muted/30 text-muted-foreground/50")
+                            ? "border-white/15 bg-card text-muted-foreground"
+                            : "border-white/[0.06] bg-muted/40 text-muted-foreground/45")
                       )}
                     >
                       {isComplete ? (
@@ -83,8 +83,8 @@ export function QuoteStepper({
                     </span>
                     <span
                       className={cn(
-                        "text-xs font-medium text-center truncate w-full px-1",
-                        isCurrent && "text-foreground",
+                        "text-xs font-medium text-center truncate w-full px-1 transition-colors duration-150",
+                        isCurrent && "font-semibold text-foreground",
                         !isCurrent && isReachable && "text-muted-foreground",
                         !isReachable && "text-muted-foreground/40"
                       )}
@@ -95,8 +95,8 @@ export function QuoteStepper({
                   {index < STEPS.length - 1 && (
                     <div
                       className={cn(
-                        "h-0.5 flex-1 min-w-[12px] mx-1 rounded-full mb-6",
-                        step < currentStep ? "bg-emerald-600/50" : "bg-border"
+                        "h-0.5 flex-1 min-w-[12px] mx-1 rounded-full mb-6 transition-colors duration-150",
+                        step < currentStep ? "bg-primary/45" : "bg-white/[0.08]"
                       )}
                       aria-hidden
                     />

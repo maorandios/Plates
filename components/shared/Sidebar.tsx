@@ -78,10 +78,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside
-      className="sticky top-0 hidden h-svh min-h-0 w-60 shrink-0 flex-col md:flex"
-      style={{ backgroundColor: "hsl(var(--sidebar-bg))" }}
-    >
+    <aside className="sticky top-0 hidden h-svh min-h-0 w-60 shrink-0 flex-col border-r border-white/[0.06] bg-sidebar-bg md:flex">
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-white/10">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">

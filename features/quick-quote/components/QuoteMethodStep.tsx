@@ -69,7 +69,7 @@ export function QuoteMethodStep({ selected, onSelect }: QuoteMethodStepProps) {
                 "hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 isSelected
                   ? "border-primary shadow-md ring-1 ring-primary/20"
-                  : "border-border"
+                  : "border-white/[0.08]"
               )}
             >
               <div

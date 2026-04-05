@@ -59,7 +59,7 @@ export function FileUploadCard({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+    <div className="ds-surface overflow-hidden">
       <div className="border-b border-border px-4 py-3 flex items-center justify-between gap-2 bg-muted/30">
         <div>
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>

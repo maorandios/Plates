@@ -53,32 +53,32 @@ export default function DashboardPage() {
       value: stats.totalBatches,
       icon: FileText,
       description: "All quotations",
-      color: "text-blue-600",
-      bg: "bg-blue-50",
+      color: "text-sky-400",
+      bg: "bg-sky-500/15",
     },
     {
       label: "Active Quotes",
       value: stats.activeBatches,
       icon: TrendingUp,
       description: "In progress",
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
+      color: "text-primary",
+      bg: "bg-primary/15",
     },
     {
       label: "Clients",
       value: stats.totalClients,
       icon: Users,
       description: "Customer database",
-      color: "text-violet-600",
-      bg: "bg-violet-50",
+      color: "text-violet-400",
+      bg: "bg-violet-500/15",
     },
     {
       label: "Quote",
       value: "→",
       icon: Calculator,
       description: "Create a quotation",
-      color: "text-amber-600",
-      bg: "bg-amber-50",
+      color: "text-amber-400",
+      bg: "bg-amber-500/15",
       href: "/quick-quote",
     },
   ];
@@ -124,14 +124,14 @@ export default function DashboardPage() {
           if ("href" in card && card.href) {
             return (
               <Link key={card.label} href={card.href}>
-                <Card className="border border-border shadow-none hover:shadow-sm transition-shadow cursor-pointer">
+                <Card className="border border-white/[0.06] shadow-none transition-all duration-150 hover:border-white/12 hover:shadow-sm cursor-pointer">
                   {content}
                 </Card>
               </Link>
             );
           }
           return (
-            <Card key={card.label} className="border border-border shadow-none">
+            <Card key={card.label} className="border border-white/[0.06] shadow-none">
               {content}
             </Card>
           );
@@ -139,7 +139,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Quotes */}
-      <Card className="border border-border shadow-none">
+      <Card className="border border-white/[0.06] shadow-none">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base font-semibold">Recent quotes</CardTitle>
           <Button variant="ghost" size="sm" asChild>
@@ -167,7 +167,7 @@ export default function DashboardPage() {
               </Button>
             </div>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-white/[0.06]">
               {recentBatches.map((batch) => (
                 <div
                   key={batch.id}

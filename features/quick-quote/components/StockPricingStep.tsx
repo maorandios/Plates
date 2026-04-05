@@ -122,7 +122,7 @@ export function StockPricingStep({
         </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4 pb-6 border-b border-border">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 pb-6 border-b border-white/[0.08]">
         <div className="space-y-1.5 max-w-xs">
           <Label className="text-xs text-muted-foreground font-normal">
             Material price ({currencyCode}/kg)
@@ -193,7 +193,7 @@ export function StockPricingStep({
             return (
               <details
                 key={row.thicknessMm}
-                className="border border-border rounded-lg bg-card overflow-hidden open:shadow-sm"
+                className="border border-white/[0.06] rounded-xl bg-card overflow-hidden open:shadow-sm"
                 open={index === 0}
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 bg-muted/25 hover:bg-muted/40 text-sm font-medium [&::-webkit-details-marker]:hidden">
@@ -205,13 +205,13 @@ export function StockPricingStep({
                   </span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground opacity-70" />
                 </summary>
-                <div className="border-t border-border px-4 py-4 space-y-4">
+                <div className="border-t border-white/[0.08] px-4 py-4 space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground font-normal">
                       Sheet sizes for this quote
                     </Label>
                     {row.sheets.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic rounded-md border border-dashed border-border px-3 py-2">
+                      <p className="text-xs text-muted-foreground italic rounded-md border border-dashed border-white/15 px-3 py-2">
                         Add at least one sheet size — use Add custom sheet size below.
                       </p>
                     ) : (
@@ -245,7 +245,7 @@ export function StockPricingStep({
                           ) : (
                             <div
                               key={line.id}
-                              className="flex flex-wrap items-end gap-3 gap-y-2 rounded-lg border border-border bg-muted/20 p-3"
+                              className="flex flex-wrap items-end gap-3 gap-y-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3"
                             >
                               <div className="space-y-1.5 flex-1 min-w-[120px]">
                                 <Label className="text-xs text-muted-foreground font-normal">
@@ -338,13 +338,13 @@ export function StockPricingStep({
         </div>
 
         {stockRows.length === 0 && (
-          <p className="text-sm text-muted-foreground rounded-md border border-dashed border-border px-4 py-8 text-center">
+          <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-white/15 px-4 py-8 text-center">
             No parts in this run — go back and select plates from validation.
           </p>
         )}
       </div>
 
-      <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-border">
+      <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-white/[0.08]">
         <Button type="button" variant="outline" onClick={onBack}>
           Back to validation
         </Button>

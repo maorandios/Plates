@@ -74,7 +74,7 @@ export function CalculationsSection({
             per job (priced per kg).
           </p>
         </div>
-        <Card className="border-dashed border-border">
+        <Card className="border-dashed border-white/15">
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
             No parts in this quote yet.
           </CardContent>
@@ -101,7 +101,7 @@ export function CalculationsSection({
         </p>
       </div>
 
-      <Card className="border-border shadow-sm overflow-hidden">
+      <Card className="border-white/[0.06] shadow-sm overflow-hidden">
         <CardContent className="p-0 sm:p-0">
           <div className="overflow-x-auto">
             <Table>

@@ -103,8 +103,8 @@ export function UploadStep({
           <JobDetailsForm value={jobDetails} onChange={onJobDetailsChange} />
         </div>
 
-        <Card className="xl:sticky xl:top-4 border-border shadow-sm">
-          <CardHeader className="pb-3 border-b border-border bg-muted/20">
+        <Card className="xl:sticky xl:top-4 border-white/[0.06] shadow-sm">
+          <CardHeader className="pb-3 border-b border-white/[0.08] bg-card/40">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
               Intake summary
@@ -152,7 +152,7 @@ export function UploadStep({
         </Card>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/[0.08]">
         <p className="text-xs text-muted-foreground">
           Continue runs a mocked validation pass. No files leave your browser in this preview.
         </p>

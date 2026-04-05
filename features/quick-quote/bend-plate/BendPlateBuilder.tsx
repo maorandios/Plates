@@ -435,7 +435,7 @@ function BendPlateHub({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
+          <div className="shrink-0 ds-surface-header sm:px-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold text-foreground">Configured plates</h2>
@@ -473,7 +473,7 @@ function BendPlateHub({
             <div className="p-4 sm:p-5">
               {quoteItems.length === 0 ? (
                 <div
-                  className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-muted/20 px-6 py-12"
+                  className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 ds-empty-state"
                 >
                   <p className="text-sm text-muted-foreground text-center max-w-sm">
                     No bent plates yet. Add a part to pick a profile shape and open the editor.
@@ -490,7 +490,7 @@ function BendPlateHub({
                 </div>
               ) : (
                 <>
-                <div className="rounded-lg border border-border overflow-x-auto">
+                <div className="rounded-xl border border-white/[0.06] overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
@@ -621,7 +621,7 @@ function BendPlateHub({
                     className={cn(
                       "rounded-xl border-2 text-left transition-all",
                       t.id === "omega" ? "px-3 py-3" : "px-4 py-4",
-                      "border-border bg-card hover:border-primary/50 hover:bg-muted/40 hover:shadow-sm",
+                      "border-white/[0.08] bg-card hover:border-primary/50 hover:bg-white/[0.04] hover:shadow-sm",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     )}
                   >
@@ -818,7 +818,7 @@ function BendPlateShapeEditor({
                 </div>
               </div>
 
-              <div className="space-y-3 border-t border-border pt-5">
+              <div className="space-y-3 border-t border-white/[0.08] pt-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -845,7 +845,7 @@ function BendPlateShapeEditor({
               </div>
             </div>
           </div>
-          <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 sm:px-5">
+          <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] bg-card px-4 py-3 sm:px-5">
             <Button type="button" variant="outline" className="gap-2" onClick={handleBackClick}>
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -884,7 +884,7 @@ function BendPlateShapeEditor({
 
       <Dialog open={preview3dOpen} onOpenChange={setPreview3dOpen}>
         <DialogContent className="max-w-[min(96vw,56rem)] gap-0 p-0">
-          <DialogHeader className="border-b border-border px-6 py-4 text-left">
+          <DialogHeader className="border-b border-white/[0.08] px-6 py-4 text-left">
             <DialogTitle>3D preview</DialogTitle>
             <DialogDescription className="text-sm">
               Extruded profile — width matches plate width.
@@ -899,7 +899,7 @@ function BendPlateShapeEditor({
               className="h-full min-h-[min(64vh,500px)] w-full rounded-md border-0 bg-transparent"
             />
           </div>
-          <DialogFooter className="border-t border-border px-6 py-3 sm:justify-end">
+          <DialogFooter className="border-t border-white/[0.08] px-6 py-3 sm:justify-end">
             <Button type="button" variant="outline" onClick={() => setPreview3dOpen(false)}>
               Close
             </Button>
@@ -952,7 +952,7 @@ function BendPlateShapeEditor({
 }
 
 const SEGMENT_DIM_BOX =
-  "rounded-lg border border-border bg-muted/25 p-3 space-y-3";
+  "rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 space-y-3";
 
 function TemplateFields({
   form,

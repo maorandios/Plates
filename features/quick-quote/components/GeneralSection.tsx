@@ -107,7 +107,7 @@ export function GeneralSection({
             title="Copy to clipboard"
           >
             {copied ? (
-              <Check className="h-4 w-4 text-green-600" />
+              <Check className="h-4 w-4 text-primary" />
             ) : (
               <Copy className="h-4 w-4 text-muted-foreground" />
             )}
@@ -215,7 +215,7 @@ export function GeneralSection({
               />
             </div>
           </div>
-          <ScrollArea className="h-[min(320px,45vh)] border-t border-border">
+          <ScrollArea className="h-[min(320px,45vh)] border-t border-white/[0.08]">
             <div className="p-2 space-y-0.5">
               {filteredClients.length === 0 ? (
                 <div className="px-3 py-8 text-center text-sm text-muted-foreground space-y-3">
@@ -249,7 +249,7 @@ export function GeneralSection({
               )}
             </div>
           </ScrollArea>
-          <div className="border-t border-border px-4 py-3 flex justify-end gap-2 bg-muted/20">
+          <div className="border-t border-white/[0.08] px-4 py-3 flex justify-end gap-2 bg-card/40">
             <Button type="button" variant="ghost" size="sm" asChild>
               <Link href="/clients" onClick={() => setClientPickerOpen(false)}>
                 Open Clients

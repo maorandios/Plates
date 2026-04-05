@@ -54,7 +54,7 @@ function StatCard({
   subtext: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-4 shadow-sm">
+    <div className="rounded-xl border border-white/[0.06] bg-card px-4 py-4 shadow-sm">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </p>
@@ -275,10 +275,10 @@ export function MaterialBreakdownSection({
         </div>
       </div>
 
-      <Card className="border-border shadow-sm overflow-hidden">
+      <Card className="border-white/[0.06] shadow-sm overflow-hidden">
         <CardContent className="p-3 sm:p-4">
           {stockRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-border rounded-lg">
+            <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-white/15 rounded-xl">
               {filteredParts.length === 0
                 ? "No parts match the current filters. Change or reset filters."
                 : !thicknessStockProvided

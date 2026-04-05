@@ -27,8 +27,8 @@ export function PricingStep({
 }: PricingStepProps) {
   return (
     <div className="space-y-8 pb-12">
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-muted/30 px-4 py-4 sm:px-6">
+      <div className="ds-surface overflow-hidden">
+        <div className="border-b border-white/[0.08] bg-card/40 px-4 py-4 sm:px-6">
           <h1 className="text-lg font-semibold tracking-tight text-foreground">
             Material pricing
           </h1>

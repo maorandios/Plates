@@ -8,9 +8,19 @@ interface MatchStatusBadgeProps {
 
 export function MatchStatusBadge({ status }: MatchStatusBadgeProps) {
   const config = {
-    matched: { label: "Matched", className: "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
-    unmatched: { label: "Unmatched", className: "bg-red-100 text-red-700 border-red-200 hover:bg-red-100" },
-    needs_review: { label: "Review", className: "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100" },
+    matched: {
+      label: "Matched",
+      className:
+        "bg-primary/15 text-primary border-primary/30 hover:bg-primary/20",
+    },
+    unmatched: {
+      label: "Unmatched",
+      className: "bg-red-500/15 text-red-400 border-red-500/25 hover:bg-red-500/20",
+    },
+    needs_review: {
+      label: "Review",
+      className: "bg-amber-500/15 text-amber-400 border-amber-500/25 hover:bg-amber-500/20",
+    },
   };
 
   const { label, className } = config[status];
@@ -28,10 +38,22 @@ interface BatchStatusBadgeProps {
 
 export function BatchStatusBadge({ status }: BatchStatusBadgeProps) {
   const config: Record<BatchStatus, { label: string; className: string }> = {
-    draft: { label: "Draft", className: "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100" },
-    active: { label: "Active", className: "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100" },
-    completed: { label: "Completed", className: "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
-    archived: { label: "Archived", className: "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100" },
+    draft: {
+      label: "Draft",
+      className: "bg-white/[0.06] text-muted-foreground border-white/10 hover:bg-white/[0.08]",
+    },
+    active: {
+      label: "Active",
+      className: "bg-sky-500/15 text-sky-300 border-sky-500/25 hover:bg-sky-500/20",
+    },
+    completed: {
+      label: "Completed",
+      className: "bg-primary/15 text-primary border-primary/30 hover:bg-primary/20",
+    },
+    archived: {
+      label: "Archived",
+      className: "bg-white/[0.04] text-muted-foreground/80 border-white/10 hover:bg-white/[0.06]",
+    },
   };
 
   const { label, className } = config[status];
@@ -49,8 +71,14 @@ interface FileTypeBadgeProps {
 
 export function FileTypeBadge({ type }: FileTypeBadgeProps) {
   const config = {
-    dxf: { label: "DXF", className: "bg-indigo-100 text-indigo-700 border-indigo-200 hover:bg-indigo-100" },
-    excel: { label: "Excel", className: "bg-green-100 text-green-700 border-green-200 hover:bg-green-100" },
+    dxf: {
+      label: "DXF",
+      className: "bg-indigo-500/15 text-indigo-300 border-indigo-500/25 hover:bg-indigo-500/20",
+    },
+    excel: {
+      label: "Excel",
+      className: "bg-primary/15 text-primary border-primary/30 hover:bg-primary/20",
+    },
   };
 
   const { label, className } = config[type];
@@ -68,8 +96,8 @@ interface PresenceBadgeProps {
 
 export function PresenceBadge({ status }: PresenceBadgeProps) {
   return status === "present" ? (
-    <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+    <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
+      <span className="h-1.5 w-1.5 rounded-full bg-primary inline-block" />
       Present
     </span>
   ) : (

@@ -145,7 +145,7 @@ export function QuoteMethodPickerPhase({
       )}
     >
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-border/80">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
               Quote method
@@ -160,7 +160,7 @@ export function QuoteMethodPickerPhase({
             </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/70">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
             <MethodPhaseMetricStrip
               label="Quantity"
               value={formatInteger(metrics.totalQty)}
@@ -180,12 +180,12 @@ export function QuoteMethodPickerPhase({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
+          <div className="shrink-0 border-b border-white/[0.08] bg-card/40 px-4 py-3 sm:px-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold text-foreground">Methods</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  A green outline means that method already has quote data. Use Configure to edit.
+                  A green border means that method already has quote data. Use Configure to edit.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -232,16 +232,17 @@ export function QuoteMethodPickerPhase({
                   <div
                     key={id}
                     className={cn(
-                      "flex flex-col rounded-xl border-2 bg-card p-5 text-left transition-all",
-                      hasData && "border-emerald-600 shadow-sm ring-1 ring-emerald-600/25",
-                      !hasData && "border-border",
-                      isSelected && "ring-2 ring-primary/40"
+                      "flex flex-col rounded-xl border-2 bg-card p-5 text-left transition-all duration-150",
+                      hasData &&
+                        "border-primary/70 shadow-sm ring-1 ring-primary/20",
+                      !hasData && "border-white/[0.08]",
+                      isSelected && "ring-2 ring-primary/35 shadow-[0_0_20px_-4px_hsl(var(--primary)/0.35)]"
                     )}
                   >
                     <button
                       type="button"
                       onClick={() => onSelect(id)}
-                      className="text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg -m-1 p-1"
+                      className="text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg -m-1 p-1"
                     >
                       <div
                         className={cn(
@@ -259,7 +260,7 @@ export function QuoteMethodPickerPhase({
                         {hint}
                       </span>
                     </button>
-                    <div className="mt-4 pt-3 border-t border-border/80">
+                    <div className="mt-4 pt-3 border-t border-white/[0.08]">
                       <Button
                         type="button"
                         variant="secondary"

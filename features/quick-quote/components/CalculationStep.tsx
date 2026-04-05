@@ -87,8 +87,8 @@ export function CalculationStep({
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_300px] xl:items-start">
-        <Card className="border-border shadow-sm">
-          <CardHeader className="border-b border-border bg-muted/20">
+        <Card className="border-white/[0.06] shadow-sm">
+          <CardHeader className="border-b border-white/[0.08] bg-card/40">
             <CardTitle className="text-base">Progress</CardTitle>
             <CardDescription>
               Current task: <span className="text-foreground font-medium">{currentTask}</span>
@@ -118,7 +118,7 @@ export function CalculationStep({
                     "flex items-start gap-3 rounded-md border px-3 py-2.5 text-sm",
                     s.state === "active" && "border-primary/40 bg-primary/5",
                     s.state === "complete" && "border-emerald-600/25 bg-emerald-600/[0.04]",
-                    s.state === "pending" && "border-border bg-muted/20 text-muted-foreground"
+                    s.state === "pending" && "border-white/[0.08] bg-white/[0.03] text-muted-foreground"
                   )}
                 >
                   <span className="mt-0.5 shrink-0">
@@ -146,8 +146,8 @@ export function CalculationStep({
           </CardContent>
         </Card>
 
-        <Card className="border-border shadow-sm xl:sticky xl:top-4">
-          <CardHeader className="border-b border-border bg-muted/20 pb-3">
+        <Card className="border-white/[0.06] shadow-sm xl:sticky xl:top-4">
+          <CardHeader className="border-b border-white/[0.08] bg-card/40 pb-3">
             <CardTitle className="text-sm">Quote snapshot</CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-3 text-sm">
@@ -184,7 +184,7 @@ export function CalculationStep({
         </Card>
       </div>
 
-      <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-border">
+      <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-white/[0.08]">
         <Button type="button" variant="outline" onClick={onBack}>
           Back to stock & pricing
         </Button>

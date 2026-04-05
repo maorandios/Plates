@@ -20,37 +20,60 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+  --color-ring-offset-background: hsl(var(--background));
+  --color-sidebar-bg: hsl(var(--sidebar-bg));
+  --color-success: hsl(var(--success));
+  --color-warning: hsl(var(--warning));
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Industrial dark SaaS — steel / fabrication */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
-  --radius: 0.5rem;
-  --sidebar-bg: 222.2 47.4% 11.2%;
-  --sidebar-fg: 210 40% 98%;
-  --sidebar-accent: 217.2 32.6% 17.5%;
-  --sidebar-border: 217.2 32.6% 20%;
+  /* #0B1F24 family — deep blue-green */
+  --background: 196 45% 9%;
+  --foreground: 0 0% 100%;
+
+  /* Cards / panels — #111827–#1F2937 range */
+  --card: 217 33% 14%;
+  --card-foreground: 0 0% 100%;
+
+  --popover: 217 33% 13%;
+  --popover-foreground: 0 0% 100%;
+
+  /* Brand accent — #22C55E */
+  --primary: 142 71% 45%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 217 25% 17%;
+  --secondary-foreground: 0 0% 100%;
+
+  --muted: 217 22% 16%;
+  /* Secondary text ~#9CA3AF */
+  --muted-foreground: 218 11% 65%;
+
+  --accent: 142 35% 18%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Subtle borders ~rgba(255,255,255,0.08) */
+  --border: 220 16% 22%;
+  --input: 217 28% 12%;
+  --ring: 142 71% 45%;
+
+  --radius: 0.75rem;
+
+  --sidebar-bg: 198 42% 8%;
+  --sidebar-fg: 0 0% 100%;
+  --sidebar-accent: 217 30% 14%;
+  --sidebar-border: 220 16% 20%;
+
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
 }
 
 * {
@@ -63,4 +86,17 @@ body {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Quote / industrial shells — use with Card-like wrappers */
+@layer utilities {
+  .ds-surface {
+    @apply rounded-xl border border-white/[0.06] bg-card shadow-sm;
+  }
+  .ds-surface-header {
+    @apply border-b border-white/[0.08] bg-card/50 px-4 py-3 sm:px-5;
+  }
+  .ds-empty-state {
+    @apply rounded-xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-12;
+  }
 }

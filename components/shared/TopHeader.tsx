@@ -40,7 +40,7 @@ export function TopHeader() {
   }
 
   return (
-    <header className="h-14 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-10 flex items-center px-4 lg:px-6 gap-4">
+    <header className="h-14 border-b border-white/[0.08] bg-background/95 backdrop-blur-md sticky top-0 z-10 flex items-center px-4 lg:px-6 gap-4">
       {/* Mobile logo */}
       <div className="flex items-center gap-2 md:hidden">
         <div

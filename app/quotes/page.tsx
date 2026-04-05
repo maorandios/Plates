@@ -105,7 +105,7 @@ export default function QuotesPage() {
           }
         />
       ) : (
-        <div className="rounded-md border border-border overflow-x-auto">
+        <div className="rounded-xl border border-white/[0.06] overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

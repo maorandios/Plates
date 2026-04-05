@@ -22,8 +22,8 @@ export function JobOverviewCard({
       className={cn(
         "rounded-xl border bg-card px-5 py-5 flex flex-col justify-between min-h-[132px]",
         emphasized
-          ? "border-foreground/20 bg-muted/25 shadow-sm"
-          : "border-border shadow-sm"
+          ? "border-primary/30 bg-primary/5 shadow-sm"
+          : "border-white/[0.06] shadow-sm"
       )}
     >
       <div>

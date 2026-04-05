@@ -113,7 +113,7 @@ export function DxfExcelCompareModal({
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3 space-y-4">
-          <Card className="border-primary/15 bg-muted/20">
+          <Card className="border-primary/25 bg-primary/5">
             <CardHeader className="pb-2 pt-4">
               <CardDescription className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Row status

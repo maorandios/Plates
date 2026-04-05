@@ -59,7 +59,7 @@ export function MethodDetailsRouter({
 }: MethodDetailsRouterProps) {
   if (!method) {
     return (
-      <Card className="max-w-md mx-auto border-dashed">
+      <Card className="mx-auto max-w-md border border-dashed border-white/20 bg-card/80">
         <CardHeader>
           <CardTitle className="text-base">No method selected</CardTitle>
           <CardDescription>Choose how you want to create this quote first.</CardDescription>

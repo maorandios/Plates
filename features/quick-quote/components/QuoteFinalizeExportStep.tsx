@@ -63,7 +63,7 @@ function PlateShapeIcon({ shape }: { shape: string }) {
   const label = labels[s] ?? shape;
   return (
     <span
-      className="inline-flex h-7 min-w-[2rem] items-center justify-center rounded border border-border bg-muted/40 px-1 text-[10px] font-semibold leading-tight text-center"
+      className="inline-flex h-7 min-w-[2rem] items-center justify-center rounded border border-white/10 bg-white/[0.04] px-1 text-[10px] font-semibold leading-tight text-center"
       title={label}
     >
       {label}
@@ -264,8 +264,8 @@ export function QuoteFinalizeExportStep({
 
   return (
     <div className="space-y-8 pb-12">
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-muted/30 px-4 py-4 sm:px-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="ds-surface overflow-hidden">
+        <div className="ds-surface-header py-4 sm:px-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
@@ -693,7 +693,7 @@ export function QuoteFinalizeExportStep({
                 <Label htmlFor="pr-incl">Total incl. VAT ({draft.quote.currency})</Label>
                 <div
                   id="pr-incl"
-                  className="flex h-10 w-full items-center rounded-md border border-border bg-muted/20 px-3 text-base font-semibold tabular-nums text-foreground"
+                  className="flex h-10 w-full items-center rounded-[10px] border border-white/10 bg-white/[0.04] px-3 text-base font-semibold tabular-nums text-foreground"
                   aria-readonly
                 >
                   {formatDecimal(

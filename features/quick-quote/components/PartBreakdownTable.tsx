@@ -208,13 +208,13 @@ function equalColumnWidthsPct(n: number): number[] {
 }
 
 /** Vertical rules: standard column vs section boundary (Ref | Part | Dim | Actions). */
-const colRule = "border-r border-border/50";
-const sectionRule = "border-r border-border";
+const colRule = "border-r border-white/10";
+const sectionRule = "border-r border-white/[0.08]";
 
 const sectionHeadClass =
   "text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/55";
 const subHeadClass =
-  "h-auto py-2 px-3 text-left align-middle font-medium text-muted-foreground bg-muted/40 border-b border-border";
+  "h-auto py-2 px-3 text-left align-middle font-medium text-muted-foreground bg-white/[0.04] border-b border-white/[0.08]";
 
 type MultiSelectOption = { value: string; label: string };
 
@@ -504,9 +504,9 @@ export function PartBreakdownTable({
   const partCols = 5;
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <div className="grid grid-cols-2 gap-3 border-b border-border bg-muted/20 p-4 sm:grid-cols-4">
-        <Card className="border-border/80 p-4 shadow-sm">
+    <div className="rounded-xl border border-white/[0.06] overflow-hidden">
+      <div className="grid grid-cols-2 gap-3 border-b border-white/[0.08] bg-card/40 p-4 sm:grid-cols-4">
+        <Card className="border border-white/[0.08] p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Plates
           </p>
@@ -515,7 +515,7 @@ export function PartBreakdownTable({
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">Quote lines</p>
         </Card>
-        <Card className="border-border/80 p-4 shadow-sm">
+        <Card className="border border-white/[0.08] p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Quantity
           </p>
@@ -524,7 +524,7 @@ export function PartBreakdownTable({
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">Total pieces</p>
         </Card>
-        <Card className="border-border/80 p-4 shadow-sm">
+        <Card className="border border-white/[0.08] p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Area
           </p>
@@ -534,7 +534,7 @@ export function PartBreakdownTable({
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">Total plate area</p>
         </Card>
-        <Card className="border-border/80 p-4 shadow-sm">
+        <Card className="border border-white/[0.08] p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Weight
           </p>
@@ -546,7 +546,7 @@ export function PartBreakdownTable({
         </Card>
       </div>
 
-      <div className="border-b border-border bg-muted/30 px-4 py-3">
+      <div className="border-b border-white/[0.08] bg-card/40 px-4 py-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
           <div className="min-w-0 flex-1 lg:min-w-[220px] lg:max-w-md">
             <label
@@ -637,7 +637,7 @@ export function PartBreakdownTable({
             ))}
           </colgroup>
           <TableHeader>
-            <TableRow className="border-b border-border hover:bg-muted/55">
+            <TableRow className="border-b border-white/[0.06] hover:bg-white/[0.04]">
               {showRefColumn ? (
                 <TableHead colSpan={1} className={cn(sectionHeadClass, sectionRule)}>
                   Ref
@@ -656,7 +656,7 @@ export function PartBreakdownTable({
                 Actions
               </TableHead>
             </TableRow>
-            <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border">
+            <TableRow className="bg-white/[0.04] hover:bg-white/[0.04] border-b border-white/[0.06]">
               {showRefColumn ? (
                 <SortableColumnHead
                   sortKey="sourceRef"
@@ -947,7 +947,7 @@ export function PartBreakdownTable({
               <DialogHeader
                 className={cn(
                   "px-6 pt-6 pb-2 text-left",
-                  pricingPreviewLayout && "border-b border-border bg-muted/20 px-6 py-4 sm:py-5"
+                  pricingPreviewLayout && "border-b border-white/[0.08] bg-card/40 px-6 py-4 sm:py-5"
                 )}
               >
                 <DialogTitle className="font-mono text-base sm:text-lg">{p.partName}</DialogTitle>
@@ -963,50 +963,50 @@ export function PartBreakdownTable({
                   <div className="p-6 min-w-0 flex flex-col">
                     <dl className="space-y-2.5 text-sm flex-1">
                       {p.sourceRef ? (
-                        <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                        <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                           <dt className="text-muted-foreground shrink-0">Ref</dt>
                           <dd className="font-medium text-right min-w-0">{p.sourceRef}</dd>
                         </div>
                       ) : null}
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Quantity</dt>
                         <dd className="tabular-nums font-medium">{p.qty}</dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Material grade</dt>
                         <dd className="font-medium text-right min-w-0">{previewGradeLabel}</dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Finish</dt>
                         <dd className="font-medium text-right min-w-0">{previewFinishLabel}</dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Thickness</dt>
                         <dd className="tabular-nums">
                           {formatInteger(Math.round(p.thicknessMm))} mm
                         </dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Width</dt>
                         <dd className="tabular-nums">{formatDecimal(p.widthMm, 2)} mm</dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Length</dt>
                         <dd className="tabular-nums">{formatDecimal(p.lengthMm, 2)} mm</dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Area (per plate)</dt>
                         <dd className="tabular-nums">{formatDecimal(p.areaM2, 3)} m²</dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Total weight (line)</dt>
                         <dd className="tabular-nums">{formatDecimal(totalWeightLine, 2)} kg</dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Cut length (per plate)</dt>
                         <dd className="tabular-nums">{formatDecimal(cutLengthM, 2)} m</dd>
                       </div>
-                      <div className="flex justify-between gap-6 border-b border-border pb-2.5">
+                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
                         <dt className="text-muted-foreground shrink-0">Pierce count</dt>
                         <dd className="tabular-nums">{p.pierceCount}</dd>
                       </div>
@@ -1033,48 +1033,48 @@ export function PartBreakdownTable({
                 <div className="grid gap-4 sm:grid-cols-2 text-sm px-6 pb-6">
                   <dl className="space-y-2 sm:col-span-2">
                     {p.sourceRef ? (
-                      <div className="flex justify-between gap-4 border-b border-border pb-2">
+                      <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                         <dt className="text-muted-foreground">Ref</dt>
                         <dd className="font-medium text-right">{p.sourceRef}</dd>
                       </div>
                     ) : null}
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Quantity</dt>
                       <dd className="tabular-nums font-medium">{p.qty}</dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Material</dt>
                       <dd className="font-medium text-right">{p.material}</dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Thickness</dt>
                       <dd className="tabular-nums">
                         {formatInteger(Math.round(p.thicknessMm))} mm
                       </dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Width × length</dt>
                       <dd className="tabular-nums">
                         {formatDecimal(p.widthMm, 2)} × {formatDecimal(p.lengthMm, 2)} mm
                       </dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Area (per plate)</dt>
                       <dd className="tabular-nums">{formatDecimal(p.areaM2, 3)} m²</dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Total weight (line)</dt>
                       <dd className="tabular-nums">{formatDecimal(totalWeightLine, 2)} kg</dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Cut length (per plate)</dt>
                       <dd className="tabular-nums">{formatDecimal(cutLengthM, 2)} m</dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Pierce count</dt>
                       <dd className="tabular-nums">{p.pierceCount}</dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Line price (est.)</dt>
                       <dd className="tabular-nums font-medium">
                         <span className="tabular-nums text-foreground" aria-hidden>
@@ -1083,11 +1083,11 @@ export function PartBreakdownTable({
                         {fmtAmount(p.estimatedLineCost)}
                       </dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">DXF file</dt>
                       <dd className="font-mono text-xs text-right break-all">{p.dxfFileName}</dd>
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-border pb-2">
+                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
                       <dt className="text-muted-foreground">Excel ref</dt>
                       <dd className="font-mono text-xs">{p.excelRowRef}</dd>
                     </div>

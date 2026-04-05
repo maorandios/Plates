@@ -25,7 +25,7 @@ function RectangularPlateSvg({
   return (
     <div
       className={cn(
-        "w-full min-h-[240px] rounded-lg border border-border bg-card/80 flex items-center justify-center p-4",
+        "w-full min-h-[240px] rounded-xl border border-white/[0.06] bg-card/80 flex items-center justify-center p-4",
         className
       )}
     >
@@ -72,7 +72,7 @@ export function QuotePartGeometryPreview({
     return (
       <div
         className={cn(
-          "w-full min-h-[240px] rounded-lg border border-border bg-muted/30 overflow-hidden flex items-center justify-center",
+          "w-full min-h-[240px] rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden flex items-center justify-center",
           className
         )}
       >

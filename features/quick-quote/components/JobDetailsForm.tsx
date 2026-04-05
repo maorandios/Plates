@@ -69,8 +69,8 @@ export function JobDetailsForm({ value, onChange }: JobDetailsFormProps) {
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-      <div className="border-b border-border px-4 py-3 bg-muted/30">
+    <div className="ds-surface overflow-hidden">
+      <div className="ds-surface-header">
         <h3 className="text-sm font-semibold text-foreground">Job details</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
           Reference information for this quote package
@@ -202,7 +202,7 @@ export function JobDetailsForm({ value, onChange }: JobDetailsFormProps) {
               />
             </div>
           </div>
-          <ScrollArea className="h-[min(320px,45vh)] border-t border-border">
+          <ScrollArea className="h-[min(320px,45vh)] border-t border-white/[0.08]">
             <div className="p-2 space-y-0.5">
               {filteredClients.length === 0 ? (
                 <div className="px-3 py-8 text-center text-sm text-muted-foreground space-y-3">
@@ -236,7 +236,7 @@ export function JobDetailsForm({ value, onChange }: JobDetailsFormProps) {
               )}
             </div>
           </ScrollArea>
-          <div className="border-t border-border px-4 py-3 flex justify-end gap-2 bg-muted/20">
+          <div className="border-t border-white/[0.08] px-4 py-3 flex justify-end gap-2 bg-card/40">
             <Button type="button" variant="ghost" size="sm" asChild>
               <Link href="/clients" onClick={() => setClientPickerOpen(false)}>
                 Open Clients

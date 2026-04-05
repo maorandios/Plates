@@ -187,7 +187,7 @@ export function ManualQuotePhase({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
+          <div className="shrink-0 ds-surface-header sm:px-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold text-foreground">Line items</h2>
@@ -223,7 +223,7 @@ export function ManualQuotePhase({
             <div className="p-4 sm:p-5">
               {rows.length === 0 ? (
                 <div
-                  className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-muted/20 px-6 py-12"
+                  className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 ds-empty-state"
                 >
                   <p className="text-sm text-muted-foreground text-center max-w-sm">
                     No parts yet. Add a line to enter thickness, width, length, and quantity.
@@ -235,7 +235,7 @@ export function ManualQuotePhase({
                 </div>
               ) : (
                 <>
-              <div className="rounded-lg border border-border overflow-x-auto">
+              <div className="rounded-xl border border-white/[0.06] overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">

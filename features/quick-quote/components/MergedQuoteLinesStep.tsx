@@ -73,7 +73,7 @@ export function MergedQuoteLinesStep({
       )}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-3 sm:px-5">
+        <div className="shrink-0 ds-surface-header">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="text-base font-semibold text-foreground">Parts</h2>
@@ -122,7 +122,7 @@ export function MergedQuoteLinesStep({
 
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
           {parts.length === 0 ? (
-            <div className="flex min-h-[min(280px,40vh)] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-12 text-center">
+            <div className="flex min-h-[min(280px,40vh)] flex-col items-center justify-center ds-empty-state text-center">
               <p className="text-sm text-muted-foreground max-w-md">
                 No quote lines yet. Go back and configure at least one method with parts before
                 continuing.

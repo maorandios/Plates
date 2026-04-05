@@ -460,7 +460,7 @@ export function QuickQuotePage() {
       />
       <PageContainer
         className={cn(
-          "bg-muted/20 flex-1 min-h-0",
+          "bg-background flex-1 min-h-0",
           step === 2 || step === 3
             ? "flex flex-col overflow-hidden p-0 lg:p-0"
             : "overflow-y-auto"
@@ -475,9 +475,9 @@ export function QuickQuotePage() {
           )}
         >
           {step === 1 && (
-            <Card className="border border-border shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-xl">General</CardTitle>
+            <Card className="mx-auto w-full max-w-4xl border border-white/[0.06] shadow-sm">
+              <CardHeader className="space-y-1 pb-2">
+                <CardTitle className="text-xl tracking-tight">General</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
                   Quote details and client information. Fields marked{" "}
                   <span className="text-destructive">*</span> are required to continue.

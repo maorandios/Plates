@@ -353,7 +353,7 @@ export function ExcelColumnMappingModal({
             ) : null}
           </div>
 
-          <DialogFooter className="shrink-0 gap-2 px-6 py-4 border-t bg-muted/20 sm:justify-between">
+          <DialogFooter className="shrink-0 gap-2 px-6 py-4 border-t border-white/[0.08] bg-card/40 sm:justify-between">
             <Button type="button" variant="outline" className="gap-2" onClick={requestDiscard}>
               <ArrowLeft className="h-4 w-4" />
               Back
