@@ -10,7 +10,7 @@ export default function NewBatchPage() {
         title="New quote job"
         description="Create a new quote job for organizing client files and parts"
       />
-      <Card className="max-w-lg border border-border shadow-none">
+      <Card className="max-w-lg shadow-none">
         <CardContent className="p-6">
           <BatchForm />
         </CardContent>

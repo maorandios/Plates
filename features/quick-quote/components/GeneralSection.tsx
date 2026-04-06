@@ -25,6 +25,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getClients } from "@/lib/store";
 import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
+import { t } from "@/lib/i18n";
 import type { QuickQuoteJobDetails } from "../types/quickQuote";
 
 interface GeneralSectionProps {
@@ -89,14 +90,14 @@ export function GeneralSection({
       {/* Quotation ID */}
       <div className="space-y-2">
         <Label htmlFor="quote-id" className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-          Quotation ID
+          {t("general.quotationId")}
         </Label>
         <div className="flex items-center gap-2">
           <Input
             id="quote-id"
             readOnly
-            value={value.referenceNumber || "Generating…"}
-            className="font-mono text-sm bg-muted/40 cursor-default border-muted-foreground/20 text-muted-foreground"
+            value={value.referenceNumber || t("general.generating")}
+            className="font-mono text-sm cursor-default text-[rgb(101,105,114)]"
           />
           <Button
             type="button"
@@ -104,7 +105,7 @@ export function GeneralSection({
             size="sm"
             onClick={copyQuoteId}
             className="shrink-0 h-9 w-9 p-0"
-            title="Copy to clipboard"
+            title={t("general.copyReference")}
           >
             {copied ? (
               <Check className="h-4 w-4 text-primary" />
@@ -118,13 +119,13 @@ export function GeneralSection({
       {/* Project name */}
       <div className="space-y-2">
         <Label htmlFor="project-name">
-          Project name <span className="text-destructive">*</span>
+          {t("general.projectName")} <span className="text-destructive">*</span>
         </Label>
         <Input
           id="project-name"
           value={value.projectName}
           onChange={(e) => patch({ projectName: e.target.value })}
-          placeholder="Project or job title"
+          placeholder={t("general.projectNamePlaceholder")}
           autoComplete="off"
           required
           aria-required="true"
@@ -134,7 +135,7 @@ export function GeneralSection({
       {/* Client name */}
       <div className="space-y-2">
         <Label htmlFor="client-name">
-          Client name <span className="text-destructive">*</span>
+          {t("general.customerName")} <span className="text-destructive">*</span>
         </Label>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <div className="relative flex-1 min-w-0">
@@ -142,7 +143,7 @@ export function GeneralSection({
               id="client-name"
               value={value.customerName}
               onChange={(e) => onCustomerInputChange(e.target.value)}
-              placeholder="Type a client name or pick from directory"
+              placeholder={t("general.customerPlaceholder")}
               autoComplete="off"
               required
               aria-required="true"
@@ -158,19 +159,19 @@ export function GeneralSection({
             }}
           >
             <BookUser className="h-4 w-4" />
-            Browse clients
+            {t("general.browseClients")}
           </Button>
         </div>
         {value.customerClientId && (
           <Badge variant="secondary" className="text-[10px] font-normal">
-            Linked to client record
+            {t("general.linkedToClient")}
           </Badge>
         )}
       </div>
 
       {/* Material type */}
       <div className="space-y-2">
-        <Label htmlFor="material-type">Material type</Label>
+        <Label htmlFor="material-type">{t("general.materialType")}</Label>
         <Select value={materialType} onValueChange={(v) => onMaterialTypeChange(v as MaterialType)}>
           <SelectTrigger id="material-type">
             <SelectValue />
@@ -185,12 +186,12 @@ export function GeneralSection({
 
       {/* Notes */}
       <div className="space-y-2">
-        <Label htmlFor="notes">Notes</Label>
+        <Label htmlFor="notes">{t("general.notes")}</Label>
         <Textarea
           id="notes"
           value={value.notes}
           onChange={(e) => patch({ notes: e.target.value })}
-          placeholder="Delivery, tolerance, or commercial notes (optional)"
+          placeholder={t("general.notesPlaceholder")}
           rows={4}
           className="resize-y min-h-[100px]"
         />
@@ -198,36 +199,41 @@ export function GeneralSection({
 
       {/* Client picker dialog */}
       <Dialog open={clientPickerOpen} onOpenChange={setClientPickerOpen}>
-        <DialogContent className="sm:max-w-md gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-4 pt-4 pb-2 space-y-1">
-            <DialogTitle>Select client</DialogTitle>
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-md gap-0 p-0 overflow-hidden"
+        >
+          <DialogHeader className="space-y-2 px-5 pt-6 pb-3 text-end sm:text-end">
+            <DialogTitle>{t("general.selectClientTitle")}</DialogTitle>
             <DialogDescription>
-              Choose a client from your directory. You can edit the name afterward if needed.
+              {t("general.selectClientDescription")}
             </DialogDescription>
           </DialogHeader>
-          <div className="px-4 pb-2">
+          <div className="px-5 pb-4">
             <div className="relative">
               <Input
-                placeholder="Search by name or code…"
+                placeholder={t("general.searchClientsPlaceholder")}
                 value={clientSearch}
                 onChange={(e) => setClientSearch(e.target.value)}
-                className="h-9"
+                className="h-10"
               />
             </div>
           </div>
           <ScrollArea className="h-[min(320px,45vh)] border-t border-white/[0.08]">
-            <div className="p-2 space-y-0.5">
+            <div className="p-3">
               {filteredClients.length === 0 ? (
-                <div className="px-3 py-8 text-center text-sm text-muted-foreground space-y-3">
-                  <p>
+                <div
+                  className="flex min-h-[min(280px,42vh)] flex-col items-center justify-center gap-4 px-4 py-6 text-center text-sm text-muted-foreground"
+                >
+                  <p className="max-w-[min(100%,20rem)] leading-relaxed">
                     {clientsSorted.length === 0
-                      ? "No active clients in your directory yet."
-                      : "No clients match your search."}
+                      ? t("general.noClientsYet")
+                      : t("general.noSearchResults")}
                   </p>
                   {clientsSorted.length === 0 && (
                     <Button variant="outline" size="sm" asChild>
                       <Link href="/clients/new" onClick={() => setClientPickerOpen(false)}>
-                        Add a client
+                        {t("general.createNewClient")}
                       </Link>
                     </Button>
                   )}
@@ -238,10 +244,16 @@ export function GeneralSection({
                     key={c.id}
                     type="button"
                     onClick={() => applyClient(c.id, c.fullName)}
-                    className="w-full text-left rounded-md px-3 py-2.5 text-sm hover:bg-muted/80 transition-colors flex items-start justify-between gap-2"
+                    dir="rtl"
+                    className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-start text-sm hover:bg-muted/80 transition-colors"
                   >
-                    <span className="font-medium leading-snug">{c.fullName}</span>
-                    <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
+                    <span className="min-w-0 flex-1 font-medium leading-snug">
+                      {c.fullName}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 font-mono text-[10px] tabular-nums"
+                    >
                       {c.shortCode}
                     </Badge>
                   </button>
@@ -249,19 +261,14 @@ export function GeneralSection({
               )}
             </div>
           </ScrollArea>
-          <div className="border-t border-white/[0.08] px-4 py-3 flex justify-end gap-2 bg-card/40">
-            <Button type="button" variant="ghost" size="sm" asChild>
-              <Link href="/clients" onClick={() => setClientPickerOpen(false)}>
-                Open Clients
-              </Link>
-            </Button>
+          <div className="flex justify-end border-t border-white/[0.08] bg-card/40 px-5 py-4">
             <Button
               type="button"
               variant="secondary"
               size="sm"
               onClick={() => setClientPickerOpen(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </DialogContent>

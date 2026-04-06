@@ -118,7 +118,7 @@ export function MaterialBreakdownBarChart({
                   thicknessMm: number;
                 };
                 return (
-                  <div className="rounded-md border border-border bg-popover px-3 py-2.5 text-xs shadow-md max-w-sm space-y-1.5">
+                  <div className="rounded-md bg-popover px-3 py-2.5 text-xs shadow-md max-w-sm space-y-1.5">
                     <p className="font-semibold text-foreground leading-snug">{p.fullName}</p>
                     <p className="text-muted-foreground">
                       {shareScopeLabel} · {p.material} · {formatDecimal(p.thicknessMm, 1)} mm

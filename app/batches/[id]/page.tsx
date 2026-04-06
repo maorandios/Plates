@@ -290,7 +290,7 @@ function BatchStatCard({
   className?: string;
 }) {
   return (
-    <Card className={`border border-border shadow-none ${className ?? ""}`}>
+    <Card className={`shadow-none ${className ?? ""}`}>
       <CardContent className="pt-5 pb-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -346,7 +346,7 @@ function ClientExpandable({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
+    <div className="rounded-xl bg-card overflow-hidden">
       <ClientImportWizardModal
         open={importWizardOpen}
         onOpenChange={setImportWizardOpen}
@@ -373,13 +373,13 @@ function ClientExpandable({
             role="group"
             aria-label="File counts by type"
           >
-            <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/35 px-2 py-0.5 text-[11px]">
+            <div className="inline-flex items-center gap-1.5 rounded-md bg-muted/35 px-2 py-0.5 text-[11px]">
               <span className="text-muted-foreground font-medium">DXF</span>
               <span className="tabular-nums font-semibold text-foreground">
                 {dxfCount}
               </span>
             </div>
-            <div className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/35 px-2 py-0.5 text-[11px]">
+            <div className="inline-flex items-center gap-1.5 rounded-md bg-muted/35 px-2 py-0.5 text-[11px]">
               <span className="text-muted-foreground font-medium">Excel</span>
               <span className="tabular-nums font-semibold text-foreground">
                 {excelCount}

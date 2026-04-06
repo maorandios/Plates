@@ -153,7 +153,7 @@ export function DxfQuotePhase({
   return (
     <div
       className={cn(
-        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
+        "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
         MANUAL_PHASE_VIEWPORT
       )}
     >

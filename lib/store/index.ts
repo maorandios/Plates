@@ -203,10 +203,15 @@ function normalizeClientFromStorage(raw: unknown): Client {
     id: String(r.id),
     fullName,
     shortCode,
+    companyRegistrationNumber:
+      typeof r.companyRegistrationNumber === "string"
+        ? r.companyRegistrationNumber
+        : undefined,
     contactName:
       typeof r.contactName === "string" ? r.contactName : undefined,
     email: typeof r.email === "string" ? r.email : undefined,
     phone: typeof r.phone === "string" ? r.phone : undefined,
+    city: typeof r.city === "string" ? r.city : undefined,
     notes: typeof r.notes === "string" ? r.notes : undefined,
     status,
     uploadedFileIds,
@@ -401,9 +406,11 @@ export function unlinkClientFromBatch(batchId: string, clientId: string): void {
 
 export type CreateGlobalClientInput = {
   fullName: string;
+  companyRegistrationNumber?: string;
   contactName?: string;
   email?: string;
   phone?: string;
+  city?: string;
   notes?: string;
   status?: ClientStatus;
 };
@@ -417,9 +424,11 @@ export function createGlobalClient(input: CreateGlobalClientInput): Client {
     id: nanoid(),
     fullName: input.fullName.trim(),
     shortCode,
+    companyRegistrationNumber: input.companyRegistrationNumber?.trim() || undefined,
     contactName: input.contactName?.trim() || undefined,
     email: input.email?.trim() || undefined,
     phone: input.phone?.trim() || undefined,
+    city: input.city?.trim() || undefined,
     notes: input.notes?.trim() || undefined,
     status: input.status === "inactive" ? "inactive" : "active",
     uploadedFileIds: [],

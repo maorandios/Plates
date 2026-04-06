@@ -208,7 +208,7 @@ export function MaterialBreakdownTable({
         <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
           <span className="shrink-0 font-medium text-foreground">Util. heat</span>
           <div
-            className="h-2.5 min-w-[140px] flex-1 max-w-xs rounded-sm border border-border bg-gradient-to-r from-red-500/40 via-amber-400/35 via-lime-500/35 to-emerald-500/40 dark:from-red-500/30 dark:via-amber-500/25 dark:via-lime-500/25 dark:to-emerald-500/30"
+            className="h-2.5 min-w-[140px] flex-1 max-w-xs rounded-sm bg-gradient-to-r from-red-500/40 via-amber-400/35 via-lime-500/35 to-emerald-500/40 dark:from-red-500/30 dark:via-amber-500/25 dark:via-lime-500/25 dark:to-emerald-500/30"
             title="Poor → strong utilization"
           />
           <span className="tabular-nums text-[10px]">poor</span>

@@ -3,12 +3,12 @@
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import type { ClientMetrics } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
-import { Layers, Package, Hash, Weight, Calendar } from "lucide-react";
+import { Layers, Package, Hash, Weight, Calendar, ScanSearch } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export function ClientMetricsCards({ metrics }: { metrics: ClientMetrics }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
       <MetricCard
         title="Batches"
         value={formatInteger(metrics.totalBatches)}
@@ -30,6 +30,11 @@ export function ClientMetricsCards({ metrics }: { metrics: ClientMetrics }) {
         icon={Weight}
       />
       <MetricCard
+        title="Area (m²)"
+        value={formatDecimal(metrics.totalAreaM2, 2)}
+        icon={ScanSearch}
+      />
+      <MetricCard
         title="Last batch"
         value={
           metrics.lastBatchDate
@@ -37,7 +42,7 @@ export function ClientMetricsCards({ metrics }: { metrics: ClientMetrics }) {
             : "—"
         }
         icon={Calendar}
-        className="col-span-2 lg:col-span-1"
+        className="col-span-2 lg:col-span-1 xl:col-span-1"
       />
     </div>
   );
@@ -55,7 +60,7 @@ function MetricCard({
   className?: string;
 }) {
   return (
-    <Card className={`border border-border shadow-none ${className ?? ""}`}>
+    <Card className={`shadow-none ${className ?? ""}`}>
       <CardContent className="pt-4 pb-3 px-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

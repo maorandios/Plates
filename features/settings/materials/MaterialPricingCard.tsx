@@ -74,7 +74,7 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
   }
 
   return (
-    <Card className="border border-border shadow-none">
+    <Card className="shadow-none">
       <CardHeader>
         <CardTitle className="text-base">Basics Parameters</CardTitle>
         <CardDescription>

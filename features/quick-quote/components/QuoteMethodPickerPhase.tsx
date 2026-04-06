@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, ClipboardList, FileCode2, FileSpreadsheet, FoldHorizontal, RotateCcw } from "lucide-react";
+import { ClipboardList, FileCode2, FileSpreadsheet, FoldHorizontal, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,42 +21,17 @@ import { jobSummaryFromParts } from "../lib/deriveQuoteSelection";
 import { mergeAllQuoteMethodParts } from "../lib/mergeAllQuoteMethods";
 import { dxfMethodHasQuotableParts } from "../lib/dxfQuoteParts";
 import { MethodPhaseMetricStrip } from "./method-phases/MethodPhaseMetricStrip";
+import { t } from "@/lib/i18n";
 
 const OPTIONS: {
   id: QuoteCreationMethod;
-  title: string;
-  description: string;
-  hint: string;
+  i18nPrefix: "dxf" | "manualAdd" | "excelImport" | "bendPlate";
   Icon: typeof FileCode2;
 }[] = [
-  {
-    id: "dxf",
-    title: "DXF",
-    description: "Upload DXF files for quoting",
-    hint: "Best for ready CAD files",
-    Icon: FileCode2,
-  },
-  {
-    id: "manualAdd",
-    title: "Manually add",
-    description: "Add part data manually",
-    hint: "Width, length, thickness, qty, material",
-    Icon: ClipboardList,
-  },
-  {
-    id: "excelImport",
-    title: "Import Excel list",
-    description: "Upload a spreadsheet and map columns",
-    hint: "CSV or Excel — same mapping flow as DXF BOM",
-    Icon: FileSpreadsheet,
-  },
-  {
-    id: "bendPlate",
-    title: "Bend plate",
-    description: "Build a bent plate from a side profile or template",
-    hint: "Geometry for quoting from your profile",
-    Icon: FoldHorizontal,
-  },
+  { id: "dxf", i18nPrefix: "dxf", Icon: FileCode2 },
+  { id: "manualAdd", i18nPrefix: "manualAdd", Icon: ClipboardList },
+  { id: "excelImport", i18nPrefix: "excelImport", Icon: FileSpreadsheet },
+  { id: "bendPlate", i18nPrefix: "bendPlate", Icon: FoldHorizontal },
 ];
 
 const VIEWPORT = "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
@@ -91,10 +66,7 @@ interface QuoteMethodPickerPhaseProps {
   selected: QuoteCreationMethod | null;
   onSelect: (method: QuoteCreationMethod) => void;
   onConfigureMethod: (method: QuoteCreationMethod) => void;
-  onBack: () => void;
   onReset: () => void;
-  onComplete: () => void;
-  canComplete: boolean;
   canReset: boolean;
 }
 
@@ -107,10 +79,7 @@ export function QuoteMethodPickerPhase({
   selected,
   onSelect,
   onConfigureMethod,
-  onBack,
   onReset,
-  onComplete,
-  canComplete,
   canReset,
 }: QuoteMethodPickerPhaseProps) {
   const [resetOpen, setResetOpen] = useState(false);
@@ -140,41 +109,40 @@ export function QuoteMethodPickerPhase({
   return (
     <div
       className={cn(
-        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
+        "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
         VIEWPORT
       )}
     >
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-white/[0.08] bg-card/60">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
-              Quote method
+              {t("quoteMethodScreen.title")}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Choose how you build this quote. Configure each method to add parts, then complete to
-              review all lines together.
+              {t("quoteMethodScreen.intro")}
             </p>
             <p className="text-xs text-muted-foreground pt-1">
-              Plate type from General:{" "}
+              {t("quoteMethodScreen.plateTypeFromGeneral")}{" "}
               <span className="font-medium text-foreground">{plateTypeLabel}</span>
             </p>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
             <MethodPhaseMetricStrip
-              label="Quantity"
+              label={t("methodMetrics.quantity")}
               value={formatInteger(metrics.totalQty)}
-              sub="Sum of quantities across all methods with data"
+              sub={t("methodMetrics.quantitySub")}
             />
             <MethodPhaseMetricStrip
-              label="Area (m²)"
+              label={t("methodMetrics.area")}
               value={formatDecimal(metrics.totalPlateAreaM2, 2)}
-              sub="Total plate area from merged quote lines"
+              sub={t("methodMetrics.areaSub")}
             />
             <MethodPhaseMetricStrip
-              label="Weight (kg)"
+              label={t("methodMetrics.weight")}
               value={formatDecimal(metrics.totalEstWeightKg, 1)}
-              sub="Estimated weight from merged lines (General density)"
+              sub={t("methodMetrics.weightSub")}
             />
           </div>
         </aside>
@@ -183,16 +151,14 @@ export function QuoteMethodPickerPhase({
           <div className="shrink-0 border-b border-white/[0.08] bg-card/40 px-4 py-3 sm:px-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground">Methods</h2>
+                <h2 className="text-base font-semibold text-foreground">
+                  {t("quoteMethodScreen.methodsTitle")}
+                </h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  A green border means that method already has quote data. Use Configure to edit.
+                  {t("quoteMethodScreen.methodsHint")}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <Button type="button" variant="outline" className="gap-2" onClick={onBack}>
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -201,17 +167,7 @@ export function QuoteMethodPickerPhase({
                   onClick={() => setResetOpen(true)}
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Reset
-                </Button>
-                <Button
-                  type="button"
-                  size="default"
-                  className="gap-2"
-                  disabled={!canComplete}
-                  onClick={onComplete}
-                >
-                  <Check className="h-4 w-4" />
-                  Complete
+                  {t("common.reset")}
                 </Button>
               </div>
             </div>
@@ -219,7 +175,10 @@ export function QuoteMethodPickerPhase({
 
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4">
-              {OPTIONS.map(({ id, title, description, hint, Icon }) => {
+              {OPTIONS.map(({ id, i18nPrefix, Icon }) => {
+                const title = t(`quote.methods.${i18nPrefix}.title`);
+                const description = t(`quote.methods.${i18nPrefix}.description`);
+                const hint = t(`quote.methods.${i18nPrefix}.hint`);
                 const isSelected = selected === id;
                 const hasData = methodHasData(
                   id,
@@ -232,7 +191,7 @@ export function QuoteMethodPickerPhase({
                   <div
                     key={id}
                     className={cn(
-                      "flex flex-col rounded-xl border-2 bg-card p-5 text-left transition-all duration-150",
+                      "flex flex-col rounded-xl border-2 bg-card p-5 text-start transition-all duration-150",
                       hasData &&
                         "border-primary/70 shadow-sm ring-1 ring-primary/20",
                       !hasData && "border-white/[0.08]",
@@ -242,7 +201,7 @@ export function QuoteMethodPickerPhase({
                     <button
                       type="button"
                       onClick={() => onSelect(id)}
-                      className="text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg -m-1 p-1"
+                      className="text-start w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg -m-1 p-1"
                     >
                       <div
                         className={cn(
@@ -271,7 +230,7 @@ export function QuoteMethodPickerPhase({
                           onConfigureMethod(id);
                         }}
                       >
-                        Configure
+                        {t("common.configure")}
                       </Button>
                     </div>
                   </div>
@@ -285,15 +244,14 @@ export function QuoteMethodPickerPhase({
       <Dialog open={resetOpen} onOpenChange={setResetOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Reset all quote methods?</DialogTitle>
+            <DialogTitle>{t("quoteMethodScreen.resetDialogTitle")}</DialogTitle>
             <DialogDescription>
-              This clears DXF, manual, Excel import, and bend-plate data for this quote. You will
-              return to an empty state on this screen.
+              {t("quoteMethodScreen.resetDialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
@@ -303,7 +261,7 @@ export function QuoteMethodPickerPhase({
                 onReset();
               }}
             >
-              Reset
+              {t("common.reset")}
             </Button>
           </DialogFooter>
         </DialogContent>

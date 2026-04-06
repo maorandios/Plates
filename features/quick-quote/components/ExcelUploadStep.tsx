@@ -484,7 +484,7 @@ export function ExcelUploadStep({
 
   const mainColumn = (
     <div className={cn(variant === "quoteImport" ? "space-y-4" : "space-y-6")}>
-      <Card className="border-primary/20">
+      <Card className="border-0">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between gap-2">
             {SUB_STEPS.map(({ step, label }, index) => {
@@ -1030,7 +1030,7 @@ export function ExcelUploadStep({
   return (
     <div
       className={cn(
-        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
+        "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
         QUOTE_IMPORT_PHASE_VIEWPORT
       )}
     >

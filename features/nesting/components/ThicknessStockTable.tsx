@@ -166,7 +166,7 @@ export function ThicknessStockTable({
         </Button>
       </div>
 
-      <div className="rounded-lg border border-border overflow-x-auto bg-card">
+      <div className="rounded-lg overflow-x-auto bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">

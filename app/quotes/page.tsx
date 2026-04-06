@@ -23,31 +23,29 @@ import {
   type QuoteListRecord,
   type QuoteListStatus,
 } from "@/lib/quotes/quoteList";
+import { t } from "@/lib/i18n";
 
-const STEP_LABEL: Record<number, string> = {
-  1: "General",
-  2: "Quote method",
-  3: "Parts",
-  4: "Stock & pricing",
-  5: "Calculation",
-  6: "Quote",
-  7: "Finalize",
-};
+function listStepLabel(step: number): string {
+  if (step >= 1 && step <= 8) {
+    return t(`quotes.listStepLabels.${step}` as `quotes.listStepLabels.${number}`);
+  }
+  return t("quotes.stepFallback", { n: step });
+}
 
 function statusBadge(status: QuoteListStatus) {
   if (status === "complete") {
     return (
       <Badge variant="secondary" className="bg-emerald-600/15 text-emerald-800 dark:text-emerald-200">
-        Complete
+        {t("quotes.statusComplete")}
       </Badge>
     );
   }
-  return <Badge variant="outline">In progress</Badge>;
+  return <Badge variant="outline">{t("quotes.statusInProgress")}</Badge>;
 }
 
 function formatUpdated(iso: string): string {
   try {
-    return new Date(iso).toLocaleString(undefined, {
+    return new Date(iso).toLocaleString("he-IL", {
       dateStyle: "medium",
       timeStyle: "short",
     });
@@ -66,21 +64,21 @@ export default function QuotesPage() {
   const rows = useMemo(() => getQuotesList(), [tick]);
 
   const handleDelete = useCallback((q: QuoteListRecord) => {
-    if (!confirm(`Remove “${q.referenceNumber}” from this list?`)) return;
+    if (!confirm(t("quotes.removeConfirm", { ref: q.referenceNumber }))) return;
     deleteQuoteFromList(q.id);
   }, []);
 
   return (
     <PageContainer>
       <PageHeader
-        title="Quotes"
-        description="All quick quotes you have started or finished. A quote appears here after you complete General and continue to quote methods."
+        title={t("quotes.title")}
+        description={t("quotes.description")}
         actions={
           <div className="flex items-center gap-2">
             <Button asChild>
-              <Link href="/quick-quote">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                New quote
+              <Link href="/quick-quote" className="gap-2">
+                <PlusCircle className="h-4 w-4 me-2" />
+                {t("quotes.newQuote")}
               </Link>
             </Button>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted shrink-0">
@@ -93,28 +91,28 @@ export default function QuotesPage() {
       {rows.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
-          title="No quotes yet"
-          description="Start a new quote and continue past the General step — it will show up here as in progress."
+          title={t("quotes.emptyTitle")}
+          description={t("quotes.emptyDescription")}
           action={
             <Button asChild>
-              <Link href="/quick-quote">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                New quote
+              <Link href="/quick-quote" className="gap-2">
+                <PlusCircle className="h-4 w-4 me-2" />
+                {t("quotes.newQuote")}
               </Link>
             </Button>
           }
         />
       ) : (
-        <div className="rounded-xl border border-white/[0.06] overflow-x-auto">
+        <div className="rounded-xl border-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Reference</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Phase</TableHead>
-                <TableHead>Updated</TableHead>
-                <TableHead className="text-right w-[140px]">Actions</TableHead>
+                <TableHead>{t("quotes.colReference")}</TableHead>
+                <TableHead>{t("quotes.colClient")}</TableHead>
+                <TableHead>{t("quotes.colStatus")}</TableHead>
+                <TableHead>{t("quotes.colPhase")}</TableHead>
+                <TableHead>{t("quotes.colUpdated")}</TableHead>
+                <TableHead className="text-end w-[140px]">{t("quotes.colActions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -126,15 +124,15 @@ export default function QuotesPage() {
                   </TableCell>
                   <TableCell>{statusBadge(q.status)}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {STEP_LABEL[q.currentStep] ?? `Step ${q.currentStep}`}
+                    {listStepLabel(q.currentStep)}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                     {formatUpdated(q.updatedAt)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     <div className="flex items-center justify-end gap-2">
                       <Button variant="outline" size="sm" asChild>
-                        <Link href="/quick-quote">Open builder</Link>
+                        <Link href="/quick-quote">{t("quotes.openBuilder")}</Link>
                       </Button>
                       <Button
                         type="button"
@@ -142,7 +140,7 @@ export default function QuotesPage() {
                         size="icon"
                         className="text-muted-foreground hover:text-destructive"
                         onClick={() => handleDelete(q)}
-                        aria-label={`Remove ${q.referenceNumber}`}
+                        aria-label={t("quotes.removeAria", { ref: q.referenceNumber })}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

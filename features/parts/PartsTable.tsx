@@ -394,7 +394,7 @@ export function PartsTable({ parts, onRemoveParts }: PartsTableProps) {
           </div>
         )}
 
-        <div className="rounded-xl border border-border overflow-x-auto">
+        <div className="rounded-xl overflow-x-auto">
           <Table className="min-w-[1180px]">
             <TableHeader>
               <TableRow className="bg-muted/60 hover:bg-muted/60 border-b border-border">
@@ -1005,7 +1005,7 @@ function FilterChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border bg-muted text-xs text-foreground",
+        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-foreground",
         mono && "font-mono"
       )}
     >

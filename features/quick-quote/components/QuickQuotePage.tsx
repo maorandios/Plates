@@ -10,6 +10,7 @@ import { MergedQuoteLinesStep } from "./MergedQuoteLinesStep";
 import { QuoteMethodPickerPhase } from "./QuoteMethodPickerPhase";
 import { CalculationStep } from "./CalculationStep";
 import { QuoteStepper } from "./QuoteStepper";
+import { QuickQuoteBottomBar } from "./QuickQuoteBottomBar";
 import { QuoteFinalizeExportStep } from "./QuoteFinalizeExportStep";
 import { PricingStep } from "./PricingStep";
 import { QuoteSummaryStep } from "./QuoteSummaryStep";
@@ -49,6 +50,7 @@ import {
   upsertQuoteInProgress,
 } from "@/lib/quotes/quoteList";
 import { nanoid } from "@/lib/utils/nanoid";
+import { t } from "@/lib/i18n";
 
 const defaultJobDetails: QuickQuoteJobDetails = {
   referenceNumber: "",
@@ -82,6 +84,8 @@ export function QuickQuotePage() {
     Record<string, string>
   >({});
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
+  /** Step 5 (calculation): mock pipeline must finish before global Continue enables. */
+  const [calculationReady, setCalculationReady] = useState(false);
 
   const [manualQuoteRows, setManualQuoteRows] = useState<ManualQuotePartRow[]>([]);
 
@@ -114,6 +118,10 @@ export function QuickQuotePage() {
     setHighestStepReached((h) => (s > h ? s : h));
     if (s === 2) setQuoteMethodSubView("picker");
   }, []);
+
+  useEffect(() => {
+    setCalculationReady(false);
+  }, [step]);
 
   const goToStep = useCallback(
     (s: QuickQuoteStep) => {
@@ -375,6 +383,15 @@ export function QuickQuotePage() {
           onContinue: handleContinueFromGeneral,
         };
       case 2:
+        if (quoteMethodSubView === "picker") {
+          return {
+            showBack: true,
+            showContinue: true,
+            canContinue: hasAnyQuoteMethodData,
+            onBack: handleBackFromQuoteMethod,
+            onContinue: handleCompleteQuoteMethodPicker,
+          };
+        }
         return {
           showBack: false,
           showContinue: false,
@@ -382,9 +399,11 @@ export function QuickQuotePage() {
         };
       case 3:
         return {
-          showBack: false,
-          showContinue: false,
-          canContinue: false,
+          showBack: true,
+          showContinue: true,
+          canContinue: hasAnyQuoteMethodData,
+          onBack: handleBackFromMergedLines,
+          onContinue: handleContinueFromMergedLines,
         };
       case 4:
         return {
@@ -398,7 +417,7 @@ export function QuickQuotePage() {
         return {
           showBack: true,
           showContinue: true,
-          canContinue: true,
+          canContinue: calculationReady,
           onBack: handleBackFromCalculationToStock,
           onContinue: handleViewQuote,
         };
@@ -406,7 +425,7 @@ export function QuickQuotePage() {
         return {
           showBack: true,
           showContinue: true,
-          canContinue: true,
+          canContinue: selection.parts.length > 0,
           onBack: handleBackFromQuote,
           onContinue: handleContinueFromQuoteToPricing,
         };
@@ -434,9 +453,16 @@ export function QuickQuotePage() {
     }
   }, [
     step,
+    quoteMethodSubView,
+    hasAnyQuoteMethodData,
+    calculationReady,
     stockPricingReady,
     canContinueFromGeneral,
     handleContinueFromGeneral,
+    handleBackFromQuoteMethod,
+    handleCompleteQuoteMethodPicker,
+    handleBackFromMergedLines,
+    handleContinueFromMergedLines,
     handleBackFromStockToValidation,
     handleContinueFromStockToCalculation,
     handleBackFromCalculationToStock,
@@ -446,26 +472,27 @@ export function QuickQuotePage() {
     handleBackFromPricing,
     handleContinueToFinalize,
     handleBackFromFinalize,
+    selection.parts.length,
   ]);
 
   const stepNav = getStepNavigation();
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <QuoteStepper
         currentStep={step}
         highestStepReached={highestStepReached}
         onStepSelect={goToStep}
-        {...stepNav}
       />
-      <PageContainer
-        className={cn(
-          "bg-background flex-1 min-h-0",
-          step === 2 || step === 3
-            ? "flex flex-col overflow-hidden p-0 lg:p-0"
-            : "overflow-y-auto"
-        )}
-      >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <PageContainer
+          className={cn(
+            "bg-background min-h-0 flex-1",
+            step === 2 || step === 3
+              ? "flex flex-col overflow-hidden p-0 lg:p-0"
+              : "overflow-y-auto"
+          )}
+        >
         <div
           className={cn(
             "w-full",
@@ -475,12 +502,13 @@ export function QuickQuotePage() {
           )}
         >
           {step === 1 && (
-            <Card className="mx-auto w-full max-w-4xl border border-white/[0.06] shadow-sm">
+            <Card className="mx-auto w-full max-w-4xl border-0 shadow-sm">
               <CardHeader className="space-y-1 pb-2">
-                <CardTitle className="text-xl tracking-tight">General</CardTitle>
+                <CardTitle className="text-xl tracking-tight">
+                  {t("quickQuotePage.generalTitle")}
+                </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Quote details and client information. Fields marked{" "}
-                  <span className="text-destructive">*</span> are required to continue.
+                  {t("quickQuotePage.generalSubtitle")}
                 </p>
               </CardHeader>
               <CardContent>
@@ -506,10 +534,7 @@ export function QuickQuotePage() {
                 setJobDetails((j) => ({ ...j, quoteCreationMethod: method }));
               }}
               onConfigureMethod={handleConfigureMethodFromPicker}
-              onBack={handleBackFromQuoteMethod}
               onReset={handleResetQuoteMethodPicker}
-              onComplete={handleCompleteQuoteMethodPicker}
-              canComplete={hasAnyQuoteMethodData}
               canReset={hasAnyQuoteMethodData}
             />
           )}
@@ -542,10 +567,7 @@ export function QuickQuotePage() {
               dxfMethodGeometries={dxfMethodGeometries}
               bendPlateQuoteItems={bendPlateQuoteItems}
               onDeletePart={handleRemoveMergedPart}
-              onBack={handleBackFromMergedLines}
               onReset={handleResetMergedLines}
-              onContinue={handleContinueFromMergedLines}
-              canContinue={hasAnyQuoteMethodData}
               canReset={hasAnyQuoteMethodData}
             />
           )}
@@ -558,8 +580,6 @@ export function QuickQuotePage() {
               materialPricePerKg={materialPricePerKg}
               onMaterialPriceChange={setMaterialPricePerKg}
               onSheetsChange={setSheetsForThickness}
-              onBack={handleBackFromStockToValidation}
-              onContinue={handleContinueFromStockToCalculation}
             />
           )}
 
@@ -572,8 +592,7 @@ export function QuickQuotePage() {
               uniquePlatesInRun={selection.parts.length}
               totalPartsQty={selection.jobSummary.totalQty}
               validationSummary={selection.validationSummary}
-              onBack={handleBackFromCalculationToStock}
-              onViewQuote={handleViewQuote}
+              onCalculationReadyChange={setCalculationReady}
             />
           )}
 
@@ -586,9 +605,7 @@ export function QuickQuotePage() {
               thicknessStock={
                 thicknessStock.length > 0 ? thicknessStock : undefined
               }
-              onBack={handleBackFromQuote}
               onBackToValidation={handleBackToValidationFromQuote}
-              onContinueToPricing={handleContinueFromQuoteToPricing}
             />
           )}
 
@@ -615,11 +632,19 @@ export function QuickQuotePage() {
               materialFamilyLabel={MATERIAL_TYPE_LABELS[materialType]}
               materialType={materialType}
               materialPricePerKgByRow={materialPricePerKgByRow}
-              onBack={handleBackFromFinalize}
             />
           )}
         </div>
       </PageContainer>
+        <QuickQuoteBottomBar
+          currentStep={step}
+          showBack={stepNav.showBack ?? false}
+          showContinue={stepNav.showContinue ?? false}
+          canContinue={stepNav.canContinue ?? false}
+          onBack={stepNav.onBack}
+          onContinue={stepNav.onContinue}
+        />
+      </div>
     </div>
   );
 }

@@ -287,7 +287,7 @@ export function NestingPreviewSection({
           ))}
 
           {/* Summary footer */}
-          <div className="rounded-md bg-muted/50 border border-border px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+          <div className="rounded-md bg-muted/50 px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
             <span>
               <span className="font-medium text-foreground">
                 {totalActualSheets}

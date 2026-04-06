@@ -731,7 +731,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   return (
     <div className="space-y-6">
       {/* Sub-Stepper */}
-      <Card className="border-primary/20">
+      <Card className="border-0">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between gap-2">
             {SUB_STEPS.map(({ step, label }, index) => {
@@ -869,7 +869,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
               </CardContent>
             </Card>
 
-            <Card className="flex flex-col border-dashed">
+            <Card className="flex flex-col border-0">
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <div>

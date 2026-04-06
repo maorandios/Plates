@@ -10,7 +10,7 @@ import type { Batch } from "@/types";
  */
 export function GenerateNestingPanel({ batch }: { batch: Batch }) {
   return (
-    <div className="rounded-xl border border-border bg-muted/20 px-4 py-4 space-y-3">
+    <div className="rounded-xl bg-muted/20 px-4 py-4 space-y-3">
       <div>
         <h2 className="text-sm font-semibold text-foreground">Automatic nesting</h2>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-xl">

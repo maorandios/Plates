@@ -29,7 +29,7 @@ export function ThicknessResultsSection({
   );
 
   return (
-    <section className="rounded-xl border border-border bg-muted/10 overflow-hidden">
+    <section className="rounded-xl bg-muted/10 overflow-hidden">
       <div className="px-4 py-3 border-b border-border bg-muted/30 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-foreground">{label}</h3>
         <div className="text-xs text-muted-foreground text-right space-y-0.5">

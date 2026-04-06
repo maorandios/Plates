@@ -101,7 +101,7 @@ export function FileUploadCard({
             {files.map((f) => (
               <li
                 key={f.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-2 rounded-md bg-background px-3 py-2 text-sm"
               >
                 <div className="min-w-0">
                   <p className="font-medium truncate text-foreground">{f.name}</p>

@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { ArrowLeft, FileDown, Square } from "lucide-react";
+import { FileDown, Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -38,7 +37,6 @@ interface QuoteFinalizeExportStepProps {
   materialType: MaterialType;
   /** Same $/kg map as Pricing step — used for line price and recalculation. */
   materialPricePerKgByRow: Record<string, string>;
-  onBack: () => void;
 }
 
 function PlateShapeIcon({ shape }: { shape: string }) {
@@ -132,7 +130,6 @@ export function QuoteFinalizeExportStep({
   materialFamilyLabel,
   materialType,
   materialPricePerKgByRow,
-  onBack,
 }: QuoteFinalizeExportStepProps) {
   const [exporting, setExporting] = useState(false);
 
@@ -280,10 +277,6 @@ export function QuoteFinalizeExportStep({
             </p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
-            <Button type="button" variant="outline" size="sm" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
-              Back to quote
-            </Button>
             <Button
               type="button"
               size="sm"
@@ -731,22 +724,6 @@ export function QuoteFinalizeExportStep({
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      <Separator />
-
-      <div className="flex flex-wrap justify-between gap-3">
-        <Button type="button" variant="ghost" className="text-muted-foreground" onClick={onBack}>
-          ← Back to quote
-        </Button>
-        <Button
-          type="button"
-          disabled={exporting || draft.items.length === 0 || !draft.company.name.trim()}
-          onClick={() => void handleExportPdf()}
-        >
-          <FileDown className="h-4 w-4 mr-1.5" />
-          {exporting ? "Exporting…" : "Export PDF"}
-        </Button>
       </div>
     </div>
   );

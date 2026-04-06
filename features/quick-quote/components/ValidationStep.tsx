@@ -13,6 +13,7 @@ import {
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { PlateScopePickerDialog } from "./PlateScopePickerDialog";
 import { ValidationTable } from "./ValidationTable";
+import { t } from "@/lib/i18n";
 import type { ValidationRow, ValidationSummary } from "../types/quickQuote";
 
 function escapeCsvField(value: string | number): string {
@@ -186,7 +187,7 @@ export function ValidationStep({
           decimals={0}
         />
         <MetricCard label="Piercing" value={analyzeMetrics.piercing} />
-        <Card className="border-border/80 xl:col-span-1 min-h-[88px]">
+        <Card className="xl:col-span-1 min-h-[88px]">
           <CardHeader className="pb-1 pt-3 px-3">
             <CardDescription className="text-[10px] font-medium uppercase tracking-wide leading-tight">
               Material grade
@@ -198,7 +199,7 @@ export function ValidationStep({
         </Card>
       </div>
 
-      <Card className="border-primary/25 bg-primary/5">
+      <Card className="border-0 bg-primary/5">
         <CardHeader className="pb-2 pt-4">
           <CardDescription className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Row status
@@ -252,15 +253,15 @@ export function ValidationStep({
         open={reportOpen}
         onOpenChange={setReportOpen}
         rows={rows}
-        title="Export CSV"
-        description="Choose which rows to include in the downloaded CSV file."
+        title={t("validation.exportCsvTitle")}
+        description={t("validation.exportCsvDescription")}
         countMessage={(n) =>
           n === 1
-            ? "1 row will be exported."
-            : `${n} rows will be exported.`
+            ? t("validation.exportCsvCountOne")
+            : t("validation.exportCsvCountMany", { n })
         }
-        confirmLabel="Download CSV"
-        confirmStartIcon={<FileDown className="h-4 w-4 mr-2" />}
+        confirmLabel={t("validation.downloadCsv")}
+        confirmStartIcon={<FileDown className="h-4 w-4 me-2" />}
         onConfirm={handleReportConfirm}
       />
 
@@ -268,22 +269,30 @@ export function ValidationStep({
         open={calcOpen}
         onOpenChange={setCalcOpen}
         rows={rows}
-        title={embedMode === "dxfUpload" ? "Plates for review" : "Plates for calculation"}
+        title={
+          embedMode === "dxfUpload"
+            ? t("validation.platesReviewTitle")
+            : t("validation.platesCalcTitle")
+        }
         description={
           embedMode === "dxfUpload"
-            ? "Choose which BOM lines to carry into the DXF part review. You can exclude errors or warnings, or pick specific parts only."
-            : "Choose which plates to include in this quote run. You can skip errors or warnings, or pick specific parts only. Next you will enter stock sheet sizes and purchase price per kg before calculation."
+            ? t("validation.platesReviewDescription")
+            : t("validation.platesCalcDescription")
         }
         countMessage={(n) =>
           embedMode === "dxfUpload"
             ? n === 1
-              ? "1 plate will continue to DXF review."
-              : `${n} plates will continue to DXF review.`
+              ? t("validation.reviewCountOne")
+              : t("validation.reviewCountMany", { n })
             : n === 1
-              ? "1 plate will be included in this calculation."
-              : `${n} plates will be included in this calculation.`
+              ? t("validation.calcCountOne")
+              : t("validation.calcCountMany", { n })
         }
-        confirmLabel={embedMode === "dxfUpload" ? "Continue" : "Start calculation"}
+        confirmLabel={
+          embedMode === "dxfUpload"
+            ? t("common.continue")
+            : t("common.startCalculation")
+        }
         onConfirm={onContinue}
       />
     </div>
@@ -302,7 +311,7 @@ function MetricCard({
   const display =
     decimals === 0 ? formatInteger(value) : formatDecimal(value, decimals);
   return (
-    <Card className="border-border/80 min-h-[88px]">
+    <Card className="min-h-[88px]">
       <CardHeader className="pb-1 pt-3 px-3">
         <CardDescription className="text-[10px] font-medium uppercase tracking-wide">
           {label}

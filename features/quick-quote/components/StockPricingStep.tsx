@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, Plus, Settings2, X } from "lucide-react";
+import { ChevronDown, Plus, Settings2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,6 @@ import {
 } from "@/types/materials";
 import type { PurchasedSheetSize } from "@/types/settings";
 import type { QuoteSheetStockLine, ThicknessStockInput } from "../types/quickQuote";
-import { isThicknessStockComplete } from "../lib/deriveQuoteSelection";
 import { hasDuplicateSheetSizes } from "../lib/quoteStockAvailability";
 
 function catalogLabel(
@@ -62,8 +61,6 @@ interface StockPricingStepProps {
   materialPricePerKg: number;
   onMaterialPriceChange: (value: number) => void;
   onSheetsChange: (thicknessMm: number, sheets: QuoteSheetStockLine[]) => void;
-  onBack: () => void;
-  onContinue: () => void;
 }
 
 export function StockPricingStep({
@@ -73,8 +70,6 @@ export function StockPricingStep({
   materialPricePerKg,
   onMaterialPriceChange,
   onSheetsChange,
-  onBack,
-  onContinue,
 }: StockPricingStepProps) {
   const { formatLengthValue } = useAppPreferences();
 
@@ -105,13 +100,6 @@ export function StockPricingStep({
   );
 
   const materialLabel = MATERIAL_TYPE_LABELS[materialType];
-
-  const canContinue = useMemo(() => {
-    if (stockRows.length === 0) return false;
-    const priceOk =
-      materialPricePerKg >= 0 && Number.isFinite(materialPricePerKg);
-    return priceOk && isThicknessStockComplete(stockRows);
-  }, [stockRows, materialPricePerKg]);
 
   return (
     <div className="space-y-8">
@@ -193,7 +181,7 @@ export function StockPricingStep({
             return (
               <details
                 key={row.thicknessMm}
-                className="border border-white/[0.06] rounded-xl bg-card overflow-hidden open:shadow-sm"
+                className="border-0 rounded-xl bg-card overflow-hidden open:shadow-sm"
                 open={index === 0}
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 bg-muted/25 hover:bg-muted/40 text-sm font-medium [&::-webkit-details-marker]:hidden">
@@ -245,7 +233,7 @@ export function StockPricingStep({
                           ) : (
                             <div
                               key={line.id}
-                              className="flex flex-wrap items-end gap-3 gap-y-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3"
+                              className="flex flex-wrap items-end gap-3 gap-y-2 rounded-xl border-0 bg-white/[0.03] p-3"
                             >
                               <div className="space-y-1.5 flex-1 min-w-[120px]">
                                 <Label className="text-xs text-muted-foreground font-normal">
@@ -342,16 +330,6 @@ export function StockPricingStep({
             No parts in this run — go back and select plates from validation.
           </p>
         )}
-      </div>
-
-      <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-white/[0.08]">
-        <Button type="button" variant="outline" onClick={onBack}>
-          Back to validation
-        </Button>
-        <Button type="button" size="lg" disabled={!canContinue} onClick={onContinue}>
-          Continue to calculation
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
       </div>
     </div>
   );

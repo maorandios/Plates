@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, Circle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -30,8 +29,8 @@ interface CalculationStepProps {
   uniquePlatesInRun: number;
   totalPartsQty: number;
   validationSummary: ValidationSummary;
-  onBack: () => void;
-  onViewQuote: () => void;
+  /** Fires when the mocked calculation pipeline has finished (enables global Continue). */
+  onCalculationReadyChange?: (ready: boolean) => void;
 }
 
 export function CalculationStep({
@@ -41,8 +40,7 @@ export function CalculationStep({
   uniquePlatesInRun,
   totalPartsQty,
   validationSummary,
-  onBack,
-  onViewQuote,
+  onCalculationReadyChange,
 }: CalculationStepProps) {
   /** 0 = first step active; STEP_LABELS.length = all complete */
   const [completedThrough, setCompletedThrough] = useState(0);
@@ -68,6 +66,11 @@ export function CalculationStep({
   );
 
   const allComplete = completedThrough >= STEP_LABELS.length;
+
+  useEffect(() => {
+    onCalculationReadyChange?.(allComplete);
+  }, [allComplete, onCalculationReadyChange]);
+
   const progressPct = allComplete
     ? 100
     : Math.round((completedThrough / STEP_LABELS.length) * 100);
@@ -87,7 +90,7 @@ export function CalculationStep({
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_300px] xl:items-start">
-        <Card className="border-white/[0.06] shadow-sm">
+        <Card className="shadow-sm">
           <CardHeader className="border-b border-white/[0.08] bg-card/40">
             <CardTitle className="text-base">Progress</CardTitle>
             <CardDescription>
@@ -146,7 +149,7 @@ export function CalculationStep({
           </CardContent>
         </Card>
 
-        <Card className="border-white/[0.06] shadow-sm xl:sticky xl:top-4">
+        <Card className="shadow-sm xl:sticky xl:top-4">
           <CardHeader className="border-b border-white/[0.08] bg-card/40 pb-3">
             <CardTitle className="text-sm">Quote snapshot</CardTitle>
           </CardHeader>
@@ -184,14 +187,6 @@ export function CalculationStep({
         </Card>
       </div>
 
-      <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-white/[0.08]">
-        <Button type="button" variant="outline" onClick={onBack}>
-          Back to stock & pricing
-        </Button>
-        <Button type="button" size="lg" disabled={!allComplete} onClick={onViewQuote}>
-          View quote
-        </Button>
-      </div>
     </div>
   );
 }

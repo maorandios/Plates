@@ -191,8 +191,8 @@ export function ProfilePreview3D({
       ref={containerRef}
       className={cn(
         fill
-          ? "h-full min-h-0 w-full rounded-lg border border-border bg-[#0f1419]"
-          : "min-h-[220px] w-full rounded-lg border border-border bg-[#0f1419]",
+          ? "h-full min-h-0 w-full rounded-lg bg-[#0f1419]"
+          : "min-h-[220px] w-full rounded-lg bg-[#0f1419]",
         className
       )}
     />

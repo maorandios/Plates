@@ -20,6 +20,7 @@ import { getBatches, getClientsByBatch } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import type { Batch } from "@/types";
 import { CUTTING_METHOD_LABELS } from "@/types/production";
+import { t } from "@/lib/i18n";
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -37,20 +38,20 @@ export default function BatchesPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Quotes"
-        description="Manage your quotations and quote jobs"
+        title={t("pages.batches.title")}
+        description={t("pages.batches.description")}
         actions={
           <div className="flex gap-2">
             <Button asChild variant="outline">
-              <Link href="/batches/new">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                New Quote Job
+              <Link href="/batches/new" className="inline-flex items-center gap-2">
+                <PlusCircle className="h-4 w-4" />
+                {t("pages.batches.newJob")}
               </Link>
             </Button>
             <Button asChild>
-              <Link href="/quick-quote">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Quick Quote
+              <Link href="/quick-quote" className="inline-flex items-center gap-2">
+                <PlusCircle className="h-4 w-4" />
+                {t("pages.batches.quickQuote")}
               </Link>
             </Button>
           </div>
@@ -60,20 +61,20 @@ export default function BatchesPage() {
       {batches.length === 0 ? (
         <EmptyState
           icon={FileText}
-          title="No quotes yet"
-          description="Create your first quote to get started. Use Quick Quote for fast DXF + Excel quotes."
+          title={t("pages.batches.emptyTitle")}
+          description={t("pages.batches.emptyDescription")}
           action={
             <div className="flex gap-2">
               <Button asChild variant="outline">
-                <Link href="/batches/new">
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  New Quote Job
+                <Link href="/batches/new" className="inline-flex items-center gap-2">
+                  <PlusCircle className="h-4 w-4" />
+                  {t("pages.batches.newJob")}
                 </Link>
               </Button>
               <Button asChild>
-                <Link href="/quick-quote">
-                  <Calculator className="h-4 w-4 mr-2" />
-                  Quick Quote
+                <Link href="/quick-quote" className="inline-flex items-center gap-2">
+                  <Calculator className="h-4 w-4" />
+                  {t("pages.batches.quickQuote")}
                 </Link>
               </Button>
             </div>
@@ -95,7 +96,7 @@ function BatchCard({ batch }: { batch: Batch }) {
 
   return (
     <Link href={`/batches/${batch.id}`}>
-      <Card className="border border-border shadow-none hover:shadow-md hover:border-primary/20 transition-all cursor-pointer group h-full">
+      <Card className="shadow-none hover:shadow-md transition-all cursor-pointer group h-full">
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-3 gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted shrink-0">
@@ -122,13 +123,16 @@ function BatchCard({ batch }: { batch: Batch }) {
           <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
             <span className="flex items-center gap-1">
               <Users className="h-3 w-3" />
-              {clients.length} client{clients.length !== 1 ? "s" : ""}
+              {clients.length}{" "}
+              {clients.length !== 1
+                ? t("dashboard.clientsCount")
+                : t("dashboard.clientSingular")}
             </span>
             <span className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {new Date(batch.updatedAt).toLocaleDateString()}
+              {new Date(batch.updatedAt).toLocaleDateString("he-IL")}
             </span>
-            <ArrowRight className="h-3.5 w-3.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-foreground" />
+            <ArrowRight className="h-3.5 w-3.5 ms-auto opacity-0 group-hover:opacity-100 transition-opacity text-foreground rtl:rotate-180" />
           </div>
         </CardContent>
       </Card>

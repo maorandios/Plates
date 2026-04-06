@@ -70,7 +70,7 @@ export function PlatePreviewCanvas(props: PlatePreviewCanvasProps) {
 
   return (
     <div ref={wrapRef} className="w-full">
-      <div className="relative rounded-xl border border-border bg-[#f8f9fa] overflow-hidden shadow-inner">
+      <div className="relative rounded-xl bg-[#f8f9fa] overflow-hidden shadow-inner">
         <Stage width={cw} height={ch}>
           <Layer>
             <PlateKonvaPlate cw={cw} ch={ch} {...props} />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Users, ArrowRight, TrendingUp, Calculator } from "lucide-react";
+import { FileText, Users, ArrowLeft, TrendingUp, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { BatchStatusBadge } from "@/components/shared/StatusBadge";
 import { formatInteger } from "@/lib/formatNumbers";
 import { getBatches, getClients, getFiles } from "@/lib/store";
+import { t } from "@/lib/i18n";
 import type { Batch } from "@/types";
 
 interface Stats {
@@ -49,34 +50,34 @@ export default function DashboardPage() {
 
   const statCards = [
     {
-      label: "Total Quotes",
+      labelKey: "dashboard.stats.totalQuotes" as const,
       value: stats.totalBatches,
       icon: FileText,
-      description: "All quotations",
+      descriptionKey: "dashboard.stats.totalQuotesDesc" as const,
       color: "text-sky-400",
       bg: "bg-sky-500/15",
     },
     {
-      label: "Active Quotes",
+      labelKey: "dashboard.stats.activeQuotes" as const,
       value: stats.activeBatches,
       icon: TrendingUp,
-      description: "In progress",
+      descriptionKey: "dashboard.stats.activeQuotesDesc" as const,
       color: "text-primary",
       bg: "bg-primary/15",
     },
     {
-      label: "Clients",
+      labelKey: "dashboard.stats.clients" as const,
       value: stats.totalClients,
       icon: Users,
-      description: "Customer database",
+      descriptionKey: "dashboard.stats.clientsDesc" as const,
       color: "text-violet-400",
       bg: "bg-violet-500/15",
     },
     {
-      label: "Quote",
-      value: "→",
+      labelKey: "dashboard.stats.newQuoteCta" as const,
+      value: "←",
       icon: Calculator,
-      description: "Create a quotation",
+      descriptionKey: "dashboard.stats.newQuoteDesc" as const,
       color: "text-amber-400",
       bg: "bg-amber-500/15",
       href: "/quick-quote",
@@ -86,13 +87,13 @@ export default function DashboardPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Dashboard"
-        description="CNC steel quotation platform"
+        title={t("dashboard.title")}
+        description={t("dashboard.subtitle")}
         actions={
           <Button asChild>
-            <Link href="/quick-quote">
-              <Calculator className="h-4 w-4 mr-2" />
-              New quote
+            <Link href="/quick-quote" className="inline-flex items-center gap-2">
+              <Calculator className="h-4 w-4" />
+              {t("dashboard.newQuote")}
             </Link>
           </Button>
         }
@@ -106,13 +107,13 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground font-medium mb-1">
-                    {card.label}
+                    {t(card.labelKey)}
                   </p>
                   <p className="text-3xl font-bold text-foreground">
                     {typeof card.value === "number" ? formatInteger(card.value) : card.value}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {card.description}
+                    {t(card.descriptionKey)}
                   </p>
                 </div>
                 <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bg}`}>
@@ -123,15 +124,15 @@ export default function DashboardPage() {
           );
           if ("href" in card && card.href) {
             return (
-              <Link key={card.label} href={card.href}>
-                <Card className="border border-white/[0.06] shadow-none transition-all duration-150 hover:border-white/12 hover:shadow-sm cursor-pointer">
+              <Link key={card.labelKey} href={card.href}>
+                <Card className="border-0 shadow-none transition-all duration-150 hover:shadow-sm cursor-pointer">
                   {content}
                 </Card>
               </Link>
             );
           }
           return (
-            <Card key={card.label} className="border border-white/[0.06] shadow-none">
+            <Card key={card.labelKey} className="border-0 shadow-none">
               {content}
             </Card>
           );
@@ -139,13 +140,13 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Quotes */}
-      <Card className="border border-white/[0.06] shadow-none">
+      <Card className="border-0 shadow-none">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base font-semibold">Recent quotes</CardTitle>
+          <CardTitle className="text-base font-semibold">{t("dashboard.recentQuotes")}</CardTitle>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/quick-quote" className="flex items-center gap-1 text-sm">
-              Open quote
-              <ArrowRight className="h-3.5 w-3.5" />
+              {t("dashboard.openQuote")}
+              <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" />
             </Link>
           </Button>
         </CardHeader>
@@ -155,14 +156,12 @@ export default function DashboardPage() {
               <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-3">
                 <FileText className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
               </div>
-              <p className="text-sm font-medium text-foreground mb-1">No quotes yet</p>
-              <p className="text-xs text-muted-foreground mb-4">
-                Create your first quote to get started
-              </p>
+              <p className="text-sm font-medium text-foreground mb-1">{t("dashboard.noQuotes")}</p>
+              <p className="text-xs text-muted-foreground mb-4">{t("dashboard.noQuotesHint")}</p>
               <Button size="sm" asChild>
-                <Link href="/quick-quote">
-                  <Calculator className="h-3.5 w-3.5 mr-2" />
-                  New quote
+                <Link href="/quick-quote" className="inline-flex items-center gap-2">
+                  <Calculator className="h-3.5 w-3.5" />
+                  {t("dashboard.newQuote")}
                 </Link>
               </Button>
             </div>
@@ -182,9 +181,11 @@ export default function DashboardPage() {
                         {batch.name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {batch.clientIds.length} client
-                        {batch.clientIds.length !== 1 ? "s" : ""} ·{" "}
-                        {new Date(batch.updatedAt).toLocaleDateString()}
+                        {batch.clientIds.length}{" "}
+                        {batch.clientIds.length !== 1
+                          ? t("dashboard.clientsCount")
+                          : t("dashboard.clientSingular")}{" "}
+                        · {new Date(batch.updatedAt).toLocaleDateString("he-IL")}
                       </p>
                     </div>
                   </div>

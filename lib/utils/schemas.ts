@@ -27,8 +27,13 @@ export type AddClientFormValues = z.infer<typeof addClientSchema>;
 export const clientFormSchema = z.object({
   fullName: z
     .string()
-    .min(2, "Client name must be at least 2 characters")
-    .max(100, "Client name is too long"),
+    .min(1, "נדרש שם חברה")
+    .max(100, "שם ארוך מדי"),
+  companyRegistrationNumber: z
+    .string()
+    .min(1, "נדרש מספר ח.פ / עוסק מורשה")
+    .max(40, "מספר ארוך מדי")
+    .regex(/^\d+$/, "יש להזין ספרות בלבד"),
   contactName: z.string().max(120).optional(),
   email: z
     .string()
@@ -36,9 +41,17 @@ export const clientFormSchema = z.object({
     .optional()
     .refine(
       (s) => !s?.trim() || z.string().email().safeParse(s.trim()).success,
-      "Invalid email"
+      "כתובת אימייל לא תקינה"
     ),
-  phone: z.string().max(40).optional(),
+  phone: z
+    .string()
+    .max(40)
+    .optional()
+    .refine(
+      (s) => !s?.trim() || /^\d+$/.test(s.trim()),
+      "הזינו מספר טלפון (ספרות בלבד)"
+    ),
+  city: z.string().max(120).optional(),
   notes: z.string().max(2000).optional(),
   status: z.enum(["active", "inactive"]),
 });

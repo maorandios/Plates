@@ -108,7 +108,7 @@ export function ClientDxfTable({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="rounded-lg border border-border overflow-hidden bg-card">
+      <div className="rounded-lg overflow-hidden bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">

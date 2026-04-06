@@ -284,7 +284,7 @@ export function NestingResultsPage() {
                   All nestable instances were placed.
                 </p>
               ) : (
-                <div className="rounded-lg border border-border overflow-x-auto">
+                <div className="rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>

@@ -147,7 +147,7 @@ export function ManualQuotePhase({
   return (
     <div
       className={cn(
-        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
+        "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
         MANUAL_PHASE_VIEWPORT
       )}
     >
@@ -235,7 +235,7 @@ export function ManualQuotePhase({
                 </div>
               ) : (
                 <>
-              <div className="rounded-xl border border-white/[0.06] overflow-x-auto">
+              <div className="rounded-xl border-0 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">

@@ -17,7 +17,7 @@ interface SheetCardProps {
 export function SheetCard({ batchId, runId, sheet, unitSystem }: SheetCardProps) {
   const typeLabel = sheet.stockType === "purchase" ? "Purchase" : "Leftover";
   return (
-    <div className="rounded-lg border border-border bg-card p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="rounded-lg bg-card p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div className="space-y-1 text-sm">
         <p className="font-medium text-foreground">
           {formatLength(sheet.widthMm, unitSystem)} ×{" "}

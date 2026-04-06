@@ -259,7 +259,7 @@ export default function PartsReviewPage() {
 
       {/* ── Diagnostics panel ─────────────────────────────────────────────── */}
       {showDiag && diag && (
-        <div className="mb-6 rounded-xl border border-border bg-muted/30 p-4 text-sm space-y-3">
+        <div className="mb-6 rounded-xl bg-muted/30 p-4 text-sm space-y-3">
           <p className="font-semibold text-foreground">Store Diagnostics</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <DiagCell label="Clients" value={diag.clients} />
@@ -301,7 +301,7 @@ export default function PartsReviewPage() {
                   {diag.geom.samples.map((s, i) => (
                     <div
                       key={i}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1.5 rounded-lg bg-background border border-border text-xs font-mono"
+                      className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1.5 rounded-lg bg-background text-xs font-mono"
                     >
                       <span className="font-semibold text-foreground">{s.name}</span>
                       <span
@@ -351,7 +351,7 @@ export default function PartsReviewPage() {
                 {diag.excelFiles.map((f) => (
                   <div
                     key={f.id}
-                    className="flex flex-wrap items-start gap-x-3 gap-y-0.5 px-3 py-1.5 rounded-lg bg-background border border-border text-xs"
+                    className="flex flex-wrap items-start gap-x-3 gap-y-0.5 px-3 py-1.5 rounded-lg bg-background text-xs"
                   >
                     <span className="font-medium text-foreground">{f.name}</span>
                     <span
@@ -396,7 +396,7 @@ export default function PartsReviewPage() {
                 {diag.excelRows.slice(0, 3).map((r) => (
                   <div
                     key={r.id}
-                    className="flex flex-wrap gap-3 px-3 py-1.5 rounded-lg bg-background border border-border text-xs font-mono"
+                    className="flex flex-wrap gap-3 px-3 py-1.5 rounded-lg bg-background text-xs font-mono"
                   >
                     <span>
                       <span className="text-muted-foreground">part: </span>

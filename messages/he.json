@@ -1,0 +1,334 @@
+{
+  "meta": {
+    "title": "PLATE — הצעות מחיר לחיתוך פלדה CNC",
+    "description": "הצעות מחיר מהירות ומדויקות לחיתוך פלדה מקבצי DXF ו-Excel"
+  },
+  "brand": {
+    "name": "PLATE",
+    "mvp": "MVP",
+    "footer": "מערכת הצעות מחיר — גרסת MVP"
+  },
+  "nav": {
+    "dashboard": "לוח בקרה",
+    "quotes": "הצעות מחיר",
+    "quote": "הצעת מחיר",
+    "clients": "לקוחות",
+    "settings": "הגדרות",
+    "accountSettings": "הגדרות חשבון",
+    "materialsConfig": "הגדרת חומרים",
+    "billAndUsage": "חיוב ושימוש"
+  },
+  "header": {
+    "client": "לקוח",
+    "plate": "PLATE"
+  },
+  "layout": {
+    "mainNavAria": "ניווט ראשי",
+    "logout": "התנתקות",
+    "logoutAria": "התנתקות מהמערכת",
+    "createNewQuote": "הצעת מחיר חדשה"
+  },
+  "status": {
+    "batchDraft": "טיוטה",
+    "batchActive": "פעיל",
+    "batchCompleted": "הושלם",
+    "batchArchived": "בארכיון"
+  },
+  "common": {
+    "continue": "המשך",
+    "back": "חזרה",
+    "cancel": "ביטול",
+    "save": "שמירה",
+    "delete": "מחיקה",
+    "edit": "עריכה",
+    "close": "סגירה",
+    "search": "חיפוש",
+    "loading": "טוען…",
+    "error": "שגיאה",
+    "yes": "כן",
+    "no": "לא",
+    "upload": "העלאה",
+    "download": "הורדה",
+    "export": "ייצוא",
+    "import": "ייבוא",
+    "add": "הוספה",
+    "remove": "הסרה",
+    "reset": "איפוס",
+    "configure": "הגדרה",
+    "review": "סקירה",
+    "parse": "פענוח",
+    "match": "התאמה",
+    "startCalculation": "התחלת חישוב"
+  },
+  "quote": {
+    "steps": {
+      "general": "כללי",
+      "quoteMethod": "שיטת הצעת מחיר",
+      "parts": "חלקים",
+      "stockPricing": "מלאי ותמחור",
+      "calculation": "חישוב",
+      "quote": "הצעת מחיר",
+      "pricing": "תמחור",
+      "finalize": "סיום"
+    },
+    "methods": {
+      "dxf": {
+        "title": "DXF",
+        "description": "העלאת קבצי DXF להצעת מחיר",
+        "hint": "מתאים לקבצי CAD מוכנים"
+      },
+      "manualAdd": {
+        "title": "הוספה ידנית",
+        "description": "הזנת נתוני חלקים ידנית",
+        "hint": "רוחב, אורך, עובי, כמות, חומר"
+      },
+      "excelImport": {
+        "title": "ייבוא מרשימת Excel",
+        "description": "העלאת גיליון והתאמת עמודות",
+        "hint": "CSV או Excel — אותו זרימת מיפוי כמו BOM ל-DXF"
+      },
+      "bendPlate": {
+        "title": "כיפוף לוח",
+        "description": "בניית לוח כפוף מפרופיל צד או תבנית",
+        "hint": "גיאומטריה להצעת מחיר מהפרופיל"
+      }
+    },
+    "methodPicker": {
+      "chooseTitle": "בחירת שיטה",
+      "chooseSubtitle": "בחרו כיצד להזין את החלקים להצעת המחיר.",
+      "summaryTitle": "סיכום",
+      "materialType": "סוג חומר",
+      "configure": "הגדרה",
+      "complete": "סיום",
+      "resetConfirmTitle": "לאפס את בחירת השיטה?",
+      "resetConfirmDescription": "פעולה זו תנקה את הנתונים שהוזנו לשיטה הנוכחית.",
+      "collapseSettings": "כיווץ תפריט הגדרות",
+      "expandSettings": "הרחבת תפריט הגדרות"
+    },
+    "dxfSubSteps": {
+      "upload": "העלאה",
+      "parse": "פענוח",
+      "review": "סקירה"
+    },
+    "finishLabels": {
+      "carbon": "פלדה",
+      "galvanized": "מגולוון",
+      "paint": "צבע"
+    }
+  },
+  "dashboard": {
+    "title": "לוח בקרה",
+    "subtitle": "פלטפורמת הצעות מחיר לחיתוך פלדה CNC",
+    "stats": {
+      "totalQuotes": "סה״כ הצעות",
+      "totalQuotesDesc": "כל ההצעות",
+      "activeQuotes": "הצעות פעילות",
+      "activeQuotesDesc": "בתהליך",
+      "clients": "לקוחות",
+      "clientsDesc": "מאגר לקוחות",
+      "newQuoteCta": "הצעת מחיר",
+      "newQuoteDesc": "יצירת הצעת מחיר"
+    },
+    "newQuote": "הצעת מחיר חדשה",
+    "recentQuotes": "הצעות אחרונות",
+    "openQuote": "פתיחת הצעה",
+    "noQuotes": "אין עדיין הצעות",
+    "noQuotesHint": "צרו את ההצעה הראשונה שלכם כדי להתחיל",
+    "clientsCount": "לקוחות",
+    "clientSingular": "לקוח"
+  },
+  "quotes": {
+    "title": "הצעות מחיר",
+    "description": "כל הצעות המהירות שהתחלתם או השלמתם. הצעה מופיעה כאן לאחר השלמת שלב ״כללי״ והמשך לשיטות ההצעה.",
+    "newQuote": "הצעת מחיר חדשה",
+    "stepLabels": {
+      "1": "כללי",
+      "2": "שיטת הצעת מחיר",
+      "3": "חלקים",
+      "4": "מלאי ותמחור",
+      "5": "חישוב",
+      "6": "הצעת מחיר",
+      "7": "תמחור",
+      "8": "סיום"
+    },
+    "listStepLabels": {
+      "1": "כללי",
+      "2": "שיטת הצעת מחיר",
+      "3": "חלקים",
+      "4": "מלאי ותמחור",
+      "5": "חישוב",
+      "6": "הצעת מחיר",
+      "7": "תמחור",
+      "8": "סיום"
+    },
+    "emptyTitle": "אין עדיין הצעות",
+    "emptyDescription": "התחילו הצעה חדשה והמשיכו מעבר לשלב ״כללי״ — היא תופיע כאן כ״בתהליך״.",
+    "colReference": "סימוכין",
+    "colClient": "לקוח",
+    "colStatus": "סטטוס",
+    "colPhase": "שלב",
+    "colUpdated": "עודכן",
+    "colActions": "פעולות",
+    "openBuilder": "פתיחת בונה",
+    "stepFallback": "שלב {{n}}",
+    "removeAria": "הסרת {{ref}}",
+    "statusComplete": "הושלם",
+    "statusInProgress": "בתהליך",
+    "removeConfirm": "להסיר את ״{{ref}}״ מהרשימה?"
+  },
+  "general": {
+    "sectionTitle": "פרטי עבודה",
+    "quotationId": "מזהה הצעה",
+    "generating": "מייצר…",
+    "referenceNumber": "מספר סימוכין",
+    "projectName": "שם פרויקט",
+    "projectNamePlaceholder": "שם הפרויקט / הצעה",
+    "customerName": "שם לקוח",
+    "customerPlaceholder": "הזן שם לקוח או צור לקוח חדש",
+    "currency": "מטבע",
+    "notes": "הערות",
+    "notesPlaceholder": "הערות כלליות אודות ההצעה",
+    "materialType": "סוג חומר",
+    "pickClient": "בחירה מרשימת לקוחות",
+    "copyReference": "העתקה ללוח",
+    "browseClients": "רשימת לקוחות",
+    "linkedToClient": "מקושר לרשומת לקוח",
+    "selectClientTitle": "בחירת לקוח",
+    "selectClientDescription": "בחר לקוח מהרשימה או צור לקוח חדש",
+    "searchClientsPlaceholder": "חפש שם לקוח",
+    "noClientsYet": "לא נמצאו לקוחות",
+    "noSearchResults": "אין תוצאות התואמות לחיפוש.",
+    "createNewClient": "צור לקוח חדש"
+  },
+  "methodMetrics": {
+    "quantity": "כמות",
+    "quantitySub": "סכום כמויות בכל השיטות עם נתונים",
+    "area": "שטח (מ״ר)",
+    "areaSub": "סה״כ שטח לוח משורות מיזוג (כללי)",
+    "weight": "משקל (ק״ג)",
+    "weightSub": "משקל משוער משורות מיזוג (צפיפות מ״כללי״)"
+  },
+  "quoteMethodScreen": {
+    "title": "שיטת הצעת מחיר",
+    "intro": "בחרו כיצד לבנות את ההצעה. הגדירו כל שיטה להוספת חלקים, ואז השלימו לסקירה משותפת של כל השורות.",
+    "plateTypeFromGeneral": "סוג לוח מ״כללי״:",
+    "methodsTitle": "שיטות",
+    "methodsHint": "מסגרת ירוקה = לשיטה כבר יש נתונים. השתמשו בכפתור ההגדרה לעריכה.",
+    "complete": "סיום",
+    "resetDialogTitle": "לאפס את כל שיטות ההצעה?",
+    "resetDialogDescription": "פעולה זו מנקה נתוני DXF, ידני, ייבוא Excel וכיפוף לוח עבור הצעה זו. תחזרו למצב ריק במסך זה."
+  },
+  "validation": {
+    "continueToCalc": "המשך",
+    "startCalculation": "התחלת חישוב",
+    "downloadCsv": "הורדת CSV",
+    "exportCsvTitle": "ייצוא CSV",
+    "exportCsvDescription": "בחרו אילו שורות לכלול בקובץ CSV שיורד.",
+    "exportCsvCountOne": "שורה אחת תיוצא.",
+    "exportCsvCountMany": "{{n}} שורות ייוצאו",
+    "platesReviewTitle": "לוחות לסקירה",
+    "platesCalcTitle": "לוחות לחישוב",
+    "platesReviewDescription": "בחרו אילו שורות BOM יעברו לסקירת חלקי DXF. ניתן להחריג שגיאות או אזהרות, או לבחור חלקים ספציפיים.",
+    "platesCalcDescription": "בחרו אילו לוחות לכלול בריצת הצעה זו. ניתן לדלג על שגיאות או אזהרות, או לבחור חלקים ספציפיים. בשלב הבא יוזנו מידות לוח ומחיר רכישה לק״ג לפני החישוב.",
+    "reviewCountOne": "לוח אחד ימשיך לסקירת DXF.",
+    "reviewCountMany": "{{n}} לוחות ימשיכו לסקירת DXF.",
+    "calcCountOne": "לוח אחד ייכלל בחישוב זה.",
+    "calcCountMany": "{{n}} לוחות ייכללו בחישוב זה."
+  },
+  "quickQuotePage": {
+    "generalTitle": "פרטים בסיסיים",
+    "generalSubtitle": "הזנת מידע כללי אודות ההצעה"
+  },
+  "clientNew": {
+    "title": "הקמת לקוח חדש",
+    "subtitle": "הזינו לקוחות חדשים למערכת לשימוש עתידי"
+  },
+  "clientEdit": {
+    "title": "עריכת לקוח",
+    "subtitle": "קוד לקוח קבוע: {{code}} — לא ניתן לשינוי.",
+    "cancelBack": "חזרה לפרטי לקוח"
+  },
+  "clientForm": {
+    "companyName": "שם החברה",
+    "companyRegistration": "מספר ח.פ / עוסק מורשה",
+    "contactName": "שם איש הקשר",
+    "email": "כתובת אימייל",
+    "phone": "מספר טלפון",
+    "city": "עיר",
+    "notes": "הערות כלליות",
+    "placeholderCompany": "הזנת שם חברה",
+    "placeholderCompanyReg": "הזינו מספר ח.פ חברה או מספר עוסק מורשה",
+    "placeholderContact": "הזנת שם איש קשר",
+    "placeholderEmail": "Email@gmail.com",
+    "placeholderPhone": "הזינו מספר טלפון",
+    "placeholderCity": "הזנת עיר",
+    "notesPlaceholder": "הזנת הערות כלליות אודות הלקוח",
+    "status": "סטטוס",
+    "statusActive": "פעיל",
+    "statusInactive": "לא פעיל",
+    "optionalPlaceholder": "אופציונלי",
+    "submitCreate": "צור לקוח חדש",
+    "submitSave": "שמור שינויים",
+    "cancel": "ביטול"
+  },
+  "pages": {
+    "batches": {
+      "title": "הצעות ועבודות",
+      "description": "ניהול הצעות מחיר ועבודות הצעה",
+      "newJob": "עבודת הצעה חדשה",
+      "quickQuote": "הצעת מחיר מהירה",
+      "emptyTitle": "אין עדיין עבודות",
+      "emptyDescription": "צרו את העבודה הראשונה. השתמשו בהצעת מחיר מהירה ל-DXF ו-Excel."
+    },
+    "clients": {
+      "title": "לקוחות",
+      "description": "רשימת כל הלקוחות המשויכים לחברה",
+      "newClient": "לקוח חדש",
+      "searchPlaceholder": "חפש לקוחות לפי שם לקוח / ח.פ / עוסק מורשה",
+      "emptyTitle": "אין עדיין לקוחות",
+      "emptyDescription": "צרו לקוח ראשון לשימוש חוזר בכל העבודות.",
+      "noSearchResults": "אין לקוחות התואמים לחיפוש.",
+      "deleteConfirm": "למחוק את {{name}}? פעולה זו אינה ניתנת לביטול.",
+      "table": {
+        "colIndex": "#",
+        "colName": "שם הלקוח",
+        "colCompanyReg": "ח.פ / עוסק מורשה",
+        "colClientId": "מזהה לקוח",
+        "colWeight": "סה״כ משקל (ק״ג)",
+        "colArea": "סה״כ שטח (מ״ר)",
+        "colPartQty": "סה״כ כמות פריטים",
+        "colView": "צפייה",
+        "colDelete": "מחיקה",
+        "viewAria": "צפייה בפרטי לקוח",
+        "deleteAria": "מחיקת לקוח"
+      }
+    },
+    "settingsAccount": {
+      "title": "הגדרות חשבון",
+      "description": "פרטי חברה המופיעים בהצעות ובייצוא PDF."
+    },
+    "settingsMaterials": {
+      "title": "הגדרת חומרים",
+      "description": "הגדרת פרמטרים בסיסיים וגדלי לוח ברירת מחדל לחומרים הנפוצים אצלכם."
+    },
+    "settingsBill": {
+      "title": "חיוב ושימוש",
+      "description": "סקירת מנוי ושימוש לסביבת העבודה. פירוט חיוב יתחבר כאן עם התקדמות התוכנית.",
+      "usageTitle": "שימוש",
+      "usageDescription": "תמונת מצב מהדפדפן (נתונים מקומיים). מתאפס אם מנקים נתוני אתר.",
+      "statTotalQuotes": "סה״כ הצעות",
+      "statQuotesMonth": "הצעות החודש",
+      "statClients": "לקוחות",
+      "billingTitle": "חיוב",
+      "billingDescription": "חשבוניות, אמצעי תשלום ופרטי תוכנית יופיעו כאן כשהחיוב יופעל לארגון.",
+      "mvpNote": "אתם בחוויית Quotation MVP. אין חיובים בתצוגה מקדימה זו."
+    }
+  },
+  "dxf": {
+    "dragDrop": "גררו והשמיטו כאן קבצי DXF",
+    "selectFiles": "בחרו קבצים",
+    "selectAtLeastOne": "יש לבחור לפחות קובץ DXF אחד",
+    "parseFailed": "פענוח DXF נכשל",
+    "readFailed": "קריאת הקבצים נכשלה"
+  }
+}

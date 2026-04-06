@@ -25,7 +25,7 @@ export function PartInspector({
 }: PartInspectorProps) {
   if (!placement) {
     return (
-      <aside className="w-full lg:w-72 shrink-0 rounded-xl border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+      <aside className="w-full lg:w-72 shrink-0 rounded-xl bg-muted/20 p-4 text-sm text-muted-foreground">
         <p className="font-medium text-foreground mb-1">Part details</p>
         <p className="text-xs leading-relaxed">
           Click a part on the sheet to see name, rotation, dimensions, and area.
@@ -39,7 +39,7 @@ export function PartInspector({
   const { ox, oy } = innerOriginOnSheet(sheet);
 
   return (
-    <aside className="w-full lg:w-72 shrink-0 rounded-xl border border-border bg-card p-4 text-sm space-y-3 shadow-sm">
+    <aside className="w-full lg:w-72 shrink-0 rounded-xl bg-card p-4 text-sm space-y-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <p className="font-semibold text-foreground">Part details</p>
         <button

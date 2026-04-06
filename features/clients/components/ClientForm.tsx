@@ -22,109 +22,132 @@ import {
 } from "@/components/ui/select";
 import { clientFormSchema, type ClientFormValues } from "@/lib/utils/schemas";
 import type { Client } from "@/types";
+import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 export interface ClientFormProps {
   defaultValues?: Partial<ClientFormValues>;
-  /** Shown after create — read-only */
-  generatedShortCode?: string;
-  /** Lock fields after successful create */
-  readOnly?: boolean;
   onSubmit: (values: ClientFormValues) => void;
   onCancel?: () => void;
   submitLabel?: string;
+  /** Hide status (default active) — use on create */
+  mode?: "create" | "edit";
+  /** Tighter spacing + scroll region for viewport-fit layouts */
+  compact?: boolean;
 }
 
 const emptyDefaults: ClientFormValues = {
   fullName: "",
+  companyRegistrationNumber: "",
   contactName: "",
   email: "",
   phone: "",
+  city: "",
   notes: "",
   status: "active",
 };
 
 export function ClientForm({
   defaultValues,
-  generatedShortCode,
-  readOnly = false,
   onSubmit,
   onCancel,
-  submitLabel = "Save",
+  submitLabel,
+  mode = "create",
+  compact = false,
 }: ClientFormProps) {
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
     defaultValues: { ...emptyDefaults, ...defaultValues },
   });
 
+  const showStatus = mode === "edit";
+  const resolvedSubmit =
+    submitLabel ??
+    (mode === "create"
+      ? t("clientForm.submitCreate")
+      : t("clientForm.submitSave"));
+
+  const itemGap = compact ? "space-y-4" : "space-y-5";
+  const labelClass = compact ? "text-sm" : "";
+
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-4 max-w-lg"
-      >
-        {generatedShortCode && (
-          <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Client code
-            </p>
-            <p className="text-2xl font-mono font-bold tracking-widest text-foreground mt-1">
-              {generatedShortCode}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Permanent global code for marking and traceability.
-            </p>
-          </div>
+        className={cn(
+          "flex w-full flex-col",
+          compact ? "min-h-0 flex-1 overflow-hidden" : "",
+          !compact && "space-y-6"
         )}
-
-        <FormField
-          control={form.control}
-          name="fullName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Client name</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="e.g. Alon Steel Industries"
-                  disabled={readOnly}
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+        dir="rtl"
+      >
+        <div
+          className={cn(
+            compact
+              ? "min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-2 pb-2 sm:px-3"
+              : "space-y-6"
           )}
-        />
-
-        <FormField
-          control={form.control}
-          name="contactName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Contact name</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Optional"
-                  disabled={readOnly}
-                  {...field}
-                  value={field.value ?? ""}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        >
           <FormField
             control={form.control}
-            name="email"
+            name="fullName"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
+              <FormItem className={itemGap}>
+                <FormLabel className={labelClass}>
+                  {t("clientForm.companyName")}{" "}
+                  <span className="text-destructive">*</span>
+                </FormLabel>
                 <FormControl>
                   <Input
-                    type="email"
-                    placeholder="Optional"
-                    disabled={readOnly}
+                    placeholder={t("clientForm.placeholderCompany")}
+                    className={compact ? "h-9" : undefined}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="companyRegistrationNumber"
+            render={({ field }) => (
+              <FormItem className={itemGap}>
+                <FormLabel className={labelClass}>
+                  {t("clientForm.companyRegistration")}{" "}
+                  <span className="text-destructive">*</span>
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder={t("clientForm.placeholderCompanyReg")}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className={compact ? "h-9" : undefined}
+                    {...field}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "");
+                      field.onChange(v);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="contactName"
+            render={({ field }) => (
+              <FormItem className={itemGap}>
+                <FormLabel className={labelClass}>
+                  {t("clientForm.contactName")}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder={t("clientForm.placeholderContact")}
+                    className={compact ? "h-9" : undefined}
                     {...field}
                     value={field.value ?? ""}
                   />
@@ -133,16 +156,66 @@ export function ClientForm({
               </FormItem>
             )}
           />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem className={itemGap}>
+                  <FormLabel className={labelClass}>
+                    {t("clientForm.email")}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder={t("clientForm.placeholderEmail")}
+                      className={compact ? "h-9" : undefined}
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem className={itemGap}>
+                  <FormLabel className={labelClass}>
+                    {t("clientForm.phone")}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t("clientForm.placeholderPhone")}
+                      inputMode="numeric"
+                      className={compact ? "h-9" : undefined}
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "");
+                        field.onChange(v);
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
           <FormField
             control={form.control}
-            name="phone"
+            name="city"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Phone</FormLabel>
+              <FormItem className={itemGap}>
+                <FormLabel className={labelClass}>{t("clientForm.city")}</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Optional"
-                    disabled={readOnly}
+                    placeholder={t("clientForm.placeholderCity")}
+                    className={compact ? "h-9" : undefined}
                     {...field}
                     value={field.value ?? ""}
                   />
@@ -151,59 +224,74 @@ export function ClientForm({
               </FormItem>
             )}
           />
+
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem className={itemGap}>
+                <FormLabel className={labelClass}>{t("clientForm.notes")}</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder={t("clientForm.notesPlaceholder")}
+                    rows={compact ? 2 : 4}
+                    className={cn(
+                      "resize-y",
+                      compact ? "min-h-[52px] text-sm" : "min-h-[100px]"
+                    )}
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {showStatus && (
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem className={itemGap}>
+                  <FormLabel className={labelClass}>
+                    {t("clientForm.status")}
+                  </FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className={compact ? "h-9" : undefined}>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="active">
+                        {t("clientForm.statusActive")}
+                      </SelectItem>
+                      <SelectItem value="inactive">
+                        {t("clientForm.statusInactive")}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
 
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Internal notes"
-                  className="min-h-[88px] resize-y"
-                  disabled={readOnly}
-                  {...field}
-                  value={field.value ?? ""}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+        <div
+          className={cn(
+            "mt-auto flex shrink-0 flex-wrap items-center gap-3 border-t border-white/[0.08] px-2 pb-1 pt-5 sm:px-3 sm:pt-6",
+            compact && "mt-3"
           )}
-        />
-
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Status</FormLabel>
-              <Select
-                value={field.value}
-                onValueChange={field.onChange}
-                disabled={readOnly}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="flex flex-wrap gap-2 pt-2">
-          {!readOnly && <Button type="submit">{submitLabel}</Button>}
+          dir="ltr"
+        >
+          <Button type="submit" size={compact ? "default" : "lg"}>
+            {resolvedSubmit}
+          </Button>
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           )}
         </div>
@@ -213,11 +301,15 @@ export function ClientForm({
 }
 
 export function clientFormValuesFromClient(c: Client): ClientFormValues {
+  const digitsOnly = (s: string | undefined) =>
+    s ? s.replace(/\D/g, "") : "";
   return {
     fullName: c.fullName,
+    companyRegistrationNumber: digitsOnly(c.companyRegistrationNumber) || "",
     contactName: c.contactName ?? "",
     email: c.email ?? "",
-    phone: c.phone ?? "",
+    phone: digitsOnly(c.phone) || "",
+    city: c.city ?? "",
     notes: c.notes ?? "",
     status: c.status,
   };

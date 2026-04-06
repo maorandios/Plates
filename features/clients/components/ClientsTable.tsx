@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Pencil, UserX, UserCheck } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -14,109 +13,123 @@ import {
 } from "@/components/ui/table";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import type { Client, ClientMetrics } from "@/types";
-import { saveClient } from "@/lib/store";
+import { deleteGlobalClient } from "@/lib/store";
+import { t } from "@/lib/i18n";
 
 export interface ClientsTableProps {
   clients: Client[];
   metricsById: Record<string, ClientMetrics>;
-  onStatusToggled?: () => void;
+  onChanged?: () => void;
 }
 
 export function ClientsTable({
   clients,
   metricsById,
-  onStatusToggled,
+  onChanged,
 }: ClientsTableProps) {
-  function toggleStatus(c: Client) {
-    const next = c.status === "active" ? "inactive" : "active";
-    saveClient({
-      ...c,
-      status: next,
-      updatedAt: new Date().toISOString(),
-    });
-    onStatusToggled?.();
+  function handleDelete(c: Client) {
+    if (
+      !confirm(
+        t("pages.clients.deleteConfirm", {
+          name: c.fullName,
+        })
+      )
+    ) {
+      return;
+    }
+    deleteGlobalClient(c.id);
+    onChanged?.();
   }
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div className="rounded-xl overflow-hidden border border-white/[0.08]" dir="rtl">
       <Table>
         <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead>Client</TableHead>
-            <TableHead className="w-[72px]">Code</TableHead>
-            <TableHead className="text-right tabular-nums">Batches</TableHead>
-            <TableHead className="text-right tabular-nums">Parts</TableHead>
-            <TableHead className="text-right tabular-nums">Qty</TableHead>
-            <TableHead className="text-right tabular-nums">Weight (kg)</TableHead>
-            <TableHead>Last batch</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="w-[140px] text-right">Actions</TableHead>
+          <TableRow className="hover:bg-transparent border-white/[0.08]">
+            <TableHead className="w-10 text-center font-medium">
+              {t("pages.clients.table.colIndex")}
+            </TableHead>
+            <TableHead className="min-w-[140px] font-medium">
+              {t("pages.clients.table.colName")}
+            </TableHead>
+            <TableHead className="min-w-[120px] font-medium">
+              {t("pages.clients.table.colCompanyReg")}
+            </TableHead>
+            <TableHead className="w-[100px] font-medium">
+              {t("pages.clients.table.colClientId")}
+            </TableHead>
+            <TableHead className="text-end tabular-nums font-medium">
+              {t("pages.clients.table.colWeight")}
+            </TableHead>
+            <TableHead className="text-end tabular-nums font-medium">
+              {t("pages.clients.table.colArea")}
+            </TableHead>
+            <TableHead className="text-end tabular-nums font-medium">
+              {t("pages.clients.table.colPartQty")}
+            </TableHead>
+            <TableHead className="w-[72px] text-center font-medium">
+              {t("pages.clients.table.colView")}
+            </TableHead>
+            <TableHead className="w-[72px] text-center font-medium">
+              {t("pages.clients.table.colDelete")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {clients.map((c) => {
+          {clients.map((c, index) => {
             const m = metricsById[c.id];
+            const reg = c.companyRegistrationNumber?.trim();
             return (
-              <TableRow key={c.id}>
-                <TableCell className="font-medium max-w-[200px] truncate">
+              <TableRow key={c.id} className="border-white/[0.06]">
+                <TableCell className="text-center tabular-nums text-muted-foreground">
+                  {index + 1}
+                </TableCell>
+                <TableCell className="font-medium max-w-[220px] truncate">
                   {c.fullName}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground tabular-nums">
+                  {reg || "—"}
                 </TableCell>
                 <TableCell>
                   <span className="font-mono text-xs font-bold tracking-wider">
                     {c.shortCode}
                   </span>
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {m?.totalBatches ?? 0}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatInteger(m?.totalParts ?? 0)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatInteger(m?.totalQuantity ?? 0)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell className="text-end tabular-nums">
                   {formatDecimal(m?.totalWeight ?? 0, 1)}
                 </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {m?.lastBatchDate
-                    ? new Date(m.lastBatchDate).toLocaleDateString()
-                    : "—"}
+                <TableCell className="text-end tabular-nums">
+                  {formatDecimal(m?.totalAreaM2 ?? 0, 2)}
                 </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={c.status === "active" ? "default" : "secondary"}
-                    className="text-[10px]"
+                <TableCell className="text-end tabular-nums">
+                  {formatInteger(m?.totalQuantity ?? 0)}
+                </TableCell>
+                <TableCell className="text-center p-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    asChild
                   >
-                    {c.status === "active" ? "Active" : "Inactive"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                      <Link href={`/clients/${c.id}`} title="View">
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                      <Link href={`/clients/${c.id}/edit`} title="Edit">
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      title={c.status === "active" ? "Deactivate" : "Activate"}
-                      onClick={() => toggleStatus(c)}
+                    <Link
+                      href={`/clients/${c.id}`}
+                      title={t("pages.clients.table.viewAria")}
                     >
-                      {c.status === "active" ? (
-                        <UserX className="h-4 w-4" />
-                      ) : (
-                        <UserCheck className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
+                      <Eye className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </TableCell>
+                <TableCell className="text-center p-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    type="button"
+                    title={t("pages.clients.table.deleteAria")}
+                    onClick={() => handleDelete(c)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             );

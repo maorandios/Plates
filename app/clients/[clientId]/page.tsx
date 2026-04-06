@@ -89,13 +89,18 @@ export default function ClientDetailPage() {
           <Building2 className="h-4 w-4 text-muted-foreground" />
           Client info
         </h2>
-        <div className="rounded-xl border border-border bg-card p-4 text-sm space-y-2 max-w-2xl">
+        <div className="rounded-xl bg-card p-4 text-sm space-y-2 max-w-2xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-            <InfoRow label="Contact" value={client.contactName} />
-            <InfoRow label="Email" value={client.email} />
-            <InfoRow label="Phone" value={client.phone} />
             <InfoRow
-              label="Created"
+              label="ח.פ / עוסק מורשה"
+              value={client.companyRegistrationNumber}
+            />
+            <InfoRow label="איש קשר" value={client.contactName} />
+            <InfoRow label="אימייל" value={client.email} />
+            <InfoRow label="טלפון" value={client.phone} />
+            <InfoRow label="עיר" value={client.city} />
+            <InfoRow
+              label="נוצר"
               value={new Date(client.createdAt).toLocaleString()}
             />
           </div>
@@ -125,7 +130,7 @@ export default function ClientDetailPage() {
             run Validation to populate part counts and weights.
           </p>
         ) : (
-          <div className="rounded-xl border border-border overflow-hidden">
+          <div className="rounded-xl overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">

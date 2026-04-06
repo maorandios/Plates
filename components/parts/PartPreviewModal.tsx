@@ -363,7 +363,7 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
               )}
 
               {geometry.holes.length > 0 && (
-                <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+                <div className="rounded-lg bg-muted/30 px-4 py-3">
                   <p className="text-muted-foreground text-xs uppercase tracking-wide mb-2">
                     Holes ({geometry.holes.length})
                   </p>
@@ -373,7 +373,7 @@ export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps)
                       return (
                         <li
                           key={`hole-size-${i}`}
-                          className="flex items-center justify-between gap-2 text-sm rounded-md bg-background border border-border px-3 py-2"
+                          className="flex items-center justify-between gap-2 text-sm rounded-md bg-background px-3 py-2"
                         >
                           <span className="text-muted-foreground">Hole {i + 1}</span>
                           <span className="font-mono font-medium text-foreground tabular-nums">

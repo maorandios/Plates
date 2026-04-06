@@ -363,8 +363,8 @@ export function ProfilePreview2D({
       className={cn(
         "flex items-center justify-center overflow-hidden",
         fill
-          ? "h-full min-h-0 w-full rounded-lg border border-border bg-[#0f1419]"
-          : "rounded-lg border border-border bg-[#0f1419] aspect-[4/3]",
+          ? "h-full min-h-0 w-full rounded-lg bg-[#0f1419]"
+          : "rounded-lg bg-[#0f1419] aspect-[4/3]",
         className
       )}
     >

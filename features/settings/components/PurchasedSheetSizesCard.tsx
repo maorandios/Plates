@@ -93,7 +93,7 @@ export function PurchasedSheetSizesCard() {
 
   if (!mounted) {
     return (
-      <Card id="purchased-sheets" className="border border-border shadow-none">
+      <Card id="purchased-sheets" className="shadow-none">
         <CardHeader>
           <CardTitle className="text-base">Purchased sheet sizes</CardTitle>
           <CardDescription>Loading…</CardDescription>
@@ -103,7 +103,7 @@ export function PurchasedSheetSizesCard() {
   }
 
   return (
-    <Card id="purchased-sheets" className="border border-border shadow-none">
+    <Card id="purchased-sheets" className="shadow-none">
       <CardHeader>
         <CardTitle className="text-base">Purchased sheet sizes</CardTitle>
         <CardDescription>
@@ -126,7 +126,7 @@ export function PurchasedSheetSizesCard() {
             1500 mm at 10 mm).
           </p>
         ) : (
-          <div className="rounded-lg border border-border overflow-x-auto">
+          <div className="rounded-lg overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">

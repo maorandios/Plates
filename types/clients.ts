@@ -13,9 +13,12 @@ export interface Client {
   fullName: string;
   /** Permanent unique 3-character uppercase code (global) */
   shortCode: string;
+  /** ח.פ / עוסק מורשה */
+  companyRegistrationNumber?: string;
   contactName?: string;
   email?: string;
   phone?: string;
+  city?: string;
   notes?: string;
   status: ClientStatus;
   /** Legacy field; file lists are derived from `UploadedFile` rows */
@@ -29,7 +32,10 @@ export interface ClientMetrics {
   totalBatches: number;
   totalParts: number;
   totalQuantity: number;
+  /** Sum of part line weights (kg) across batches */
   totalWeight: number;
+  /** Sum of part line net areas (m²) across batches */
+  totalAreaM2: number;
   lastBatchDate: string | null;
 }
 

@@ -319,7 +319,7 @@ export function PlateGeometryCanvas({
 
   return (
     <div
-      className="relative rounded-lg border border-border overflow-hidden bg-white"
+      className="relative rounded-lg overflow-hidden bg-white"
       style={{ cursor: measureMode ? "crosshair" : "default" }}
     >
       <Stage width={width} height={height}>

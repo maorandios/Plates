@@ -84,7 +84,7 @@ export function SheetCanvas({
   );
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden bg-slate-50 shadow-inner">
+    <div className="rounded-lg overflow-hidden bg-slate-50 shadow-inner">
       <Stage width={width} height={height}>
         <Layer>
           <Rect

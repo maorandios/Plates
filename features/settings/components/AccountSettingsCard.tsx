@@ -46,7 +46,7 @@ export function AccountSettingsCard() {
   );
 
   return (
-    <Card className="border border-border shadow-none">
+    <Card className="shadow-none">
       <CardHeader>
         <CardTitle className="text-base">Company & account</CardTitle>
         <CardDescription>

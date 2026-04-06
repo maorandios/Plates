@@ -95,7 +95,7 @@ export function StockSheetForm({ sheet, isNew, onSave, onCancel }: StockSheetFor
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+        <div className="rounded-lg bg-muted/30 px-4 py-3">
           <p className="text-xs text-muted-foreground mb-1">Preview area</p>
           <p className="text-lg font-semibold tabular-nums">{previewAreaM2}</p>
         </div>

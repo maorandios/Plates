@@ -27,7 +27,7 @@ export function UnitSystemCard() {
   const { preferences, setUnitSystem } = useAppPreferences();
 
   return (
-    <Card className="border border-border shadow-none">
+    <Card className="shadow-none">
       <CardHeader>
         <CardTitle className="text-base">Unit system</CardTitle>
         <CardDescription>

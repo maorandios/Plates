@@ -18,7 +18,8 @@
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
+  /* Field surfaces: rgb(12, 19, 24) — shared by bg-input / primitives */
+  --color-input: #0c1318;
   --color-ring: hsl(var(--ring));
   --color-ring-offset-background: hsl(var(--background));
   --color-sidebar-bg: hsl(var(--sidebar-bg));
@@ -32,13 +33,14 @@
 
 /*
  * Palette (reference — inventar-style industrial dark SaaS)
- * #0D1619 — app backdrop / outer background
+ * #090F0F — app backdrop / outer background
  * #121F25 — main panels & cards
- * #182430 — inner rows, inputs, nested surfaces
+ * #0C1318 — input / field surfaces (rgb(12, 19, 24))
+ * #182430 — inner rows, nested surfaces (popover, etc.)
  * #00E19A — primary actions (text on buttons: dark for contrast)
  */
 :root {
-  --background: 196 31% 7.5%; /* #0D1619 */
+  --background: 180 25% 4.7%; /* #090F0F */
   --foreground: 0 0% 100%;
 
   --card: 199 34% 10.8%; /* #121F25 */
@@ -49,7 +51,7 @@
 
   /* #00E19A — mint / emerald CTA */
   --primary: 163 100% 44.1%;
-  --primary-foreground: 196 31% 7.5%; /* dark text on bright button */
+  --primary-foreground: 180 25% 4.7%; /* #090F0F — dark text on mint button */
 
   --secondary: 210 33% 14.1%; /* #182430 */
   --secondary-foreground: 0 0% 100%;
@@ -65,12 +67,13 @@
   --destructive-foreground: 0 0% 100%;
 
   --border: 205 22% 22%;
-  --input: 210 33% 14.1%; /* #182430 */
+  /* Legacy HSL token; theme field fill uses --color-input #0c1318 */
+  --input: 204 35% 14%;
   --ring: 163 100% 44.1%;
 
   --radius: 0.75rem;
 
-  --sidebar-bg: 196 31% 7.5%; /* align with #0D1619 */
+  --sidebar-bg: 180 25% 4.7%; /* align with #090F0F */
   --sidebar-fg: 0 0% 100%;
   --sidebar-accent: 199 34% 10.8%; /* #121F25 */
   --sidebar-border: 205 18% 18%;
@@ -86,20 +89,73 @@
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-family: var(--font-noto-sans-hebrew), "Noto Sans Hebrew", sans-serif;
+  letter-spacing: -0.02em;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  text-align: start;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  text-align: start;
+}
+
+input,
+textarea,
+select {
+  text-align: start;
+}
+
+/* Native fields (and fallbacks): match shared Input styling app-wide */
+@layer base {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="hidden"]
+    ):not([type="image"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]),
+  textarea,
+  select {
+    background-color: rgb(12, 19, 24);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* WebKit autofill — match field bg rgb(12, 19, 24) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: hsl(var(--foreground));
+  caret-color: hsl(var(--foreground));
+  -webkit-box-shadow: 0 0 0 1000px #0c1318 inset;
+  box-shadow: 0 0 0 1000px #0c1318 inset;
+  transition: background-color 99999s ease-out 0s;
+}
+
+table th,
+table td {
+  text-align: start;
 }
 
 /* Quote / industrial shells — use with Card-like wrappers */
 @layer utilities {
   .ds-surface {
-    @apply rounded-xl border border-white/[0.06] bg-card shadow-sm;
+    @apply rounded-xl border-0 bg-card shadow-sm;
   }
   .ds-surface-header {
-    @apply border-b border-white/[0.08] bg-card/50 px-4 py-3 sm:px-5;
+    @apply bg-card/50 px-4 py-3 sm:px-5;
   }
   .ds-empty-state {
-    @apply rounded-xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-12;
+    @apply rounded-xl border-0 bg-white/[0.03] px-6 py-12;
   }
 }

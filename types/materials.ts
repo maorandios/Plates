@@ -12,9 +12,9 @@ export const MATERIAL_TYPE_OPTIONS: readonly MaterialType[] = [
 ] as const;
 
 export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
-  carbonSteel: "Carbon Steel",
-  stainlessSteel: "Stainless Steel",
-  aluminum: "Aluminum",
+  carbonSteel: "פלדה",
+  stainlessSteel: "נירוסטה",
+  aluminum: "אלומיניום",
 };
 
 /** Material price is always per kg. */

@@ -5,9 +5,9 @@
 export type CuttingMethod = "laser" | "plasma" | "oxy_fuel";
 
 export const CUTTING_METHOD_LABELS: Record<CuttingMethod, string> = {
-  laser: "Laser",
-  plasma: "Plasma",
-  oxy_fuel: "Oxy-fuel",
+  laser: "לייזר",
+  plasma: "פלזמה",
+  oxy_fuel: "חיתוך חמצן",
 };
 
 /** Ordered for selects */

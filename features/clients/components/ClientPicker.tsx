@@ -135,7 +135,7 @@ export function ClientPicker({
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="rounded-lg border border-border overflow-y-auto max-h-[min(320px,40vh)] divide-y divide-border">
+            <div className="rounded-lg overflow-y-auto max-h-[min(320px,40vh)] divide-y divide-border">
               {pickable.length === 0 ? (
                 <p className="text-sm text-muted-foreground p-4 text-center">
                   {getClients().length === 0

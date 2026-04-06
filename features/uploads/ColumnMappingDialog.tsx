@@ -207,7 +207,7 @@ export function ColumnMappingDialog({
             {previewRows.length === 0 ? (
               <p className="text-sm text-muted-foreground italic">No data rows found.</p>
             ) : (
-              <div className="rounded-lg border border-border overflow-x-auto">
+              <div className="rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/50 border-b border-border">

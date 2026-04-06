@@ -83,7 +83,7 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
 
   return (
     <>
-      <Card className="border border-border shadow-none">
+      <Card className="shadow-none">
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -104,7 +104,7 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
               No stock sheets defined. Click Add sheet to create one.
             </div>
           ) : (
-            <div className="rounded-md border border-border overflow-x-auto">
+            <div className="rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

@@ -504,9 +504,9 @@ export function PartBreakdownTable({
   const partCols = 5;
 
   return (
-    <div className="rounded-xl border border-white/[0.06] overflow-hidden">
+    <div className="rounded-xl border-0 overflow-hidden">
       <div className="grid grid-cols-2 gap-3 border-b border-white/[0.08] bg-card/40 p-4 sm:grid-cols-4">
-        <Card className="border border-white/[0.08] p-4 shadow-sm">
+        <Card className="border-0 p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Plates
           </p>
@@ -515,7 +515,7 @@ export function PartBreakdownTable({
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">Quote lines</p>
         </Card>
-        <Card className="border border-white/[0.08] p-4 shadow-sm">
+        <Card className="border-0 p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Quantity
           </p>
@@ -524,7 +524,7 @@ export function PartBreakdownTable({
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">Total pieces</p>
         </Card>
-        <Card className="border border-white/[0.08] p-4 shadow-sm">
+        <Card className="border-0 p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Area
           </p>
@@ -534,7 +534,7 @@ export function PartBreakdownTable({
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">Total plate area</p>
         </Card>
-        <Card className="border border-white/[0.08] p-4 shadow-sm">
+        <Card className="border-0 p-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Weight
           </p>

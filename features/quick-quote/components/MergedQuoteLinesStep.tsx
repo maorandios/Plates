@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ArrowLeft, Check, Package, RotateCcw } from "lucide-react";
+import { Package, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,10 +27,7 @@ interface MergedQuoteLinesStepProps {
   dxfMethodGeometries: DxfPartGeometry[];
   bendPlateQuoteItems: BendPlateQuoteItem[];
   onDeletePart: (row: QuotePartRow) => void;
-  onBack: () => void;
   onReset: () => void;
-  onContinue: () => void;
-  canContinue: boolean;
   canReset: boolean;
 }
 
@@ -41,10 +38,7 @@ export function MergedQuoteLinesStep({
   dxfMethodGeometries,
   bendPlateQuoteItems,
   onDeletePart,
-  onBack,
   onReset,
-  onContinue,
-  canContinue,
   canReset,
 }: MergedQuoteLinesStepProps) {
   const [resetOpen, setResetOpen] = useState(false);
@@ -68,7 +62,7 @@ export function MergedQuoteLinesStep({
   return (
     <div
       className={cn(
-        "flex w-full max-w-[1800px] mx-auto flex-col gap-0 overflow-hidden",
+        "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
         VIEWPORT
       )}
     >
@@ -82,10 +76,6 @@ export function MergedQuoteLinesStep({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <Button type="button" variant="outline" className="gap-2" onClick={onBack}>
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -105,16 +95,6 @@ export function MergedQuoteLinesStep({
               >
                 <Package className="h-4 w-4" />
                 {exporting ? "Building…" : "Export package"}
-              </Button>
-              <Button
-                type="button"
-                size="default"
-                className="gap-2"
-                disabled={!canContinue}
-                onClick={onContinue}
-              >
-                <Check className="h-4 w-4" />
-                Continue
               </Button>
             </div>
           </div>

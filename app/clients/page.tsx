@@ -11,22 +11,31 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ClientsTable } from "@/features/clients/components/ClientsTable";
 import { getClients } from "@/lib/store";
 import { getClientMetrics } from "@/lib/clients/metrics";
+import { t } from "@/lib/i18n";
+import type { Client } from "@/types";
+
+function clientMatchesSearch(c: Client, raw: string): boolean {
+  const q = raw.trim().toLowerCase();
+  if (!q) return true;
+  if (c.fullName.toLowerCase().includes(q)) return true;
+  if (c.shortCode.toLowerCase().includes(q)) return true;
+  const reg = (c.companyRegistrationNumber ?? "").toLowerCase();
+  if (reg.includes(q)) return true;
+  const qDigits = raw.replace(/\D/g, "");
+  const regDigits = (c.companyRegistrationNumber ?? "").replace(/\D/g, "");
+  if (qDigits.length > 0 && regDigits.includes(qDigits)) return true;
+  return false;
+}
 
 export default function ClientsPage() {
   const [search, setSearch] = useState("");
   const [tick, setTick] = useState(0);
 
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
+  const refresh = useCallback(() => setTick((n) => n + 1), []);
 
   const clients = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return getClients()
-      .filter(
-        (c) =>
-          !q ||
-          c.fullName.toLowerCase().includes(q) ||
-          c.shortCode.toLowerCase().includes(q)
-      )
+      .filter((c) => clientMatchesSearch(c, search))
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
   }, [search, tick]);
 
@@ -41,13 +50,14 @@ export default function ClientsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Clients"
-        description="Global directory — one permanent code per client, reused across every batch."
+        titleIcon={Users}
+        title={t("pages.clients.title")}
+        description={t("pages.clients.description")}
         actions={
           <Button asChild>
-            <Link href="/clients/new">
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New client
+            <Link href="/clients/new" className="inline-flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" />
+              {t("pages.clients.newClient")}
             </Link>
           </Button>
         }
@@ -56,7 +66,7 @@ export default function ClientsPage() {
       {getClients().length > 0 && (
         <div className="mb-4 max-w-sm">
           <Input
-            placeholder="Search by name or code…"
+            placeholder={t("pages.clients.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -66,26 +76,26 @@ export default function ClientsPage() {
       {clients.length === 0 && getClients().length === 0 ? (
         <EmptyState
           icon={Users}
-          title="No clients yet"
-          description='Create your first client to reuse it across batches.'
+          title={t("pages.clients.emptyTitle")}
+          description={t("pages.clients.emptyDescription")}
           action={
             <Button asChild>
-              <Link href="/clients/new">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                New client
+              <Link href="/clients/new" className="inline-flex items-center gap-2">
+                <PlusCircle className="h-4 w-4" />
+                {t("pages.clients.newClient")}
               </Link>
             </Button>
           }
         />
       ) : clients.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">
-          No clients match your search.
+          {t("pages.clients.noSearchResults")}
         </p>
       ) : (
         <ClientsTable
           clients={clients}
           metricsById={metricsById}
-          onStatusToggled={refresh}
+          onChanged={refresh}
         />
       )}
     </PageContainer>

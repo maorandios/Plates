@@ -103,7 +103,7 @@ export function UploadStep({
           <JobDetailsForm value={jobDetails} onChange={onJobDetailsChange} />
         </div>
 
-        <Card className="xl:sticky xl:top-4 border-white/[0.06] shadow-sm">
+        <Card className="xl:sticky xl:top-4 shadow-sm">
           <CardHeader className="pb-3 border-b border-white/[0.08] bg-card/40">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />

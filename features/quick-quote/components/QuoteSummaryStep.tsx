@@ -1,13 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  FileSpreadsheet,
-  Save,
-  Sparkles,
-} from "lucide-react";
+import { FileSpreadsheet, Save, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -27,9 +21,7 @@ interface QuoteSummaryStepProps {
   parts: QuotePartRow[];
   mfgParams: ManufacturingParameters;
   thicknessStock?: ThicknessStockInput[];
-  onBack: () => void;
   onBackToValidation: () => void;
-  onContinueToPricing: () => void;
 }
 
 export function QuoteSummaryStep({
@@ -38,9 +30,7 @@ export function QuoteSummaryStep({
   parts,
   mfgParams,
   thicknessStock,
-  onBack,
   onBackToValidation,
-  onContinueToPricing,
 }: QuoteSummaryStepProps) {
   const thicknessStockProvided = Boolean(thicknessStock?.length);
 
@@ -71,19 +61,6 @@ export function QuoteSummaryStep({
             <p className="text-xs text-muted-foreground">{quoteDate}</p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
-            <Button type="button" variant="outline" size="sm" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
-              Back
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={parts.length === 0}
-              onClick={onContinueToPricing}
-            >
-              Continue to pricing
-              <ArrowRight className="h-4 w-4 ml-1.5" />
-            </Button>
             <Button type="button" variant="outline" size="sm" disabled>
               <FileSpreadsheet className="h-4 w-4 mr-1.5" />
               Export Excel

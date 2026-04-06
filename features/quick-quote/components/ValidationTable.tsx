@@ -179,7 +179,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
         </div>
       </div>
 
-      <div className="w-full rounded-md border border-border overflow-x-auto">
+      <div className="w-full rounded-md overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/55 hover:bg-muted/55 border-b border-border">

@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 import type { MatchStatus, BatchStatus } from "@/types";
 
 interface MatchStatusBadgeProps {
@@ -37,26 +38,27 @@ interface BatchStatusBadgeProps {
 }
 
 export function BatchStatusBadge({ status }: BatchStatusBadgeProps) {
-  const config: Record<BatchStatus, { label: string; className: string }> = {
+  const config: Record<BatchStatus, { labelKey: string; className: string }> = {
     draft: {
-      label: "Draft",
+      labelKey: "status.batchDraft",
       className: "bg-white/[0.06] text-muted-foreground border-white/10 hover:bg-white/[0.08]",
     },
     active: {
-      label: "Active",
+      labelKey: "status.batchActive",
       className: "bg-sky-500/15 text-sky-300 border-sky-500/25 hover:bg-sky-500/20",
     },
     completed: {
-      label: "Completed",
+      labelKey: "status.batchCompleted",
       className: "bg-primary/15 text-primary border-primary/30 hover:bg-primary/20",
     },
     archived: {
-      label: "Archived",
+      labelKey: "status.batchArchived",
       className: "bg-white/[0.04] text-muted-foreground/80 border-white/10 hover:bg-white/[0.06]",
     },
   };
 
-  const { label, className } = config[status];
+  const { labelKey, className } = config[status];
+  const label = t(labelKey);
 
   return (
     <Badge variant="outline" className={cn("text-xs font-medium", className)}>

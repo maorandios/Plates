@@ -1,22 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Noto_Sans_Hebrew } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/shared/Sidebar";
-import { TopHeader } from "@/components/shared/TopHeader";
+import { AppTopBar } from "@/components/shared/AppTopBar";
+import messages from "@/messages/he.json";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const notoSansHebrew = Noto_Sans_Hebrew({
+  subsets: ["hebrew"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-noto-sans-hebrew",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "PLATE — CNC Steel Quotation",
-  description: "Fast, accurate CNC steel cutting quotes from DXF and Excel files",
+  title: messages.meta.title,
+  description: messages.meta.description,
 };
 
 export default function RootLayout({
@@ -25,17 +22,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="he" dir="rtl" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${notoSansHebrew.variable} ${notoSansHebrew.className} antialiased`}
       >
-        <div className="flex h-svh min-h-0 overflow-hidden bg-background">
-          <Sidebar />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <TopHeader />
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-              {children}
-            </div>
+        <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
+          <AppTopBar />
+          <div className="flex min-h-0 min-w-0 w-full max-w-none flex-1 flex-col overflow-auto">
+            {children}
           </div>
         </div>
       </body>

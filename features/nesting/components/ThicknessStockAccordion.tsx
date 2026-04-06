@@ -95,7 +95,7 @@ export function ThicknessStockAccordion({
         return (
           <div
             key={key}
-            className="rounded-xl border border-border bg-card shadow-sm overflow-hidden"
+            className="rounded-xl bg-card shadow-sm overflow-hidden"
           >
             <button
               type="button"

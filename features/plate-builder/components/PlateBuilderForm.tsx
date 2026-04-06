@@ -40,7 +40,7 @@ const PlatePreviewCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex min-h-[320px] w-full items-center justify-center rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground">
+      <div className="flex min-h-[320px] w-full items-center justify-center rounded-xl bg-muted/30 text-sm text-muted-foreground">
         Loading preview…
       </div>
     ),
@@ -388,7 +388,7 @@ export function PlateBuilderForm({
                   holesArr.fields.map((field, index) => (
                     <div
                       key={field.id}
-                      className="flex flex-wrap items-end gap-2 gap-y-2 rounded-lg border border-border p-3"
+                      className="flex flex-wrap items-end gap-2 gap-y-2 rounded-lg p-3"
                     >
                       <input
                         type="hidden"
@@ -491,7 +491,7 @@ export function PlateBuilderForm({
                   slotsArr.fields.map((field, index) => (
                     <div
                       key={field.id}
-                      className="flex flex-wrap items-end gap-2 gap-y-2 rounded-lg border border-border p-3"
+                      className="flex flex-wrap items-end gap-2 gap-y-2 rounded-lg p-3"
                     >
                       <input
                         type="hidden"
