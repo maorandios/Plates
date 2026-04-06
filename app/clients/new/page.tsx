@@ -25,7 +25,6 @@ export default function NewClientPage() {
       phone: values.phone || undefined,
       city: values.city?.trim() || undefined,
       notes: values.notes || undefined,
-      status: values.status,
     });
     router.push(`/clients/${client.id}`);
   }

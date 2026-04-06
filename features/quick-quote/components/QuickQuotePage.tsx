@@ -190,6 +190,8 @@ export function QuickQuotePage() {
       id: quoteListSessionIdRef.current,
       referenceNumber: jobDetails.referenceNumber,
       customerName: jobDetails.customerName.trim(),
+      projectName: jobDetails.projectName.trim(),
+      customerClientId: jobDetails.customerClientId,
       currentStep: 2,
     });
     advanceTo(2);
@@ -331,9 +333,28 @@ export function QuickQuotePage() {
 
   useEffect(() => {
     const qid = quoteListSessionIdRef.current;
-    if (!qid || step <= 1) return;
-    patchQuoteSession(qid, { currentStep: step });
-  }, [step]);
+    if (!qid) return;
+    const js = selection.jobSummary;
+    patchQuoteSession(qid, {
+      currentStep: step,
+      customerClientId: jobDetails.customerClientId,
+      projectName: jobDetails.projectName.trim(),
+      customerName: jobDetails.customerName.trim(),
+      referenceNumber: jobDetails.referenceNumber,
+      totalWeightKg: js.totalEstWeightKg,
+      totalAreaM2: js.totalPlateAreaM2,
+      totalItemQty: js.totalQty,
+    });
+  }, [
+    step,
+    jobDetails.customerClientId,
+    jobDetails.projectName,
+    jobDetails.customerName,
+    jobDetails.referenceNumber,
+    selection.jobSummary.totalEstWeightKg,
+    selection.jobSummary.totalPlateAreaM2,
+    selection.jobSummary.totalQty,
+  ]);
 
   const setSheetsForThickness = useCallback(
     (thicknessMm: number, sheets: QuoteSheetStockLine[]) => {

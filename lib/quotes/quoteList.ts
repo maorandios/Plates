@@ -13,6 +13,14 @@ export interface QuoteListRecord {
   currentStep: number;
   createdAt: string;
   updatedAt: string;
+  /** Global client directory id when chosen on General step. */
+  customerClientId?: string;
+  /** Project name from General step. */
+  projectName?: string;
+  /** Last synced job totals from the quote wizard (for client project table). */
+  totalWeightKg?: number;
+  totalAreaM2?: number;
+  totalItemQty?: number;
 }
 
 const STORAGE_KEY = "plate_quotes_list_v1";
@@ -39,6 +47,10 @@ function load(): QuoteListRecord[] {
   }
 }
 
+function numOrUndef(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
 function normalizeRecord(r: QuoteListRecord): QuoteListRecord {
   return {
     id: r.id,
@@ -51,6 +63,12 @@ function normalizeRecord(r: QuoteListRecord): QuoteListRecord {
         : 1,
     createdAt: typeof r.createdAt === "string" ? r.createdAt : new Date().toISOString(),
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : new Date().toISOString(),
+    customerClientId:
+      typeof r.customerClientId === "string" ? r.customerClientId : undefined,
+    projectName: typeof r.projectName === "string" ? r.projectName : undefined,
+    totalWeightKg: numOrUndef(r.totalWeightKg),
+    totalAreaM2: numOrUndef(r.totalAreaM2),
+    totalItemQty: numOrUndef(r.totalItemQty),
   };
 }
 
@@ -80,6 +98,8 @@ export function subscribeQuotesListChanged(callback: () => void): () => void {
 export function upsertQuoteInProgress(
   patch: Pick<QuoteListRecord, "id" | "referenceNumber" | "customerName"> & {
     currentStep: number;
+    projectName?: string;
+    customerClientId?: string;
   }
 ): void {
   const list = load();
@@ -92,6 +112,8 @@ export function upsertQuoteInProgress(
       referenceNumber: patch.referenceNumber,
       customerName: patch.customerName,
       currentStep: patch.currentStep,
+      projectName: patch.projectName ?? prev.projectName,
+      customerClientId: patch.customerClientId ?? prev.customerClientId,
       updatedAt: now,
       status: prev.status === "complete" ? "complete" : "in_progress",
     };
@@ -104,6 +126,8 @@ export function upsertQuoteInProgress(
       currentStep: patch.currentStep,
       createdAt: now,
       updatedAt: now,
+      projectName: patch.projectName,
+      customerClientId: patch.customerClientId,
     });
   }
   save(list);
@@ -112,7 +136,19 @@ export function upsertQuoteInProgress(
 /** Update step / metadata without changing complete → in_progress. */
 export function patchQuoteSession(
   id: string,
-  partial: Partial<Pick<QuoteListRecord, "currentStep" | "customerName" | "referenceNumber">>
+  partial: Partial<
+    Pick<
+      QuoteListRecord,
+      | "currentStep"
+      | "customerName"
+      | "referenceNumber"
+      | "customerClientId"
+      | "projectName"
+      | "totalWeightKg"
+      | "totalAreaM2"
+      | "totalItemQty"
+    >
+  >
 ): void {
   const list = load();
   const i = list.findIndex((q) => q.id === id);
@@ -139,4 +175,9 @@ export function markQuoteComplete(id: string): void {
 export function deleteQuoteFromList(id: string): void {
   const list = load().filter((q) => q.id !== id);
   save(list);
+}
+
+/** Quotes (projects) linked to a global client id. */
+export function getQuotesForClient(clientId: string): QuoteListRecord[] {
+  return load().filter((q) => q.customerClientId === clientId);
 }

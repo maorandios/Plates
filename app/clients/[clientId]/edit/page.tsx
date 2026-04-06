@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageContainer } from "@/components/shared/PageContainer";
 import {
   ClientForm,
   clientFormValuesFromClient,
 } from "@/features/clients/components/ClientForm";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -53,35 +51,29 @@ export default function EditClientPage() {
       phone: values.phone?.trim() || undefined,
       city: values.city?.trim() || undefined,
       notes: values.notes?.trim() || undefined,
-      status: values.status,
+      status: "active",
       updatedAt: new Date().toISOString(),
     });
     router.push(`/clients/${clientId}`);
   }
 
   return (
-    <PageContainer>
-      <div className="mx-auto w-full max-w-4xl space-y-6">
-        <div className="flex justify-end">
-          <Button variant="outline" asChild>
-            <Link href={`/clients/${clientId}`}>
-              {t("clientEdit.cancelBack")}
-            </Link>
-          </Button>
-        </div>
-
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="space-y-1 pb-2">
+    <PageContainer className="!flex !min-h-0 !flex-1 !flex-col !overflow-hidden !p-4 sm:!p-5 lg:!p-6">
+      <div className="mx-auto flex h-[calc(100svh-4.5rem)] max-h-[calc(100svh-4.5rem)] w-full max-w-4xl min-h-0 flex-1 flex-col">
+        <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-0 shadow-sm rounded-xl">
+          <CardHeader className="shrink-0 space-y-2 px-6 pb-4 pt-6 sm:px-8 sm:pb-5 sm:pt-7">
             <CardTitle className="text-xl tracking-tight">
               {t("clientEdit.title")}
             </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {t("clientEdit.subtitle", { code: current.shortCode })}
+            <p className="text-sm text-muted-foreground leading-relaxed mt-1.5">
+              {t("clientEdit.subtitle")}
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-6 pt-0 sm:px-8 sm:pb-8">
             <ClientForm
               mode="edit"
+              compact
+              warnOnUnsavedCancel
               defaultValues={clientFormValuesFromClient(current)}
               onSubmit={handleSubmit}
               onCancel={() => router.push(`/clients/${clientId}`)}

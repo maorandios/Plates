@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
-  title: string;
+  title: ReactNode;
   /** Optional icon shown before the title (e.g. section affordance). */
   titleIcon?: LucideIcon;
   description?: ReactNode;
@@ -21,7 +21,7 @@ export function PageHeader({
   return (
     <div className={cn("flex items-start justify-between gap-4 mb-6", className)}>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2.5">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex flex-wrap items-center gap-x-2.5 gap-y-1">
           {TitleIcon && (
             <TitleIcon
               className="h-7 w-7 shrink-0 text-muted-foreground"

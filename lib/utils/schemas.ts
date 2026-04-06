@@ -53,7 +53,6 @@ export const clientFormSchema = z.object({
     ),
   city: z.string().max(120).optional(),
   notes: z.string().max(2000).optional(),
-  status: z.enum(["active", "inactive"]),
 });
 
 export type ClientFormValues = z.infer<typeof clientFormSchema>;

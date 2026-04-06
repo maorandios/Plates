@@ -2,9 +2,18 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -13,13 +22,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { clientFormSchema, type ClientFormValues } from "@/lib/utils/schemas";
 import type { Client } from "@/types";
 import { t } from "@/lib/i18n";
@@ -30,10 +32,11 @@ export interface ClientFormProps {
   onSubmit: (values: ClientFormValues) => void;
   onCancel?: () => void;
   submitLabel?: string;
-  /** Hide status (default active) — use on create */
   mode?: "create" | "edit";
   /** Tighter spacing + scroll region for viewport-fit layouts */
   compact?: boolean;
+  /** If true, ביטול asks for confirmation when the form has unsaved changes */
+  warnOnUnsavedCancel?: boolean;
 }
 
 const emptyDefaults: ClientFormValues = {
@@ -44,7 +47,6 @@ const emptyDefaults: ClientFormValues = {
   phone: "",
   city: "",
   notes: "",
-  status: "active",
 };
 
 export function ClientForm({
@@ -54,13 +56,17 @@ export function ClientForm({
   submitLabel,
   mode = "create",
   compact = false,
+  warnOnUnsavedCancel = false,
 }: ClientFormProps) {
+  const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
     defaultValues: { ...emptyDefaults, ...defaultValues },
   });
 
-  const showStatus = mode === "edit";
+  /** Must subscribe in render — otherwise `isDirty` stays stale in handlers (RHF proxy). */
+  const { isDirty } = form.formState;
+
   const resolvedSubmit =
     submitLabel ??
     (mode === "create"
@@ -70,8 +76,54 @@ export function ClientForm({
   const itemGap = compact ? "space-y-4" : "space-y-5";
   const labelClass = compact ? "text-sm" : "";
 
+  function handleCancelClick() {
+    if (!onCancel) return;
+    if (warnOnUnsavedCancel && isDirty) {
+      setUnsavedDialogOpen(true);
+    } else {
+      onCancel();
+    }
+  }
+
+  function confirmLeaveWithoutSaving() {
+    setUnsavedDialogOpen(false);
+    onCancel?.();
+  }
+
   return (
     <Form {...form}>
+      <Dialog open={unsavedDialogOpen} onOpenChange={setUnsavedDialogOpen}>
+        <DialogContent showCloseButton={false} className="sm:max-w-md" dir="rtl">
+          <DialogHeader className="text-right sm:text-right">
+            <DialogTitle className="sr-only">
+              {t("clientEdit.unsavedTitle")}
+            </DialogTitle>
+            <DialogDescription className="text-right text-sm leading-relaxed text-foreground">
+              {t("clientEdit.unsavedWarning")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter
+            className="flex flex-row flex-wrap gap-2 sm:justify-start"
+            dir="rtl"
+          >
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmLeaveWithoutSaving}
+            >
+              {t("clientEdit.unsavedLeave")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setUnsavedDialogOpen(false)}
+            >
+              {t("clientEdit.unsavedStay")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className={cn(
@@ -247,36 +299,6 @@ export function ClientForm({
               </FormItem>
             )}
           />
-
-          {showStatus && (
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem className={itemGap}>
-                  <FormLabel className={labelClass}>
-                    {t("clientForm.status")}
-                  </FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger className={compact ? "h-9" : undefined}>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">
-                        {t("clientForm.statusActive")}
-                      </SelectItem>
-                      <SelectItem value="inactive">
-                        {t("clientForm.statusInactive")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
         </div>
 
         <div
@@ -290,7 +312,7 @@ export function ClientForm({
             {resolvedSubmit}
           </Button>
           {onCancel && (
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={handleCancelClick}>
               {t("common.cancel")}
             </Button>
           )}
@@ -311,6 +333,5 @@ export function clientFormValuesFromClient(c: Client): ClientFormValues {
     phone: digitsOnly(c.phone) || "",
     city: c.city ?? "",
     notes: c.notes ?? "",
-    status: c.status,
   };
 }

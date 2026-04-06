@@ -244,9 +244,40 @@
     "subtitle": "הזינו לקוחות חדשים למערכת לשימוש עתידי"
   },
   "clientEdit": {
-    "title": "עריכת לקוח",
-    "subtitle": "קוד לקוח קבוע: {{code}} — לא ניתן לשינוי.",
-    "cancelBack": "חזרה לפרטי לקוח"
+    "title": "עדכן פרטי לקוח",
+    "subtitle": "עדכן את פרטי הלקוח ושמור שינויים",
+    "unsavedTitle": "יציאה ללא שמירה",
+    "unsavedWarning": "השינויים שביצעת לא נשמרו, האם בכל זאת לצאת?",
+    "unsavedLeave": "צא ללא שמירה",
+    "unsavedStay": "המשך בעריכה"
+  },
+  "clientDetail": {
+    "allClients": "כל הלקוחות",
+    "edit": "עריכה",
+    "infoTitle": "פרטי הלקוח",
+    "notesLabel": "הערות",
+    "cardTotalQuotes": "סה״כ הצעות",
+    "cardTotalWeight": "סה״כ משקל (ק״ג)",
+    "cardTotalArea": "סה״כ שטח (מ״ר)",
+    "projectsTitle": "הצעות משויכות ללקוח",
+    "projectsEmpty": "אין עדיין הצעות המקושרות ללקוח זה. צרו הצעה מהירה ובחרו לקוח בשלב ״כללי״.",
+    "projectsDeleteConfirm": "למחוק את ההצעה {{ref}} מהרשימה?",
+    "table": {
+      "colIndex": "#",
+      "colProjectId": "מזהה פרויקט",
+      "colProjectName": "שם הפרויקט",
+      "colCreated": "תאריך יצירה",
+      "colWeight": "סה״כ משקל (ק״ג)",
+      "colArea": "סה״כ שטח (מ״ר)",
+      "colQty": "סה״כ כמות פריטים",
+      "colStatus": "סטטוס",
+      "statusPending": "ממתין",
+      "statusApproved": "אושר",
+      "colView": "צפייה",
+      "colDelete": "מחיקה",
+      "viewAria": "פתיחת הצעה",
+      "deleteAria": "מחיקת הצעה מהרשימה"
+    }
   },
   "clientForm": {
     "companyName": "שם החברה",
@@ -263,9 +294,6 @@
     "placeholderPhone": "הזינו מספר טלפון",
     "placeholderCity": "הזנת עיר",
     "notesPlaceholder": "הזנת הערות כלליות אודות הלקוח",
-    "status": "סטטוס",
-    "statusActive": "פעיל",
-    "statusInactive": "לא פעיל",
     "optionalPlaceholder": "אופציונלי",
     "submitCreate": "צור לקוח חדש",
     "submitSave": "שמור שינויים",
@@ -288,7 +316,9 @@
       "emptyTitle": "אין עדיין לקוחות",
       "emptyDescription": "צרו לקוח ראשון לשימוש חוזר בכל העבודות.",
       "noSearchResults": "אין לקוחות התואמים לחיפוש.",
-      "deleteConfirm": "למחוק את {{name}}? פעולה זו אינה ניתנת לביטול.",
+      "deleteModalTitle": "מחיקת לקוח",
+      "deleteModalBody": "ביקשת למחוק את החברה [ {{name}} ] מרשימת הלקוחות שלך, שים לב שכל המידע ימחק לחלוטין מהמערכת ולא ניתן יהיה לשחזר אותו בעתיד.",
+      "deleteModalConfirm": "מחק",
       "table": {
         "colIndex": "#",
         "colName": "שם הלקוח",
