@@ -177,17 +177,14 @@ export function DxfQuotePhase({
             <MethodPhaseMetricStrip
               label="Quantity"
               value={asideMetrics.qtyLabel}
-              sub="Sum of BOM quantities (valid parts)"
             />
             <MethodPhaseMetricStrip
               label="Area (m²)"
               value={asideMetrics.areaLabel}
-              sub="Net area from valid DXF geometry"
             />
             <MethodPhaseMetricStrip
               label="Weight (kg)"
               value={asideMetrics.weightLabel}
-              sub="Per-part thickness (review table) × area × density (General)"
             />
           </div>
         </aside>

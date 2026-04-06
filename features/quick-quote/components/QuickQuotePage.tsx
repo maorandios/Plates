@@ -220,10 +220,6 @@ export function QuickQuotePage() {
     advanceTo,
   ]);
 
-  const handleResetQuoteMethodPicker = useCallback(() => {
-    clearAllQuoteMethodData();
-  }, [clearAllQuoteMethodData]);
-
   const handleConfigureMethodFromPicker = useCallback(
     (method: QuoteCreationMethod) => {
       setJobDetails((j) => ({ ...j, quoteCreationMethod: method }));
@@ -555,8 +551,6 @@ export function QuickQuotePage() {
                 setJobDetails((j) => ({ ...j, quoteCreationMethod: method }));
               }}
               onConfigureMethod={handleConfigureMethodFromPicker}
-              onReset={handleResetQuoteMethodPicker}
-              canReset={hasAnyQuoteMethodData}
             />
           )}
 

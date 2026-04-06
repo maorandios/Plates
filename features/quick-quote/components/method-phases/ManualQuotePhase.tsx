@@ -171,17 +171,14 @@ export function ManualQuotePhase({
             <MethodPhaseMetricStrip
               label="Quantity"
               value={formatInteger(metrics.totalQty)}
-              sub="Sum of line quantities"
             />
             <MethodPhaseMetricStrip
               label="Area (m²)"
               value={formatDecimal(metrics.totalAreaM2, 2)}
-              sub="Width × length × qty"
             />
             <MethodPhaseMetricStrip
               label="Weight (kg)"
               value={formatDecimal(metrics.totalWeightKg, 1)}
-              sub="Thickness × area × density (General)"
             />
           </div>
         </aside>

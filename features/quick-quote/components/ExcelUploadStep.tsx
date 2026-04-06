@@ -1025,8 +1025,6 @@ export function ExcelUploadStep({
   const qtySidebar = m ? formatInteger(m.totalQty) : "—";
   const areaSidebar = m ? formatDecimal(m.totalAreaM2, 2) : "—";
   const wtSidebar = m ? formatDecimal(m.totalWeightKg, 1) : "—";
-  const pendingSub = "Totals appear after you review the mapped list";
-
   return (
     <div
       className={cn(
@@ -1054,17 +1052,14 @@ export function ExcelUploadStep({
             <MethodPhaseMetricStrip
               label="Quantity"
               value={qtySidebar}
-              sub={m ? "Sum of line quantities" : pendingSub}
             />
             <MethodPhaseMetricStrip
               label="Area (m²)"
               value={areaSidebar}
-              sub={m ? "Width × length × qty" : pendingSub}
             />
             <MethodPhaseMetricStrip
               label="Weight (kg)"
               value={wtSidebar}
-              sub={m ? "Thickness × area × density (General)" : pendingSub}
             />
           </div>
         </aside>

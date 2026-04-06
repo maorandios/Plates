@@ -1,20 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ClipboardList, FileCode2, FileSpreadsheet, FoldHorizontal, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ClipboardList,
+  FileCode2,
+  FileSpreadsheet,
+  FoldHorizontal,
+  Package,
+  Square,
+  Weight,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import type { DxfPartGeometry } from "@/types";
-import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
+import type { MaterialType } from "@/types/materials";
 import type { BendPlateQuoteItem } from "../bend-plate/types";
 import type { ManualQuotePartRow, QuoteCreationMethod } from "../types/quickQuote";
 import { jobSummaryFromParts } from "../lib/deriveQuoteSelection";
@@ -66,8 +66,6 @@ interface QuoteMethodPickerPhaseProps {
   selected: QuoteCreationMethod | null;
   onSelect: (method: QuoteCreationMethod) => void;
   onConfigureMethod: (method: QuoteCreationMethod) => void;
-  onReset: () => void;
-  canReset: boolean;
 }
 
 export function QuoteMethodPickerPhase({
@@ -79,13 +77,7 @@ export function QuoteMethodPickerPhase({
   selected,
   onSelect,
   onConfigureMethod,
-  onReset,
-  canReset,
 }: QuoteMethodPickerPhaseProps) {
-  const [resetOpen, setResetOpen] = useState(false);
-
-  const plateTypeLabel = MATERIAL_TYPE_LABELS[materialType];
-
   const mergedParts = useMemo(
     () =>
       mergeAllQuoteMethodParts(
@@ -122,63 +114,37 @@ export function QuoteMethodPickerPhase({
             <p className="text-sm text-muted-foreground leading-relaxed">
               {t("quoteMethodScreen.intro")}
             </p>
-            <p className="text-xs text-muted-foreground pt-1">
-              {t("quoteMethodScreen.plateTypeFromGeneral")}{" "}
-              <span className="font-medium text-foreground">{plateTypeLabel}</span>
-            </p>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
             <MethodPhaseMetricStrip
+              icon={Package}
               label={t("methodMetrics.quantity")}
               value={formatInteger(metrics.totalQty)}
-              sub={t("methodMetrics.quantitySub")}
             />
             <MethodPhaseMetricStrip
+              icon={Square}
               label={t("methodMetrics.area")}
               value={formatDecimal(metrics.totalPlateAreaM2, 2)}
-              sub={t("methodMetrics.areaSub")}
             />
             <MethodPhaseMetricStrip
+              icon={Weight}
               label={t("methodMetrics.weight")}
               value={formatDecimal(metrics.totalEstWeightKg, 1)}
-              sub={t("methodMetrics.weightSub")}
             />
           </div>
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 border-b border-white/[0.08] bg-card/40 px-4 py-3 sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground">
-                  {t("quoteMethodScreen.methodsTitle")}
-                </h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {t("quoteMethodScreen.methodsHint")}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="gap-2"
-                  disabled={!canReset}
-                  onClick={() => setResetOpen(true)}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  {t("common.reset")}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4">
+          <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 sm:p-5">
+            <div
+              className={cn(
+                "grid min-h-0 flex-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4",
+                "[grid-auto-rows:minmax(0,1fr)]"
+              )}
+            >
               {OPTIONS.map(({ id, i18nPrefix, Icon }) => {
                 const title = t(`quote.methods.${i18nPrefix}.title`);
-                const description = t(`quote.methods.${i18nPrefix}.description`);
-                const hint = t(`quote.methods.${i18nPrefix}.hint`);
                 const isSelected = selected === id;
                 const hasData = methodHasData(
                   id,
@@ -191,35 +157,32 @@ export function QuoteMethodPickerPhase({
                   <div
                     key={id}
                     className={cn(
-                      "flex flex-col rounded-xl border-2 bg-card p-5 text-start transition-all duration-150",
+                      "flex h-full min-h-[14rem] flex-col rounded-xl border-2 bg-card p-5 text-center transition-all duration-150",
                       hasData &&
                         "border-primary/70 shadow-sm ring-1 ring-primary/20",
                       !hasData && "border-white/[0.08]",
-                      isSelected && "ring-2 ring-primary/35 shadow-[0_0_20px_-4px_hsl(var(--primary)/0.35)]"
+                      isSelected &&
+                        "ring-2 ring-primary/35 shadow-[0_0_20px_-4px_hsl(var(--primary)/0.35)]"
                     )}
                   >
                     <button
                       type="button"
                       onClick={() => onSelect(id)}
-                      className="text-start w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg -m-1 p-1"
+                      className="flex min-h-0 flex-1 flex-col items-center justify-center text-center gap-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg -m-1 p-1"
                     >
                       <div
                         className={cn(
-                          "mb-3 flex h-11 w-11 items-center justify-center rounded-xl",
-                          isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                          "mb-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground"
                         )}
                       >
                         <Icon className="h-5 w-5" aria-hidden />
                       </div>
                       <span className="text-base font-semibold text-foreground">{title}</span>
-                      <span className="mt-2 block text-sm text-muted-foreground leading-snug">
-                        {description}
-                      </span>
-                      <span className="mt-2 block text-xs text-muted-foreground/90 leading-snug">
-                        {hint}
-                      </span>
                     </button>
-                    <div className="mt-4 pt-3 border-t border-white/[0.08]">
+                    <div className="mt-auto shrink-0 border-t border-white/[0.08] pt-4">
                       <Button
                         type="button"
                         variant="secondary"
@@ -230,7 +193,7 @@ export function QuoteMethodPickerPhase({
                           onConfigureMethod(id);
                         }}
                       >
-                        {t("common.configure")}
+                        {t("common.continue")}
                       </Button>
                     </div>
                   </div>
@@ -240,32 +203,6 @@ export function QuoteMethodPickerPhase({
           </div>
         </div>
       </div>
-
-      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("quoteMethodScreen.resetDialogTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("quoteMethodScreen.resetDialogDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                setResetOpen(false);
-                onReset();
-              }}
-            >
-              {t("common.reset")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

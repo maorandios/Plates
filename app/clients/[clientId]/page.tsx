@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Pencil, Building2, ClipboardList, Weight, Square, Eye, Trash2 } from "lucide-react";
+import { ArrowLeft, Building2, ClipboardList, Weight, Square, Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -103,13 +103,16 @@ export default function ClientDetailPage() {
         }
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link href="/clients">{t("clientDetail.allClients")}</Link>
-            </Button>
             <Button asChild>
-              <Link href={`/clients/${clientId}/edit`}>
-                <Pencil className="h-4 w-4 me-2" />
-                {t("clientDetail.edit")}
+              <Link href={`/clients/${clientId}/edit`}>{t("clientDetail.edit")}</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link
+                href="/clients"
+                className="inline-flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+                {t("clientDetail.back")}
               </Link>
             </Button>
           </div>
