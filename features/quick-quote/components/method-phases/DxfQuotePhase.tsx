@@ -44,7 +44,7 @@ interface DxfQuotePhaseProps {
 }
 
 const MANUAL_PHASE_VIEWPORT =
-  "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
+  "flex h-full min-h-0 max-h-full flex-col";
 
 const defaultMetrics: DxfPhaseMetricsPayload = {
   totalQuantity: 0,
@@ -157,13 +157,10 @@ export function DxfQuotePhase({
 
   return (
     <div
-      className={cn(
-        "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
-        MANUAL_PHASE_VIEWPORT
-      )}
+      className={cn("flex w-full min-w-0 flex-col gap-0", MANUAL_PHASE_VIEWPORT)}
       dir="rtl"
     >
-      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 gap-0">
         <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
@@ -195,16 +192,15 @@ export function DxfQuotePhase({
           </div>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
           <div className="shrink-0 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4">
             <p className="text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
               {t("quote.dxfPhase.stripe")}
             </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 sm:p-5">
-            {/* Fills scroll viewport so DXF + Excel upload cards get real height for vertical centering */}
-            <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
               <DxfUploadStep
                 ref={dxfRef}
                 materialType={materialType}

@@ -494,19 +494,37 @@ export function QuickQuotePage() {
 
   const stepNav = getStepNavigation();
 
+  const methodSetupScrollFriendly =
+    step === 2 && quoteMethodSubView === "methodSetup";
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col",
+        !methodSetupScrollFriendly && "overflow-hidden"
+      )}
+    >
       <QuoteStepper
         currentStep={step}
         highestStepReached={highestStepReached}
         onStepSelect={goToStep}
       />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          !methodSetupScrollFriendly && "overflow-hidden"
+        )}
+      >
         <PageContainer
           className={cn(
             "bg-background min-h-0 flex-1",
             step === 2 || step === 3
-              ? "flex flex-col overflow-hidden p-0 lg:p-0"
+              ? cn(
+                  "flex flex-col p-0 lg:p-0",
+                  (step === 3 ||
+                    (step === 2 && quoteMethodSubView === "picker")) &&
+                    "overflow-hidden"
+                )
               : "overflow-y-auto"
           )}
         >
@@ -514,7 +532,12 @@ export function QuickQuotePage() {
           className={cn(
             "w-full",
             step === 2 || step === 3
-              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+              ? cn(
+                  "flex min-h-0 flex-1 flex-col",
+                  (step === 3 ||
+                    (step === 2 && quoteMethodSubView === "picker")) &&
+                    "overflow-hidden"
+                )
               : "space-y-8"
           )}
         >

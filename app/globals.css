@@ -40,6 +40,7 @@
  * #00E19A — primary actions (text on buttons: dark for contrast)
  */
 :root {
+  color-scheme: dark;
   --background: 180 25% 4.7%; /* #090F0F */
   --foreground: 0 0% 100%;
 
@@ -129,6 +130,38 @@ body {
   table td {
     text-align: start;
   }
+
+  /* Dark scrollbars (Firefox + WebKit) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) hsl(var(--card));
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: hsl(var(--card));
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+    border: 2px solid hsl(var(--card));
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.45);
+  }
+}
+
+/* Hide number input spinners (WebKit + Firefox). Avoid display:none on pseudos — can confuse dev tooling. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* WebKit autofill — match field bg rgb(12, 19, 24) */

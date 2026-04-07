@@ -79,16 +79,18 @@ export function MethodDetailsRouter({
 
   switch (method) {
     case "dxf":
-      return shell(
-        <DxfQuotePhase
-          materialType={materialType}
-          savedDxfGeometries={dxfMethodGeometries}
-          savedDxfExcel={dxfMethodExcel}
-          onSavedDxfExcelChange={onDxfMethodExcelChange}
-          onGeometriesApproved={onDxfMethodGeometriesChange}
-          onBack={onBackToMethodPicker}
-          onComplete={onBackToMethodPicker}
-        />
+      return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <DxfQuotePhase
+            materialType={materialType}
+            savedDxfGeometries={dxfMethodGeometries}
+            savedDxfExcel={dxfMethodExcel}
+            onSavedDxfExcelChange={onDxfMethodExcelChange}
+            onGeometriesApproved={onDxfMethodGeometriesChange}
+            onBack={onBackToMethodPicker}
+            onComplete={onBackToMethodPicker}
+          />
+        </div>
       );
     case "manualAdd":
       return shell(

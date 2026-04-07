@@ -42,6 +42,7 @@ import {
 import type { MaterialType } from "@/types/materials";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 import { MethodPhaseMetricStrip } from "./method-phases/MethodPhaseMetricStrip";
 import { readExcelHeaders, parseExcelFileWithMapping } from "@/lib/parsers/excelParser";
 import type { ColumnMapping, ExcelRow } from "@/types";
@@ -856,7 +857,7 @@ export function ExcelUploadStep({
                               <SelectContent>
                                 {PLATE_FINISH_OPTIONS.map((o) => (
                                   <SelectItem key={o.value} value={o.value}>
-                                    {o.label}
+                                    {t(`quote.finishLabels.${o.value}`)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

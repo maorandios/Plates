@@ -18,6 +18,7 @@ import {
   getMarkingFontSizePx,
   getMarkingPositionMm,
 } from "@/lib/geometry/marking";
+import { cn } from "@/lib/utils";
 
 /** Max distance (px) from pointer to vertex to snap */
 const SNAP_PX = 16;
@@ -125,6 +126,11 @@ interface PlateGeometryCanvasProps {
   markingDebugPaths?: [number, number][][];
   /** Plate marking preview: part name ± client code; empty hides the MARKING text layer */
   plateMarkingText?: string;
+  /**
+   * DXF review modal: cyan stroke, dark green fill, transparent canvas — matches dark dialog bg.
+   * Hides the bottom W×H overlay (dimensions shown in the modal panel instead).
+   */
+  appearance?: "default" | "previewModal";
 }
 
 export function PlateGeometryCanvas({
@@ -138,6 +144,7 @@ export function PlateGeometryCanvas({
   debugCleaned = null,
   markingDebugPaths = [],
   plateMarkingText = "",
+  appearance = "default",
 }: PlateGeometryCanvasProps) {
   const markingPaths = markingDebugPaths ?? [];
   const markingLabel = plateMarkingText.trim();
@@ -312,17 +319,41 @@ export function PlateGeometryCanvas({
     );
   }
 
-  const holeStroke = debugMode ? "#2563eb" : "#dc2626";
-  const holeFill = debugMode ? "rgba(37,99,235,0.12)" : "#ffffff";
-  const outerStroke = debugMode ? "#16a34a" : "#1e40af";
-  const outerFill = debugMode ? "rgba(22,163,74,0.15)" : "#e0f2fe";
+  const previewModal = appearance === "previewModal" && !debugMode;
+  const holeStroke = previewModal
+    ? "#00FF9F"
+    : debugMode
+      ? "#2563eb"
+      : "#dc2626";
+  const holeFill = previewModal
+    ? "rgba(0,0,0,0)"
+    : debugMode
+      ? "rgba(37,99,235,0.12)"
+      : "#ffffff";
+  const outerStroke = previewModal
+    ? "#00FF9F"
+    : debugMode
+      ? "#16a34a"
+      : "#1e40af";
+  const outerFill = previewModal
+    ? "#00371F"
+    : debugMode
+      ? "rgba(22,163,74,0.15)"
+      : "#e0f2fe";
 
   return (
     <div
-      className="relative rounded-lg overflow-hidden bg-white"
+      className={cn(
+        "relative rounded-lg overflow-hidden",
+        previewModal ? "bg-transparent" : "bg-white"
+      )}
       style={{ cursor: measureMode ? "crosshair" : "default" }}
     >
-      <Stage width={width} height={height}>
+      <Stage
+        width={width}
+        height={height}
+        style={previewModal ? { background: "transparent" } : undefined}
+      >
         <Layer listening={false}>
           {debugMode && debugLayers && (
             <>
@@ -582,25 +613,27 @@ export function PlateGeometryCanvas({
         </Layer>
       </Stage>
 
-      <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-mono bg-white/90 backdrop-blur-sm rounded px-2 py-1 border border-border">
-        <span>W: {bboxLabelW}</span>
-        <span>×</span>
-        <span>H: {bboxLabelH}</span>
-        {geometry.holes.length > 0 && (
-          <>
-            <span className="text-muted-foreground/50">·</span>
-            <span className={debugMode ? "text-blue-600" : "text-red-600"}>
-              {geometry.holes.length} hole{geometry.holes.length > 1 ? "s" : ""}
-            </span>
-          </>
-        )}
-        {debugMode && (
-          <>
-            <span className="text-muted-foreground/50">·</span>
-            <span className="text-violet-700">Debug</span>
-          </>
-        )}
-      </div>
+      {!previewModal && (
+        <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-mono bg-white/90 backdrop-blur-sm rounded px-2 py-1 border border-border">
+          <span>W: {bboxLabelW}</span>
+          <span>×</span>
+          <span>H: {bboxLabelH}</span>
+          {geometry.holes.length > 0 && (
+            <>
+              <span className="text-muted-foreground/50">·</span>
+              <span className={debugMode ? "text-blue-600" : "text-red-600"}>
+                {geometry.holes.length} hole{geometry.holes.length > 1 ? "s" : ""}
+              </span>
+            </>
+          )}
+          {debugMode && (
+            <>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="text-violet-700">Debug</span>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

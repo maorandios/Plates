@@ -4,7 +4,7 @@ import { normalizeDxfFileHint } from "@/lib/matching/matcher";
 
 // ─── Column name aliases (all lowercase, no diacritics) ──────────────────────
 
-const PART_NAME_KEYS = [
+const PART_NAME_KEYS_BASE = [
   // English
   "part name", "partname", "part no", "part number", "part_name", "part",
   "description", "desc", "item name", "item", "name",
@@ -19,7 +19,7 @@ const PART_NAME_KEYS = [
   "bezeichnung", "benennung", "pos nr", "lfd nr",
 ];
 
-const QUANTITY_KEYS = [
+const QUANTITY_KEYS_BASE = [
   // Standard
   "qty", "quantity", "count", "pcs", "pieces", "amount", "num", "number",
   // Typos / variants seen in the wild
@@ -32,71 +32,183 @@ const QUANTITY_KEYS = [
   "pieces required", "req qty", "total qty", "total pcs", "nos",
 ];
 
-const THICKNESS_KEYS = [
+const THICKNESS_KEYS_BASE = [
   "thickness", "espessura", "thk", "th", "thick",
   "gauge", "esp", "wall", "wall thickness", "dicke", "spessore",
   "plate thk", "plate thickness",
 ];
 
-const MATERIAL_KEYS = [
+const MATERIAL_KEYS_BASE = [
   "material", "mat", "matl", "grade", "type",
   "steel grade", "alloy", "metal", "material type",
   "specification", "spec", "material grade", "werkstoff", "materiale",
   "liga", "tipo",
 ];
 
-const FINISH_KEYS = [
+const FINISH_KEYS_BASE = [
   "finish", "surface", "coating", "treatment", "surface treatment",
   "galvanized", "paint", "carbon", "finish type", "acabamento", "oberflache",
 ];
 
-const WIDTH_KEYS = [
+const WIDTH_KEYS_BASE = [
   "width", "largura", "breite", "width (mm)", "width(mm)",
   "w", "wd", "wid",
 ];
 
-const LENGTH_KEYS = [
+const LENGTH_KEYS_BASE = [
   "length", "comprimento", "länge", "length (mm)", "length(mm)",
   "length (m)", "length(m)", "len", "l",
 ];
 
-const AREA_KEYS = [
+const AREA_KEYS_BASE = [
   "area", "área", "area (m2)", "area(m2)", "area m2",
   "area t (m2)", "area t(m2)", "surface", "superficie",
   "flache", "fläche",
 ];
 
-const WEIGHT_KEYS = [
+const WEIGHT_KEYS_BASE = [
   "weight", "peso", "gewicht", "weight (kg)", "weight(kg)",
   "wieght (kg)", "wieght(kg)", "unit weight", "kg",
   "mass", "massa",
 ];
 
-const TOTAL_WEIGHT_KEYS = [
+const TOTAL_WEIGHT_KEYS_BASE = [
   "total weight", "total weight (kg)", "total weight(kg)",
   "peso total", "wieght t (kg)", "wieght t(kg)", "weight t",
   "total kg", "total mass", "gesamtgewicht",
 ];
 
 /** Column headers that identify a DXF / drawing filename for row↔file linking */
-const DXF_FILE_KEYS = [
+const DXF_FILE_KEYS_BASE = [
   "dxf file", "dxf name", "dxf filename", "dxf", "cad file", "cad drawing",
   "drawing file", "drawing name", "drawing no", "drawing number", "dwg file",
   "filename", "file name", "nc file", "plate dxf", "ficheiro dxf", "arquivo dxf",
   "desenho", "zeichnung",
 ];
 
+/** Hebrew (and mixed) column titles — matched after {@link normalizeHeader} */
+const PART_NAME_KEYS_HE = [
+  "שם חלק",
+  "שם החלק",
+  "שם פריט",
+  "שם המוצר",
+  "מספר חלק",
+  "מספר פריט",
+  "מספר מוצר",
+  "תיאור פריט",
+  "תיאור",
+  "מזהה פריט",
+  "מזהה",
+  "מקט",
+  "מספר שרטוט",
+  "מספר תכנית",
+  "פריט",
+  "קוד פריט",
+];
+
+const QUANTITY_KEYS_HE = [
+  "כמות",
+  "כמות נדרשת",
+  "כמות בפועל",
+  "מספר יחידות",
+  "יחידות",
+];
+
+const THICKNESS_KEYS_HE = [
+  "עובי",
+  "עובי ממ",
+  "עובי (ממ)",
+  "עובי בממ",
+  "עובי פלטה",
+];
+
+const MATERIAL_KEYS_HE = [
+  "חומר",
+  "דרגה",
+  "דרגת פלדה",
+  "סיווג מתכת",
+  "סוג חומר",
+  "מתכת",
+];
+
+const FINISH_KEYS_HE = [
+  "גימור",
+  "טיפול שטח",
+  "ציפוי",
+];
+
+const WIDTH_KEYS_HE = [
+  "רוחב",
+  "רוחב ממ",
+  "רוחב (ממ)",
+  "רוחב בממ",
+];
+
+const LENGTH_KEYS_HE = [
+  "אורך",
+  "אורך ממ",
+  "אורך (ממ)",
+  "אורך בממ",
+];
+
+const AREA_KEYS_HE = [
+  "שטח",
+  "שטח מר",
+  "שטח במר",
+];
+
+const WEIGHT_KEYS_HE = [
+  "משקל",
+  "משקל קג",
+  "משקל (קג)",
+  "משקל ליחידה",
+  "משקל יחידה",
+];
+
+const TOTAL_WEIGHT_KEYS_HE = [
+  "משקל כולל",
+  "סהכ משקל",
+  "סה\"כ משקל",
+  "משקל כללי",
+];
+
+const DXF_FILE_KEYS_HE = [
+  "קובץ dxf",
+  "שם קובץ",
+  "קובץ שרטוט",
+  "שרטוט",
+  "שם שרטוט",
+  "קובץ cad",
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Lowercase + trim + collapse whitespace + strip diacritics */
+/** Lowercase + trim + collapse whitespace + strip diacritics + bidi marks (Excel RTL) */
 function normalizeHeader(h: unknown): string {
   return String(h ?? "")
     .normalize("NFD")               // decompose accented chars → base + combining
     .replace(/[\u0300-\u036f]/g, "") // remove combining diacritical marks
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "") // strip bidi / isolate marks from Excel
     .toLowerCase()
     .trim()
     .replace(/[\r\n\t]+/g, " ")
     .replace(/\s+/g, " ");
+}
+
+const PART_NAME_KEYS = [...PART_NAME_KEYS_BASE, ...PART_NAME_KEYS_HE];
+const QUANTITY_KEYS = [...QUANTITY_KEYS_BASE, ...QUANTITY_KEYS_HE];
+const THICKNESS_KEYS = [...THICKNESS_KEYS_BASE, ...THICKNESS_KEYS_HE];
+const MATERIAL_KEYS = [...MATERIAL_KEYS_BASE, ...MATERIAL_KEYS_HE];
+const FINISH_KEYS = [...FINISH_KEYS_BASE, ...FINISH_KEYS_HE];
+const WIDTH_KEYS = [...WIDTH_KEYS_BASE, ...WIDTH_KEYS_HE];
+const LENGTH_KEYS = [...LENGTH_KEYS_BASE, ...LENGTH_KEYS_HE];
+const AREA_KEYS = [...AREA_KEYS_BASE, ...AREA_KEYS_HE];
+const WEIGHT_KEYS = [...WEIGHT_KEYS_BASE, ...WEIGHT_KEYS_HE];
+const TOTAL_WEIGHT_KEYS = [...TOTAL_WEIGHT_KEYS_BASE, ...TOTAL_WEIGHT_KEYS_HE];
+const DXF_FILE_KEYS = [...DXF_FILE_KEYS_BASE, ...DXF_FILE_KEYS_HE];
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function findColumn(headers: string[], aliases: string[]): number {
@@ -109,20 +221,59 @@ function findColumn(headers: string[], aliases: string[]): number {
     const h = headers[i];
     if (h && aliases.some((a) => a.length >= 3 && h.startsWith(a))) return i;
   }
-  // 3. Alias is contained in header as a whole word
+  // 3. Alias is contained in header as a whole word (aliases may include parens — escape for RegExp)
   for (let i = 0; i < headers.length; i++) {
     const h = headers[i];
     if (
       h &&
       aliases.some((a) => {
         if (a.length < 3) return false; // skip very short aliases for safety
-        const re = new RegExp(`(^|\\s|_)${a}(\\s|_|$)`);
+        const re = new RegExp(`(^|\\s|_)${escapeRegExp(a)}(\\s|_|$)`);
         return re.test(h);
       })
     )
       return i;
   }
   return -1;
+}
+
+function countNonEmptyCells(row: unknown[]): number {
+  return row.filter((c) => String(c ?? "").trim() !== "").length;
+}
+
+/**
+ * Pick the sheet row that holds column titles: prefer rows that match known (EN/HE) headers;
+ * if none match, use the row with the most non-empty cells (Hebrew-only sheets, title rows above table).
+ */
+function pickHeaderRowIndex(raw: unknown[][]): number {
+  let headerRowIdx = 0;
+  let bestScore = 0;
+  const limit = Math.min(15, raw.length);
+  for (let i = 0; i < limit; i++) {
+    const norm = (raw[i] as unknown[]).map(normalizeHeader);
+    let score = 0;
+    if (findColumn(norm, PART_NAME_KEYS) >= 0) score += 3;
+    if (findColumn(norm, QUANTITY_KEYS) >= 0) score += 2;
+    if (findColumn(norm, THICKNESS_KEYS) >= 0) score += 1;
+    if (findColumn(norm, MATERIAL_KEYS) >= 0) score += 1;
+    if (score > bestScore) {
+      bestScore = score;
+      headerRowIdx = i;
+    }
+  }
+  if (bestScore === 0 && raw.length > 0) {
+    let bestNonEmpty = -1;
+    let bestIdx = 0;
+    for (let i = 0; i < limit; i++) {
+      const n = countNonEmptyCells(raw[i] as unknown[]);
+      if (n > bestNonEmpty) {
+        bestNonEmpty = n;
+        bestIdx = i;
+      }
+    }
+    if (bestNonEmpty > 0) headerRowIdx = bestIdx;
+  }
+  return headerRowIdx;
 }
 
 /** Part names that indicate a summary / total / header bleed row — skip them */
@@ -212,19 +363,7 @@ export async function parseExcelFile(
     };
   }
 
-  // ── Find best header row (score-based, first 15 rows) ────────────────────
-  let headerRowIdx = 0;
-  let bestScore = 0;
-
-  for (let i = 0; i < Math.min(15, raw.length); i++) {
-    const normalized = (raw[i] as unknown[]).map(normalizeHeader);
-    let score = 0;
-    if (findColumn(normalized, PART_NAME_KEYS) >= 0) score += 3;
-    if (findColumn(normalized, QUANTITY_KEYS) >= 0) score += 2;
-    if (findColumn(normalized, THICKNESS_KEYS) >= 0) score += 1;
-    if (findColumn(normalized, MATERIAL_KEYS) >= 0) score += 1;
-    if (score > bestScore) { bestScore = score; headerRowIdx = i; }
-  }
+  const headerRowIdx = pickHeaderRowIndex(raw);
 
   const rawHeaderCells = raw[headerRowIdx] as unknown[];
   const headerRowNorm = rawHeaderCells.map(normalizeHeader);
@@ -347,18 +486,7 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
     header: 1, defval: "", blankrows: false, raw: true,
   });
 
-  // Find best header row (same scoring as main parser)
-  let headerRowIdx = 0;
-  let bestScore = 0;
-  for (let i = 0; i < Math.min(15, raw.length); i++) {
-    const norm = (raw[i] as unknown[]).map(normalizeHeader);
-    let score = 0;
-    if (findColumn(norm, PART_NAME_KEYS) >= 0) score += 3;
-    if (findColumn(norm, QUANTITY_KEYS) >= 0) score += 2;
-    if (findColumn(norm, THICKNESS_KEYS) >= 0) score += 1;
-    if (findColumn(norm, MATERIAL_KEYS) >= 0) score += 1;
-    if (score > bestScore) { bestScore = score; headerRowIdx = i; }
-  }
+  const headerRowIdx = pickHeaderRowIndex(raw);
 
   const rawHeaderCells = (raw[headerRowIdx] as unknown[]) ?? [];
   const rawHeaders = rawHeaderCells.map((h) => String(h ?? "").trim());

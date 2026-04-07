@@ -38,6 +38,7 @@ import {
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { nanoid } from "@/lib/utils/nanoid";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import {
   DEFAULT_PLATE_FINISH,
@@ -809,7 +810,7 @@ function BendPlateShapeEditor({
                       <SelectContent>
                         {PLATE_FINISH_OPTIONS.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            {o.label}
+                            {t(`quote.finishLabels.${o.value}`)}
                           </SelectItem>
                         ))}
                       </SelectContent>

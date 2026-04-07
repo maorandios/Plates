@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export default function QuickQuoteLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col">
       {children}
     </div>
   );

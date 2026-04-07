@@ -5,10 +5,13 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useLayoutEffect,
   forwardRef,
   useImperativeHandle,
   useRef,
+  type ReactNode,
 } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   Upload,
   FileIcon,
@@ -20,6 +23,15 @@ import {
   Check,
   Eye,
   ChevronRight,
+  Info,
+  Hash,
+  Tag,
+  Layers,
+  MoveHorizontal,
+  MoveVertical,
+  Weight,
+  Square,
+  Palette,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,18 +46,15 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -60,6 +69,7 @@ import { parseDxfFile } from "@/lib/parsers/dxfParser";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import {
   DEFAULT_PLATE_FINISH,
+  PLATE_FINISH_OPTIONS,
   defaultMaterialGradeForFamily,
   type PlateFinish,
 } from "../lib/plateFields";
@@ -76,6 +86,7 @@ import { mergeExcelIntoDxfUploads } from "../lib/dxfUploadExcelMerge";
 import { DXF_QUOTE_DEFAULT_THICKNESS_MM } from "../lib/dxfQuoteParts";
 import { ExcelColumnMappingModal } from "./ExcelColumnMappingModal";
 import { DxfExcelCompareModal } from "./DxfExcelCompareModal";
+import { DxfFileBadgeIcon } from "./icons/DxfFileBadgeIcon";
 import { t } from "@/lib/i18n";
 
 export type DxfUploadSubStep = 1 | 2 | 3;
@@ -86,6 +97,89 @@ const SUB_STEPS = [
   { step: 2 as DxfSubStep, label: "Parse" },
   { step: 3 as DxfSubStep, label: "Review" },
 ] as const;
+
+/** Unit label to the left of the number (LTR) so suffix stays visually left of the value in RTL UI */
+function StatValueUnitLeft({
+  numericText,
+  unitSuffix,
+}: {
+  numericText: string;
+  unitSuffix: string;
+}) {
+  return (
+    <span
+      className="inline-flex flex-row items-baseline justify-center gap-1.5"
+      dir="ltr"
+    >
+      <span className="text-sm text-muted-foreground">{unitSuffix.trim()}</span>
+      <span className="text-base tabular-nums font-semibold text-foreground">{numericText}</span>
+    </span>
+  );
+}
+
+/** Part preview modal — one cell in the 4×2 grid (icon + label + value, centered) */
+function DxfPreviewStatCell({
+  icon: Icon,
+  label,
+  value,
+  className,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex aspect-square min-h-0 w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden px-2 py-2.5 text-center",
+        className
+      )}
+    >
+      <Icon
+        className="h-4 w-4 shrink-0 text-[#00FF9F]/70"
+        strokeWidth={1.75}
+        aria-hidden
+      />
+      <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="line-clamp-2 max-w-full break-words text-sm font-semibold leading-tight text-foreground sm:text-[15px]">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** Column header with optional hint (e.g. defaults without Excel BOM). */
+function ReviewTableHeadWithHint({
+  label,
+  hint,
+}: {
+  label: string;
+  hint?: string | null;
+}) {
+  if (!hint) return <>{label}</>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex max-w-[10rem] items-center gap-1 cursor-help">
+          {label}
+          <Info
+            className="h-3.5 w-3.5 shrink-0 origin-center scale-[0.8] text-orange-500 dark:text-orange-400"
+            aria-hidden
+          />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="max-w-[min(100vw-2rem,22rem)] text-start text-xs leading-relaxed"
+      >
+        {hint}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 /** Crossing curved arrows (shuffle-style): lighter + primary strokes for DXF ↔ Excel sync. */
 function QuickSyncCrossIcon({ className }: { className?: string }) {
@@ -142,12 +236,6 @@ interface DxfFileUpload {
   /** Review table: finish (editable; default carbon = “Carbon steel”). */
   finish: PlateFinish;
 }
-
-const DXF_FINISH_OPTIONS: { value: PlateFinish; label: string }[] = [
-  { value: "carbon", label: "Carbon steel" },
-  { value: "galvanized", label: "Galvanized" },
-  { value: "paint", label: "Paint" },
-];
 
 /**
  * Rebuild upload rows from geometries already approved in the quote (same session).
@@ -251,6 +339,18 @@ export type DxfUploadStepHandle = {
   canLeaveWithoutConfirm: () => boolean;
 };
 
+const NO_EXCEL_DEFAULTS_BANNER_STORAGE_KEY =
+  "dxf-review-no-excel-defaults-banner-dismissed";
+
+function readNoExcelDefaultsBannerDismissed(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return sessionStorage.getItem(NO_EXCEL_DEFAULTS_BANNER_STORAGE_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
+
 export type DxfUploadNavState = {
   subStep: DxfUploadSubStep;
   /** Step 2 label: Parse vs Match (Excel BOM mapped). */
@@ -333,7 +433,11 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     null
   );
   const [compareModalOpen, setCompareModalOpen] = useState(false);
-  const [previewGeometry, setPreviewGeometry] = useState<DxfPartGeometry | null>(null);
+  const [previewUploadIndex, setPreviewUploadIndex] = useState<number | null>(null);
+  const previewCanvasHostRef = useRef<HTMLDivElement>(null);
+  const [previewCanvasSize, setPreviewCanvasSize] = useState({ w: 640, h: 400 });
+  const [noExcelDefaultsBannerDismissed, setNoExcelDefaultsBannerDismissed] =
+    useState(true);
 
   const excelRestoreAppliedRef = useRef(false);
   useEffect(() => {
@@ -355,6 +459,83 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     }
   }, [restoredExcelBundle, restoredGeometries, materialType]);
 
+  useEffect(() => {
+    if (subStep !== 3) return;
+    if (mappedExcelRows?.length) return;
+    setNoExcelDefaultsBannerDismissed(readNoExcelDefaultsBannerDismissed());
+  }, [subStep, mappedExcelRows?.length]);
+
+  const dismissNoExcelDefaultsBanner = useCallback(() => {
+    try {
+      sessionStorage.setItem(NO_EXCEL_DEFAULTS_BANNER_STORAGE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setNoExcelDefaultsBannerDismissed(true);
+  }, []);
+
+  const previewPartStats = useMemo(() => {
+    if (previewUploadIndex === null) return null;
+    const upload = uploadedFiles[previewUploadIndex];
+    const geom = upload?.parsed?.processedGeometry;
+    if (!geom || !upload) return null;
+    const bbox = geom.boundingBox;
+    const materialConfig = getMaterialConfig(materialType);
+    const densityKgPerM3 = materialConfig.densityKgPerM3;
+    const thMm = clampPositiveThicknessMm(upload.thicknessMm);
+    const unitWeightKg =
+      geom.area > 0
+        ? (geom.area / 1_000_000) * (thMm / 1000) * densityKgPerM3
+        : 0;
+    const qty = Math.max(1, Math.floor(Number(upload.quantity)) || 1);
+    const totalWeightKg = unitWeightKg * qty;
+    const unitAreaM2 = geom.area > 0 ? geom.area / 1_000_000 : 0;
+    const totalAreaM2 = unitAreaM2 * qty;
+    const dim1 = bbox.width;
+    const dim2 = bbox.height;
+    const widthMm = dim1 > 0 && dim2 > 0 ? Math.min(dim1, dim2) : dim1 || dim2;
+    const lengthMm = dim1 > 0 && dim2 > 0 ? Math.max(dim1, dim2) : 0;
+    const partLabel =
+      upload.parsed?.guessedPartName ||
+      upload.file.name.replace(/\.dxf$/i, "");
+    return {
+      geom,
+      partLabel,
+      qty,
+      thMm,
+      widthMm,
+      lengthMm,
+      totalWeightKg,
+      totalAreaM2,
+      finish: upload.finish,
+    };
+  }, [previewUploadIndex, uploadedFiles, materialType]);
+
+  useLayoutEffect(() => {
+    if (previewUploadIndex === null) return;
+    const el = previewCanvasHostRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setPreviewCanvasSize({
+        w: Math.max(160, Math.floor(r.width)),
+        h: Math.max(160, Math.floor(r.height)),
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [previewUploadIndex]);
+
+  useEffect(() => {
+    if (previewUploadIndex === null) return;
+    const u = uploadedFiles[previewUploadIndex];
+    if (!u?.parsed?.processedGeometry) {
+      setPreviewUploadIndex(null);
+    }
+  }, [previewUploadIndex, uploadedFiles]);
+
   const step2Label = mappedExcelRows?.length ? "Match" : "Parse";
 
   const resetSession = useCallback(() => {
@@ -372,7 +553,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     setValidationRows(null);
     setValidationSummary(null);
     setCompareModalOpen(false);
-    setPreviewGeometry(null);
+    setPreviewUploadIndex(null);
     excelRestoreAppliedRef.current = false;
     onOptionalExcelChange?.(null);
     onExcelSessionPersist?.(null);
@@ -542,6 +723,10 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     handleExcelMappingRemoved();
   }, [handleExcelMappingRemoved]);
 
+  const excelMappedComplete = Boolean(
+    optionalExcelFile && mappedExcelRows && mappedExcelRows.length > 0
+  );
+
   const handleContinueToParse = useCallback(() => {
     if (uploadedFiles.length === 0) return;
 
@@ -563,7 +748,11 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       return;
     }
 
-    setSubStep(2);
+    // No Excel: parse in place and go straight to review (skip intermediate parse step)
+    const parsed = parseDxfUploadsInPlace(uploadedFiles, materialType);
+    const merged = mergeExcelIntoDxfUploads(parsed, null, materialType);
+    setUploadedFiles(merged);
+    setSubStep(3);
   }, [uploadedFiles, mappedExcelRows, materialType]);
 
   const handleRemoveFile = useCallback((index: number) => {
@@ -603,15 +792,14 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     setSubStep(1);
   }, []);
 
+  /** Back from review (step 3) — always return to upload (step 1). Parse step is skipped when no Excel. */
   const handleBackToParse = useCallback(() => {
     setCompareModalOpen(false);
     if (mappedExcelRows?.length) {
       setValidationRows(null);
       setValidationSummary(null);
-      setSubStep(1);
-      return;
     }
-    setSubStep(2);
+    setSubStep(1);
   }, [mappedExcelRows?.length]);
 
   const updateUploadRow = useCallback(
@@ -799,13 +987,6 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     ]
   );
 
-  const getStatusColor = (geometry: DxfPartGeometry | null): "success" | "error" | "warning" => {
-    if (!geometry || !geometry.processedGeometry) return "error";
-    if (geometry.processedGeometry.status === "valid") return "success";
-    if (geometry.processedGeometry.status === "warning") return "warning";
-    return "error";
-  };
-
   return (
     <div
       className={cn(
@@ -898,51 +1079,65 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                     : "Upload part geometry — required before continuing (multiple files supported)."}
                 </p>
               </CardHeader>
-              <CardContent className="flex min-h-0 flex-1 flex-col">
+              <CardContent
+                className={cn(
+                  "flex min-h-0 flex-1 flex-col",
+                  dxfQuotePhaseLayout &&
+                    uploadedFiles.length > 0 &&
+                    "justify-center items-center"
+                )}
+              >
                 {dxfQuotePhaseLayout && uploadedFiles.length > 0 ? (
-                  <div
-                    className={cn(
-                      "grid min-h-[200px] flex-1 place-content-center place-items-center rounded-lg border-2 border-dashed border-emerald-500/25 bg-emerald-500/[0.04] p-6 text-center transition-colors sm:p-8"
-                    )}
-                  >
-                    <div className="flex w-full max-w-md flex-col items-center gap-4">
-                      {/* Inline colors: globals/base can override Tailwind arbitrary classes on nested text */}
-                      <div
-                        className="inline-flex max-w-full items-center gap-4 rounded-full border-2 px-5 py-2.5 text-sm font-medium leading-snug shadow-[inset_0_1px_0_rgba(0,255,159,0.08)]"
-                        style={{
-                          backgroundColor: "#0D281D",
-                          borderColor: "#00FF9F",
-                          color: "#00FFB7",
-                        }}
-                      >
-                        <svg
-                          width={12}
-                          height={12}
-                          viewBox="0 0 12 12"
-                          className="block shrink-0 animate-dxf-status-dot overflow-visible"
-                          aria-hidden
-                        >
-                          <circle cx="6" cy="6" r="5" fill="#00FF9F" />
-                        </svg>
-                        <span className="text-center" style={{ color: "#00FFB7" }}>
-                          {uploadedFiles.length === 1
-                            ? t("quote.dxfPhase.dxfFilesCapturedSummaryOne")
-                            : t("quote.dxfPhase.dxfFilesCapturedSummaryMany", {
-                                n: uploadedFiles.length,
-                              })}
-                        </span>
+                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <DxfFileBadgeIcon
+                        className="h-6 w-6 shrink-0 text-emerald-600"
+                        aria-hidden
+                      />
+                      <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {t("quote.dxfPhase.dxfUploadedTypeLabel")}
+                          </p>
+                          <p className="text-sm font-medium text-foreground">
+                            {t("quote.dxfPhase.dxfUploadedTypeValue")}
+                          </p>
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {t("quote.dxfPhase.dxfUploadedFilesSizeLabel")}
+                          </p>
+                          <p className="text-sm font-medium tabular-nums text-foreground">
+                            {formatDecimal(
+                              uploadedFiles.reduce((s, u) => s + u.file.size, 0) /
+                                1024,
+                              1
+                            )}{" "}
+                            KB
+                          </p>
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {t("quote.dxfPhase.dxfUploadedFilesCountLabel")}
+                          </p>
+                          <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
+                            {t("quote.dxfPhase.dxfUploadedFilesCountValue", {
+                              n: uploadedFiles.length,
+                            })}
+                          </p>
+                        </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="border-white/15 text-muted-foreground hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
-                        onClick={handleClearDxfFiles}
-                        aria-label={t("quote.dxfPhase.dxfClearUploadAria")}
-                      >
-                        {t("quote.dxfPhase.dxfCancelUpload")}
-                      </Button>
                     </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearDxfFiles}
+                      className="shrink-0 self-center"
+                      aria-label={t("quote.dxfPhase.dxfClearUploadAria")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ) : (
                   <>
@@ -1083,83 +1278,129 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex min-h-0 flex-1 flex-col">
-                <div
-                  onDrop={handleExcelDrop}
-                  onDragOver={handleExcelDragOver}
-                  onDragLeave={handleExcelDragLeave}
-                  className={cn(
-                    "border-2 border-dashed rounded-lg p-6 text-center transition-colors sm:p-8",
-                    dxfQuotePhaseLayout
-                      ? "grid min-h-[200px] flex-1 place-content-center place-items-center"
-                      : "flex min-h-[200px] flex-1 flex-col items-center justify-center",
-                    isDraggingExcel
-                      ? "border-primary bg-primary/5"
-                      : "border-border/80 hover:border-muted-foreground/40"
-                  )}
-                >
-                  <div className="mx-auto flex w-full max-w-md flex-col items-center justify-center gap-4">
-                    <div className="h-14 w-14 shrink-0 rounded-full bg-muted flex items-center justify-center">
-                      <FileSpreadsheet className="h-7 w-7 text-muted-foreground" />
-                    </div>
-                    <div className="w-full text-balance">
-                      <p className="text-center text-sm font-medium leading-snug">
-                        {dxfQuotePhaseLayout
-                          ? t("quote.dxfPhase.excelDropPrimary")
-                          : "Drop Excel or CSV here"}
-                      </p>
-                      <p className="mt-1.5 text-center text-xs leading-relaxed text-muted-foreground">
-                        {dxfQuotePhaseLayout
-                          ? t("quote.dxfPhase.excelDropSecondary")
-                          : "One file — mapping opens in a dialog"}
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls,.csv"
-                      onChange={handleExcelFileInputChange}
-                      className="hidden"
-                      id="dxf-step-excel-upload"
-                      key={optionalExcelFile?.name ?? "no-excel"}
-                    />
-                    <div className="flex w-full justify-center">
-                      <Button asChild variant="outline" size="sm">
-                        <label
-                          htmlFor="dxf-step-excel-upload"
-                          className="cursor-pointer inline-flex items-center justify-center gap-2 text-center"
-                        >
-                          <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden />
+              <CardContent
+                className={cn(
+                  "flex min-h-0 flex-1 flex-col",
+                  excelMappedComplete && "justify-center items-center",
+                  excelMappedComplete &&
+                    !dxfQuotePhaseLayout &&
+                    "min-h-[220px]"
+                )}
+              >
+                {!excelMappedComplete && (
+                  <div
+                    onDrop={handleExcelDrop}
+                    onDragOver={handleExcelDragOver}
+                    onDragLeave={handleExcelDragLeave}
+                    className={cn(
+                      "border-2 border-dashed rounded-lg p-6 text-center transition-colors sm:p-8",
+                      dxfQuotePhaseLayout
+                        ? "grid min-h-[200px] flex-1 place-content-center place-items-center"
+                        : "flex min-h-[200px] flex-1 flex-col items-center justify-center",
+                      isDraggingExcel
+                        ? "border-primary bg-primary/5"
+                        : "border-border/80 hover:border-muted-foreground/40"
+                    )}
+                  >
+                    <div className="mx-auto flex w-full max-w-md flex-col items-center justify-center gap-4">
+                      <div className="h-14 w-14 shrink-0 rounded-full bg-muted flex items-center justify-center">
+                        <FileSpreadsheet className="h-7 w-7 text-muted-foreground" />
+                      </div>
+                      <div className="w-full text-balance">
+                        <p className="text-center text-sm font-medium leading-snug">
                           {dxfQuotePhaseLayout
-                            ? t("quote.dxfPhase.excelChooseFile")
-                            : "Choose spreadsheet"}
-                        </label>
-                      </Button>
+                            ? t("quote.dxfPhase.excelDropPrimary")
+                            : "Drop Excel or CSV here"}
+                        </p>
+                        <p className="mt-1.5 text-center text-xs leading-relaxed text-muted-foreground">
+                          {dxfQuotePhaseLayout
+                            ? t("quote.dxfPhase.excelDropSecondary")
+                            : "One file — mapping opens in a dialog"}
+                        </p>
+                      </div>
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleExcelFileInputChange}
+                        className="hidden"
+                        id="dxf-step-excel-upload"
+                        key={optionalExcelFile?.name ?? "no-excel"}
+                      />
+                      <div className="flex w-full justify-center">
+                        <Button asChild variant="outline" size="sm">
+                          <label
+                            htmlFor="dxf-step-excel-upload"
+                            className="cursor-pointer inline-flex items-center justify-center gap-2 text-center"
+                          >
+                            <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden />
+                            {dxfQuotePhaseLayout
+                              ? t("quote.dxfPhase.excelChooseFile")
+                              : "Choose spreadsheet"}
+                          </label>
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {optionalExcelFile && mappedExcelRows && mappedExcelRows.length > 0 && (
-                  <div className="mt-4 flex items-center justify-between gap-2 p-3 rounded-lg border bg-emerald-500/5 border-emerald-500/20">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
-                      <span className="text-sm truncate">{optionalExcelFile.name}</span>
-                      <Badge variant="secondary" className="text-xs shrink-0">
-                        {formatDecimal(optionalExcelFile.size / 1024, 1)} KB
-                      </Badge>
-                      <Badge className="text-xs shrink-0 bg-emerald-600/15 text-emerald-800 dark:text-emerald-200">
-                        {dxfQuotePhaseLayout
-                          ? t("quote.dxfPhase.excelRowsMapped", {
-                              n: mappedExcelRows.length,
-                            })
-                          : `${mappedExcelRows.length} rows mapped`}
-                      </Badge>
+                {excelMappedComplete && optionalExcelFile && mappedExcelRows && (
+                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <FileSpreadsheet
+                        className="h-5 w-5 shrink-0 text-emerald-600"
+                        aria-hidden
+                      />
+                      <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {dxfQuotePhaseLayout
+                              ? t("quote.dxfPhase.excelUploadedFileName")
+                              : "File name"}
+                          </p>
+                          <p
+                            className="truncate text-sm font-medium text-foreground"
+                            title={optionalExcelFile.name}
+                          >
+                            {optionalExcelFile.name}
+                          </p>
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {dxfQuotePhaseLayout
+                              ? t("quote.dxfPhase.excelUploadedFileSize")
+                              : "File size"}
+                          </p>
+                          <p className="text-sm font-medium tabular-nums text-foreground">
+                            {formatDecimal(optionalExcelFile.size / 1024, 1)} KB
+                          </p>
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {dxfQuotePhaseLayout
+                              ? t("quote.dxfPhase.excelUploadedRowCount")
+                              : "Rows detected"}
+                          </p>
+                          <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
+                            {dxfQuotePhaseLayout
+                              ? t("quote.dxfPhase.excelUploadedRowsDetectedValue", {
+                                  n: mappedExcelRows.length,
+                                })
+                              : `${mappedExcelRows.length} rows`}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={handleRemoveOptionalExcel}
-                      className="shrink-0"
+                      className="shrink-0 self-center"
+                      aria-label={
+                        dxfQuotePhaseLayout
+                          ? t("quote.dxfPhase.excelRemoveFileAria")
+                          : "Remove spreadsheet"
+                      }
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -1167,7 +1408,12 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 )}
 
                 {excelUploadError && (
-                  <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+                  <div
+                    className={cn(
+                      "p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2",
+                      excelMappedComplete ? "mt-4 w-full max-w-4xl mx-auto" : "mt-4"
+                    )}
+                  >
                     <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                     <p className="text-sm text-destructive">{excelUploadError}</p>
                   </div>
@@ -1184,7 +1430,9 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 disabled={uploadedFiles.length === 0}
                 onClick={handleContinueToParse}
               >
-                {mappedExcelRows?.length ? "Continue to review" : "Continue to parse"}
+                {dxfQuotePhaseLayout
+                  ? t("quote.dxfPhase.continueToReview")
+                  : "Continue to review"}
                 <CheckCircle2 className="h-4 w-4" />
               </Button>
             </div>
@@ -1279,40 +1527,110 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
           {/* Parts Table */}
           <Card>
             <CardHeader>
-              <CardTitle>DXF Parts Data</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Parsed geometry and part information
-                {mappedExcelRows?.length
-                  ? " — quantity, material grade, and thickness (when mapped) are taken from the Excel list where part names match; otherwise quantity is 1, thickness defaults to 2 mm, and grade follows the DXF. All values stay editable."
-                  : ""}
+              <CardTitle>{t("quote.dxfPhase.dxfReviewTable.title")}</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                {t("quote.dxfPhase.dxfReviewTable.subtitle")}
+                {mappedExcelRows?.length ? (
+                  <>
+                    {" "}
+                    {t("quote.dxfPhase.dxfReviewTable.subtitleExcelHint")}
+                  </>
+                ) : null}
               </p>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[120px]">Part Number</TableHead>
-                      <TableHead className="min-w-[88px]">Quantity</TableHead>
-                      <TableHead className="min-w-[88px]">Thickness (mm)</TableHead>
-                      <TableHead className="min-w-[88px]">Width (mm)</TableHead>
-                      <TableHead className="min-w-[88px]">Length (mm)</TableHead>
-                      <TableHead className="min-w-[88px]">Weight (kg)</TableHead>
-                      <TableHead className="min-w-[88px]">Area (m²)</TableHead>
-                      <TableHead className="min-w-[100px]">Perimeter (mm)</TableHead>
-                      <TableHead className="min-w-[80px]">Piercing</TableHead>
-                      <TableHead className="min-w-[120px]">Material Grade</TableHead>
-                      <TableHead className="min-w-[140px]">Finish</TableHead>
-                      <TableHead className="w-[72px]">Preview</TableHead>
-                      <TableHead className="w-[72px]">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {uploadedFiles.map((upload, index) => {
+              {!mappedExcelRows?.length && !noExcelDefaultsBannerDismissed && (
+                <div
+                  role="status"
+                  className={cn(
+                    "mb-4 flex gap-3 rounded-lg border border-amber-500/45 bg-amber-500/[0.09] p-3 text-start shadow-sm",
+                    "animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-300"
+                  )}
+                >
+                  <Info
+                    className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerTitle")}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerBody")}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0 self-start"
+                    onClick={dismissNoExcelDefaultsBanner}
+                  >
+                    {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerDismiss")}
+                  </Button>
+                </div>
+              )}
+              <TooltipProvider delayDuration={250}>
+                <div className="rounded-md border border-white/[0.08]">
+                  <Table
+                    className="border-separate border-spacing-0"
+                    containerClassName="overflow-visible"
+                  >
+                    <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+                      <TableRow className="border-b-0 hover:bg-transparent">
+                        <TableHead className="min-w-[120px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colPartNumber")}
+                        </TableHead>
+                        <TableHead className="min-w-[88px]">
+                          <ReviewTableHeadWithHint
+                            label={t("quote.dxfPhase.dxfReviewTable.colQuantity")}
+                            hint={
+                              !mappedExcelRows?.length
+                                ? t("quote.dxfPhase.dxfReviewTable.qtyColumnNoExcelHint")
+                                : null
+                            }
+                          />
+                        </TableHead>
+                        <TableHead className="min-w-[88px]">
+                          <ReviewTableHeadWithHint
+                            label={t("quote.dxfPhase.dxfReviewTable.colThickness")}
+                            hint={
+                              !mappedExcelRows?.length
+                                ? t("quote.dxfPhase.dxfReviewTable.thkColumnNoExcelHint")
+                                : null
+                            }
+                          />
+                        </TableHead>
+                        <TableHead className="min-w-[88px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colWidth")}
+                        </TableHead>
+                        <TableHead className="min-w-[88px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colLength")}
+                        </TableHead>
+                        <TableHead className="min-w-[88px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colWeight")}
+                        </TableHead>
+                        <TableHead className="min-w-[88px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colArea")}
+                        </TableHead>
+                        <TableHead className="min-w-[80px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colPiercing")}
+                        </TableHead>
+                        <TableHead className="min-w-[120px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colMaterialGrade")}
+                        </TableHead>
+                        <TableHead className="min-w-[140px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colFinish")}
+                        </TableHead>
+                        <TableHead className="w-[72px]">
+                          {t("quote.dxfPhase.dxfReviewTable.colPreview")}
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {uploadedFiles.map((upload, index) => {
                       const geom = upload.parsed?.processedGeometry;
                       const bbox = geom?.boundingBox;
-                      const status = getStatusColor(upload.parsed);
-                      const hasError = upload.parseError !== null;
 
                       const materialConfig = getMaterialConfig(materialType);
                       const densityKgPerM3 = materialConfig.densityKgPerM3;
@@ -1321,6 +1639,11 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                         geom && geom.area > 0
                           ? (geom.area / 1_000_000) * (thMm / 1000) * densityKgPerM3
                           : 0;
+                      const qty = Math.max(1, Math.floor(Number(upload.quantity)) || 1);
+                      const totalWeightKg = unitWeightKg * qty;
+                      const unitAreaM2 =
+                        geom && geom.area > 0 ? geom.area / 1_000_000 : 0;
+                      const totalAreaM2 = unitAreaM2 * qty;
 
                       const dim1 = bbox?.width ?? 0;
                       const dim2 = bbox?.height ?? 0;
@@ -1331,75 +1654,91 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                         upload.parsed?.guessedPartName ||
                         upload.file.name.replace(/\.dxf$/i, "");
 
-                      return (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{partLabel}</TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min={1}
-                              step={1}
-                              className="h-8 w-20"
-                              value={upload.quantity}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                updateUploadRow(
-                                  index,
-                                  Number.isFinite(v) && v >= 1
-                                    ? { quantity: Math.floor(v) }
-                                    : { quantity: 1 }
-                                );
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min={0.1}
-                              step={0.1}
-                              className="h-8 w-[4.5rem] tabular-nums"
-                              value={Number.isFinite(upload.thicknessMm) ? upload.thicknessMm : ""}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                updateUploadRow(
-                                  index,
-                                  Number.isFinite(v) && v > 0
-                                    ? { thicknessMm: v }
-                                    : { thicknessMm: DXF_QUOTE_DEFAULT_THICKNESS_MM }
-                                );
-                              }}
-                            />
-                          </TableCell>
+                        return (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{partLabel}</TableCell>
+                            <TableCell>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                spellCheck={false}
+                                className="h-8 w-20 [color-scheme:dark]"
+                                value={String(upload.quantity)}
+                                onChange={(e) => {
+                                  const digits = e.target.value.replace(/\D/g, "");
+                                  if (digits === "") {
+                                    updateUploadRow(index, { quantity: 1 });
+                                    return;
+                                  }
+                                  const v = parseInt(digits, 10);
+                                  updateUploadRow(index, {
+                                    quantity: Number.isFinite(v) ? Math.max(1, v) : 1,
+                                  });
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                spellCheck={false}
+                                className="h-8 w-[4.5rem] tabular-nums [color-scheme:dark]"
+                                value={
+                                  Number.isFinite(upload.thicknessMm)
+                                    ? String(upload.thicknessMm)
+                                    : ""
+                                }
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(",", ".").trim();
+                                  if (raw === "") {
+                                    updateUploadRow(index, {
+                                      thicknessMm: DXF_QUOTE_DEFAULT_THICKNESS_MM,
+                                    });
+                                    return;
+                                  }
+                                  const v = Number(raw);
+                                  updateUploadRow(
+                                    index,
+                                    Number.isFinite(v) && v > 0
+                                      ? { thicknessMm: v }
+                                      : {
+                                          thicknessMm: DXF_QUOTE_DEFAULT_THICKNESS_MM,
+                                        }
+                                  );
+                                }}
+                              />
+                            </TableCell>
                           <TableCell>
                             {bbox ? formatDecimal(widthMm, 1) : "-"}
                           </TableCell>
                           <TableCell>
                             {bbox ? formatDecimal(lengthMm, 1) : "-"}
                           </TableCell>
-                          <TableCell>
-                            {unitWeightKg > 0
-                              ? formatDecimal(unitWeightKg, 2)
+                          <TableCell className="tabular-nums">
+                            {totalWeightKg > 0
+                              ? formatDecimal(totalWeightKg, 2)
                               : "-"}
                           </TableCell>
-                          <TableCell>
-                            {geom ? formatDecimal(geom.area / 1_000_000, 4) : "-"}
-                          </TableCell>
-                          <TableCell>
-                            {geom ? formatDecimal(geom.perimeter, 1) : "-"}
+                          <TableCell className="tabular-nums">
+                            {geom && geom.area > 0
+                              ? formatDecimal(totalAreaM2, 4)
+                              : "-"}
                           </TableCell>
                           <TableCell>
                             {geom?.preparation?.manufacturing?.cutInner?.length ?? 0}
                           </TableCell>
                           <TableCell>
                             <Input
-                              className="h-8 min-w-[7rem]"
+                              className="h-8 min-w-[7rem] [color-scheme:dark]"
                               value={upload.materialGrade}
                               onChange={(e) =>
                                 updateUploadRow(index, {
                                   materialGrade: e.target.value,
                                 })
                               }
-                              placeholder="Grade"
+                              placeholder={t("quote.dxfPhase.dxfReviewTable.gradePlaceholder")}
                             />
                           </TableCell>
                           <TableCell>
@@ -1411,62 +1750,49 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                                 })
                               }
                             >
-                              <SelectTrigger className="h-8 w-[140px]">
+                              <SelectTrigger className="h-8 w-[140px] [color-scheme:dark]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {DXF_FINISH_OPTIONS.map((o) => (
+                                {PLATE_FINISH_OPTIONS.map((o) => (
                                   <SelectItem key={o.value} value={o.value}>
-                                    {o.label}
+                                    {t(`quote.finishLabels.${o.value}`)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setPreviewGeometry(upload.parsed)}
-                              className="h-7 w-7 p-0"
+                            <button
+                              type="button"
+                              aria-label={t("quote.dxfPhase.dxfReviewTable.colPreview")}
+                              onClick={() =>
+                                upload.parsed?.processedGeometry &&
+                                setPreviewUploadIndex(index)
+                              }
                               disabled={!upload.parsed}
+                              className={cn(
+                                "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md p-0",
+                                "text-[#00E5FF] hover:bg-white/5",
+                                "disabled:pointer-events-none disabled:opacity-50",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              )}
                             >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                          <TableCell>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div
-                                    className={cn(
-                                      "h-2.5 w-2.5 rounded-full cursor-pointer",
-                                      status === "success" && "bg-emerald-600",
-                                      status === "warning" && "bg-amber-500",
-                                      status === "error" && "bg-destructive"
-                                    )}
-                                  />
-                                </TooltipTrigger>
-                                {(status === "error" || status === "warning") &&
-                                  hasError && (
-                                    <TooltipContent side="left" className="max-w-xs">
-                                      <p className="text-xs">{upload.parseError}</p>
-                                    </TooltipContent>
-                                  )}
-                                {status === "success" && (
-                                  <TooltipContent side="left">
-                                    <p className="text-xs">Valid geometry</p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
+                              <Eye
+                                className="h-4 w-4"
+                                stroke="#00E5FF"
+                                strokeWidth={2}
+                                aria-hidden
+                              />
+                            </button>
                           </TableCell>
                         </TableRow>
                       );
                     })}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableBody>
+                  </Table>
+                </div>
+              </TooltipProvider>
             </CardContent>
           </Card>
 
@@ -1497,84 +1823,151 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         onDiscard={handleExcelMappingDiscard}
       />
 
-      {/* Preview Modal */}
-      <Dialog open={previewGeometry !== null} onOpenChange={(open) => !open && setPreviewGeometry(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>Part Preview</DialogTitle>
-            <DialogDescription>
-              {previewGeometry?.guessedPartName || "DXF Part"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 overflow-y-auto max-h-[calc(90vh-200px)]">
-            {previewGeometry?.processedGeometry && (
-              <>
-                {/* Geometry Canvas */}
-                <div className="rounded-lg border bg-muted/10 p-4">
-                  <PlateGeometryCanvas
-                    geometry={previewGeometry.processedGeometry}
-                    unitSystem="metric"
-                    width={800}
-                    height={500}
-                    debugMode={false}
-                  />
-                </div>
+      {/* Part preview — compact modal: preview strip + edge-to-edge stat grid */}
+      <Dialog
+        open={previewUploadIndex !== null}
+        onOpenChange={(open) => !open && setPreviewUploadIndex(null)}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className={cn(
+            "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-white/10 bg-card p-0 sm:max-w-[30rem] sm:rounded-xl"
+          )}
+        >
+          <div className="flex min-h-0 flex-col overflow-hidden" dir="rtl">
+            <DialogTitle className="sr-only">
+              {t("quote.dxfPhase.partPreviewModal.a11yTitle")}
+            </DialogTitle>
 
-                {/* Parameters */}
-                <div className="rounded-lg border bg-muted/30 p-4">
-                  <p className="text-sm font-semibold mb-3">Part Parameters</p>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Width:</span>
-                      <span className="ml-2 font-medium">
-                        {formatDecimal(previewGeometry.processedGeometry.boundingBox.width, 2)} mm
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Height:</span>
-                      <span className="ml-2 font-medium">
-                        {formatDecimal(previewGeometry.processedGeometry.boundingBox.height, 2)} mm
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Area:</span>
-                      <span className="ml-2 font-medium">
-                        {formatDecimal(previewGeometry.processedGeometry.area / 1000000, 4)} m²
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Perimeter:</span>
-                      <span className="ml-2 font-medium">
-                        {formatDecimal(previewGeometry.processedGeometry.perimeter, 2)} mm
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Holes:</span>
-                      <span className="ml-2 font-medium">
-                        {previewGeometry.processedGeometry.holes?.length || 0}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Entities:</span>
-                      <span className="ml-2 font-medium">
-                        {previewGeometry.entityCount}
-                      </span>
+            {/* Top: plate preview — bottom: stats (two stacked bands, no side padding on stats grid) */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="flex min-h-[min(45vh,475px)] flex-1 shrink-0 items-center justify-center px-5 py-6">
+                <div
+                  ref={previewCanvasHostRef}
+                  className="relative flex h-[min(425px,52vh)] w-full max-w-full items-center justify-center overflow-hidden bg-transparent"
+                >
+                  {previewPartStats && (
+                    <PlateGeometryCanvas
+                      geometry={previewPartStats.geom}
+                      unitSystem="metric"
+                      width={previewCanvasSize.w}
+                      height={previewCanvasSize.h}
+                      debugMode={false}
+                      appearance="previewModal"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="w-full shrink-0 border-t border-white/10">
+                {previewPartStats ? (
+                  <div dir="ltr" className="w-full overflow-hidden">
+                    <div className="grid w-full grid-cols-4 grid-rows-2">
+                      {(
+                        [
+                          {
+                            key: "finish",
+                            icon: Palette,
+                            label: t("quote.dxfPhase.partPreviewModal.finish"),
+                            value: t(`quote.finishLabels.${previewPartStats.finish}`),
+                          },
+                          {
+                            key: "thickness",
+                            icon: Layers,
+                            label: t("quote.dxfPhase.partPreviewModal.thickness"),
+                            value: (
+                              <StatValueUnitLeft
+                                numericText={formatDecimal(previewPartStats.thMm, 1)}
+                                unitSuffix={t("quote.dxfPhase.partPreviewModal.mmSuffix")}
+                              />
+                            ),
+                          },
+                          {
+                            key: "quantity",
+                            icon: Hash,
+                            label: t("quote.dxfPhase.partPreviewModal.quantity"),
+                            value: previewPartStats.qty,
+                          },
+                          {
+                            key: "plateName",
+                            icon: Tag,
+                            label: t("quote.dxfPhase.partPreviewModal.plateName"),
+                            value: previewPartStats.partLabel,
+                          },
+                          {
+                            key: "weight",
+                            icon: Weight,
+                            label: t("quote.dxfPhase.partPreviewModal.weight"),
+                            value:
+                              previewPartStats.totalWeightKg > 0 ? (
+                                <StatValueUnitLeft
+                                  numericText={formatDecimal(previewPartStats.totalWeightKg, 2)}
+                                  unitSuffix={t("quote.dxfPhase.partPreviewModal.kgSuffix")}
+                                />
+                              ) : (
+                                "-"
+                              ),
+                          },
+                          {
+                            key: "area",
+                            icon: Square,
+                            label: t("quote.dxfPhase.partPreviewModal.area"),
+                            value:
+                              previewPartStats.totalAreaM2 > 0 ? (
+                                <StatValueUnitLeft
+                                  numericText={formatDecimal(previewPartStats.totalAreaM2, 4)}
+                                  unitSuffix={t("quote.dxfPhase.partPreviewModal.m2Suffix")}
+                                />
+                              ) : (
+                                "-"
+                              ),
+                          },
+                          {
+                            key: "length",
+                            icon: MoveHorizontal,
+                            label: t("quote.dxfPhase.partPreviewModal.length"),
+                            value: (
+                              <StatValueUnitLeft
+                                numericText={formatDecimal(previewPartStats.lengthMm, 1)}
+                                unitSuffix={t("quote.dxfPhase.partPreviewModal.mmSuffix")}
+                              />
+                            ),
+                          },
+                          {
+                            key: "width",
+                            icon: MoveVertical,
+                            label: t("quote.dxfPhase.partPreviewModal.width"),
+                            value: (
+                              <StatValueUnitLeft
+                                numericText={formatDecimal(previewPartStats.widthMm, 1)}
+                                unitSuffix={t("quote.dxfPhase.partPreviewModal.mmSuffix")}
+                              />
+                            ),
+                          },
+                        ] as const
+                      ).map((cell, i) => (
+                        <DxfPreviewStatCell
+                          key={cell.key}
+                          icon={cell.icon}
+                          label={cell.label}
+                          value={cell.value}
+                          className={cn(
+                            "border-b border-solid border-[#00FF9F]/20",
+                            i % 4 === 0 && "border-s",
+                            i % 4 !== 3 && "border-e"
+                          )}
+                        />
+                      ))}
                     </div>
                   </div>
-                </div>
-              </>
-            )}
-            {!previewGeometry?.processedGeometry && (
-              <div className="p-8 rounded-lg bg-muted/30 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No geometry data available
-                </p>
+                ) : (
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                    {t("quote.dxfPhase.partPreviewModal.noGeometry")}
+                  </p>
+                )}
               </div>
-            )}
+            </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setPreviewGeometry(null)}>Close</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

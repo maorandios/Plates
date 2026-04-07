@@ -123,6 +123,16 @@
       "dxfClearUploadAria": "לבטל העלאה ולהתחיל מחדש",
       "dxfCancelUpload": "ביטול",
       "excelRowsMapped": "{{n}} שורות ממופות",
+      "excelUploadedFileName": "שם קובץ",
+      "excelUploadedFileSize": "משקל קובץ",
+      "excelUploadedRowCount": "כמות שורות שזוהו",
+      "excelUploadedRowsDetectedValue": "{{n}} שורות",
+      "excelRemoveFileAria": "הסרת קובץ הגיליון",
+      "dxfUploadedTypeLabel": "סוג קובץ",
+      "dxfUploadedTypeValue": "DXF",
+      "dxfUploadedFilesSizeLabel": "משקל קבצים",
+      "dxfUploadedFilesCountLabel": "כמות קבצים שזוהו",
+      "dxfUploadedFilesCountValue": "{{n}} קבצים",
       "quickSync": "סנכרון מהיר",
       "sidebarTitle": "ייבוא קבצי DXF",
       "sidebarIntro": "ייבוא קבצי DXF, המערכת תוציא באופן אוטומטי את כל הנתונים הדרושים",
@@ -131,12 +141,104 @@
       "back": "חזרה",
       "reset": "איפוס",
       "next": "המשך",
-      "complete": "סיום"
+      "continueToReview": "המשך לסקירה",
+      "complete": "סיום",
+      "dxfReviewTable": {
+        "title": "טבלת סיכום DXF",
+        "subtitle": "הצגת נתונים מתוך קבצי DXF",
+        "subtitleExcelHint": "כמות, דרגת חומר ועובי נלקחים מרשימת Excel כששמות החלקים תואמים; אחרת ברירת מחדל: כמות 1, עובי 2 מ״מ, דרגה לפי ה-DXF. ניתן לערוך את כל הערכים.",
+        "colPartNumber": "מספר חלק",
+        "colQuantity": "כמות",
+        "colThickness": "עובי (מ״מ)",
+        "colWidth": "רוחב (מ״מ)",
+        "colLength": "אורך (מ״מ)",
+        "colWeight": "משקל (ק״ג)",
+        "colArea": "שטח (מ״ר)",
+        "colPiercing": "חורים",
+        "firstVisitNoExcelBannerTitle": "שימו לב: כמות ועובי ללא Excel",
+        "firstVisitNoExcelBannerBody": "ללא רשימת Excel, עמודות הכמות והעובי מציגות ברירות מחדל מערכתיות (למשל כמות 1 ועובי קבוע) ולא בהכרח את נתוני האספקה. יש לעדכן אותן לפי הצורך — או להעלות Excel לסנכרון.",
+        "firstVisitNoExcelBannerDismiss": "הבנתי",
+        "qtyColumnNoExcelHint": "ללא רשימת Excel, הכמות היא ברירת מחדל (לרוב 1) ואינה משקפת בהכרח את הזמנתכם. יש לעדכן לפי כמות האספקה הנדרשת.",
+        "thkColumnNoExcelHint": "ללא רשימת Excel, העובי הוא ברירת מחדל מערכתית ואינו נלקח מקובץ ה-DXF. יש לאמת ולעדכן לפי מפרט החומר והפח.",
+        "colMaterialGrade": "דרגת פלדה",
+        "colFinish": "גימור",
+        "colPreview": "תצוגה",
+        "gradePlaceholder": "דרגה"
+      },
+      "partPreviewModal": {
+        "title": "תצוגת פלטה",
+        "close": "סגור",
+        "plateName": "שם פלטה",
+        "quantity": "כמות",
+        "thickness": "עובי",
+        "length": "אורך",
+        "width": "רוחב",
+        "weight": "משקל",
+        "area": "שטח",
+        "finish": "גימור",
+        "mmSuffix": " מ״מ",
+        "kgSuffix": " ק״ג",
+        "m2Suffix": " מ״ר",
+        "noGeometry": "אין נתוני גיאומטריה להצגה",
+        "a11yTitle": "תצוגת פלטה"
+      }
+    },
+    "excelColumnMapping": {
+      "title": "מיפוי שורות טבלת Excel",
+      "description": "נדרש למפות כל עמודה לכותרת הנכונה שלה כדי ליצור סנכרון בין הקבצים",
+      "file": "קובץ",
+      "rowsDetected": "{{n}} שורות זוהו",
+      "mappingSectionTitle": "מיפוי עמודות",
+      "mappingSectionHint": "מיפוי עמודות בקובץ לשדות רשימת החלקים",
+      "resetAuto": "איפוס לזיהוי אוטומטי",
+      "none": "ללא",
+      "previewRows": "תצוגה מקדימה (3 שורות ראשונות)",
+      "partNameRequired": "יש למפות את עמודת שם החלק",
+      "loading": "טוען גיליון…",
+      "complete": "סיום",
+      "headersReadError": "לא ניתן לקרוא את כותרות הגיליון",
+      "mapPartNameBeforeComplete": "יש למפות את שם החלק לעמודה לפני הסיום",
+      "noValidRows": "לא נמצאו שורות תקינות עם המיפוי הנוכחי. נא לעדכן את המיפוי.",
+      "parseFailed": "נכשל בפענוח הגיליון",
+      "discardTitle": "להסיר את הגיליון?",
+      "discardDescription": "חזרה תנקה את קובץ ה-Excel או ה-CSV שהועלה ואת כל המיפוי ושורות הרשימה מצעד זה. ניתן להעלות קובץ שוב בכל עת.",
+      "discardCancel": "ביטול",
+      "discardConfirm": "הסרת הגיליון",
+      "fields": {
+        "partNameCol": {
+          "label": "שם חלק",
+          "description": "מזהה ייחודי לכל חלק"
+        },
+        "qtyCol": {
+          "label": "כמות",
+          "description": "מספר פריטים (ברירת מחדל 1)"
+        },
+        "thkCol": {
+          "label": "עובי",
+          "description": "עובי הפלטה במ״מ"
+        },
+        "matCol": {
+          "label": "סיווג מתכת",
+          "description": "דרגת פלדה או סוג חומר"
+        },
+        "lengthCol": {
+          "label": "אורך",
+          "description": "אורך הפלטה במ״מ"
+        },
+        "widthCol": {
+          "label": "רוחב",
+          "description": "רוחב הפלטה במ״מ"
+        },
+        "weightCol": {
+          "label": "משקל",
+          "description": "משקל ליחידה בק״ג"
+        }
+      }
     },
     "finishLabels": {
-      "carbon": "פלדה",
-      "galvanized": "מגולוון",
-      "paint": "צבע"
+      "carbon": "פח שחור",
+      "galvanized": "פח מגולוון",
+      "paint": "פח צבוע"
     }
   },
   "dashboard": {

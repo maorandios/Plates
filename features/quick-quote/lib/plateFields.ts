@@ -1,4 +1,5 @@
 import type { MaterialType } from "@/types/materials";
+import { t } from "@/lib/i18n";
 
 /** Surface / coating finish for plate line items (Quick Quote). */
 export type PlateFinish = "carbon" | "galvanized" | "paint";
@@ -11,6 +12,10 @@ export const PLATE_FINISH_OPTIONS: { value: PlateFinish; label: string }[] = [
 
 export const DEFAULT_PLATE_FINISH: PlateFinish = "carbon";
 
+function finishLabelKey(f: PlateFinish): string {
+  return `quote.finishLabels.${f}`;
+}
+
 /** Default material grade label for the selected material family (General step). */
 export function defaultMaterialGradeForFamily(materialType: MaterialType): string {
   if (materialType === "carbonSteel") return "S235";
@@ -19,7 +24,7 @@ export function defaultMaterialGradeForFamily(materialType: MaterialType): strin
 
 export function plateFinishLabel(finish: PlateFinish | undefined): string {
   const f = finish ?? DEFAULT_PLATE_FINISH;
-  return PLATE_FINISH_OPTIONS.find((o) => o.value === f)?.label ?? f;
+  return t(finishLabelKey(f));
 }
 
 /** Map a BOM cell value to a plate finish when possible. */
@@ -27,13 +32,17 @@ export function parsePlateFinishFromLabelOrValue(
   s: string | undefined
 ): PlateFinish | undefined {
   if (!s?.trim()) return undefined;
-  const t = s.trim().toLowerCase();
-  if (t === "carbon" || t === "galvanized" || t === "paint") {
-    return t as PlateFinish;
+  const low = s.trim().toLowerCase();
+  if (low === "carbon" || low === "galvanized" || low === "paint") {
+    return low as PlateFinish;
   }
-  if (t.includes("galvan")) return "galvanized";
-  if (t.includes("paint")) return "paint";
-  if (t.includes("carbon") || t.includes("black steel")) return "carbon";
+  if (low.includes("galvan")) return "galvanized";
+  if (low.includes("paint")) return "paint";
+  if (low.includes("carbon") || low.includes("black steel")) return "carbon";
+  const raw = s.trim();
+  if (raw.includes("פח מגולוון") || raw.includes("מגולוון")) return "galvanized";
+  if (raw.includes("פח צבוע") || raw.includes("צבוע")) return "paint";
+  if (raw.includes("פח שחור") || raw.includes("שחור")) return "carbon";
   return undefined;
 }
 
