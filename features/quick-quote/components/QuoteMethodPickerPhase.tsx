@@ -6,11 +6,10 @@ import {
   FileCode2,
   FileSpreadsheet,
   FoldHorizontal,
+  LayoutGrid,
   Package,
-  Square,
   Weight,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import type { DxfPartGeometry } from "@/types";
@@ -74,7 +73,7 @@ export function QuoteMethodPickerPhase({
   excelImportQuoteRows,
   dxfMethodGeometries,
   bendPlateQuoteItems,
-  selected,
+  selected: _selected,
   onSelect,
   onConfigureMethod,
 }: QuoteMethodPickerPhaseProps) {
@@ -106,7 +105,7 @@ export function QuoteMethodPickerPhase({
       )}
     >
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
               {t("quoteMethodScreen.title")}
@@ -123,19 +122,29 @@ export function QuoteMethodPickerPhase({
               value={formatInteger(metrics.totalQty)}
             />
             <MethodPhaseMetricStrip
-              icon={Square}
+              icon={LayoutGrid}
               label={t("methodMetrics.area")}
               value={formatDecimal(metrics.totalPlateAreaM2, 2)}
+              valueUnit={t("methodMetrics.unitM2")}
             />
             <MethodPhaseMetricStrip
               icon={Weight}
               label={t("methodMetrics.weight")}
               value={formatDecimal(metrics.totalEstWeightKg, 1)}
+              valueUnit={t("methodMetrics.unitKg")}
             />
           </div>
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <div
+            className="shrink-0 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4"
+            dir="rtl"
+          >
+            <p className="text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
+              {t("quoteMethodScreen.methodsStripe")}
+            </p>
+          </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 sm:p-5">
             <div
               className={cn(
@@ -145,7 +154,6 @@ export function QuoteMethodPickerPhase({
             >
               {OPTIONS.map(({ id, i18nPrefix, Icon }) => {
                 const title = t(`quote.methods.${i18nPrefix}.title`);
-                const isSelected = selected === id;
                 const hasData = methodHasData(
                   id,
                   manualQuoteRows,
@@ -154,49 +162,60 @@ export function QuoteMethodPickerPhase({
                   bendPlateQuoteItems
                 );
                 return (
-                  <div
+                  <button
                     key={id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(id);
+                      onConfigureMethod(id);
+                    }}
+                    aria-label={title}
                     className={cn(
-                      "flex h-full min-h-[14rem] flex-col rounded-xl border-2 bg-card p-5 text-center transition-all duration-150",
+                      "group flex h-full min-h-[14rem] min-w-0 flex-col items-center justify-center rounded-xl border-2 bg-card p-5 text-center transition-all duration-150",
+                      "cursor-pointer hover:border-primary/50 hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       hasData &&
                         "border-primary/70 shadow-sm ring-1 ring-primary/20",
-                      !hasData && "border-white/[0.08]",
-                      isSelected &&
-                        "ring-2 ring-primary/35 shadow-[0_0_20px_-4px_hsl(var(--primary)/0.35)]"
+                      !hasData && "border-white/[0.08]"
                     )}
                   >
-                    <button
-                      type="button"
-                      onClick={() => onSelect(id)}
-                      className="flex min-h-0 flex-1 flex-col items-center justify-center text-center gap-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg -m-1 p-1"
+                    <div
+                      className={cn(
+                        "mb-4 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors",
+                        hasData
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground group-hover:bg-muted/90"
+                      )}
                     >
-                      <div
+                      <Icon className="h-5 w-5" aria-hidden />
+                    </div>
+                    <div
+                      className={cn(
+                        "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5",
+                        hasData
+                          ? "border-primary/30 bg-primary/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                          : "border-white/[0.12] bg-muted/35"
+                      )}
+                      dir="rtl"
+                    >
+                      <span
                         className={cn(
-                          "mb-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-                          isSelected
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-foreground"
+                          "h-2 w-2 shrink-0 rounded-full",
+                          hasData
+                            ? "bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.65)]"
+                            : "bg-muted-foreground/50"
+                        )}
+                        aria-hidden
+                      />
+                      <span
+                        className={cn(
+                          "text-sm font-semibold leading-snug",
+                          hasData ? "text-foreground" : "text-muted-foreground"
                         )}
                       >
-                        <Icon className="h-5 w-5" aria-hidden />
-                      </div>
-                      <span className="text-base font-semibold text-foreground">{title}</span>
-                    </button>
-                    <div className="mt-auto shrink-0 border-t border-white/[0.08] pt-4">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => {
-                          onSelect(id);
-                          onConfigureMethod(id);
-                        }}
-                      >
-                        {t("common.continue")}
-                      </Button>
+                        {title}
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

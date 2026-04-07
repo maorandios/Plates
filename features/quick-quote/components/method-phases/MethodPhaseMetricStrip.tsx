@@ -6,11 +6,14 @@ import type { LucideIcon } from "lucide-react";
 export function MethodPhaseMetricStrip({
   label,
   value,
+  valueUnit,
   icon: Icon,
 }: {
   label: string;
   value: string;
   icon?: LucideIcon;
+  /** Shown inline next to the value in a smaller type (e.g. מ״ר, ק״ג). */
+  valueUnit?: string;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 px-5 py-5 sm:px-7 sm:py-6">
@@ -22,12 +25,22 @@ export function MethodPhaseMetricStrip({
         />
       ) : null}
       <p
-        className="font-semibold tabular-nums tracking-tight text-foreground leading-none
-          text-[clamp(2rem,6.5vmin,4.25rem)]"
+        className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0 leading-none"
+        dir={valueUnit ? "rtl" : undefined}
       >
-        {value}
+        <span
+          className="font-semibold tabular-nums tracking-tight text-foreground
+            text-[clamp(2rem,6.5vmin,4.25rem)]"
+        >
+          {value}
+        </span>
+        {valueUnit ? (
+          <span className="text-base font-semibold tabular-nums text-muted-foreground sm:text-lg">
+            {valueUnit}
+          </span>
+        ) : null}
       </p>
-      <p className="text-[11px] font-semibold leading-snug tracking-wide text-muted-foreground pt-1 max-w-[18rem]">
+      <p className="text-[22px] font-semibold leading-snug tracking-wide text-muted-foreground pt-1 max-w-[18rem]">
         {label}
       </p>
     </div>
