@@ -148,6 +148,7 @@ export function PlateGeometryCanvas({
 }: PlateGeometryCanvasProps) {
   const markingPaths = markingDebugPaths ?? [];
   const markingLabel = plateMarkingText.trim();
+  const previewModal = appearance === "previewModal" && !debugMode;
 
   const geomBounds = useMemo(() => {
     if (debugMode && debugCleaned) {
@@ -157,9 +158,17 @@ export function PlateGeometryCanvas({
     return geometry.boundingBox;
   }, [debugMode, debugCleaned, geometry, markingPaths]);
 
+  /** Modal preview: keep padding within canvas so fit never uses negative available width on narrow hosts. */
+  const viewPadding = useMemo(() => {
+    if (!previewModal) return 50;
+    const m = Math.min(width, height);
+    const maxPad = Math.floor((m - 1) / 2);
+    return Math.min(50, Math.max(0, maxPad));
+  }, [previewModal, width, height]);
+
   const transform = useMemo(() => {
-    return calculateViewTransform(geomBounds, width, height, 50);
-  }, [geomBounds, width, height]);
+    return calculateViewTransform(geomBounds, width, height, viewPadding);
+  }, [geomBounds, width, height, viewPadding]);
 
   const outerPoints = useMemo(() => {
     if (geometry.outer.length === 0) return [];
@@ -319,7 +328,6 @@ export function PlateGeometryCanvas({
     );
   }
 
-  const previewModal = appearance === "previewModal" && !debugMode;
   const holeStroke = previewModal
     ? "#00FF9F"
     : debugMode

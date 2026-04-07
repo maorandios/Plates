@@ -51,6 +51,8 @@ const MAPPING_FIELDS: MappingField[] = [
   { key: "weightCol", required: false },
 ];
 
+const MAPPING_COL_WIDTH_PCT = 100 / MAPPING_FIELDS.length;
+
 function fieldLabelKey(fieldKey: MappingField["key"]): string {
   return `quote.excelColumnMapping.fields.${fieldKey}.label`;
 }
@@ -238,7 +240,7 @@ export function ExcelColumnMappingModal({
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="min-w-0">
                   <CardHeader className="py-3">
                     <div className="flex items-center justify-between gap-2">
                       <div>
@@ -260,11 +262,22 @@ export function ExcelColumnMappingModal({
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="min-w-0 space-y-4">
                     {previewData && (
-                      <div className="space-y-2">
-                        <div className="rounded-md border min-w-0 overflow-x-auto">
-                          <Table className="w-max min-w-full table-auto">
+                      <div className="min-w-0 space-y-2">
+                        <div className="min-w-0 overflow-x-hidden rounded-md border px-2 sm:px-3">
+                          <Table
+                            containerClassName="overflow-visible"
+                            className="w-full max-w-full table-fixed border-collapse text-sm"
+                          >
+                            <colgroup>
+                              {MAPPING_FIELDS.map((field) => (
+                                <col
+                                  key={field.key}
+                                  style={{ width: `${MAPPING_COL_WIDTH_PCT}%` }}
+                                />
+                              ))}
+                            </colgroup>
                             <TableHeader>
                               <TableRow className="bg-muted/30">
                                 {MAPPING_FIELDS.map((field) => {
@@ -277,22 +290,24 @@ export function ExcelColumnMappingModal({
                                   return (
                                     <TableHead
                                       key={field.key}
-                                      className="p-2 align-top min-w-[15rem] max-w-none whitespace-nowrap"
+                                      className="!h-auto min-w-0 !px-2.5 !pt-[1.953125rem] !pb-[2.734375rem] align-top sm:!px-3 sm:!pt-[2.34375rem] sm:!pb-[3.125rem]"
                                     >
-                                      <div className="space-y-1.5 min-w-[15rem]">
-                                        <div className="flex items-center gap-1.5 whitespace-nowrap">
-                                          <span className="text-xs font-semibold">
+                                      <div className="min-w-0 space-y-[0.9765625rem]">
+                                        <div className="flex min-w-0 items-baseline gap-1 pt-1">
+                                          <span className="break-words text-sm font-semibold leading-snug">
                                             {t(fieldLabelKey(field.key))}
                                           </span>
                                           {field.required && (
-                                            <span className="text-destructive text-xs">*</span>
+                                            <span className="shrink-0 text-destructive text-sm">
+                                              *
+                                            </span>
                                           )}
                                         </div>
                                         <Select
                                           value={valueStr}
                                           onValueChange={(v) => updateMapping(field.key, v)}
                                         >
-                                          <SelectTrigger className="h-8 text-xs w-full min-w-[15rem] [&>span]:line-clamp-none [&>span]:flex-initial [&>span]:shrink-0 [&>span]:whitespace-nowrap [&>span]:overflow-visible">
+                                          <SelectTrigger className="h-8 w-full min-w-0 max-w-full px-2 text-sm [&>span]:min-w-0 [&>span]:truncate">
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -313,7 +328,7 @@ export function ExcelColumnMappingModal({
                                               ))}
                                           </SelectContent>
                                         </Select>
-                                        <p className="text-[10px] text-muted-foreground leading-tight whitespace-nowrap">
+                                        <p className="text-xs text-muted-foreground leading-relaxed break-words pt-[0.5859375rem] pb-[0.390625rem]">
                                           {t(fieldDescriptionKey(field.key))}
                                         </p>
                                       </div>
@@ -328,9 +343,14 @@ export function ExcelColumnMappingModal({
                                   {row.cells.map((cell, cellIndex) => (
                                     <TableCell
                                       key={cellIndex}
-                                      className="text-sm py-2 align-top whitespace-nowrap min-w-[15rem]"
+                                      className="overflow-hidden !px-1 !py-2 align-middle text-sm tabular-nums leading-normal"
                                     >
-                                      {cell.value}
+                                      <span
+                                        className="block min-w-0 whitespace-nowrap"
+                                        title={cell.value}
+                                      >
+                                        {cell.value}
+                                      </span>
                                     </TableCell>
                                   ))}
                                 </TableRow>

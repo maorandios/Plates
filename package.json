@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "predev": "node scripts/copy-svgnest-worker.mjs",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev --turbopack",
     "prebuild": "node scripts/copy-svgnest-worker.mjs",
     "build": "next build",
     "start": "next start",

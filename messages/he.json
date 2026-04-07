@@ -143,6 +143,12 @@
       "next": "המשך",
       "continueToReview": "המשך לסקירה",
       "complete": "סיום",
+      "excelDxfValidationBanner": {
+        "titleMismatch": "מצאנו אי התאמות בין קבצי DXF לטבלת ה EXCEL שצירפת!",
+        "bodyMismatch": "לחצו כאן לצפיה בניתוח הנתונים שביצענו עבורך",
+        "titleMatch": "רשימת Excel והגיאומטריה תואמים במסגרת הסבולת",
+        "bodyMatch": "פתחו את טבלת ההשוואה לפרטים או לייצוא דוח CSV."
+      },
       "dxfReviewTable": {
         "title": "טבלת סיכום DXF",
         "subtitle": "הצגת נתונים מתוך קבצי DXF",

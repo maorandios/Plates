@@ -5,7 +5,6 @@ import {
   useCallback,
   useMemo,
   useEffect,
-  useLayoutEffect,
   forwardRef,
   useImperativeHandle,
   useRef,
@@ -22,7 +21,6 @@ import {
   X,
   Check,
   Eye,
-  ChevronRight,
   Info,
   Hash,
   Tag,
@@ -434,8 +432,32 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   );
   const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [previewUploadIndex, setPreviewUploadIndex] = useState<number | null>(null);
-  const previewCanvasHostRef = useRef<HTMLDivElement>(null);
-  const [previewCanvasSize, setPreviewCanvasSize] = useState({ w: 640, h: 400 });
+  const previewCanvasResizeObserverRef = useRef<ResizeObserver | null>(null);
+  /** Measured host box; Konva size must match host (never force a min larger than the visible area). */
+  const [previewCanvasSize, setPreviewCanvasSize] = useState({ w: 0, h: 0 });
+
+  const setPreviewCanvasHostRef = useCallback((el: HTMLDivElement | null) => {
+    previewCanvasResizeObserverRef.current?.disconnect();
+    previewCanvasResizeObserverRef.current = null;
+
+    if (!el) {
+      setPreviewCanvasSize({ w: 0, h: 0 });
+      return;
+    }
+
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setPreviewCanvasSize({
+        w: Math.max(1, Math.floor(r.width)),
+        h: Math.max(1, Math.floor(r.height)),
+      });
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    previewCanvasResizeObserverRef.current = ro;
+  }, []);
   const [noExcelDefaultsBannerDismissed, setNoExcelDefaultsBannerDismissed] =
     useState(true);
 
@@ -510,23 +532,6 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       finish: upload.finish,
     };
   }, [previewUploadIndex, uploadedFiles, materialType]);
-
-  useLayoutEffect(() => {
-    if (previewUploadIndex === null) return;
-    const el = previewCanvasHostRef.current;
-    if (!el) return;
-    const measure = () => {
-      const r = el.getBoundingClientRect();
-      setPreviewCanvasSize({
-        w: Math.max(160, Math.floor(r.width)),
-        h: Math.max(160, Math.floor(r.height)),
-      });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [previewUploadIndex]);
 
   useEffect(() => {
     if (previewUploadIndex === null) return;
@@ -1483,36 +1488,43 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
             validationSummary &&
             validationRows &&
             validationRows.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setCompareModalOpen(true)}
-                className={cn(
-                  "w-full text-left rounded-lg border p-4 flex items-start gap-3 transition-colors",
-                  "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  validationSummary.warnings > 0 || validationSummary.critical > 0
-                    ? "border-amber-500/50 bg-amber-500/[0.06]"
-                    : "border-emerald-500/40 bg-emerald-500/[0.05]"
-                )}
-              >
+              <div className="flex w-full justify-start">
+                <button
+                  type="button"
+                  onClick={() => setCompareModalOpen(true)}
+                  className={cn(
+                    "inline-flex w-fit max-w-full items-center gap-3 rounded-lg border p-4 text-start transition-colors focus-visible:outline-none",
+                    validationSummary.warnings > 0 || validationSummary.critical > 0
+                      ? "excel-dxf-mismatch-banner"
+                      : "border-emerald-500/40 bg-emerald-500/[0.05] text-foreground hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  )}
+                >
                 {validationSummary.warnings > 0 || validationSummary.critical > 0 ? (
-                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-current" aria-hidden />
                 ) : (
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
                 )}
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="text-sm font-medium text-foreground">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-medium">
                     {validationSummary.warnings > 0 || validationSummary.critical > 0
-                      ? "We found differences between your Excel BOM and DXF geometry"
-                      : "Excel BOM and DXF geometry match within tolerance"}
+                      ? t("quote.dxfPhase.excelDxfValidationBanner.titleMismatch")
+                      : t("quote.dxfPhase.excelDxfValidationBanner.titleMatch")}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p
+                    className={cn(
+                      "text-xs",
+                      validationSummary.warnings > 0 || validationSummary.critical > 0
+                        ? "text-current"
+                        : "text-muted-foreground"
+                    )}
+                  >
                     {validationSummary.warnings > 0 || validationSummary.critical > 0
-                      ? "Open the full comparison table to review dimensions, area, weight, and material. You can export a CSV report."
-                      : "Open the comparison table to inspect details or export a CSV report."}
+                      ? t("quote.dxfPhase.excelDxfValidationBanner.bodyMismatch")
+                      : t("quote.dxfPhase.excelDxfValidationBanner.bodyMatch")}
                   </p>
                 </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
-              </button>
+                </button>
+              </div>
             )}
 
           {validationSummary && validationRows && validationRows.length > 0 && (
@@ -1834,28 +1846,33 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
             "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-white/10 bg-card p-0 sm:max-w-[30rem] sm:rounded-xl"
           )}
         >
-          <div className="flex min-h-0 flex-col overflow-hidden" dir="rtl">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden" dir="rtl">
             <DialogTitle className="sr-only">
               {t("quote.dxfPhase.partPreviewModal.a11yTitle")}
             </DialogTitle>
 
             {/* Top: plate preview — bottom: stats (two stacked bands, no side padding on stats grid) */}
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <div className="flex min-h-[min(45vh,475px)] flex-1 shrink-0 items-center justify-center px-5 py-6">
+              <div
+                className="flex min-h-[min(45vh,475px)] flex-1 shrink-0 items-center justify-center px-5 py-6"
+                dir="ltr"
+              >
                 <div
-                  ref={previewCanvasHostRef}
-                  className="relative flex h-[min(425px,52vh)] w-full max-w-full items-center justify-center overflow-hidden bg-transparent"
+                  ref={setPreviewCanvasHostRef}
+                  className="relative flex h-[min(425px,52vh)] w-full min-w-0 max-w-full items-center justify-center overflow-hidden bg-transparent"
                 >
-                  {previewPartStats && (
-                    <PlateGeometryCanvas
-                      geometry={previewPartStats.geom}
-                      unitSystem="metric"
-                      width={previewCanvasSize.w}
-                      height={previewCanvasSize.h}
-                      debugMode={false}
-                      appearance="previewModal"
-                    />
-                  )}
+                  {previewPartStats &&
+                    previewCanvasSize.w > 0 &&
+                    previewCanvasSize.h > 0 && (
+                      <PlateGeometryCanvas
+                        geometry={previewPartStats.geom}
+                        unitSystem="metric"
+                        width={previewCanvasSize.w}
+                        height={previewCanvasSize.h}
+                        debugMode={false}
+                        appearance="previewModal"
+                      />
+                    )}
                 </div>
               </div>
 
