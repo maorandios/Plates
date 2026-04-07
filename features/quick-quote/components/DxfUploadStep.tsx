@@ -76,6 +76,7 @@ import { mergeExcelIntoDxfUploads } from "../lib/dxfUploadExcelMerge";
 import { DXF_QUOTE_DEFAULT_THICKNESS_MM } from "../lib/dxfQuoteParts";
 import { ExcelColumnMappingModal } from "./ExcelColumnMappingModal";
 import { DxfExcelCompareModal } from "./DxfExcelCompareModal";
+import { t } from "@/lib/i18n";
 
 export type DxfUploadSubStep = 1 | 2 | 3;
 type DxfSubStep = DxfUploadSubStep;
@@ -85,6 +86,41 @@ const SUB_STEPS = [
   { step: 2 as DxfSubStep, label: "Parse" },
   { step: 3 as DxfSubStep, label: "Review" },
 ] as const;
+
+/** Crossing curved arrows (shuffle-style): lighter + primary strokes for DXF ↔ Excel sync. */
+function QuickSyncCrossIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden
+    >
+      <g
+        className="text-muted-foreground/55"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
+        <path d="m18 14 4 4-4 4" />
+      </g>
+      <g
+        className="text-primary"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
+        <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
+        <path d="m18 2 4 4-4 4" />
+      </g>
+    </svg>
+  );
+}
 
 function clampPositiveThicknessMm(raw: unknown): number {
   const n = typeof raw === "number" ? raw : Number(raw);
@@ -204,6 +240,11 @@ export type DxfUploadStepHandle = {
   attemptComplete: () => boolean;
   /** Advance upload → parse → review (steps 1–2); no-op on step 3. */
   attemptNext: () => boolean;
+  /**
+   * Review → parse/upload, parse → upload, or close Excel mapping modal.
+   * Returns false on step 1 (parent should exit the DXF phase to quote methods).
+   */
+  attemptBackWithinPhase: () => boolean;
   /** Clear all DXF/Excel session data and return to step 1; notifies parent via onSessionReset. */
   resetSession: () => void;
   /** True when there is no upload / Excel / progress to warn about before leaving the phase. */
@@ -212,6 +253,8 @@ export type DxfUploadStepHandle = {
 
 export type DxfUploadNavState = {
   subStep: DxfUploadSubStep;
+  /** Step 2 label: Parse vs Match (Excel BOM mapped). */
+  step2Mode: "parse" | "match";
   canGoNext: boolean;
   isReviewStep: boolean;
   /** Step 3: at least one valid part — enables Complete. */
@@ -240,6 +283,10 @@ interface DxfUploadStepProps {
   onExcelSessionPersist?: (payload: DxfMethodExcelSnapshot | null) => void;
   /** Hide bottom Continue / Back to parse buttons (quote method uses header Next / Complete / Reset). */
   hideBottomNavigation?: boolean;
+  /** Hide the internal Upload/Parse/Review sub-stepper (parent renders it in the top stripe). */
+  hideSubStepper?: boolean;
+  /** Quick Quote → DXF method only: {@link DxfQuotePhase} — RTL, Hebrew copy, two-column upload + sidebar nav. */
+  dxfQuotePhaseLayout?: boolean;
   /** Fired when sub-step or next-button availability changes (for header controls). */
   onDxfNavStateChange?: (state: DxfUploadNavState) => void;
   /** After internal reset: clear parent `dxfMethodGeometries` + Excel snapshot. */
@@ -257,6 +304,8 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       restoredExcelBundle,
       onExcelSessionPersist,
       hideBottomNavigation = false,
+      hideSubStepper = false,
+      dxfQuotePhaseLayout = false,
       onDxfNavStateChange,
       onSessionReset,
     },
@@ -530,6 +579,16 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     });
   }, []);
 
+  /** DXF quote phase: clear all uploaded DXF and return to empty drop zone (does not clear optional Excel). */
+  const handleClearDxfFiles = useCallback(() => {
+    setUploadedFiles([]);
+    setUploadError(null);
+    setSubStep(1);
+    setValidationRows(null);
+    setValidationSummary(null);
+    setCompareModalOpen(false);
+  }, []);
+
   const handleParseFiles = useCallback(() => {
     const parsed = parseDxfUploadsInPlace(uploadedFiles, materialType);
     const merged = mergeExcelIntoDxfUploads(parsed, null, materialType);
@@ -662,6 +721,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       !excelMappingModalOpen;
     onDxfNavStateChange({
       subStep,
+      step2Mode: mappedExcelRows?.length ? "match" : "parse",
       canGoNext,
       isReviewStep: subStep === 3,
       canCompleteReview: subStep === 3 && metrics.validParts > 0,
@@ -699,6 +759,21 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         }
         return false;
       },
+      attemptBackWithinPhase: () => {
+        if (excelMappingModalOpen) {
+          handleExcelMappingDiscard();
+          return true;
+        }
+        if (subStep === 3) {
+          handleBackToParse();
+          return true;
+        }
+        if (subStep === 2) {
+          handleBackToUpload();
+          return true;
+        }
+        return false;
+      },
       resetSession,
       canLeaveWithoutConfirm: () =>
         uploadedFiles.length === 0 &&
@@ -712,6 +787,9 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       handleContinueToNextPhase,
       handleContinueToParse,
       handleParseFiles,
+      handleBackToParse,
+      handleBackToUpload,
+      handleExcelMappingDiscard,
       resetSession,
       uploadedFiles.length,
       mappedExcelRows,
@@ -729,135 +807,231 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   };
 
   return (
-    <div className="space-y-6">
-      {/* Sub-Stepper */}
-      <Card className="border-0">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between gap-2">
-            {SUB_STEPS.map(({ step, label }, index) => {
-              const isComplete = step < subStep;
-              const isCurrent = step === subStep;
-              const displayLabel = index === 1 ? step2Label : label;
+    <div
+      className={cn(
+        "space-y-6",
+        dxfQuotePhaseLayout && "flex h-full min-h-0 flex-1 flex-col"
+      )}
+      dir={dxfQuotePhaseLayout ? "rtl" : undefined}
+    >
+      {/* Sub-Stepper — hidden when parent renders it in the quote-method top stripe */}
+      {!hideSubStepper && (
+        <Card className="border-0">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between gap-2">
+              {SUB_STEPS.map(({ step, label }, index) => {
+                const isComplete = step < subStep;
+                const isCurrent = step === subStep;
+                const displayLabel = index === 1 ? step2Label : label;
 
-              return (
-                <div key={step} className="flex items-center flex-1 last:flex-none">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div
-                      className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors",
-                        isComplete && "border-emerald-600 bg-emerald-600 text-white",
-                        isCurrent && !isComplete && "border-primary bg-primary text-primary-foreground",
-                        !isCurrent && !isComplete && "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
-                      )}
-                    >
-                      {isComplete ? <Check className="h-4 w-4" /> : step}
+                return (
+                  <div key={step} className="flex items-center flex-1 last:flex-none">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div
+                        className={cn(
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors",
+                          isComplete && "border-emerald-600 bg-emerald-600 text-white",
+                          isCurrent && !isComplete && "border-primary bg-primary text-primary-foreground",
+                          !isCurrent && !isComplete && "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        {isComplete ? <Check className="h-4 w-4" /> : step}
+                      </div>
+                      <span
+                        className={cn(
+                          "text-sm font-medium whitespace-nowrap",
+                          isCurrent && "text-foreground",
+                          !isCurrent && isComplete && "text-emerald-600",
+                          !isCurrent && !isComplete && "text-muted-foreground"
+                        )}
+                      >
+                        {displayLabel}
+                      </span>
                     </div>
-                    <span
-                      className={cn(
-                        "text-sm font-medium whitespace-nowrap",
-                        isCurrent && "text-foreground",
-                        !isCurrent && isComplete && "text-emerald-600",
-                        !isCurrent && !isComplete && "text-muted-foreground"
-                      )}
-                    >
-                      {displayLabel}
-                    </span>
+                    {index < SUB_STEPS.length - 1 && (
+                      <div
+                        className={cn(
+                          "h-0.5 flex-1 mx-3",
+                          step < subStep ? "bg-emerald-600" : "bg-border"
+                        )}
+                      />
+                    )}
                   </div>
-                  {index < SUB_STEPS.length - 1 && (
-                    <div
-                      className={cn(
-                        "h-0.5 flex-1 mx-3",
-                        step < subStep ? "bg-emerald-600" : "bg-border"
-                      )}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Step 1: DXF + optional Excel (two cards) */}
       {subStep === 1 && (
-        <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 md:items-stretch">
-            <Card className="flex flex-col">
+        <div
+          className={cn(
+            "space-y-4",
+            dxfQuotePhaseLayout && "flex h-full min-h-0 flex-1 flex-col"
+          )}
+        >
+          <div
+            className={cn(
+              "grid gap-4",
+              dxfQuotePhaseLayout
+                ? "h-full min-h-0 flex-1 grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_minmax(0,1fr)] md:gap-8 [grid-auto-rows:minmax(0,1fr)]"
+                : "md:grid-cols-2 md:items-stretch"
+            )}
+          >
+            <Card
+              className={cn(
+                "flex flex-col min-h-0",
+                dxfQuotePhaseLayout && "h-full min-h-[14rem] border-white/[0.08]"
+              )}
+            >
               <CardHeader>
-                <CardTitle>DXF files</CardTitle>
+                <CardTitle>
+                  {dxfQuotePhaseLayout
+                    ? t("quote.dxfPhase.dxfCardTitle")
+                    : "DXF files"}
+                </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Upload part geometry — required before continuing (multiple files supported).
+                  {dxfQuotePhaseLayout
+                    ? t("quote.dxfPhase.dxfCardSubtitle")
+                    : "Upload part geometry — required before continuing (multiple files supported)."}
                 </p>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-col">
-                <div
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  className={cn(
-                    "border-2 border-dashed rounded-lg p-8 text-center transition-colors flex-1 flex flex-col justify-center min-h-[200px]",
-                    isDragging
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  )}
-                >
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
-                      <Upload className="h-7 w-7 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Drag and drop DXF files here</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        or browse — multiple files allowed
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      accept=".dxf"
-                      multiple
-                      onChange={handleFileInputChange}
-                      className="hidden"
-                      id="dxf-upload"
-                    />
-                    <Button asChild variant="outline" size="sm">
-                      <label htmlFor="dxf-upload" className="cursor-pointer">
-                        <FileIcon className="h-4 w-4 mr-2" />
-                        Choose DXF files
-                      </label>
-                    </Button>
-                  </div>
-                </div>
-
-                {uploadedFiles.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <p className="text-sm font-medium">
-                      {uploadedFiles.length} file{uploadedFiles.length !== 1 ? "s" : ""} ready
-                    </p>
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                      {uploadedFiles.map((upload, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between gap-2 p-3 rounded-lg border bg-muted/30"
+              <CardContent className="flex min-h-0 flex-1 flex-col">
+                {dxfQuotePhaseLayout && uploadedFiles.length > 0 ? (
+                  <div
+                    className={cn(
+                      "grid min-h-[200px] flex-1 place-content-center place-items-center rounded-lg border-2 border-dashed border-emerald-500/25 bg-emerald-500/[0.04] p-6 text-center transition-colors sm:p-8"
+                    )}
+                  >
+                    <div className="flex w-full max-w-md flex-col items-center gap-4">
+                      {/* Inline colors: globals/base can override Tailwind arbitrary classes on nested text */}
+                      <div
+                        className="inline-flex max-w-full items-center gap-4 rounded-full border-2 px-5 py-2.5 text-sm font-medium leading-snug shadow-[inset_0_1px_0_rgba(0,255,159,0.08)]"
+                        style={{
+                          backgroundColor: "#0D281D",
+                          borderColor: "#00FF9F",
+                          color: "#00FFB7",
+                        }}
+                      >
+                        <svg
+                          width={12}
+                          height={12}
+                          viewBox="0 0 12 12"
+                          className="block shrink-0 animate-dxf-status-dot overflow-visible"
+                          aria-hidden
                         >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                            <span className="text-sm truncate">{upload.file.name}</span>
-                            <Badge variant="secondary" className="text-xs shrink-0">
-                              {formatDecimal(upload.file.size / 1024, 1)} KB
-                            </Badge>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveFile(index)}
-                            className="shrink-0"
-                          >
-                            <X className="h-4 w-4" />
+                          <circle cx="6" cy="6" r="5" fill="#00FF9F" />
+                        </svg>
+                        <span className="text-center" style={{ color: "#00FFB7" }}>
+                          {uploadedFiles.length === 1
+                            ? t("quote.dxfPhase.dxfFilesCapturedSummaryOne")
+                            : t("quote.dxfPhase.dxfFilesCapturedSummaryMany", {
+                                n: uploadedFiles.length,
+                              })}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-white/15 text-muted-foreground hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+                        onClick={handleClearDxfFiles}
+                        aria-label={t("quote.dxfPhase.dxfClearUploadAria")}
+                      >
+                        {t("quote.dxfPhase.dxfCancelUpload")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      className={cn(
+                        "border-2 border-dashed rounded-lg p-6 text-center transition-colors sm:p-8",
+                        dxfQuotePhaseLayout
+                          ? "grid min-h-[200px] flex-1 place-content-center place-items-center"
+                          : "flex min-h-[200px] flex-1 flex-col items-center justify-center",
+                        isDragging
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className="mx-auto flex w-full max-w-md flex-col items-center justify-center gap-4">
+                        <div className="h-14 w-14 shrink-0 rounded-full bg-muted flex items-center justify-center">
+                          <Upload className="h-7 w-7 text-muted-foreground" />
+                        </div>
+                        <div className="w-full text-balance">
+                          <p className="text-center text-sm font-medium leading-snug">
+                            {dxfQuotePhaseLayout
+                              ? t("quote.dxfPhase.dxfDropPrimary")
+                              : "Drag and drop DXF files here"}
+                          </p>
+                          <p className="mt-1.5 text-center text-xs leading-relaxed text-muted-foreground">
+                            {dxfQuotePhaseLayout
+                              ? t("quote.dxfPhase.dxfDropSecondary")
+                              : "or browse — multiple files allowed"}
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          accept=".dxf"
+                          multiple
+                          onChange={handleFileInputChange}
+                          className="hidden"
+                          id="dxf-upload"
+                        />
+                        <div className="flex w-full justify-center">
+                          <Button asChild variant="outline" size="sm">
+                            <label
+                              htmlFor="dxf-upload"
+                              className="cursor-pointer inline-flex items-center justify-center gap-2 text-center"
+                            >
+                              <FileIcon className="h-4 w-4 shrink-0" aria-hidden />
+                              {dxfQuotePhaseLayout
+                                ? t("quote.dxfPhase.dxfChooseFiles")
+                                : "Choose DXF files"}
+                            </label>
                           </Button>
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
+
+                    {uploadedFiles.length > 0 && !dxfQuotePhaseLayout && (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-sm font-medium">
+                          {`${uploadedFiles.length} file${uploadedFiles.length !== 1 ? "s" : ""} ready`}
+                        </p>
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                          {uploadedFiles.map((upload, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between gap-2 p-3 rounded-lg border bg-muted/30"
+                            >
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <span className="text-sm truncate">{upload.file.name}</span>
+                                <Badge variant="secondary" className="text-xs shrink-0">
+                                  {formatDecimal(upload.file.size / 1024, 1)} KB
+                                </Badge>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveFile(index)}
+                                className="shrink-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {uploadError && (
@@ -869,43 +1043,75 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
               </CardContent>
             </Card>
 
-            <Card className="flex flex-col border-0">
+            {dxfQuotePhaseLayout && (
+              <div className="flex min-h-0 flex-col items-center justify-center gap-5 px-6 py-10 md:self-stretch md:px-8 md:py-6 lg:px-12 lg:py-8">
+                <p className="max-w-[12rem] text-center text-xs font-semibold uppercase leading-snug tracking-[0.1em] text-muted-foreground sm:text-[13px]">
+                  {t("quote.dxfPhase.quickSync")}
+                </p>
+                <div className="relative flex shrink-0 items-center justify-center" aria-hidden>
+                  <QuickSyncCrossIcon className="h-[4.5rem] w-[4.5rem] sm:h-[5.25rem] sm:w-[5.25rem]" />
+                </div>
+              </div>
+            )}
+
+            <Card
+              className={cn(
+                "flex flex-col min-h-0",
+                dxfQuotePhaseLayout
+                  ? "h-full min-h-[14rem] border border-white/[0.08]"
+                  : "border-0"
+              )}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
-                      Excel / CSV
+                    <CardTitle className="flex flex-wrap items-center gap-2">
+                      {dxfQuotePhaseLayout
+                        ? t("quote.dxfPhase.excelCardTitle")
+                        : "Excel / CSV"}
                       <Badge variant="outline" className="font-normal text-muted-foreground">
-                        Optional
+                        {dxfQuotePhaseLayout
+                          ? t("quote.dxfPhase.excelOptionalBadge")
+                          : "Optional"}
                       </Badge>
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
-                      BOM or part list for matching. After you choose a file, a dialog opens to map
-                      columns (same as the main Excel upload step). Skip if you only have DXF.
+                      {dxfQuotePhaseLayout
+                        ? t("quote.dxfPhase.excelCardSubtitle")
+                        : "BOM or part list for matching. After you choose a file, a dialog opens to map columns (same as the main Excel upload step). Skip if you only have DXF."}
                     </p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-col">
+              <CardContent className="flex min-h-0 flex-1 flex-col">
                 <div
                   onDrop={handleExcelDrop}
                   onDragOver={handleExcelDragOver}
                   onDragLeave={handleExcelDragLeave}
                   className={cn(
-                    "border-2 border-dashed rounded-lg p-8 text-center transition-colors flex-1 flex flex-col justify-center min-h-[200px]",
+                    "border-2 border-dashed rounded-lg p-6 text-center transition-colors sm:p-8",
+                    dxfQuotePhaseLayout
+                      ? "grid min-h-[200px] flex-1 place-content-center place-items-center"
+                      : "flex min-h-[200px] flex-1 flex-col items-center justify-center",
                     isDraggingExcel
                       ? "border-primary bg-primary/5"
                       : "border-border/80 hover:border-muted-foreground/40"
                   )}
                 >
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
+                  <div className="mx-auto flex w-full max-w-md flex-col items-center justify-center gap-4">
+                    <div className="h-14 w-14 shrink-0 rounded-full bg-muted flex items-center justify-center">
                       <FileSpreadsheet className="h-7 w-7 text-muted-foreground" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">Drop Excel or CSV here</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        One file — mapping opens in a dialog
+                    <div className="w-full text-balance">
+                      <p className="text-center text-sm font-medium leading-snug">
+                        {dxfQuotePhaseLayout
+                          ? t("quote.dxfPhase.excelDropPrimary")
+                          : "Drop Excel or CSV here"}
+                      </p>
+                      <p className="mt-1.5 text-center text-xs leading-relaxed text-muted-foreground">
+                        {dxfQuotePhaseLayout
+                          ? t("quote.dxfPhase.excelDropSecondary")
+                          : "One file — mapping opens in a dialog"}
                       </p>
                     </div>
                     <input
@@ -916,12 +1122,19 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                       id="dxf-step-excel-upload"
                       key={optionalExcelFile?.name ?? "no-excel"}
                     />
-                    <Button asChild variant="outline" size="sm">
-                      <label htmlFor="dxf-step-excel-upload" className="cursor-pointer">
-                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                        Choose spreadsheet
-                      </label>
-                    </Button>
+                    <div className="flex w-full justify-center">
+                      <Button asChild variant="outline" size="sm">
+                        <label
+                          htmlFor="dxf-step-excel-upload"
+                          className="cursor-pointer inline-flex items-center justify-center gap-2 text-center"
+                        >
+                          <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden />
+                          {dxfQuotePhaseLayout
+                            ? t("quote.dxfPhase.excelChooseFile")
+                            : "Choose spreadsheet"}
+                        </label>
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -934,7 +1147,11 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                         {formatDecimal(optionalExcelFile.size / 1024, 1)} KB
                       </Badge>
                       <Badge className="text-xs shrink-0 bg-emerald-600/15 text-emerald-800 dark:text-emerald-200">
-                        {mappedExcelRows.length} rows mapped
+                        {dxfQuotePhaseLayout
+                          ? t("quote.dxfPhase.excelRowsMapped", {
+                              n: mappedExcelRows.length,
+                            })
+                          : `${mappedExcelRows.length} rows mapped`}
                       </Badge>
                     </div>
                     <Button

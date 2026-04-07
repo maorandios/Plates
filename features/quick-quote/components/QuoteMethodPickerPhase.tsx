@@ -3,13 +3,13 @@
 import { useMemo } from "react";
 import {
   ClipboardList,
-  FileCode2,
   FileSpreadsheet,
   FoldHorizontal,
   LayoutGrid,
   Package,
   Weight,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import type { DxfPartGeometry } from "@/types";
@@ -20,14 +20,15 @@ import { jobSummaryFromParts } from "../lib/deriveQuoteSelection";
 import { mergeAllQuoteMethodParts } from "../lib/mergeAllQuoteMethods";
 import { dxfMethodHasQuotableParts } from "../lib/dxfQuoteParts";
 import { MethodPhaseMetricStrip } from "./method-phases/MethodPhaseMetricStrip";
+import { DxfFileBadgeIcon } from "./icons/DxfFileBadgeIcon";
 import { t } from "@/lib/i18n";
 
 const OPTIONS: {
   id: QuoteCreationMethod;
   i18nPrefix: "dxf" | "manualAdd" | "excelImport" | "bendPlate";
-  Icon: typeof FileCode2;
+  Icon: LucideIcon | typeof DxfFileBadgeIcon;
 }[] = [
-  { id: "dxf", i18nPrefix: "dxf", Icon: FileCode2 },
+  { id: "dxf", i18nPrefix: "dxf", Icon: DxfFileBadgeIcon },
   { id: "manualAdd", i18nPrefix: "manualAdd", Icon: ClipboardList },
   { id: "excelImport", i18nPrefix: "excelImport", Icon: FileSpreadsheet },
   { id: "bendPlate", i18nPrefix: "bendPlate", Icon: FoldHorizontal },
@@ -172,10 +173,11 @@ export function QuoteMethodPickerPhase({
                     aria-label={title}
                     className={cn(
                       "group flex h-full min-h-[14rem] min-w-0 flex-col items-center justify-center rounded-xl border-2 bg-card p-5 text-center transition-all duration-150",
-                      "cursor-pointer hover:border-primary/50 hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       hasData &&
-                        "border-primary/70 shadow-sm ring-1 ring-primary/20",
-                      !hasData && "border-white/[0.08]"
+                        "border-primary shadow-[0_0_28px_-10px_hsl(var(--primary)/0.55)] ring-2 ring-primary/50 hover:border-primary hover:ring-primary/60",
+                      !hasData &&
+                        "border-white/[0.08] hover:border-primary/50 hover:bg-card/90"
                     )}
                   >
                     <div

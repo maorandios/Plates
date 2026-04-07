@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronRight, RotateCcw } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  Package,
+  RotateCcw,
+  Weight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +22,7 @@ import {
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import type { DxfPartGeometry } from "@/types";
-import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
+import type { MaterialType } from "@/types/materials";
 import type { DxfMethodExcelSnapshot } from "../../types/quickQuote";
 import {
   DxfUploadStep,
@@ -23,12 +31,11 @@ import {
   type DxfUploadStepHandle,
 } from "../DxfUploadStep";
 import { MethodPhaseMetricStrip } from "./MethodPhaseMetricStrip";
+import { t } from "@/lib/i18n";
 
 interface DxfQuotePhaseProps {
   materialType: MaterialType;
-  /** Parent copy of approved DXF parts — used to restore the upload/review UI when returning after Complete. */
   savedDxfGeometries: DxfPartGeometry[];
-  /** Optional Excel BOM persisted with the DXF method session. */
   savedDxfExcel: DxfMethodExcelSnapshot | null;
   onSavedDxfExcelChange: (payload: DxfMethodExcelSnapshot | null) => void;
   onGeometriesApproved: (data: DxfPartGeometry[]) => void;
@@ -46,9 +53,6 @@ const defaultMetrics: DxfPhaseMetricsPayload = {
   dxfFileCount: 0,
 };
 
-/**
- * Quote method “DXF import” — same shell as manual / Excel (aside metrics + header Back / Complete).
- */
 export function DxfQuotePhase({
   materialType,
   savedDxfGeometries,
@@ -66,8 +70,6 @@ export function DxfQuotePhase({
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [dxfNavState, setDxfNavState] = useState<DxfUploadNavState | null>(null);
-
-  const plateTypeLabel = MATERIAL_TYPE_LABELS[materialType];
 
   const handlePhaseMetricsChange = useCallback((payload: DxfPhaseMetricsPayload) => {
     setPhaseMetrics(payload);
@@ -90,6 +92,9 @@ export function DxfQuotePhase({
   }, [onGeometriesApproved, onSavedDxfExcelChange]);
 
   function handleBackClick() {
+    if (dxfRef.current?.attemptBackWithinPhase()) {
+      return;
+    }
     if (dxfRef.current?.canLeaveWithoutConfirm()) {
       onBack();
       return;
@@ -156,97 +161,50 @@ export function DxfQuotePhase({
         "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
         MANUAL_PHASE_VIEWPORT
       )}
+      dir="rtl"
     >
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-border/80">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
-              DXF import
+              {t("quote.dxfPhase.sidebarTitle")}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Upload DXF files, parse geometry, then review quantities and finishes before merging
-              into the quote.
-            </p>
-            <p className="text-xs text-muted-foreground pt-1">
-              Plate type from General:{" "}
-              <span className="font-medium text-foreground">{plateTypeLabel}</span>
+              {t("quote.dxfPhase.sidebarIntro")}
             </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/70">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
             <MethodPhaseMetricStrip
-              label="Quantity"
+              icon={Package}
+              label={t("methodMetrics.quantity")}
               value={asideMetrics.qtyLabel}
             />
             <MethodPhaseMetricStrip
-              label="Area (m²)"
+              icon={LayoutGrid}
+              label={t("methodMetrics.area")}
               value={asideMetrics.areaLabel}
+              valueUnit={t("methodMetrics.unitM2")}
             />
             <MethodPhaseMetricStrip
-              label="Weight (kg)"
+              icon={Weight}
+              label={t("methodMetrics.weight")}
               value={asideMetrics.weightLabel}
+              valueUnit={t("methodMetrics.unitKg")}
             />
           </div>
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 ds-surface-header sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground">Upload &amp; review</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {asideMetrics.fileLabel} DXF file
-                  {phaseMetrics.dxfFileCount === 1 ? "" : "s"} in session · scroll the panel below
-                  when the list grows.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  className="gap-2"
-                  onClick={handleBackClick}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  className="gap-2"
-                  onClick={handleResetClick}
-                  disabled={dxfNavState != null && !dxfNavState.canReset}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Reset
-                </Button>
-                <Button
-                  type="button"
-                  size="default"
-                  className="gap-2"
-                  disabled={primaryDisabled}
-                  onClick={handlePrimaryActionClick}
-                >
-                  {dxfNavState?.isReviewStep ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      Complete
-                    </>
-                  ) : (
-                    <>
-                      <ChevronRight className="h-4 w-4" />
-                      Next
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+          <div className="shrink-0 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4">
+            <p className="text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
+              {t("quote.dxfPhase.stripe")}
+            </p>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="p-4 sm:p-5">
+          <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 sm:p-5">
+            {/* Fills scroll viewport so DXF + Excel upload cards get real height for vertical centering */}
+            <div className="flex min-h-0 flex-1 flex-col">
               <DxfUploadStep
                 ref={dxfRef}
                 materialType={materialType}
@@ -258,11 +216,59 @@ export function DxfQuotePhase({
                 restoredExcelBundle={savedDxfExcel ?? undefined}
                 onExcelSessionPersist={handleExcelSessionPersist}
                 hideBottomNavigation
+                hideSubStepper
+                dxfQuotePhaseLayout
                 onDxfNavStateChange={handleDxfNavStateChange}
                 onSessionReset={handleSessionReset}
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Full viewport width — same pattern as method picker: sidebar ends above this bar */}
+      <div
+        className="shrink-0 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+        dir="ltr"
+      >
+        <div className="flex flex-wrap items-center justify-start gap-2">
+          <Button
+            type="button"
+            className="gap-2"
+            disabled={primaryDisabled}
+            onClick={handlePrimaryActionClick}
+          >
+            {dxfNavState?.isReviewStep ? (
+              <>
+                <Check className="h-4 w-4" aria-hidden />
+                {t("quote.dxfPhase.complete")}
+              </>
+            ) : (
+              <>
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+                {t("quote.dxfPhase.next")}
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="inline-flex flex-row gap-2"
+            onClick={handleBackClick}
+          >
+            <span>{t("quote.dxfPhase.back")}</span>
+            <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={handleResetClick}
+            disabled={dxfNavState != null && !dxfNavState.canReset}
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            {t("quote.dxfPhase.reset")}
+          </Button>
         </div>
       </div>
 

@@ -97,24 +97,25 @@ body {
   text-align: start;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p {
-  text-align: start;
-}
-
-input,
-textarea,
-select {
-  text-align: start;
-}
-
 /* Native fields (and fallbacks): match shared Input styling app-wide */
 @layer base {
+  /* In @layer base so Tailwind utilities (e.g. text-center) can override without !important */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    text-align: start;
+  }
+
+  input,
+  textarea,
+  select {
+    text-align: start;
+  }
+
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
       [type="hidden"]
     ):not([type="image"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]),
@@ -122,6 +123,11 @@ select {
   select {
     background-color: rgb(12, 19, 24);
     border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  table th,
+  table td {
+    text-align: start;
   }
 }
 
@@ -142,13 +148,24 @@ select:-webkit-autofill:focus {
   transition: background-color 99999s ease-out 0s;
 }
 
-table th,
-table td {
-  text-align: start;
+/* DXF upload summary — calm “active” pulse (opacity only: avoids SVG+transform bugs in some browsers) */
+@keyframes dxf-status-dot-active {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.48;
+  }
 }
 
 /* Quote / industrial shells — use with Card-like wrappers */
 @layer utilities {
+  .animate-dxf-status-dot {
+    animation: dxf-status-dot-active 2.75s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+    will-change: opacity;
+  }
+
   .ds-surface {
     @apply rounded-xl border-0 bg-card shadow-sm;
   }
