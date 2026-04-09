@@ -97,14 +97,16 @@ export function MethodDetailsRouter({
         </div>
       );
     case "manualAdd":
-      return shell(
-        <ManualQuotePhase
-          materialType={materialType}
-          rows={manualQuoteRows}
-          onRowsChange={onManualQuoteRowsChange}
-          onBack={onBackToMethodPicker}
-          onComplete={onBackToMethodPicker}
-        />
+      return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <ManualQuotePhase
+            materialType={materialType}
+            rows={manualQuoteRows}
+            onRowsChange={onManualQuoteRowsChange}
+            onBack={onBackToMethodPicker}
+            onComplete={onBackToMethodPicker}
+          />
+        </div>
       );
     case "excelImport":
       return (

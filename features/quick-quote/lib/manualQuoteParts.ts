@@ -11,29 +11,35 @@ import { QUOTE_METHOD_LABEL } from "./mergeQuotePlates";
 import type { QuotePartRow } from "../types/quickQuote";
 import type { ManualQuotePartRow } from "../types/quickQuote";
 
+/** Stable codes for missing/invalid manual fields — map to locale in UI. */
+export type ManualRowIssueCode =
+  | "thicknessMm"
+  | "widthMm"
+  | "lengthMm"
+  | "quantity"
+  | "material";
+
 /** Per-row issues for manual entry — empty array means the row is complete enough to finish. */
-export function getManualRowValidationIssues(row: ManualQuotePartRow): string[] {
-  const issues: string[] = [];
-  if (!(Number(row.thicknessMm) > 0)) issues.push("thickness (mm)");
-  if (!(Number(row.widthMm) > 0)) issues.push("width (mm)");
-  if (!(Number(row.lengthMm) > 0)) issues.push("length (mm)");
+export function getManualRowValidationIssues(row: ManualQuotePartRow): ManualRowIssueCode[] {
+  const issues: ManualRowIssueCode[] = [];
+  if (!(Number(row.thicknessMm) > 0)) issues.push("thicknessMm");
+  if (!(Number(row.widthMm) > 0)) issues.push("widthMm");
+  if (!(Number(row.lengthMm) > 0)) issues.push("lengthMm");
   if (!(Math.floor(row.quantity) >= 1)) issues.push("quantity");
-  if (!(row.material ?? "").trim()) issues.push("material grade");
+  if (!(row.material ?? "").trim()) issues.push("material");
   return issues;
 }
 
-/** Human-readable lines for dialog; null if every row is valid. */
-export function getManualQuoteValidationLines(rows: ManualQuotePartRow[]): string[] | null {
-  const lines: string[] = [];
+/** 1-based row numbers with issue codes — empty if all rows valid. */
+export function getManualQuoteRowsWithValidationIssues(
+  rows: ManualQuotePartRow[]
+): { rowNumber: number; issues: ManualRowIssueCode[] }[] {
+  const out: { rowNumber: number; issues: ManualRowIssueCode[] }[] = [];
   rows.forEach((row, index) => {
-    const rowIssues = getManualRowValidationIssues(row);
-    if (rowIssues.length > 0) {
-      lines.push(
-        `Row ${index + 1}: add ${rowIssues.join(", ")}.`
-      );
-    }
+    const issues = getManualRowValidationIssues(row);
+    if (issues.length > 0) out.push({ rowNumber: index + 1, issues });
   });
-  return lines.length > 0 ? lines : null;
+  return out;
 }
 
 /** Line total area (m²) = (width × length / 1e6) × quantity — matches sidebar totals. */

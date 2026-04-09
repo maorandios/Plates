@@ -1,7 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowLeft, Check, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Check,
+  ChevronRight,
+  Eye,
+  LayoutGrid,
+  Package,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Weight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,7 +42,7 @@ import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { nanoid } from "@/lib/utils/nanoid";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
+import type { MaterialType } from "@/types/materials";
 import {
   DEFAULT_PLATE_FINISH,
   PLATE_FINISH_OPTIONS,
@@ -42,26 +52,28 @@ import type { PlateFinish } from "../../lib/plateFields";
 import type { ManualQuotePartRow } from "../../types/quickQuote";
 import {
   computeManualQuoteMetrics,
-  getManualQuoteValidationLines,
+  getManualQuoteRowsWithValidationIssues,
   getManualRowValidationIssues,
   manualRowLineAreaM2,
   manualRowLineWeightKg,
+  type ManualRowIssueCode,
 } from "../../lib/manualQuoteParts";
 import { MethodPhaseMetricStrip } from "./MethodPhaseMetricStrip";
+import { ManualPartPreviewDialog } from "./ManualPartPreviewDialog";
 
 interface ManualQuotePhaseProps {
   materialType: MaterialType;
   rows: ManualQuotePartRow[];
   onRowsChange: (rows: ManualQuotePartRow[]) => void;
-  /** Return to the quote method step (e.g. step back in the wizard). */
+  /** Return to the quote method picker. */
   onBack: () => void;
   /** Called when the user completes this phase and validation passes — e.g. return to quote methods. */
   onComplete: () => void;
 }
 
-/** Fills content area below stepper (parent must be flex with min-h-0). */
-const MANUAL_PHASE_VIEWPORT =
-  "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
+const MANUAL_PHASE_VIEWPORT = "flex h-full min-h-0 max-h-full flex-col";
+
+const MP = "quote.manualPhase";
 
 function createRow(materialType: MaterialType): ManualQuotePartRow {
   return {
@@ -88,14 +100,35 @@ export function ManualQuotePhase({
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [validationLines, setValidationLines] = useState<string[]>([]);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [previewRowId, setPreviewRowId] = useState<string | null>(null);
 
   const materialConfig = useMemo(() => getMaterialConfig(materialType), [materialType]);
-  const plateTypeLabel = MATERIAL_TYPE_LABELS[materialType];
 
   const metrics = useMemo(
     () => computeManualQuoteMetrics(rows, materialConfig.densityKgPerM3),
     [rows, materialConfig.densityKgPerM3]
   );
+
+  const rowIssuesList = useMemo(() => getManualQuoteRowsWithValidationIssues(rows), [rows]);
+  const primaryDisabled = rows.length === 0 || rowIssuesList.length > 0;
+  const canReset = rows.length > 0;
+
+  const previewRow = useMemo(
+    () => (previewRowId ? (rows.find((r) => r.id === previewRowId) ?? null) : null),
+    [previewRowId, rows]
+  );
+  const previewLineNumber = useMemo(() => {
+    if (!previewRowId) return 0;
+    const i = rows.findIndex((r) => r.id === previewRowId);
+    return i >= 0 ? i + 1 : 0;
+  }, [previewRowId, rows]);
+
+  useEffect(() => {
+    if (previewRowId && !rows.some((r) => r.id === previewRowId)) {
+      setPreviewRowId(null);
+    }
+  }, [previewRowId, rows]);
 
   function patchRow(id: string, patch: Partial<ManualQuotePartRow>) {
     onRowsChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -115,7 +148,7 @@ export function ManualQuotePhase({
       onBack();
       return;
     }
-    const incomplete = getManualQuoteValidationLines(rows);
+    const incomplete = rows.some((r) => getManualRowValidationIssues(r).length > 0);
     if (incomplete) {
       setBackConfirmOpen(true);
       return;
@@ -130,15 +163,37 @@ export function ManualQuotePhase({
     onBack();
   }
 
+  function handleResetClick() {
+    setResetConfirmOpen(true);
+  }
+
+  function confirmResetSession() {
+    setResetConfirmOpen(false);
+    onRowsChange([]);
+  }
+
   function handleCompleteClick() {
     if (rows.length === 0) {
-      setValidationLines(["Add at least one line item before completing."]);
+      setValidationLines([t(`${MP}.validationEmpty`)]);
       setValidationDialogOpen(true);
       return;
     }
-    const lines = getManualQuoteValidationLines(rows);
-    if (lines) {
-      setValidationLines(lines);
+    if (rowIssuesList.length > 0) {
+      const issueLabels: Record<ManualRowIssueCode, string> = {
+        thicknessMm: t(`${MP}.issueThickness`),
+        widthMm: t(`${MP}.issueWidth`),
+        lengthMm: t(`${MP}.issueLength`),
+        quantity: t(`${MP}.issueQuantity`),
+        material: t(`${MP}.issueMaterial`),
+      };
+      setValidationLines(
+        rowIssuesList.map(({ rowNumber, issues }) =>
+          t(`${MP}.validationRow`, {
+            n: rowNumber,
+            fields: issues.map((c) => issueLabels[c]).join(", "),
+          })
+        )
+      );
       setValidationDialogOpen(true);
       return;
     }
@@ -147,250 +202,291 @@ export function ManualQuotePhase({
 
   return (
     <div
-      className={cn(
-        "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
-        MANUAL_PHASE_VIEWPORT
-      )}
+      className={cn("flex w-full min-w-0 flex-col gap-0", MANUAL_PHASE_VIEWPORT)}
+      dir="rtl"
     >
-      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-border/80">
+      <div className="flex min-h-0 min-w-0 flex-1 gap-0">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
-              Manually add parts
+            <h1 className="text-xl font-semibold text-foreground leading-snug">
+              {t(`${MP}.sidebarTitle`)}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Enter line items in millimeters. Plate names are assigned when you merge sources into
-              one quote table.
-            </p>
-            <p className="text-xs text-muted-foreground pt-1">
-              Plate type from General:{" "}
-              <span className="font-medium text-foreground">{plateTypeLabel}</span>
+              {t(`${MP}.sidebarIntro`)}
             </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/70">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
             <MethodPhaseMetricStrip
-              label="Quantity"
+              icon={Package}
+              label={t("methodMetrics.quantity")}
               value={formatInteger(metrics.totalQty)}
             />
             <MethodPhaseMetricStrip
-              label="Area (m²)"
+              icon={LayoutGrid}
+              label={t("methodMetrics.area")}
               value={formatDecimal(metrics.totalAreaM2, 2)}
+              valueUnit={t("methodMetrics.unitM2")}
             />
             <MethodPhaseMetricStrip
-              label="Weight (kg)"
+              icon={Weight}
+              label={t("methodMetrics.weight")}
               value={formatDecimal(metrics.totalWeightKg, 1)}
+              valueUnit={t("methodMetrics.unitKg")}
             />
           </div>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 ds-surface-header sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground">Line items</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Add parts as needed. Only this panel scrolls when the list grows.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  className="gap-2"
-                  onClick={handleBackClick}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Button>
-                <Button
-                  type="button"
-                  size="default"
-                  className="gap-2"
-                  onClick={handleCompleteClick}
-                >
-                  <Check className="h-4 w-4" />
-                  Complete
-                </Button>
-              </div>
-            </div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+          <div
+            className="flex shrink-0 items-center gap-3 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4"
+            dir="rtl"
+          >
+            <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
+              {t(`${MP}.stripe`)}
+            </p>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="p-4 sm:p-5">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
               {rows.length === 0 ? (
-                <div
-                  className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 ds-empty-state"
-                >
-                  <p className="text-sm text-muted-foreground text-center max-w-sm">
-                    No parts yet. Add a line to enter thickness, width, length, and quantity.
+                <div className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 py-8">
+                  <p className="text-sm text-muted-foreground text-center max-w-sm leading-relaxed">
+                    {t(`${MP}.emptyState`)}
                   </p>
-                  <Button type="button" size="default" className="gap-2" onClick={addRow}>
-                    <Plus className="h-4 w-4" />
-                    Add new Part
-                  </Button>
+                  <div className="flex justify-center">
+                    <Button type="button" size="default" className="gap-2" onClick={addRow}>
+                      <Plus className="h-4 w-4" aria-hidden />
+                      {t(`${MP}.addPart`)}
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <>
-              <div className="rounded-xl border-0 overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 hover:bg-muted/50">
-                      <TableHead className="text-xs font-semibold w-12 text-center">#</TableHead>
-                      <TableHead className="text-xs font-semibold w-[110px]">
-                        Thickness (mm)
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold w-[120px]">Width (mm)</TableHead>
-                      <TableHead className="text-xs font-semibold w-[120px]">Length (mm)</TableHead>
-                      <TableHead className="text-xs font-semibold w-[100px]">Quantity</TableHead>
-                      <TableHead className="text-xs font-semibold w-[110px] text-right">
-                        Area (m²)
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold w-[110px] text-right">
-                        Weight (kg)
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold min-w-[140px]">
-                        Material grade
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold min-w-[120px]">Finish</TableHead>
-                      <TableHead className="text-xs font-semibold w-[100px] text-right">
-                        Actions
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((row, index) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="py-2 align-middle text-center text-muted-foreground text-sm tabular-nums">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="py-2 align-middle">
-                          <Input
-                            type="number"
-                            min={0.1}
-                            step={0.01}
-                            className="h-9 font-mono tabular-nums text-sm w-[100px]"
-                            value={row.thicknessMm > 0 ? row.thicknessMm : ""}
-                            onChange={(e) =>
-                              patchRow(row.id, {
-                                thicknessMm: Math.max(0, Number(e.target.value) || 0),
-                              })
-                            }
-                            placeholder="0"
-                            aria-label="Thickness mm"
-                          />
-                        </TableCell>
-                        <TableCell className="py-2 align-middle">
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            className="h-9 font-mono tabular-nums text-sm"
-                            value={row.widthMm > 0 ? row.widthMm : ""}
-                            onChange={(e) =>
-                              patchRow(row.id, { widthMm: Number(e.target.value) })
-                            }
-                            placeholder="0"
-                            aria-label="Width mm"
-                          />
-                        </TableCell>
-                        <TableCell className="py-2 align-middle">
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            className="h-9 font-mono tabular-nums text-sm"
-                            value={row.lengthMm > 0 ? row.lengthMm : ""}
-                            onChange={(e) =>
-                              patchRow(row.id, { lengthMm: Number(e.target.value) })
-                            }
-                            placeholder="0"
-                            aria-label="Length mm"
-                          />
-                        </TableCell>
-                        <TableCell className="py-2 align-middle">
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            className="h-9 font-mono tabular-nums text-sm w-[88px]"
-                            value={row.quantity > 0 ? row.quantity : ""}
-                            onChange={(e) =>
-                              patchRow(row.id, {
-                                quantity: Math.max(0, Math.floor(Number(e.target.value))),
-                              })
-                            }
-                            placeholder="0"
-                            aria-label="Quantity"
-                          />
-                        </TableCell>
-                        <TableCell className="py-2 align-middle text-right font-mono tabular-nums text-sm text-muted-foreground">
-                          {formatDecimal(manualRowLineAreaM2(row), 3)}
-                        </TableCell>
-                        <TableCell className="py-2 align-middle text-right font-mono tabular-nums text-sm text-muted-foreground">
-                          {formatDecimal(
-                            manualRowLineWeightKg(row, materialConfig.densityKgPerM3),
-                            2
-                          )}
-                        </TableCell>
-                        <TableCell className="py-2 align-middle">
-                          <Input
-                            className="h-9 text-sm"
-                            value={row.material}
-                            onChange={(e) =>
-                              patchRow(row.id, { material: e.target.value })
-                            }
-                            placeholder="e.g. S235"
-                            aria-label="Material grade"
-                          />
-                        </TableCell>
-                        <TableCell className="py-2 align-middle">
-                          <Select
-                            value={row.finish}
-                            onValueChange={(v) =>
-                              patchRow(row.id, { finish: v as PlateFinish })
-                            }
+                  <div className="max-h-[min(70vh,800px)] overflow-auto rounded-md border border-white/[0.08] bg-card">
+                    <Table
+                      className="border-separate border-spacing-0"
+                      containerClassName="overflow-visible"
+                    >
+                      <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+                        <TableRow className="border-b-0 hover:bg-transparent">
+                          <TableHead
+                            className={cn(
+                              "min-w-[3.5rem] sticky top-0 right-0 z-40 bg-card py-2 pe-3 ps-3 text-center text-xs font-medium shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]"
+                            )}
                           >
-                            <SelectTrigger className="h-9 w-full min-w-[120px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {PLATE_FINISH_OPTIONS.map((o) => (
-                                <SelectItem key={o.value} value={o.value}>
-                                  {t(`quote.finishLabels.${o.value}`)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="py-2 text-right pr-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                            aria-label="Remove row"
-                            onClick={() => removeRow(row.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-4 gap-1.5"
-                onClick={addRow}
-              >
-                <Plus className="h-4 w-4" />
-                Add new Part
-              </Button>
+                            {t(`${MP}.colIndex`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${MP}.colQuantity`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${MP}.colThickness`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${MP}.colWidth`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${MP}.colLength`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${MP}.colWeight`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${MP}.colArea`)}
+                          </TableHead>
+                          <TableHead className="min-w-[120px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${MP}.colMaterial`)}
+                          </TableHead>
+                          <TableHead className="min-w-[140px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${MP}.colFinish`)}
+                          </TableHead>
+                          <TableHead className="w-[72px] py-2 pe-3 ps-3 text-center text-xs font-medium">
+                            {t(`${MP}.colPreview`)}
+                          </TableHead>
+                          <TableHead className="min-w-[4.5rem] py-2 text-center text-xs font-medium">
+                            {t("quote.dxfPhase.dxfReviewTable.deleteColumnHeader")}
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rows.map((row, index) => {
+                          const canPreview = row.widthMm > 0 && row.lengthMm > 0;
+                          return (
+                            <TableRow key={row.id} className="group/row">
+                              <TableCell
+                                className={cn(
+                                  "sticky right-0 z-20 bg-card py-2 pe-3 ps-3 text-center text-sm tabular-nums text-muted-foreground shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.25)]",
+                                  "group-hover/row:bg-white/[0.04]"
+                                )}
+                              >
+                                {index + 1}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3">
+                                <Input
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  className="h-8 w-20 text-sm tabular-nums [color-scheme:dark]"
+                                  value={row.quantity > 0 ? String(row.quantity) : ""}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(/\D/g, "");
+                                    patchRow(row.id, {
+                                      quantity:
+                                        raw === ""
+                                          ? 0
+                                          : Math.max(0, Math.floor(parseInt(raw, 10) || 0)),
+                                    });
+                                  }}
+                                  placeholder="0"
+                                  aria-label={t(`${MP}.ariaQuantity`)}
+                                />
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  className="h-8 w-[4.5rem] text-sm tabular-nums [color-scheme:dark]"
+                                  value={row.thicknessMm > 0 ? String(row.thicknessMm) : ""}
+                                  onChange={(e) =>
+                                    patchRow(row.id, {
+                                      thicknessMm: Math.max(
+                                        0,
+                                        Number(e.target.value.replace(",", ".")) || 0
+                                      ),
+                                    })
+                                  }
+                                  placeholder="0"
+                                  aria-label={t(`${MP}.ariaThickness`)}
+                                />
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  className="h-8 w-24 text-sm tabular-nums [color-scheme:dark]"
+                                  value={row.widthMm > 0 ? String(row.widthMm) : ""}
+                                  onChange={(e) =>
+                                    patchRow(row.id, {
+                                      widthMm: Number(e.target.value.replace(",", ".")) || 0,
+                                    })
+                                  }
+                                  placeholder="0"
+                                  aria-label={t(`${MP}.ariaWidth`)}
+                                />
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  className="h-8 w-24 text-sm tabular-nums [color-scheme:dark]"
+                                  value={row.lengthMm > 0 ? String(row.lengthMm) : ""}
+                                  onChange={(e) =>
+                                    patchRow(row.id, {
+                                      lengthMm: Number(e.target.value.replace(",", ".")) || 0,
+                                    })
+                                  }
+                                  placeholder="0"
+                                  aria-label={t(`${MP}.ariaLength`)}
+                                />
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm font-medium tabular-nums">
+                                {manualRowLineWeightKg(row, materialConfig.densityKgPerM3) > 0
+                                  ? formatDecimal(
+                                      manualRowLineWeightKg(row, materialConfig.densityKgPerM3),
+                                      2
+                                    )
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm font-medium tabular-nums">
+                                {manualRowLineAreaM2(row) > 0
+                                  ? formatDecimal(manualRowLineAreaM2(row), 4)
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3">
+                                <Input
+                                  className="h-8 min-w-[7rem] text-sm [color-scheme:dark]"
+                                  value={row.material}
+                                  onChange={(e) =>
+                                    patchRow(row.id, { material: e.target.value })
+                                  }
+                                  placeholder={t(`${MP}.gradePlaceholder`)}
+                                  aria-label={t(`${MP}.ariaMaterial`)}
+                                />
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3">
+                                <Select
+                                  value={row.finish}
+                                  onValueChange={(v) =>
+                                    patchRow(row.id, { finish: v as PlateFinish })
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 w-[140px] text-sm [color-scheme:dark]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {PLATE_FINISH_OPTIONS.map((o) => (
+                                      <SelectItem key={o.value} value={o.value}>
+                                        {t(`quote.finishLabels.${o.value}`)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3">
+                                <button
+                                  type="button"
+                                  aria-label={t(`${MP}.colPreview`)}
+                                  onClick={() => setPreviewRowId(row.id)}
+                                  disabled={!canPreview}
+                                  className={cn(
+                                    "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md p-0",
+                                    "text-[#00E5FF] hover:bg-white/5",
+                                    "disabled:pointer-events-none disabled:opacity-50",
+                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                  )}
+                                >
+                                  <Eye
+                                    className="h-4 w-4"
+                                    stroke="#00E5FF"
+                                    strokeWidth={2}
+                                    aria-hidden
+                                  />
+                                </button>
+                              </TableCell>
+                              <TableCell className="py-2 pe-2 ps-2 text-center">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-muted-foreground hover:text-destructive"
+                                  aria-label={t(`${MP}.removeRowAria`)}
+                                  onClick={() => removeRow(row.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="mt-4 flex justify-start" dir="rtl">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="inline-flex shrink-0 gap-1.5"
+                      onClick={addRow}
+                    >
+                      <Plus className="h-4 w-4" aria-hidden />
+                      {t(`${MP}.addPart`)}
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
@@ -398,46 +494,104 @@ export function ManualQuotePhase({
         </div>
       </div>
 
+      <div
+        className="shrink-0 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+        dir="ltr"
+      >
+        <div className="flex flex-wrap items-center justify-start gap-2">
+          <Button
+            type="button"
+            className="gap-2"
+            disabled={primaryDisabled}
+            onClick={handleCompleteClick}
+          >
+            <Check className="h-4 w-4" aria-hidden />
+            {t(`${MP}.complete`)}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="inline-flex flex-row gap-2"
+            onClick={handleBackClick}
+          >
+            <span>{t(`${MP}.back`)}</span>
+            <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={handleResetClick}
+            disabled={!canReset}
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            {t(`${MP}.reset`)}
+          </Button>
+        </div>
+      </div>
+
       <Dialog open={validationDialogOpen} onOpenChange={setValidationDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Complete line items first</DialogTitle>
-            <DialogDescription>
-              Fix the following before you can complete this step.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${MP}.validationDialogTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${MP}.validationDialogDescription`)}</DialogDescription>
           </DialogHeader>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-foreground">
+          <ul className="list-disc space-y-1.5 ps-5 text-sm text-foreground">
             {validationLines.map((line, i) => (
               <li key={i}>{line}</li>
             ))}
           </ul>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-start">
             <Button type="button" onClick={() => setValidationDialogOpen(false)}>
-              OK
+              {t(`${MP}.validationDialogOk`)}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={backConfirmOpen} onOpenChange={setBackConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Discard incomplete line items?</DialogTitle>
-            <DialogDescription>
-              Some rows are still incomplete. Going back will remove those line items. Complete rows
-              are kept.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${MP}.confirmBackTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${MP}.confirmBackDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
             <Button type="button" variant="outline" onClick={() => setBackConfirmOpen(false)}>
-              Cancel
+              {t(`${MP}.confirmBackCancel`)}
             </Button>
-            <Button type="button" variant="default" onClick={confirmBackAndDropIncomplete}>
-              Remove incomplete and go back
+            <Button type="button" onClick={confirmBackAndDropIncomplete}>
+              {t(`${MP}.confirmBackAction`)}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${MP}.confirmResetTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${MP}.confirmResetDescription`)}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
+            <Button type="button" variant="outline" onClick={() => setResetConfirmOpen(false)}>
+              {t(`${MP}.confirmBackCancel`)}
+            </Button>
+            <Button type="button" onClick={confirmResetSession}>
+              {t(`${MP}.confirmResetAction`)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ManualPartPreviewDialog
+        open={previewRowId !== null}
+        onOpenChange={(open: boolean) => {
+          if (!open) setPreviewRowId(null);
+        }}
+        row={previewRow}
+        lineNumber={previewLineNumber}
+        densityKgPerM3={materialConfig.densityKgPerM3}
+      />
     </div>
   );
 }

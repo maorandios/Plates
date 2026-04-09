@@ -246,11 +246,11 @@ function quoteImportMappingFieldsT(): MappingField[] {
 
 function manualQuoteValidationLinesHebrew(rows: ManualQuotePartRow[]): string[] | null {
   const issueLabel: Record<string, string> = {
-    "thickness (mm)": t(`${EI}.issueThickness`),
-    "width (mm)": t(`${EI}.issueWidth`),
-    "length (mm)": t(`${EI}.issueLength`),
+    thicknessMm: t(`${EI}.issueThickness`),
+    widthMm: t(`${EI}.issueWidth`),
+    lengthMm: t(`${EI}.issueLength`),
     quantity: t(`${EI}.issueQuantity`),
-    "material grade": t(`${EI}.issueMaterial`),
+    material: t(`${EI}.issueMaterial`),
   };
   const lines: string[] = [];
   rows.forEach((row, index) => {
@@ -527,6 +527,15 @@ export function ExcelUploadStep({
     onPhaseBack?.();
   }, [handleRemoveFile, onPhaseBack]);
 
+  const handleExcelNavBack = useCallback(() => {
+    if (variant !== "quoteImport") return;
+    if (subStep === 3) {
+      handleBackToMapping();
+      return;
+    }
+    handleQuotePhaseBack();
+  }, [variant, subStep, handleBackToMapping, handleQuotePhaseBack]);
+
   const handleQuotePhaseComplete = useCallback(() => {
     if (variant !== "quoteImport" || !onPhaseComplete || !quoteImportMaterialType) return;
     if (subStep !== 3 || !parsedRows?.length) {
@@ -695,14 +704,6 @@ export function ExcelUploadStep({
     if (variant !== "quoteImport") return "";
     return t(`${EI}.stripeDataEntry`);
   }, [variant]);
-
-  const handleExcelNavBack = useCallback(() => {
-    if (subStep === 3) {
-      handleBackToMapping();
-      return;
-    }
-    handleQuotePhaseBack();
-  }, [subStep, handleBackToMapping, handleQuotePhaseBack]);
 
   const handleExcelReset = useCallback(() => {
     setPhaseResetConfirmOpen(true);
