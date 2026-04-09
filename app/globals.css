@@ -91,7 +91,9 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-noto-sans-hebrew), "Noto Sans Hebrew", sans-serif;
+  /* Tight body copy: −2% where supported (~−0.02em fallback). */
   letter-spacing: -0.02em;
+  letter-spacing: -2%;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

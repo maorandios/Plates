@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   Upload,
   FileSpreadsheet,
@@ -10,7 +11,20 @@ import {
   RefreshCw,
   Check,
   Trash2,
-  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Package,
+  LayoutGrid,
+  Weight,
+  Eye,
+  Palette,
+  Layers,
+  Hash,
+  Tag,
+  Square,
+  MoveHorizontal,
+  MoveVertical,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,20 +58,27 @@ import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { MethodPhaseMetricStrip } from "./method-phases/MethodPhaseMetricStrip";
-import { readExcelHeaders, parseExcelFileWithMapping } from "@/lib/parsers/excelParser";
+import {
+  readExcelHeaders,
+  parseExcelFileWithMapping,
+  countEligibleExcelDataRows,
+} from "@/lib/parsers/excelParser";
 import type { ColumnMapping, ExcelRow } from "@/types";
 import type { ExcelHeadersResult } from "@/lib/parsers/excelParser";
 import {
   DEFAULT_PLATE_FINISH,
   PLATE_FINISH_OPTIONS,
+  defaultMaterialGradeForFamily,
   type PlateFinish,
 } from "../lib/plateFields";
 import type { ManualQuotePartRow } from "../types/quickQuote";
 import {
   excelRowsToManualQuoteRows,
-  getManualQuoteValidationLines,
+  getManualRowValidationIssues,
+  manualQuoteRowsToQuoteParts,
   manualQuoteRowsToRestoredExcelRows,
 } from "../lib/manualQuoteParts";
+import { QuotePartGeometryPreview } from "./QuotePartGeometryPreview";
 
 const NONE = "__none__";
 
@@ -70,8 +91,6 @@ interface ExcelUploadStepProps {
   onQuoteImportRowsChange?: (data: ExcelRow[]) => void;
   /** Quote import: material density from General — used for estimated total weight. */
   quoteImportDensityKgPerM3?: number;
-  /** Quote import: plate family label from General (split sidebar). */
-  quoteImportPlateTypeLabel?: string;
   /** Quote import: validates Complete against manual-quote rules. */
   quoteImportMaterialType?: MaterialType;
   onPhaseBack?: () => void;
@@ -105,15 +124,144 @@ const MAPPING_FIELDS: MappingField[] = [
 ];
 
 /** Column mapping for quote-from-list (no DXF / weight columns). */
-const QUOTE_IMPORT_MAPPING_FIELDS: MappingField[] = [
-  { key: "partNameCol", label: "Part number", required: true, description: "Unique identifier for each line" },
-  { key: "thkCol", label: "Thickness (mm)", required: false, description: "Plate thickness in mm" },
-  { key: "qtyCol", label: "Quantity", required: false, description: "Number of pieces (defaults to 1)" },
-  { key: "widthCol", label: "Width (mm)", required: false, description: "Plate width in mm" },
-  { key: "lengthCol", label: "Length (mm)", required: false, description: "Plate length in mm" },
-  { key: "matCol", label: "Material grade", required: false, description: "Steel grade or designation" },
-  { key: "finishCol", label: "Finish", required: false, description: "Surface finish (carbon, galvanized, paint)" },
-];
+/** Lives under `quote.dxfPhase` in he.json (same nesting block as validationTable / dxfReviewTable). */
+const EI = "quote.dxfPhase.excelImportPhase";
+/** Same Excel file summary copy as optional Excel badge in DXF upload. */
+const DXF_EXCEL_UI = "quote.dxfPhase";
+const DXF_RV = "quote.dxfPhase.dxfReviewTable";
+
+function quoteImportRowDensityTotals(
+  row: ExcelRow,
+  densityKgPerM3: number
+): { totalAreaM2: number; totalWeightKg: number } {
+  const w = Math.max(0, row.width ?? 0);
+  const l = Math.max(0, row.length ?? 0);
+  const q = Math.max(1, Math.floor(row.quantity) || 1);
+  const th = Math.max(0, Number(row.thickness) || 0);
+  const pieceAreaM2 = (w * l) / 1_000_000;
+  const totalAreaM2 = pieceAreaM2 * q;
+  const tM = th / 1000;
+  const totalWeightKg = pieceAreaM2 * tM * q * densityKgPerM3;
+  return { totalAreaM2, totalWeightKg };
+}
+
+/** Excel import preview modal — LTR unit layout (same pattern as DXF part preview). */
+function ExcelImportStatValueUnitLeft({
+  numericText,
+  unitSuffix,
+}: {
+  numericText: string;
+  unitSuffix: string;
+}) {
+  return (
+    <span
+      className="inline-flex flex-row items-baseline justify-center gap-1.5"
+      dir="ltr"
+    >
+      <span className="text-sm text-muted-foreground">{unitSuffix.trim()}</span>
+      <span className="text-base tabular-nums font-semibold text-foreground">{numericText}</span>
+    </span>
+  );
+}
+
+function ExcelImportPreviewStatCell({
+  icon: Icon,
+  label,
+  value,
+  className,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex aspect-square min-h-0 w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden px-2 py-2.5 text-center",
+        className
+      )}
+    >
+      <Icon
+        className="h-4 w-4 shrink-0 text-[#00FF9F]/70"
+        strokeWidth={1.75}
+        aria-hidden
+      />
+      <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="line-clamp-2 max-w-full break-words text-sm font-semibold leading-tight text-foreground sm:text-[15px]">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function quoteImportMappingFieldsT(): MappingField[] {
+  return [
+    {
+      key: "partNameCol",
+      label: t(`${EI}.mapPartNumberLabel`),
+      required: true,
+      description: t(`${EI}.mapPartNumberDesc`),
+    },
+    {
+      key: "thkCol",
+      label: t(`${EI}.mapThicknessLabel`),
+      required: false,
+      description: t(`${EI}.mapThicknessDesc`),
+    },
+    {
+      key: "qtyCol",
+      label: t(`${EI}.mapQtyLabel`),
+      required: false,
+      description: t(`${EI}.mapQtyDesc`),
+    },
+    {
+      key: "widthCol",
+      label: t(`${EI}.mapWidthLabel`),
+      required: false,
+      description: t(`${EI}.mapWidthDesc`),
+    },
+    {
+      key: "lengthCol",
+      label: t(`${EI}.mapLengthLabel`),
+      required: false,
+      description: t(`${EI}.mapLengthDesc`),
+    },
+    {
+      key: "matCol",
+      label: t(`${EI}.mapMaterialLabel`),
+      required: false,
+      description: t(`${EI}.mapMaterialDesc`),
+    },
+    {
+      key: "finishCol",
+      label: t(`${EI}.mapFinishLabel`),
+      required: false,
+      description: t(`${EI}.mapFinishDesc`),
+    },
+  ];
+}
+
+function manualQuoteValidationLinesHebrew(rows: ManualQuotePartRow[]): string[] | null {
+  const issueLabel: Record<string, string> = {
+    "thickness (mm)": t(`${EI}.issueThickness`),
+    "width (mm)": t(`${EI}.issueWidth`),
+    "length (mm)": t(`${EI}.issueLength`),
+    quantity: t(`${EI}.issueQuantity`),
+    "material grade": t(`${EI}.issueMaterial`),
+  };
+  const lines: string[] = [];
+  rows.forEach((row, index) => {
+    const issues = getManualRowValidationIssues(row);
+    if (issues.length > 0) {
+      const fields = issues.map((k) => issueLabel[k] ?? k).join(", ");
+      lines.push(t(`${EI}.validationRow`, { n: index + 1, fields }));
+    }
+  });
+  return lines.length > 0 ? lines : null;
+}
 
 type ExcelSubStep = 1 | 2 | 3;
 
@@ -139,14 +287,15 @@ function finishStringToPlateFinish(s: string | undefined): PlateFinish {
 }
 
 const QUOTE_IMPORT_PHASE_VIEWPORT =
-  "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
+  "flex h-full min-h-0 max-h-full flex-col";
+
+const IMPORT_METHOD_VIEWPORT = "flex w-full min-w-0 flex-col gap-0";
 
 export function ExcelUploadStep({
   onDataApproved,
   variant = "dxf",
   onQuoteImportRowsChange,
   quoteImportDensityKgPerM3,
-  quoteImportPlateTypeLabel,
   quoteImportMaterialType,
   onPhaseBack,
   onPhaseComplete,
@@ -172,7 +321,10 @@ export function ExcelUploadStep({
       quoteImportRestoredRows &&
       quoteImportRestoredRows.length > 0
     ) {
-      return manualQuoteRowsToRestoredExcelRows(quoteImportRestoredRows);
+      return manualQuoteRowsToRestoredExcelRows(
+        quoteImportRestoredRows,
+        quoteImportMaterialType
+      );
     }
     return null;
   });
@@ -180,13 +332,25 @@ export function ExcelUploadStep({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [phaseBackConfirmOpen, setPhaseBackConfirmOpen] = useState(false);
+  const [phaseResetConfirmOpen, setPhaseResetConfirmOpen] = useState(false);
+  const [importPreviewRowId, setImportPreviewRowId] = useState<string | null>(null);
   const [phaseCompleteDialogOpen, setPhaseCompleteDialogOpen] = useState(false);
   const [phaseCompleteLines, setPhaseCompleteLines] = useState<string[]>([]);
 
   const activeMappingFields = useMemo(
-    () => (variant === "quoteImport" ? QUOTE_IMPORT_MAPPING_FIELDS : MAPPING_FIELDS),
+    () => (variant === "quoteImport" ? quoteImportMappingFieldsT() : MAPPING_FIELDS),
     [variant]
   );
+
+  /** Rows `parseExcelFileWithMapping` would import with the current mapping (excludes blank / invalid part-name rows). */
+  const excelBadgeDataRowCount = useMemo(() => {
+    if (!arrayBuffer || !mapping) return 0;
+    try {
+      return countEligibleExcelDataRows(arrayBuffer, mapping);
+    } catch {
+      return 0;
+    }
+  }, [arrayBuffer, mapping]);
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     setUploadError(null);
@@ -208,7 +372,11 @@ export function ExcelUploadStep({
       setSubStep(2);
     } catch (error) {
       setUploadError(
-        error instanceof Error ? error.message : "Failed to read Excel file"
+        variant === "quoteImport"
+          ? t(`${EI}.uploadFailed`)
+          : error instanceof Error
+            ? error.message
+            : "Failed to read Excel file"
       );
       setFile(null);
       setArrayBuffer(null);
@@ -298,23 +466,42 @@ export function ExcelUploadStep({
       );
 
       if (result.rows.length === 0) {
-        setParseError("No valid rows found with current mapping. Please adjust the column mapping.");
+        setParseError(
+          variant === "quoteImport"
+            ? t(`${EI}.parseNoRows`)
+            : "No valid rows found with current mapping. Please adjust the column mapping."
+        );
         return;
       }
 
-      const rowsWithIds: ExcelRow[] = result.rows.map((row, index) => ({
+      let rowsWithIds: ExcelRow[] = result.rows.map((row, index) => ({
         ...row,
         id: `excel-row-${index}`,
       }));
+
+      if (variant === "quoteImport") {
+        const dm =
+          quoteImportMaterialType != null
+            ? defaultMaterialGradeForFamily(quoteImportMaterialType)
+            : "S235";
+        rowsWithIds = rowsWithIds.map((r) => ({
+          ...r,
+          material: (r.material ?? "").trim() || dm,
+        }));
+      }
 
       setParsedRows(rowsWithIds);
       setSubStep(3);
     } catch (error) {
       setParseError(
-        error instanceof Error ? error.message : "Failed to parse Excel file"
+        variant === "quoteImport"
+          ? t(`${EI}.parseFailed`)
+          : error instanceof Error
+            ? error.message
+            : "Failed to parse Excel file"
       );
     }
-  }, [arrayBuffer, mapping, file]);
+  }, [arrayBuffer, mapping, file, variant, quoteImportMaterialType]);
 
   const handleBackToMapping = useCallback(() => {
     setSubStep(2);
@@ -343,14 +530,12 @@ export function ExcelUploadStep({
   const handleQuotePhaseComplete = useCallback(() => {
     if (variant !== "quoteImport" || !onPhaseComplete || !quoteImportMaterialType) return;
     if (subStep !== 3 || !parsedRows?.length) {
-      setPhaseCompleteLines([
-        "Finish upload, column mapping, and review so at least one row is in the table before completing.",
-      ]);
+      setPhaseCompleteLines([t(`${EI}.validationNeedSteps`)]);
       setPhaseCompleteDialogOpen(true);
       return;
     }
     const manualRows = excelRowsToManualQuoteRows(parsedRows, quoteImportMaterialType);
-    const lines = getManualQuoteValidationLines(manualRows);
+    const lines = manualQuoteValidationLinesHebrew(manualRows);
     if (lines) {
       setPhaseCompleteLines(lines);
       setPhaseCompleteDialogOpen(true);
@@ -424,6 +609,52 @@ export function ExcelUploadStep({
     };
   }, [parsedRows, quoteImportDensityKgPerM3]);
 
+  const quoteImportDefaultMaterialGrade = useMemo(
+    () =>
+      quoteImportMaterialType != null
+        ? defaultMaterialGradeForFamily(quoteImportMaterialType)
+        : "S235",
+    [quoteImportMaterialType]
+  );
+
+  const quoteImportPreviewPart = useMemo(() => {
+    if (!importPreviewRowId || !parsedRows || !quoteImportMaterialType) return null;
+    const row = parsedRows.find((r) => r.id === importPreviewRowId);
+    if (!row) return null;
+    const rho =
+      quoteImportDensityKgPerM3 != null && Number.isFinite(quoteImportDensityKgPerM3)
+        ? quoteImportDensityKgPerM3
+        : 7850;
+    const manual = excelRowsToManualQuoteRows([row], quoteImportMaterialType)[0];
+    return manualQuoteRowsToQuoteParts([manual], rho)[0];
+  }, [
+    importPreviewRowId,
+    parsedRows,
+    quoteImportMaterialType,
+    quoteImportDensityKgPerM3,
+  ]);
+
+  const excelImportPreviewStats = useMemo(() => {
+    if (!importPreviewRowId || !parsedRows) return null;
+    const row = parsedRows.find((r) => r.id === importPreviewRowId);
+    if (!row) return null;
+    const rho =
+      quoteImportDensityKgPerM3 != null && Number.isFinite(quoteImportDensityKgPerM3)
+        ? quoteImportDensityKgPerM3
+        : 7850;
+    const { totalAreaM2, totalWeightKg } = quoteImportRowDensityTotals(row, rho);
+    return {
+      partLabel: row.partName,
+      thMm: Number(row.thickness) || 0,
+      qty: row.quantity,
+      widthMm: row.width ?? 0,
+      lengthMm: row.length ?? 0,
+      totalWeightKg,
+      totalAreaM2,
+      finish: finishStringToPlateFinish(row.finish),
+    };
+  }, [importPreviewRowId, parsedRows, quoteImportDensityKgPerM3]);
+
   useEffect(() => {
     if (variant !== "quoteImport" || subStep !== 3 || !onQuoteImportRowsChange) return;
     onQuoteImportRowsChange(parsedRows ?? []);
@@ -460,76 +691,78 @@ export function ExcelUploadStep({
   const uploadInputId =
     variant === "quoteImport" ? "excel-upload-quote-import" : "excel-upload";
 
-  const quoteImportRightHeader = useMemo(() => {
-    if (variant !== "quoteImport") return { title: "", desc: "" };
-    switch (subStep) {
-      case 1:
-        return {
-          title: "Upload spreadsheet",
-          desc: "Drop an Excel or CSV file, or browse. Column mapping follows on the next step.",
-        };
-      case 2:
-        return {
-          title: "Map columns",
-          desc: "Match each field to a workbook column. Part number is required.",
-        };
-      case 3:
-        return {
-          title: "Review data",
-          desc: "Edit values or remove lines. Tables below stay in sync with the summary on the left.",
-        };
-      default:
-        return { title: "", desc: "" };
+  const excelImportStripe = useMemo(() => {
+    if (variant !== "quoteImport") return "";
+    return t(`${EI}.stripeDataEntry`);
+  }, [variant]);
+
+  const handleExcelNavBack = useCallback(() => {
+    if (subStep === 3) {
+      handleBackToMapping();
+      return;
     }
-  }, [variant, subStep]);
+    handleQuotePhaseBack();
+  }, [subStep, handleBackToMapping, handleQuotePhaseBack]);
+
+  const handleExcelReset = useCallback(() => {
+    setPhaseResetConfirmOpen(true);
+  }, []);
+
+  const confirmExcelReset = useCallback(() => {
+    handleRemoveFile();
+    setPhaseResetConfirmOpen(false);
+  }, [handleRemoveFile]);
 
   const mainColumn = (
     <div className={cn(variant === "quoteImport" ? "space-y-4" : "space-y-6")}>
-      <Card className="border-0">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between gap-2">
-            {SUB_STEPS.map(({ step, label }, index) => {
-              const isComplete = step < subStep;
-              const isCurrent = step === subStep;
+      {variant !== "quoteImport" ? (
+        <Card className="border-0">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between gap-2">
+              {SUB_STEPS.map(({ step, label: defaultLabel }, index) => {
+                const isComplete = step < subStep;
+                const isCurrent = step === subStep;
+                const label = defaultLabel;
 
-              return (
-                <div key={step} className="flex items-center flex-1 last:flex-none">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div
-                      className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors",
-                        isComplete && "border-emerald-600 bg-emerald-600 text-white",
-                        isCurrent && !isComplete && "border-primary bg-primary text-primary-foreground",
-                        !isCurrent && !isComplete && "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
-                      )}
-                    >
-                      {isComplete ? <Check className="h-4 w-4" /> : step}
+                return (
+                  <div key={step} className="flex items-center flex-1 last:flex-none">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div
+                        className={cn(
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors",
+                          isComplete && "border-emerald-600 bg-emerald-600 text-white",
+                          isCurrent && !isComplete && "border-primary bg-primary text-primary-foreground",
+                          !isCurrent && !isComplete && "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        {isComplete ? <Check className="h-4 w-4" /> : step}
+                      </div>
+                      <span
+                        className={cn(
+                          "text-sm font-medium whitespace-nowrap",
+                          isCurrent && "text-foreground",
+                          !isCurrent && isComplete && "text-emerald-600",
+                          !isCurrent && !isComplete && "text-muted-foreground"
+                        )}
+                      >
+                        {label}
+                      </span>
                     </div>
-                    <span
-                      className={cn(
-                        "text-sm font-medium whitespace-nowrap",
-                        isCurrent && "text-foreground",
-                        !isCurrent && isComplete && "text-emerald-600",
-                        !isCurrent && !isComplete && "text-muted-foreground"
-                      )}
-                    >
-                      {label}
-                    </span>
+                    {index < SUB_STEPS.length - 1 && (
+                      <div
+                        className={cn(
+                          "h-0.5 flex-1 mx-3",
+                          step < subStep ? "bg-emerald-600" : "bg-border"
+                        )}
+                      />
+                    )}
                   </div>
-                  {index < SUB_STEPS.length - 1 && (
-                    <div
-                      className={cn(
-                        "h-0.5 flex-1 mx-3",
-                        step < subStep ? "bg-emerald-600" : "bg-border"
-                      )}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {subStep === 1 && (
         <Card>
@@ -559,10 +792,14 @@ export function ExcelUploadStep({
                 </div>
                 <div>
                   <p className="text-sm font-medium">
-                    Drag and drop your Excel or CSV file here
+                    {variant === "quoteImport"
+                      ? t(`${EI}.dropTitle`)
+                      : "Drag and drop your Excel or CSV file here"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    or click to browse
+                    {variant === "quoteImport"
+                      ? t(`${EI}.dropHint`)
+                      : "or click to browse"}
                   </p>
                 </div>
                 <input
@@ -574,8 +811,8 @@ export function ExcelUploadStep({
                 />
                 <Button asChild variant="outline">
                   <label htmlFor={uploadInputId} className="cursor-pointer">
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Choose File
+                    <FileSpreadsheet className="h-4 w-4 me-2" aria-hidden />
+                    {variant === "quoteImport" ? t(`${EI}.chooseFile`) : "Choose File"}
                   </label>
                 </Button>
               </div>
@@ -592,49 +829,104 @@ export function ExcelUploadStep({
 
       {subStep === 2 && file && headersResult && mapping && (
         <>
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>File Uploaded</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Verify the column mapping below
-                  </p>
+          {variant === "quoteImport" ? (
+            <div className="w-full max-w-3xl me-auto">
+              <div className="flex w-full flex-col gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <FileSpreadsheet
+                    className="h-5 w-5 shrink-0 text-emerald-600"
+                    aria-hidden
+                  />
+                  <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                        {t(`${DXF_EXCEL_UI}.excelUploadedFileName`)}
+                      </p>
+                      <p className="truncate text-sm font-medium text-foreground" title={file.name}>
+                        {file.name}
+                      </p>
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                        {t(`${DXF_EXCEL_UI}.excelUploadedFileSize`)}
+                      </p>
+                      <p className="text-sm font-medium tabular-nums text-foreground">
+                        {formatDecimal(file.size / 1024, 1)} KB
+                      </p>
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                        {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
+                      </p>
+                      <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
+                        {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
+                          n: excelBadgeDataRowCount,
+                        })}
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={handleRemoveFile}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="shrink-0 self-center"
+                  aria-label={t(`${DXF_EXCEL_UI}.excelRemoveFileAria`)}
                 >
-                  <X className="h-4 w-4 mr-1" />
-                  Remove
+                  <X className="h-4 w-4" aria-hidden />
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <FileSpreadsheet className="h-5 w-5 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {headersResult.previewRows.length} rows detected
-                  </p>
+            </div>
+          ) : (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>File Uploaded</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Verify the column mapping below
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveFile}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4 me-1" aria-hidden />
+                    Remove
+                  </Button>
                 </div>
-                <Badge variant="secondary" className="shrink-0">
-                  {headersResult.sheetName}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <FileSpreadsheet className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {`${excelBadgeDataRowCount} rows detected`}
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="shrink-0">
+                    {headersResult.sheetName}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Column Mapping</CardTitle>
+                  <CardTitle>
+                    {variant === "quoteImport" ? t(`${EI}.columnMapTitle`) : "Column Mapping"}
+                  </CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Map your Excel columns to the required fields
+                    {variant === "quoteImport"
+                      ? t(`${EI}.columnMapHint`)
+                      : "Map your Excel columns to the required fields"}
                   </p>
                 </div>
                 <Button
@@ -643,8 +935,8 @@ export function ExcelUploadStep({
                   onClick={resetToAutoDetected}
                   className="gap-2"
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Reset to Auto-detected
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                  {variant === "quoteImport" ? t(`${EI}.resetAuto`) : "Reset to Auto-detected"}
                 </Button>
               </div>
             </CardHeader>
@@ -682,7 +974,9 @@ export function ExcelUploadStep({
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value={NONE}>
-                                        <span className="text-muted-foreground text-xs">None</span>
+                                        <span className="text-muted-foreground text-xs">
+                                          {variant === "quoteImport" ? t(`${EI}.noneColumn`) : "None"}
+                                        </span>
                                       </SelectItem>
                                       {headersResult.rawHeaders
                                         .filter((h) => h && h.trim())
@@ -715,21 +1009,31 @@ export function ExcelUploadStep({
                       </TableBody>
                     </Table>
                   </div>
-                  <p className="text-xs text-muted-foreground">Preview (first 3 rows)</p>
+                  <p className="text-xs text-muted-foreground">
+                    {variant === "quoteImport" ? t(`${EI}.previewNote`) : "Preview (first 3 rows)"}
+                  </p>
                 </div>
               )}
 
               <div className="flex items-center justify-between pt-4 border-t">
                 {!isMappingValid && (
                   <div className="flex items-center gap-2 text-amber-600">
-                    <AlertCircle className="h-4 w-4" />
-                    <p className="text-sm">Part Name is required</p>
+                    <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                    <p className="text-sm">
+                      {variant === "quoteImport"
+                        ? t(`${EI}.partNumberRequired`)
+                        : "Part Name is required"}
+                    </p>
                   </div>
                 )}
-                {isMappingValid && <div className="flex-1" />}
-                <Button onClick={handleParseWithMapping} disabled={!isMappingValid} size="lg">
-                  Continue to Review
-                </Button>
+                {variant !== "quoteImport" ? (
+                  <>
+                    {isMappingValid && <div className="flex-1" />}
+                    <Button onClick={handleParseWithMapping} disabled={!isMappingValid} size="lg">
+                      Continue to Review
+                    </Button>
+                  </>
+                ) : null}
               </div>
 
               {parseError && (
@@ -747,43 +1051,110 @@ export function ExcelUploadStep({
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Review and edit</CardTitle>
+              <CardTitle>
+                {variant === "quoteImport" ? t(`${EI}.reviewTableTitle`) : "Review and edit"}
+              </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                {formatInteger(parsedRows.length)} rows — adjust values or remove lines as needed.
+                {variant === "quoteImport"
+                  ? t(`${EI}.reviewTableSubtitle`)
+                  : `${formatInteger(parsedRows.length)} rows — adjust values or remove lines as needed.`}
               </p>
             </CardHeader>
-            <CardContent>
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[120px]">Part number</TableHead>
-                      <TableHead className="min-w-[88px]">Thickness</TableHead>
-                      <TableHead className="min-w-[72px]">Qty</TableHead>
-                      <TableHead className="min-w-[88px]">Width (mm)</TableHead>
-                      <TableHead className="min-w-[88px]">Length (mm)</TableHead>
-                      <TableHead className="min-w-[120px]">Material grade</TableHead>
-                      <TableHead className="min-w-[120px]">Finish</TableHead>
-                      <TableHead className="w-[52px]" />
+            <CardContent className="min-h-0">
+              <div className="max-h-[min(70vh,800px)] overflow-auto rounded-md border border-white/[0.08] bg-card">
+                <Table
+                  className="border-separate border-spacing-0"
+                  containerClassName="overflow-visible"
+                >
+                  <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_tr]:border-b-0">
+                    <TableRow className="border-b-0 hover:bg-transparent">
+                      <TableHead
+                        className={cn(
+                          "min-w-[120px] sticky top-0 right-0 z-40 bg-card py-2 pe-3 ps-3 shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]"
+                        )}
+                      >
+                        {t(`${EI}.colPartNumber`)}
+                      </TableHead>
+                      <TableHead className="min-w-[88px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colQuantity`)}
+                      </TableHead>
+                      <TableHead className="min-w-[88px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colThickness`)}
+                      </TableHead>
+                      <TableHead className="min-w-[88px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colWidth`)}
+                      </TableHead>
+                      <TableHead className="min-w-[88px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colLength`)}
+                      </TableHead>
+                      <TableHead className="min-w-[88px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colWeight`)}
+                      </TableHead>
+                      <TableHead className="min-w-[88px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colArea`)}
+                      </TableHead>
+                      <TableHead className="min-w-[120px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colMaterialGrade`)}
+                      </TableHead>
+                      <TableHead className="min-w-[140px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colFinish`)}
+                      </TableHead>
+                      <TableHead className="w-[72px] py-2 pe-3 ps-3">
+                        {t(`${DXF_RV}.colPreview`)}
+                      </TableHead>
+                      <TableHead className="min-w-[4.5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
+                        {t(`${EI}.deleteColumnHeader`)}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {parsedRows.map((row) => {
                       const finishVal = finishStringToPlateFinish(row.finish);
+                      const rho =
+                        quoteImportDensityKgPerM3 != null &&
+                        Number.isFinite(quoteImportDensityKgPerM3)
+                          ? quoteImportDensityKgPerM3
+                          : 7850;
+                      const { totalAreaM2, totalWeightKg } = quoteImportRowDensityTotals(
+                        row,
+                        rho
+                      );
+                      const matDisplay =
+                        (row.material ?? "").trim() || quoteImportDefaultMaterialGrade;
+                      const canPreview =
+                        (row.width ?? 0) > 0 && (row.length ?? 0) > 0;
                       return (
-                        <TableRow key={row.id}>
-                          <TableCell>
+                        <TableRow key={row.id} className="group/row">
+                          <TableCell
+                            className={cn(
+                              "sticky right-0 z-20 bg-card py-2 pe-3 ps-3 font-medium shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.25)]",
+                              "group-hover/row:bg-white/[0.04]"
+                            )}
+                          >
                             <Input
-                              className="h-8 min-w-[100px]"
+                              className="h-8 min-w-[100px] [color-scheme:dark]"
                               value={row.partName}
                               onChange={(e) =>
                                 patchParsedRow(row.id, { partName: e.target.value })
                               }
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2 pe-3 ps-3">
                             <Input
-                              className="h-8 w-20"
+                              className="h-8 w-20 [color-scheme:dark]"
+                              inputMode="numeric"
+                              value={String(row.quantity)}
+                              onChange={(e) => {
+                                const n = parseCellNumber(e.target.value);
+                                patchParsedRow(row.id, {
+                                  quantity: Math.max(1, Math.floor(n ?? 1) || 1),
+                                });
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell className="py-2 pe-3 ps-3">
+                            <Input
+                              className="h-8 w-[4.5rem] tabular-nums [color-scheme:dark]"
                               inputMode="decimal"
                               value={
                                 row.thickness != null && Number.isFinite(row.thickness)
@@ -798,22 +1169,9 @@ export function ExcelUploadStep({
                               }}
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2 pe-3 ps-3">
                             <Input
-                              className="h-8 w-16"
-                              inputMode="numeric"
-                              value={String(row.quantity)}
-                              onChange={(e) => {
-                                const n = parseCellNumber(e.target.value);
-                                patchParsedRow(row.id, {
-                                  quantity: Math.max(1, Math.floor(n ?? 1) || 1),
-                                });
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              className="h-8 w-24"
+                              className="h-8 w-24 [color-scheme:dark]"
                               inputMode="decimal"
                               value={row.width != null ? String(row.width) : ""}
                               onChange={(e) => {
@@ -822,9 +1180,9 @@ export function ExcelUploadStep({
                               }}
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2 pe-3 ps-3">
                             <Input
-                              className="h-8 w-24"
+                              className="h-8 w-24 [color-scheme:dark]"
                               inputMode="decimal"
                               value={row.length != null ? String(row.length) : ""}
                               onChange={(e) => {
@@ -833,16 +1191,23 @@ export function ExcelUploadStep({
                               }}
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="tabular-nums py-2 pe-3 ps-3">
+                            {totalWeightKg > 0 ? formatDecimal(totalWeightKg, 2) : "—"}
+                          </TableCell>
+                          <TableCell className="tabular-nums py-2 pe-3 ps-3">
+                            {totalAreaM2 > 0 ? formatDecimal(totalAreaM2, 4) : "—"}
+                          </TableCell>
+                          <TableCell className="py-2 pe-3 ps-3">
                             <Input
-                              className="h-8 min-w-[100px]"
-                              value={row.material ?? ""}
+                              className="h-8 min-w-[7rem] [color-scheme:dark]"
+                              value={matDisplay}
+                              placeholder={t(`${DXF_RV}.gradePlaceholder`)}
                               onChange={(e) =>
                                 patchParsedRow(row.id, { material: e.target.value })
                               }
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2 pe-3 ps-3">
                             <Select
                               value={finishVal}
                               onValueChange={(v) =>
@@ -851,7 +1216,7 @@ export function ExcelUploadStep({
                                 })
                               }
                             >
-                              <SelectTrigger className="h-8 w-[130px]">
+                              <SelectTrigger className="h-8 w-[140px] [color-scheme:dark]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -863,14 +1228,35 @@ export function ExcelUploadStep({
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="py-2 pe-3 ps-3">
+                            <button
+                              type="button"
+                              aria-label={t(`${DXF_RV}.colPreview`)}
+                              onClick={() => setImportPreviewRowId(row.id)}
+                              disabled={!canPreview}
+                              className={cn(
+                                "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md p-0",
+                                "text-[#00E5FF] hover:bg-white/5",
+                                "disabled:pointer-events-none disabled:opacity-50",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              )}
+                            >
+                              <Eye
+                                className="h-4 w-4"
+                                stroke="#00E5FF"
+                                strokeWidth={2}
+                                aria-hidden
+                              />
+                            </button>
+                          </TableCell>
+                          <TableCell className="py-2 pe-2 ps-2 text-center">
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
                               className="text-muted-foreground hover:text-destructive"
                               onClick={() => deleteParsedRow(row.id)}
-                              aria-label="Delete row"
+                              aria-label={t(`${EI}.deleteRowAria`)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -881,27 +1267,39 @@ export function ExcelUploadStep({
                   </TableBody>
                 </Table>
               </div>
+            </CardContent>
+          </Card>
+
+          {variant === "quoteImport" ? (
+            !file ? (
+              <p className="text-xs text-muted-foreground mt-2 max-w-xl">
+                {t(`${EI}.reviewFooterRestored`)}
+              </p>
+            ) : null
+          ) : (
+            <>
               <p className="text-xs text-muted-foreground mt-4">
                 Use <span className="font-medium text-foreground">Complete</span> above to save the list
                 and return to quote method. Use the stepper{" "}
                 <span className="font-medium text-foreground">Continue</span> when you are ready for
                 stock and pricing.
               </p>
-            </CardContent>
-          </Card>
+            </>
+          )}
 
-          {file ? (
+          {variant !== "quoteImport" && file ? (
             <div className="flex items-center justify-between">
               <Button variant="outline" onClick={handleBackToMapping}>
                 Back to Mapping
               </Button>
             </div>
-          ) : (
+          ) : null}
+          {variant !== "quoteImport" && !file ? (
             <p className="text-xs text-muted-foreground mt-2 max-w-xl">
               This table was restored from your saved quote. To change column mapping, upload a new
               file from step 1 — that replaces the list.
             </p>
-          )}
+          ) : null}
         </>
       )}
 
@@ -1023,115 +1421,343 @@ export function ExcelUploadStep({
   }
 
   const m = quoteImportMetrics;
-  const qtySidebar = m ? formatInteger(m.totalQty) : "—";
-  const areaSidebar = m ? formatDecimal(m.totalAreaM2, 2) : "—";
-  const wtSidebar = m ? formatDecimal(m.totalWeightKg, 1) : "—";
+  const qtySidebar = formatInteger(m?.totalQty ?? 0);
+  const areaSidebar = formatDecimal(m?.totalAreaM2 ?? 0, 2);
+  const wtSidebar = formatDecimal(m?.totalWeightKg ?? 0, 1);
+
+  const excelPrimaryDisabled =
+    subStep === 1 ||
+    (subStep === 2 && !isMappingValid) ||
+    (subStep === 3 && (!parsedRows || parsedRows.length === 0));
+
+  const excelPrimaryLabel =
+    subStep === 1 || subStep === 2
+      ? t(`${EI}.next`)
+      : t(`${EI}.complete`);
+
+  const excelCanReset = file !== null || subStep > 1;
+
+  const handleExcelPrimary = () => {
+    if (subStep === 2) void handleParseWithMapping();
+    else if (subStep === 3) handleQuotePhaseComplete();
+  };
+
   return (
-    <div
-      className={cn(
-        "flex w-full min-w-0 flex-col gap-0 overflow-hidden",
-        QUOTE_IMPORT_PHASE_VIEWPORT
-      )}
-    >
-      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col border-r border-border/80">
+    <div className={cn(IMPORT_METHOD_VIEWPORT, QUOTE_IMPORT_PHASE_VIEWPORT)} dir="rtl">
+      <div className="flex min-h-0 min-w-0 flex-1 gap-0">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
-              Import Excel list
+            <h1 className="text-xl font-semibold text-foreground leading-snug">
+              {t(`${EI}.sidebarTitle`)}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Upload a spreadsheet with part dimensions and quantities for this quote.
+              {t(`${EI}.sidebarIntro`)}
             </p>
-            {quoteImportPlateTypeLabel ? (
-              <p className="text-xs text-muted-foreground pt-1">
-                Plate type from General:{" "}
-                <span className="font-medium text-foreground">{quoteImportPlateTypeLabel}</span>
-              </p>
-            ) : null}
           </div>
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/70">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
             <MethodPhaseMetricStrip
-              label="Quantity"
+              icon={Package}
+              label={t("methodMetrics.quantity")}
               value={qtySidebar}
             />
             <MethodPhaseMetricStrip
-              label="Area (m²)"
+              icon={LayoutGrid}
+              label={t("methodMetrics.area")}
               value={areaSidebar}
+              valueUnit={t("methodMetrics.unitM2")}
             />
             <MethodPhaseMetricStrip
-              label="Weight (kg)"
+              icon={Weight}
+              label={t("methodMetrics.weight")}
               value={wtSidebar}
+              valueUnit={t("methodMetrics.unitKg")}
             />
           </div>
         </aside>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 ds-surface-header sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground">
-                  {quoteImportRightHeader.title}
-                </h2>
-                <p className="text-sm text-muted-foreground mt-0.5">{quoteImportRightHeader.desc}</p>
-              </div>
-              {onPhaseBack && onPhaseComplete ? (
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="gap-2"
-                    onClick={handleQuotePhaseBack}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
-                  </Button>
-                  <Button type="button" className="gap-2" onClick={handleQuotePhaseComplete}>
-                    <Check className="h-4 w-4" />
-                    Complete
-                  </Button>
-                </div>
-              ) : null}
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+          <div
+            className="flex shrink-0 items-center gap-3 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4"
+            dir="rtl"
+          >
+            <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
+              {excelImportStripe}
+            </p>
+          </div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
+              {mainColumn}
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{mainColumn}</div>
+        </div>
+      </div>
+
+      <div
+        className="shrink-0 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+        dir="ltr"
+      >
+        <div className="flex flex-wrap items-center justify-start gap-2">
+          <Button
+            type="button"
+            className="gap-2"
+            disabled={excelPrimaryDisabled}
+            onClick={handleExcelPrimary}
+          >
+            {subStep === 3 ? (
+              <Check className="h-4 w-4" aria-hidden />
+            ) : (
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            )}
+            {excelPrimaryLabel}
+          </Button>
+          {subStep !== 3 ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="inline-flex flex-row gap-2"
+              onClick={handleExcelNavBack}
+            >
+              <span>{t(`${EI}.back`)}</span>
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={handleExcelReset}
+            disabled={!excelCanReset}
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            {t(`${EI}.reset`)}
+          </Button>
         </div>
       </div>
 
       <Dialog open={phaseBackConfirmOpen} onOpenChange={setPhaseBackConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Leave Import Excel list?</DialogTitle>
-            <DialogDescription>
-              A file or mapping is in progress. Going back clears this import and removes lines added
-              from this step until you import again.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${EI}.confirmBackTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${EI}.confirmBackDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
             <Button type="button" variant="outline" onClick={() => setPhaseBackConfirmOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="button" onClick={confirmQuotePhaseBack}>
-              Leave and go back
+              {t(`${EI}.confirmBackAction`)}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={phaseCompleteDialogOpen} onOpenChange={setPhaseCompleteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Complete import first</DialogTitle>
-            <DialogDescription>
-              Fix the following before you can complete and return to quote method.
-            </DialogDescription>
+      <Dialog open={phaseResetConfirmOpen} onOpenChange={setPhaseResetConfirmOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${EI}.confirmResetTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${EI}.confirmResetDescription`)}</DialogDescription>
           </DialogHeader>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-foreground">
+          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
+            <Button type="button" variant="outline" onClick={() => setPhaseResetConfirmOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="button" onClick={confirmExcelReset}>
+              {t(`${EI}.confirmResetAction`)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={importPreviewRowId !== null}
+        onOpenChange={(open) => {
+          if (!open) setImportPreviewRowId(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className={cn(
+            "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-white/10 bg-card p-0 sm:max-w-[30rem] sm:rounded-xl"
+          )}
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden" dir="rtl">
+            <DialogTitle className="sr-only">
+              {t("quote.dxfPhase.partPreviewModal.a11yTitle")}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {t("quote.dxfPhase.partPreviewModal.a11yTitle")}
+            </DialogDescription>
+
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div
+                className="flex min-h-[min(45vh,475px)] flex-1 shrink-0 items-center justify-center px-5 py-6"
+                dir="ltr"
+              >
+                <div className="relative flex h-[min(425px,52vh)] w-full min-w-0 max-w-full items-center justify-center overflow-hidden bg-transparent">
+                  {quoteImportPreviewPart ? (
+                    <QuotePartGeometryPreview
+                      part={quoteImportPreviewPart}
+                      dxfGeometries={null}
+                      rectangleAppearance="dxfPreviewModal"
+                      className="min-h-0 w-full max-w-full border-0 bg-transparent shadow-none [&>div]:min-h-0 [&>div]:bg-transparent [&_svg]:max-h-[min(400px,48vh)]"
+                    />
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="w-full shrink-0 border-t border-white/10">
+                {excelImportPreviewStats ? (
+                  <div dir="ltr" className="w-full overflow-hidden">
+                    <div className="grid w-full grid-cols-4 grid-rows-2">
+                      {(
+                        [
+                          {
+                            key: "finish",
+                            icon: Palette,
+                            label: t("quote.dxfPhase.partPreviewModal.finish"),
+                            value: t(
+                              `quote.finishLabels.${excelImportPreviewStats.finish}`
+                            ),
+                          },
+                          {
+                            key: "thickness",
+                            icon: Layers,
+                            label: t("quote.dxfPhase.partPreviewModal.thickness"),
+                            value: (
+                              <ExcelImportStatValueUnitLeft
+                                numericText={formatDecimal(
+                                  excelImportPreviewStats.thMm,
+                                  1
+                                )}
+                                unitSuffix={t(
+                                  "quote.dxfPhase.partPreviewModal.mmSuffix"
+                                )}
+                              />
+                            ),
+                          },
+                          {
+                            key: "quantity",
+                            icon: Hash,
+                            label: t("quote.dxfPhase.partPreviewModal.quantity"),
+                            value: excelImportPreviewStats.qty,
+                          },
+                          {
+                            key: "plateName",
+                            icon: Tag,
+                            label: t("quote.dxfPhase.partPreviewModal.plateName"),
+                            value: excelImportPreviewStats.partLabel,
+                          },
+                          {
+                            key: "weight",
+                            icon: Weight,
+                            label: t("quote.dxfPhase.partPreviewModal.weight"),
+                            value:
+                              excelImportPreviewStats.totalWeightKg > 0 ? (
+                                <ExcelImportStatValueUnitLeft
+                                  numericText={formatDecimal(
+                                    excelImportPreviewStats.totalWeightKg,
+                                    2
+                                  )}
+                                  unitSuffix={t(
+                                    "quote.dxfPhase.partPreviewModal.kgSuffix"
+                                  )}
+                                />
+                              ) : (
+                                "-"
+                              ),
+                          },
+                          {
+                            key: "area",
+                            icon: Square,
+                            label: t("quote.dxfPhase.partPreviewModal.area"),
+                            value:
+                              excelImportPreviewStats.totalAreaM2 > 0 ? (
+                                <ExcelImportStatValueUnitLeft
+                                  numericText={formatDecimal(
+                                    excelImportPreviewStats.totalAreaM2,
+                                    4
+                                  )}
+                                  unitSuffix={t(
+                                    "quote.dxfPhase.partPreviewModal.m2Suffix"
+                                  )}
+                                />
+                              ) : (
+                                "-"
+                              ),
+                          },
+                          {
+                            key: "length",
+                            icon: MoveHorizontal,
+                            label: t("quote.dxfPhase.partPreviewModal.length"),
+                            value: (
+                              <ExcelImportStatValueUnitLeft
+                                numericText={formatDecimal(
+                                  excelImportPreviewStats.lengthMm,
+                                  1
+                                )}
+                                unitSuffix={t(
+                                  "quote.dxfPhase.partPreviewModal.mmSuffix"
+                                )}
+                              />
+                            ),
+                          },
+                          {
+                            key: "width",
+                            icon: MoveVertical,
+                            label: t("quote.dxfPhase.partPreviewModal.width"),
+                            value: (
+                              <ExcelImportStatValueUnitLeft
+                                numericText={formatDecimal(
+                                  excelImportPreviewStats.widthMm,
+                                  1
+                                )}
+                                unitSuffix={t(
+                                  "quote.dxfPhase.partPreviewModal.mmSuffix"
+                                )}
+                              />
+                            ),
+                          },
+                        ] as const
+                      ).map((cell, i) => (
+                        <ExcelImportPreviewStatCell
+                          key={cell.key}
+                          icon={cell.icon}
+                          label={cell.label}
+                          value={cell.value}
+                          className={cn(
+                            "border-b border-solid border-[#00FF9F]/20",
+                            i % 4 === 0 && "border-s",
+                            i % 4 !== 3 && "border-e"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                    {t("quote.dxfPhase.partPreviewModal.noGeometry")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={phaseCompleteDialogOpen} onOpenChange={setPhaseCompleteDialogOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${EI}.validationDialogTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${EI}.validationDialogDescription`)}</DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-1.5 ps-5 text-sm text-foreground">
             {phaseCompleteLines.map((line, i) => (
               <li key={i}>{line}</li>
             ))}
           </ul>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-start">
             <Button type="button" onClick={() => setPhaseCompleteDialogOpen(false)}>
-              OK
+              {t(`${EI}.validationDialogOk`)}
             </Button>
           </DialogFooter>
         </DialogContent>

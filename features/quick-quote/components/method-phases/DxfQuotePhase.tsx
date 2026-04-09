@@ -118,18 +118,14 @@ export function DxfQuotePhase({
         onComplete();
         return;
       }
-      setValidationLines([
-        "Add at least one valid DXF part on the Review step before completing. Fix parse errors or adjust quantities as needed.",
-      ]);
+      setValidationLines([t("quote.dxfPhase.validationCompleteReview")]);
       setValidationDialogOpen(true);
       return;
     }
     if (dxfRef.current?.attemptNext()) {
       return;
     }
-    setValidationLines([
-      "Add at least one DXF file before continuing, or finish the Excel column mapping dialog.",
-    ]);
+    setValidationLines([t("quote.dxfPhase.validationNeedUpload")]);
     setValidationDialogOpen(true);
   }
 
@@ -167,7 +163,7 @@ export function DxfQuotePhase({
       <div className="flex min-h-0 min-w-0 flex-1 gap-0">
         <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
+            <h1 className="text-xl font-semibold text-foreground leading-snug">
               {t("quote.dxfPhase.sidebarTitle")}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -204,17 +200,19 @@ export function DxfQuotePhase({
             <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
               {t("quote.dxfPhase.stripe")}
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-1.5 [color-scheme:dark]"
-              disabled={!dxfNavState?.canExportExcelDxfCompare}
-              onClick={() => dxfRef.current?.exportExcelDxfCompareXlsx()}
-            >
-              <FileDown className="h-4 w-4 shrink-0" aria-hidden />
-              {t("quote.dxfPhase.excelDxfCompare.exportXlsx")}
-            </Button>
+            {dxfNavState?.isExcelCompareScreenOpen ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 [color-scheme:dark]"
+                disabled={!dxfNavState?.canExportExcelDxfCompare}
+                onClick={() => dxfRef.current?.exportExcelDxfCompareXlsx()}
+              >
+                <FileDown className="h-4 w-4 shrink-0" aria-hidden />
+                {t("quote.dxfPhase.excelDxfCompare.exportXlsx")}
+              </Button>
+            ) : null}
           </div>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
@@ -265,15 +263,17 @@ export function DxfQuotePhase({
               </>
             )}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="inline-flex flex-row gap-2"
-            onClick={handleBackClick}
-          >
-            <span>{t("quote.dxfPhase.back")}</span>
-            <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-          </Button>
+          {!dxfNavState?.isReviewStep ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="inline-flex flex-row gap-2"
+              onClick={handleBackClick}
+            >
+              <span>{t("quote.dxfPhase.back")}</span>
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -288,61 +288,53 @@ export function DxfQuotePhase({
       </div>
 
       <Dialog open={validationDialogOpen} onOpenChange={setValidationDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Finish DXF review first</DialogTitle>
-            <DialogDescription>
-              Fix the following before you can complete this step.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t("quote.dxfPhase.validationDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("quote.dxfPhase.validationDialogDescription")}</DialogDescription>
           </DialogHeader>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-foreground">
+          <ul className="list-disc space-y-1.5 ps-5 text-sm text-foreground">
             {validationLines.map((line, i) => (
               <li key={i}>{line}</li>
             ))}
           </ul>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-start">
             <Button type="button" onClick={() => setValidationDialogOpen(false)}>
-              OK
+              {t("quote.dxfPhase.validationDialogOk")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reset DXF import?</DialogTitle>
-            <DialogDescription>
-              This clears all uploaded DXF files, optional Excel mapping, and review data, and returns
-              you to the first step.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t("quote.dxfPhase.confirmResetTitle")}</DialogTitle>
+            <DialogDescription>{t("quote.dxfPhase.confirmResetDescription")}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
             <Button type="button" variant="outline" onClick={() => setResetConfirmOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="button" variant="destructive" onClick={confirmResetSession}>
-              Reset
+              {t("quote.dxfPhase.confirmResetAction")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={backConfirmOpen} onOpenChange={setBackConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Leave DXF import?</DialogTitle>
-            <DialogDescription>
-              You have files, Excel match, or progress in this step. Going back returns to quote
-              methods; this DXF session will reset when you open it again.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t("quote.dxfPhase.confirmBackTitle")}</DialogTitle>
+            <DialogDescription>{t("quote.dxfPhase.confirmBackDescription")}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
             <Button type="button" variant="outline" onClick={() => setBackConfirmOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="button" variant="default" onClick={confirmBack}>
-              Leave and go back
+              {t("quote.dxfPhase.confirmBackAction")}
             </Button>
           </DialogFooter>
         </DialogContent>

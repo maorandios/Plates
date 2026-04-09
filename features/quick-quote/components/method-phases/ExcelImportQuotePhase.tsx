@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
+import type { MaterialType } from "@/types/materials";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import type { ExcelRow } from "@/types";
 import { ExcelUploadStep } from "../ExcelUploadStep";
@@ -42,7 +42,6 @@ export function ExcelImportQuotePhase({
       onDataApproved={sync}
       onQuoteImportRowsChange={sync}
       quoteImportDensityKgPerM3={densityKgPerM3}
-      quoteImportPlateTypeLabel={MATERIAL_TYPE_LABELS[materialType]}
       quoteImportMaterialType={materialType}
       onPhaseBack={onBack}
       onPhaseComplete={onComplete}

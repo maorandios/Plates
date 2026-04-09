@@ -29,8 +29,7 @@ export function MethodPhaseMetricStrip({
         dir={valueUnit ? "rtl" : undefined}
       >
         <span
-          className="font-semibold tabular-nums tracking-tight text-foreground
-            text-[clamp(2rem,6.5vmin,4.25rem)]"
+          className="font-semibold tabular-nums text-[#00FF9F] text-[clamp(2rem,6.5vmin,4.25rem)]"
         >
           {value}
         </span>
@@ -40,7 +39,7 @@ export function MethodPhaseMetricStrip({
           </span>
         ) : null}
       </p>
-      <p className="text-[22px] font-semibold leading-snug tracking-wide text-muted-foreground pt-1 max-w-[18rem]">
+      <p className="text-[22px] font-semibold leading-snug text-muted-foreground pt-1 max-w-[18rem]">
         {label}
       </p>
     </div>

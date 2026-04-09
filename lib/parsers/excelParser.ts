@@ -444,6 +444,51 @@ export async function parseExcelFile(
   return { rows, warnings, sheetName, totalRawRows: dataRows.length, rawHeaders, detectedColumns };
 }
 
+/**
+ * Rows that {@link parseExcelFileWithMapping} would emit: non-empty row, non-empty part name,
+ * and not filtered by {@link shouldSkipRow}. Uses the same `headerRowIdx` and `partNameCol` as `mapping`.
+ */
+function countEligibleRowsFromRaw(raw: unknown[][], mapping: ColumnMapping): number {
+  const hdr = mapping.headerRowIdx;
+  if (hdr < 0 || hdr >= raw.length) return 0;
+  const dataRows = raw.slice(hdr + 1) as unknown[][];
+  let n = 0;
+  for (const rawRow of dataRows) {
+    const cells = rawRow as unknown[];
+    if (cells.every((c) => c === "" || c === null || c === undefined)) continue;
+
+    const partName = String(cells[mapping.partNameCol] ?? "").trim();
+    if (!partName) continue;
+    if (shouldSkipRow(partName)) continue;
+    n++;
+  }
+  return n;
+}
+
+/** Same row counting rules as parsing — for badges / UX before full parse. */
+export function countEligibleExcelDataRows(
+  arrayBuffer: ArrayBuffer,
+  mapping: ColumnMapping
+): number {
+  const uint8 = new Uint8Array(arrayBuffer);
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = XLSX.read(uint8, { type: "array" });
+  } catch {
+    return 0;
+  }
+  const sheetName = workbook.SheetNames[0] ?? "";
+  if (!sheetName) return 0;
+  const sheet = workbook.Sheets[sheetName];
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: "",
+    blankrows: false,
+    raw: true,
+  });
+  return countEligibleRowsFromRaw(raw, mapping);
+}
+
 // ─── readExcelHeaders ─────────────────────────────────────────────────────────
 // Lightweight: open workbook, find header row, return structure + preview rows.
 // Does NOT extract data rows — used to populate the mapping dialog.
@@ -454,6 +499,10 @@ export interface ExcelHeadersResult {
   sheetName: string;
   /** First 5 data rows (raw cell values) for the preview table */
   previewRows: unknown[][];
+  /** Rows in sheet below detected header (before filtering); for UI summaries */
+  dataRowCount: number;
+  /** Rows that would parse with {@link autoDetected} (non-empty + valid part name) */
+  eligibleDataRowCount: number;
   /** Best auto-detected mapping using the alias lists */
   autoDetected: ColumnMapping;
 }
@@ -472,7 +521,12 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
   const sheetName = workbook.SheetNames[0] ?? "";
   if (!sheetName) {
     return {
-      rawHeaders: [], headerRowIdx: 0, sheetName: "", previewRows: [],
+      rawHeaders: [],
+      headerRowIdx: 0,
+      sheetName: "",
+      previewRows: [],
+      dataRowCount: 0,
+      eligibleDataRowCount: 0,
       autoDetected: {
         partNameCol: 0, qtyCol: null, thkCol: null, matCol: null, finishCol: null,
         widthCol: null, lengthCol: null, areaCol: null, weightCol: null,
@@ -520,8 +574,18 @@ export function readExcelHeaders(arrayBuffer: ArrayBuffer): ExcelHeadersResult {
   };
 
   const previewRows = (raw.slice(headerRowIdx + 1, headerRowIdx + 6) as unknown[][]);
+  const dataRowCount = Math.max(0, raw.length - headerRowIdx - 1);
+  const eligibleDataRowCount = countEligibleRowsFromRaw(raw, autoDetected);
 
-  return { rawHeaders, headerRowIdx, sheetName, previewRows, autoDetected };
+  return {
+    rawHeaders,
+    headerRowIdx,
+    sheetName,
+    previewRows,
+    dataRowCount,
+    eligibleDataRowCount,
+    autoDetected,
+  };
 }
 
 // ─── parseExcelFileWithMapping ────────────────────────────────────────────────

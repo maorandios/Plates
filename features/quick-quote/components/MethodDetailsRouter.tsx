@@ -107,14 +107,16 @@ export function MethodDetailsRouter({
         />
       );
     case "excelImport":
-      return shell(
-        <ExcelImportQuotePhase
-          materialType={materialType}
-          onRowsChange={onExcelImportQuoteRowsChange}
-          savedRows={excelImportQuoteRows}
-          onBack={onBackToMethodPicker}
-          onComplete={onBackToMethodPicker}
-        />
+      return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <ExcelImportQuotePhase
+            materialType={materialType}
+            onRowsChange={onExcelImportQuoteRowsChange}
+            savedRows={excelImportQuoteRows}
+            onBack={onBackToMethodPicker}
+            onComplete={onBackToMethodPicker}
+          />
+        </div>
       );
     case "bendPlate":
       return shell(

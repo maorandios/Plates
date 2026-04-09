@@ -32,8 +32,14 @@ import { cn } from "@/lib/utils";
 import type { ValidationRow, ValidationRowStatus } from "../types/quickQuote";
 
 const FILTER_ALL = "__all__";
+/** Filter value: rows that are warning or error (shown as “לא תקין”). */
+const FILTER_NOT_OK = "__not_ok__";
 
 const VT = "quote.dxfPhase.validationTable";
+
+/** Same amber/orange treatment as “לא תואם” metric cards on the compare screen. */
+const MISMATCH_CELL_CLASS =
+  "bg-amber-500/[0.06] font-medium text-amber-600 dark:bg-amber-500/[0.08] dark:text-amber-400";
 
 /** Section dividers — physical left edge so header/body align in RTL table. */
 const SEC_BORDER = "border-l border-white/[0.12]";
@@ -95,16 +101,16 @@ function statusBadge(status: ValidationRowStatus) {
           variant="outline"
           className="border-emerald-600/40 bg-emerald-600/10 font-medium text-emerald-800 dark:text-emerald-200"
         >
-          {t(`${VT}.statusValid`)}
+          {t(`${VT}.exportStatusOk`)}
         </Badge>
       );
     case "warning":
       return (
         <Badge
           variant="outline"
-          className="border-amber-600/45 bg-amber-500/10 font-medium text-amber-900 dark:text-amber-200"
+          className="border-amber-500/40 bg-amber-500/[0.08] font-medium text-amber-600 dark:text-amber-400"
         >
-          {t(`${VT}.statusWarning`)}
+          {t(`${VT}.exportStatusNotOk`)}
         </Badge>
       );
     case "error":
@@ -113,7 +119,7 @@ function statusBadge(status: ValidationRowStatus) {
           variant="outline"
           className="border-destructive/50 bg-destructive/10 font-medium text-destructive"
         >
-          {t(`${VT}.statusError`)}
+          {t(`${VT}.exportStatusNotOk`)}
         </Badge>
       );
   }
@@ -157,7 +163,13 @@ export function ValidationTable({ rows }: ValidationTableProps) {
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      if (statusFilter !== FILTER_ALL && r.status !== statusFilter) return false;
+      if (statusFilter !== FILTER_ALL) {
+        if (statusFilter === FILTER_NOT_OK) {
+          if (r.status === "valid") return false;
+        } else if (r.status !== statusFilter) {
+          return false;
+        }
+      }
 
       if (thicknessFilter !== FILTER_ALL) {
         const tVal = Number.parseFloat(thicknessFilter);
@@ -456,8 +468,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                       className={cn(
                         "tabular-nums text-start",
                         INNER_BORDER,
-                        r.excelLengthMm !== r.dxfLengthMm &&
-                          "font-medium text-amber-800 dark:text-amber-200"
+                        r.excelLengthMm !== r.dxfLengthMm && MISMATCH_CELL_CLASS
                       )}
                     >
                       {formatDecimal(r.dxfLengthMm, 1)}
@@ -469,8 +480,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                       className={cn(
                         "tabular-nums text-start",
                         INNER_BORDER,
-                        r.excelWidthMm !== r.dxfWidthMm &&
-                          "font-medium text-amber-800 dark:text-amber-200"
+                        r.excelWidthMm !== r.dxfWidthMm && MISMATCH_CELL_CLASS
                       )}
                     >
                       {formatDecimal(r.dxfWidthMm, 1)}
@@ -482,8 +492,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                       className={cn(
                         "tabular-nums text-start",
                         INNER_BORDER,
-                        Math.abs(r.excelAreaM2 - r.dxfAreaM2) > 0.001 &&
-                          "font-medium text-amber-800 dark:text-amber-200"
+                        Math.abs(r.excelAreaM2 - r.dxfAreaM2) > 0.001 && MISMATCH_CELL_CLASS
                       )}
                     >
                       {formatDecimal(r.dxfAreaM2, 3)}
@@ -495,8 +504,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                       className={cn(
                         "tabular-nums text-start",
                         INNER_BORDER,
-                        Math.abs(r.excelWeightKg - r.dxfWeightKg) > 0.05 &&
-                          "font-medium text-amber-800 dark:text-amber-200"
+                        Math.abs(r.excelWeightKg - r.dxfWeightKg) > 0.05 && MISMATCH_CELL_CLASS
                       )}
                     >
                       {formatDecimal(r.dxfWeightKg, 1)}
@@ -508,7 +516,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                       className={cn(
                         "text-start text-xs",
                         INNER_BORDER,
-                        r.excelMaterial !== r.dxfMaterial && "font-medium text-destructive"
+                        r.excelMaterial !== r.dxfMaterial && MISMATCH_CELL_CLASS
                       )}
                     >
                       {r.dxfMaterial}

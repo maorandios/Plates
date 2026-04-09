@@ -30,6 +30,7 @@ import {
   Weight,
   Square,
   Palette,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -364,6 +365,8 @@ export type DxfUploadNavState = {
   canReset: boolean;
   /** Excel vs DXF validation rows exist — enables CSV export in phase header. */
   canExportExcelDxfCompare: boolean;
+  /** True when the full-screen Excel–DXF comparison table is open (quote method). */
+  isExcelCompareScreenOpen: boolean;
 };
 
 interface DxfUploadStepProps {
@@ -494,6 +497,18 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     if (mappedExcelRows?.length) return;
     setNoExcelDefaultsBannerDismissed(readNoExcelDefaultsBannerDismissed());
   }, [subStep, mappedExcelRows?.length]);
+
+  /** After removing the last review row, return to upload so the UI is not stuck on an empty step 3. */
+  useEffect(() => {
+    if (subStep !== 3) return;
+    if (uploadedFiles.length > 0) return;
+    setSubStep(1);
+    setExcelCompareScreenOpen(false);
+    if (mappedExcelRows?.length) {
+      setValidationRows(null);
+      setValidationSummary(null);
+    }
+  }, [subStep, uploadedFiles.length, mappedExcelRows?.length]);
 
   const dismissNoExcelDefaultsBanner = useCallback(() => {
     try {
@@ -829,6 +844,16 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     []
   );
 
+  const removeUploadAtIndex = useCallback((index: number) => {
+    setPreviewUploadIndex((prev) => {
+      if (prev === null) return null;
+      if (prev === index) return null;
+      if (prev > index) return prev - 1;
+      return prev;
+    });
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const handleContinueToNextPhase = useCallback(() => {
     const validUploads = uploadedFiles.filter((u) => u.parsed !== null);
     const validGeometries = validUploads.map((u) => {
@@ -929,6 +954,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       canReset: !canLeaveEmpty,
       canExportExcelDxfCompare:
         subStep === 3 && validationRows != null && validationRows.length > 0,
+      isExcelCompareScreenOpen: excelCompareScreenOpen,
     });
   }, [
     subStep,
@@ -939,6 +965,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     metrics.validParts,
     onDxfNavStateChange,
     validationRows,
+    excelCompareScreenOpen,
   ]);
 
   useImperativeHandle(
@@ -1571,12 +1598,6 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                   <CardTitle>{t("quote.dxfPhase.dxfReviewTable.title")}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                     {t("quote.dxfPhase.dxfReviewTable.subtitle")}
-                    {mappedExcelRows?.length ? (
-                      <>
-                        {" "}
-                        {t("quote.dxfPhase.dxfReviewTable.subtitleExcelHint")}
-                      </>
-                    ) : null}
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -1666,6 +1687,9 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                         <TableHead className="w-[72px]">
                           {t("quote.dxfPhase.dxfReviewTable.colPreview")}
                         </TableHead>
+                        <TableHead className="min-w-[4.5rem] py-2 text-center text-xs font-medium">
+                          {t("quote.dxfPhase.dxfReviewTable.deleteColumnHeader")}
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1696,7 +1720,12 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                         upload.file.name.replace(/\.dxf$/i, "");
 
                         return (
-                          <TableRow key={index}>
+                          <TableRow
+                            key={
+                              upload.parsed?.id ??
+                              `${upload.file.name}-${upload.file.size}-${upload.file.lastModified}`
+                            }
+                          >
                             <TableCell className="font-medium">{partLabel}</TableCell>
                             <TableCell>
                               <Input
@@ -1826,6 +1855,20 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                                 aria-hidden
                               />
                             </button>
+                          </TableCell>
+                          <TableCell className="py-2 text-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => removeUploadAtIndex(index)}
+                              aria-label={t(
+                                "quote.dxfPhase.dxfReviewTable.deleteRowAria"
+                              )}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );

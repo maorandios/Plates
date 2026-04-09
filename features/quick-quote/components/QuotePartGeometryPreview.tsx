@@ -6,21 +6,30 @@ import type { DxfPartGeometry } from "@/types";
 import { findDxfGeometryForQuotePart } from "../lib/quotePartGeometryLookup";
 import type { QuotePartRow } from "../types/quickQuote";
 
+/**
+ * `dxfPreviewModal` matches {@link PlateGeometryCanvas} `appearance="previewModal"` outer fill/stroke.
+ */
 function RectangularPlateSvg({
   widthMm,
   lengthMm,
   className,
+  rectStyle = "default",
 }: {
   widthMm: number;
   lengthMm: number;
   className?: string;
+  rectStyle?: "default" | "dxfPreviewModal";
 }) {
   const w = Math.max(1, widthMm);
   const l = Math.max(1, lengthMm);
   const pad = 0.08;
   const vw = w * (1 + 2 * pad);
   const vl = l * (1 + 2 * pad);
-  const stroke = Math.max(w, l) * 0.004;
+  const strokeW = Math.max(w, l) * 0.004;
+  const fill =
+    rectStyle === "dxfPreviewModal" ? "#00371F" : "hsl(var(--muted) / 0.35)";
+  const stroke =
+    rectStyle === "dxfPreviewModal" ? "#00FF9F" : "hsl(var(--primary))";
 
   return (
     <div
@@ -40,10 +49,10 @@ function RectangularPlateSvg({
           y={0}
           width={w}
           height={l}
-          fill="hsl(var(--muted) / 0.35)"
-          stroke="hsl(var(--primary))"
-          strokeWidth={stroke}
-          rx={stroke}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={strokeW}
+          rx={strokeW}
         />
       </svg>
     </div>
@@ -54,6 +63,11 @@ interface QuotePartGeometryPreviewProps {
   part: QuotePartRow;
   dxfGeometries?: DxfPartGeometry[] | null;
   className?: string;
+  /**
+   * When there is no DXF geometry, style the nominal rectangle like the DXF part preview modal
+   * (dark green fill + mint stroke).
+   */
+  rectangleAppearance?: "default" | "dxfPreviewModal";
 }
 
 /**
@@ -64,6 +78,7 @@ export function QuotePartGeometryPreview({
   part,
   dxfGeometries,
   className,
+  rectangleAppearance = "default",
 }: QuotePartGeometryPreviewProps) {
   const dxf = findDxfGeometryForQuotePart(part, dxfGeometries ?? undefined);
   const pg = dxf?.processedGeometry;
@@ -82,6 +97,9 @@ export function QuotePartGeometryPreview({
           width={440}
           height={280}
           debugMode={false}
+          appearance={
+            rectangleAppearance === "dxfPreviewModal" ? "previewModal" : "default"
+          }
         />
       </div>
     );
@@ -92,6 +110,7 @@ export function QuotePartGeometryPreview({
       widthMm={part.widthMm}
       lengthMm={part.lengthMm}
       className={className}
+      rectStyle={rectangleAppearance === "dxfPreviewModal" ? "dxfPreviewModal" : "default"}
     />
   );
 }

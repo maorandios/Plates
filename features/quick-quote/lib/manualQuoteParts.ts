@@ -119,7 +119,12 @@ export function excelRowsToManualQuoteRows(
 }
 
 /** Rebuild quote-import editor rows from saved manual lines (re-enter Import Excel list). */
-export function manualQuoteRowsToRestoredExcelRows(rows: ManualQuotePartRow[]): ExcelRow[] {
+export function manualQuoteRowsToRestoredExcelRows(
+  rows: ManualQuotePartRow[],
+  materialType?: MaterialType
+): ExcelRow[] {
+  const defaultMat =
+    materialType != null ? defaultMaterialGradeForFamily(materialType) : "S235";
   return rows.map((r) => ({
     id: r.id,
     fileId: "quick-quote-import",
@@ -128,7 +133,7 @@ export function manualQuoteRowsToRestoredExcelRows(rows: ManualQuotePartRow[]): 
     partName: r.partNumber,
     quantity: Math.max(1, Math.floor(r.quantity) || 1),
     thickness: r.thicknessMm > 0 ? r.thicknessMm : undefined,
-    material: (r.material ?? "").trim() || undefined,
+    material: (r.material ?? "").trim() || defaultMat,
     width: r.widthMm > 0 ? r.widthMm : undefined,
     length: r.lengthMm > 0 ? r.lengthMm : undefined,
     finish: plateFinishLabel(r.finish),
