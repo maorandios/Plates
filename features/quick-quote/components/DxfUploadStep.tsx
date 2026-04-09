@@ -82,8 +82,9 @@ import type {
 import { buildValidationData } from "../lib/buildValidationData";
 import { mergeExcelIntoDxfUploads } from "../lib/dxfUploadExcelMerge";
 import { DXF_QUOTE_DEFAULT_THICKNESS_MM } from "../lib/dxfQuoteParts";
+import { downloadExcelDxfCompareXlsx } from "../lib/validationReportXlsx";
 import { ExcelColumnMappingModal } from "./ExcelColumnMappingModal";
-import { DxfExcelCompareModal } from "./DxfExcelCompareModal";
+import { DxfExcelCompareScreen } from "./DxfExcelCompareScreen";
 import { DxfFileBadgeIcon } from "./icons/DxfFileBadgeIcon";
 import { t } from "@/lib/i18n";
 
@@ -335,6 +336,8 @@ export type DxfUploadStepHandle = {
   resetSession: () => void;
   /** True when there is no upload / Excel / progress to warn about before leaving the phase. */
   canLeaveWithoutConfirm: () => boolean;
+  /** Download Excel vs DXF validation spreadsheet when review data exists. */
+  exportExcelDxfCompareXlsx: () => void;
 };
 
 const NO_EXCEL_DEFAULTS_BANNER_STORAGE_KEY =
@@ -359,6 +362,8 @@ export type DxfUploadNavState = {
   canCompleteReview: boolean;
   /** False when session is empty (nothing to reset). */
   canReset: boolean;
+  /** Excel vs DXF validation rows exist — enables CSV export in phase header. */
+  canExportExcelDxfCompare: boolean;
 };
 
 interface DxfUploadStepProps {
@@ -389,6 +394,8 @@ interface DxfUploadStepProps {
   onDxfNavStateChange?: (state: DxfUploadNavState) => void;
   /** After internal reset: clear parent `dxfMethodGeometries` + Excel snapshot. */
   onSessionReset?: () => void;
+  /** General step project name — Excel השוואה filename (with Hebrew date). */
+  excelExportProjectName?: string;
 }
 
 export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>(
@@ -406,6 +413,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       dxfQuotePhaseLayout = false,
       onDxfNavStateChange,
       onSessionReset,
+      excelExportProjectName,
     },
     ref
   ) {
@@ -430,7 +438,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   const [validationSummary, setValidationSummary] = useState<ValidationSummary | null>(
     null
   );
-  const [compareModalOpen, setCompareModalOpen] = useState(false);
+  const [excelCompareScreenOpen, setExcelCompareScreenOpen] = useState(false);
   const [previewUploadIndex, setPreviewUploadIndex] = useState<number | null>(null);
   const previewCanvasResizeObserverRef = useRef<ResizeObserver | null>(null);
   /** Measured host box; Konva size must match host (never force a min larger than the visible area). */
@@ -557,7 +565,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     setMappedExcelRows(null);
     setValidationRows(null);
     setValidationSummary(null);
-    setCompareModalOpen(false);
+    setExcelCompareScreenOpen(false);
     setPreviewUploadIndex(null);
     excelRestoreAppliedRef.current = false;
     onOptionalExcelChange?.(null);
@@ -690,7 +698,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     setMappedExcelRows(null);
     setValidationRows(null);
     setValidationSummary(null);
-    setCompareModalOpen(false);
+    setExcelCompareScreenOpen(false);
     setExcelMappingModalOpen(false);
     onOptionalExcelChange?.(null);
     onExcelSessionPersist?.(null);
@@ -767,7 +775,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         setSubStep(1);
         setValidationRows(null);
         setValidationSummary(null);
-        setCompareModalOpen(false);
+        setExcelCompareScreenOpen(false);
       }
       return next;
     });
@@ -780,7 +788,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     setSubStep(1);
     setValidationRows(null);
     setValidationSummary(null);
-    setCompareModalOpen(false);
+    setExcelCompareScreenOpen(false);
   }, []);
 
   const handleParseFiles = useCallback(() => {
@@ -791,7 +799,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   }, [uploadedFiles, materialType]);
 
   const handleBackToUpload = useCallback(() => {
-    setCompareModalOpen(false);
+    setExcelCompareScreenOpen(false);
     setValidationRows(null);
     setValidationSummary(null);
     setSubStep(1);
@@ -799,7 +807,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
 
   /** Back from review (step 3) — always return to upload (step 1). Parse step is skipped when no Excel. */
   const handleBackToParse = useCallback(() => {
-    setCompareModalOpen(false);
+    setExcelCompareScreenOpen(false);
     if (mappedExcelRows?.length) {
       setValidationRows(null);
       setValidationSummary(null);
@@ -919,6 +927,8 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       isReviewStep: subStep === 3,
       canCompleteReview: subStep === 3 && metrics.validParts > 0,
       canReset: !canLeaveEmpty,
+      canExportExcelDxfCompare:
+        subStep === 3 && validationRows != null && validationRows.length > 0,
     });
   }, [
     subStep,
@@ -928,6 +938,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     optionalExcelFile,
     metrics.validParts,
     onDxfNavStateChange,
+    validationRows,
   ]);
 
   useImperativeHandle(
@@ -953,6 +964,10 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         return false;
       },
       attemptBackWithinPhase: () => {
+        if (excelCompareScreenOpen) {
+          setExcelCompareScreenOpen(false);
+          return true;
+        }
         if (excelMappingModalOpen) {
           handleExcelMappingDiscard();
           return true;
@@ -974,6 +989,14 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         !optionalExcelFile &&
         subStep === 1 &&
         !excelMappingModalOpen,
+      exportExcelDxfCompareXlsx: () => {
+        if (!validationRows || validationRows.length === 0) return;
+        void downloadExcelDxfCompareXlsx(validationRows, {
+          projectName: excelExportProjectName,
+        }).catch((err) => {
+          console.error(err);
+        });
+      },
     }),
     [
       metrics.validParts,
@@ -989,6 +1012,9 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       optionalExcelFile,
       subStep,
       excelMappingModalOpen,
+      excelCompareScreenOpen,
+      validationRows,
+      excelExportProjectName,
     ]
   );
 
@@ -996,7 +1022,12 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     <div
       className={cn(
         "space-y-6",
-        dxfQuotePhaseLayout && "flex h-full min-h-0 flex-1 flex-col"
+        dxfQuotePhaseLayout && "flex h-full min-h-0 flex-1 flex-col",
+        dxfQuotePhaseLayout && "pt-4 sm:pt-5",
+        dxfQuotePhaseLayout &&
+          subStep === 3 &&
+          excelCompareScreenOpen &&
+          "min-h-0 space-y-0 gap-0 !pt-0"
       )}
       dir={dxfQuotePhaseLayout ? "rtl" : undefined}
     >
@@ -1484,73 +1515,71 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       {/* Step 3: Review Parts */}
       {subStep === 3 && uploadedFiles.length > 0 && (
         <>
-          {mappedExcelRows?.length &&
-            validationSummary &&
-            validationRows &&
-            validationRows.length > 0 && (
-              <div className="flex w-full justify-start">
-                <button
-                  type="button"
-                  onClick={() => setCompareModalOpen(true)}
-                  className={cn(
-                    "inline-flex w-fit max-w-full items-center gap-3 rounded-lg border p-4 text-start transition-colors focus-visible:outline-none",
-                    validationSummary.warnings > 0 || validationSummary.critical > 0
-                      ? "excel-dxf-mismatch-banner"
-                      : "border-emerald-500/40 bg-emerald-500/[0.05] text-foreground hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  )}
-                >
-                {validationSummary.warnings > 0 || validationSummary.critical > 0 ? (
-                  <AlertTriangle className="h-5 w-5 shrink-0 text-current" aria-hidden />
-                ) : (
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+          {excelCompareScreenOpen &&
+          validationSummary &&
+          validationRows &&
+          validationRows.length > 0 ? (
+            <DxfExcelCompareScreen summary={validationSummary} rows={validationRows} />
+          ) : (
+            <>
+              {mappedExcelRows?.length &&
+                validationSummary &&
+                validationRows &&
+                validationRows.length > 0 && (
+                  <div className="flex w-full justify-start">
+                    <button
+                      type="button"
+                      onClick={() => setExcelCompareScreenOpen(true)}
+                      className={cn(
+                        "inline-flex w-fit max-w-full items-center gap-3 rounded-lg border p-4 text-start transition-colors focus-visible:outline-none",
+                        validationSummary.warnings > 0 || validationSummary.critical > 0
+                          ? "excel-dxf-mismatch-banner"
+                          : "border-emerald-500/40 bg-emerald-500/[0.05] text-foreground hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      )}
+                    >
+                      {validationSummary.warnings > 0 || validationSummary.critical > 0 ? (
+                        <AlertTriangle className="h-5 w-5 shrink-0 text-current" aria-hidden />
+                      ) : (
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+                      )}
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium">
+                          {validationSummary.warnings > 0 || validationSummary.critical > 0
+                            ? t("quote.dxfPhase.excelDxfValidationBanner.titleMismatch")
+                            : t("quote.dxfPhase.excelDxfValidationBanner.titleMatch")}
+                        </p>
+                        <p
+                          className={cn(
+                            "text-xs",
+                            validationSummary.warnings > 0 || validationSummary.critical > 0
+                              ? "text-current"
+                              : "text-muted-foreground"
+                          )}
+                        >
+                          {validationSummary.warnings > 0 || validationSummary.critical > 0
+                            ? t("quote.dxfPhase.excelDxfValidationBanner.bodyMismatch")
+                            : t("quote.dxfPhase.excelDxfValidationBanner.bodyMatch")}
+                        </p>
+                      </div>
+                    </button>
+                  </div>
                 )}
-                <div className="min-w-0 space-y-1">
-                  <p className="text-sm font-medium">
-                    {validationSummary.warnings > 0 || validationSummary.critical > 0
-                      ? t("quote.dxfPhase.excelDxfValidationBanner.titleMismatch")
-                      : t("quote.dxfPhase.excelDxfValidationBanner.titleMatch")}
-                  </p>
-                  <p
-                    className={cn(
-                      "text-xs",
-                      validationSummary.warnings > 0 || validationSummary.critical > 0
-                        ? "text-current"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    {validationSummary.warnings > 0 || validationSummary.critical > 0
-                      ? t("quote.dxfPhase.excelDxfValidationBanner.bodyMismatch")
-                      : t("quote.dxfPhase.excelDxfValidationBanner.bodyMatch")}
-                  </p>
-                </div>
-                </button>
-              </div>
-            )}
 
-          {validationSummary && validationRows && validationRows.length > 0 && (
-            <DxfExcelCompareModal
-              open={compareModalOpen}
-              onOpenChange={setCompareModalOpen}
-              summary={validationSummary}
-              rows={validationRows}
-            />
-          )}
-
-          {/* Parts Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("quote.dxfPhase.dxfReviewTable.title")}</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                {t("quote.dxfPhase.dxfReviewTable.subtitle")}
-                {mappedExcelRows?.length ? (
-                  <>
-                    {" "}
-                    {t("quote.dxfPhase.dxfReviewTable.subtitleExcelHint")}
-                  </>
-                ) : null}
-              </p>
-            </CardHeader>
-            <CardContent>
+              {/* Parts Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("quote.dxfPhase.dxfReviewTable.title")}</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                    {t("quote.dxfPhase.dxfReviewTable.subtitle")}
+                    {mappedExcelRows?.length ? (
+                      <>
+                        {" "}
+                        {t("quote.dxfPhase.dxfReviewTable.subtitleExcelHint")}
+                      </>
+                    ) : null}
+                  </p>
+                </CardHeader>
+                <CardContent>
               {!mappedExcelRows?.length && !noExcelDefaultsBannerDismissed && (
                 <div
                   role="status"
@@ -1805,24 +1834,26 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                   </Table>
                 </div>
               </TooltipProvider>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {!hideBottomNavigation && (
-            <div className="flex items-center justify-between">
-              <Button variant="outline" onClick={handleBackToParse}>
-                Back to Parse
-              </Button>
-              <Button
-                onClick={handleContinueToNextPhase}
-                size="lg"
-                className="gap-2"
-                disabled={metrics.validParts === 0}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Continue to Next Phase
-              </Button>
-            </div>
+              {!hideBottomNavigation && (
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" onClick={handleBackToParse}>
+                    Back to Parse
+                  </Button>
+                  <Button
+                    onClick={handleContinueToNextPhase}
+                    size="lg"
+                    className="gap-2"
+                    disabled={metrics.validParts === 0}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Continue to Next Phase
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

@@ -594,6 +594,7 @@ export function QuickQuotePage() {
               dxfMethodGeometries={dxfMethodGeometries}
               dxfMethodExcel={dxfMethodExcel}
               onDxfMethodExcelChange={setDxfMethodExcel}
+              dxfExcelExportProjectName={jobDetails.projectName.trim()}
             />
           )}
 

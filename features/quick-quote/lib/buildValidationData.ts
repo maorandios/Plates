@@ -51,12 +51,19 @@ export function buildValidationData(
     const dxfDim1 = bbox?.width || 0;
     const dxfDim2 = bbox?.height || 0;
 
-    const excelLengthMm = excelRow.length || 0;
-    const excelWidthMm = excelRow.width || 0;
+    /** Raw BOM columns — may label either edge as "length" or "width". */
+    const rawExcelL = excelRow.length || 0;
+    const rawExcelW = excelRow.width || 0;
 
-    const excelDimensions = [excelLengthMm, excelWidthMm].sort((a, b) => b - a);
+    const excelDimensions = [rawExcelL, rawExcelW].sort((a, b) => b - a);
     const dxfDimensions = [dxfDim1, dxfDim2].sort((a, b) => b - a);
 
+    /**
+     * Canonical plate edges: larger ↔ larger, smaller ↔ smaller (L/W labels can be swapped).
+     * Persist these so tables, CSV, and aggregates compare the same edge on both sides.
+     */
+    const excelLengthMm = excelDimensions[0];
+    const excelWidthMm = excelDimensions[1];
     const dxfLengthMm = dxfDimensions[0];
     const dxfWidthMm = dxfDimensions[1];
 
@@ -75,18 +82,18 @@ export function buildValidationData(
       mismatchFields.push("DXF file not found");
       status = "error";
     } else {
-      if (excelDimensions[0] > 0 && dxfDimensions[0] > 0) {
+      if (excelLengthMm > 0 && dxfLengthMm > 0) {
         const lengthDiff =
-          Math.abs(excelDimensions[0] - dxfDimensions[0]) / excelDimensions[0];
+          Math.abs(excelLengthMm - dxfLengthMm) / excelLengthMm;
         if (lengthDiff > DIMENSION_TOLERANCE) {
           mismatchFields.push("Length");
           if (status === "valid") status = "warning";
         }
       }
 
-      if (excelDimensions[1] > 0 && dxfDimensions[1] > 0) {
+      if (excelWidthMm > 0 && dxfWidthMm > 0) {
         const widthDiff =
-          Math.abs(excelDimensions[1] - dxfDimensions[1]) / excelDimensions[1];
+          Math.abs(excelWidthMm - dxfWidthMm) / excelWidthMm;
         if (widthDiff > DIMENSION_TOLERANCE) {
           mismatchFields.push("Width");
           if (status === "valid") status = "warning";

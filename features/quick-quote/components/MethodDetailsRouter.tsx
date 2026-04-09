@@ -38,6 +38,8 @@ interface MethodDetailsRouterProps {
   dxfMethodGeometries: DxfPartGeometry[];
   dxfMethodExcel: DxfMethodExcelSnapshot | null;
   onDxfMethodExcelChange: (payload: DxfMethodExcelSnapshot | null) => void;
+  /** General step — used for Excel export filename (שם פרויקט + תאריך). */
+  dxfExcelExportProjectName?: string;
 }
 
 export function MethodDetailsRouter({
@@ -56,6 +58,7 @@ export function MethodDetailsRouter({
   dxfMethodGeometries,
   dxfMethodExcel,
   onDxfMethodExcelChange,
+  dxfExcelExportProjectName,
 }: MethodDetailsRouterProps) {
   if (!method) {
     return (
@@ -89,6 +92,7 @@ export function MethodDetailsRouter({
             onGeometriesApproved={onDxfMethodGeometriesChange}
             onBack={onBackToMethodPicker}
             onComplete={onBackToMethodPicker}
+            excelExportProjectName={dxfExcelExportProjectName}
           />
         </div>
       );

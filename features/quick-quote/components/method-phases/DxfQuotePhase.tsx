@@ -5,6 +5,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  FileDown,
   LayoutGrid,
   Package,
   RotateCcw,
@@ -41,6 +42,8 @@ interface DxfQuotePhaseProps {
   onGeometriesApproved: (data: DxfPartGeometry[]) => void;
   onBack: () => void;
   onComplete: () => void;
+  /** For Excel download filename: שם פרויקט + תאריך עברי. */
+  excelExportProjectName?: string;
 }
 
 const MANUAL_PHASE_VIEWPORT =
@@ -61,6 +64,7 @@ export function DxfQuotePhase({
   onGeometriesApproved,
   onBack,
   onComplete,
+  excelExportProjectName,
 }: DxfQuotePhaseProps) {
   const dxfRef = useRef<DxfUploadStepHandle>(null);
   const [phaseMetrics, setPhaseMetrics] =
@@ -193,14 +197,28 @@ export function DxfQuotePhase({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-          <div className="shrink-0 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4">
-            <p className="text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
+          <div
+            className="flex shrink-0 items-center gap-3 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4"
+            dir="rtl"
+          >
+            <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
               {t("quote.dxfPhase.stripe")}
             </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 [color-scheme:dark]"
+              disabled={!dxfNavState?.canExportExcelDxfCompare}
+              onClick={() => dxfRef.current?.exportExcelDxfCompareXlsx()}
+            >
+              <FileDown className="h-4 w-4 shrink-0" aria-hidden />
+              {t("quote.dxfPhase.excelDxfCompare.exportXlsx")}
+            </Button>
           </div>
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-0 sm:px-5 sm:pb-5">
               <DxfUploadStep
                 ref={dxfRef}
                 materialType={materialType}
@@ -216,6 +234,7 @@ export function DxfQuotePhase({
                 dxfQuotePhaseLayout
                 onDxfNavStateChange={handleDxfNavStateChange}
                 onSessionReset={handleSessionReset}
+                excelExportProjectName={excelExportProjectName}
               />
             </div>
           </div>

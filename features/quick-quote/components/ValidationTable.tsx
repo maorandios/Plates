@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { RotateCcw, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,10 +27,65 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
+import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { ValidationRow, ValidationRowStatus } from "../types/quickQuote";
 
 const FILTER_ALL = "__all__";
+
+const VT = "quote.dxfPhase.validationTable";
+
+/** Section dividers — physical left edge so header/body align in RTL table. */
+const SEC_BORDER = "border-l border-white/[0.12]";
+/** Lighter split between Excel | DXF within a section. */
+const INNER_BORDER = "border-l border-white/[0.06]";
+
+function SectionGroupTitle({
+  titleKey,
+  unitKey,
+}: {
+  titleKey: string;
+  unitKey?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 text-start leading-tight">
+      <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
+        {t(titleKey)}
+      </span>
+      {unitKey ? (
+        <span className="text-[10px] font-normal text-muted-foreground/85">{t(unitKey)}</span>
+      ) : null}
+    </div>
+  );
+}
+
+function formatMismatchFieldLabel(field: string): string {
+  const map: Record<string, string> = {
+    Length: `${VT}.mismatchLength`,
+    Width: `${VT}.mismatchWidth`,
+    Area: `${VT}.mismatchArea`,
+    Weight: `${VT}.mismatchWeight`,
+    Material: `${VT}.mismatchMaterial`,
+    "DXF file not found": `${VT}.mismatchDxfNotFound`,
+  };
+  const key = map[field];
+  return key ? t(key) : field;
+}
+
+function mismatchFieldsHebrew(row: ValidationRow): string {
+  return row.mismatchFields.map(formatMismatchFieldLabel).join(" · ");
+}
+
+function tooltipReasonText(row: ValidationRow): string {
+  if (row.mismatchFields.length === 0) return t(`${VT}.tooltipReasonMatch`);
+  return t(`${VT}.tooltipReasonMismatch`, { fields: mismatchFieldsHebrew(row) });
+}
+
+function tooltipActionText(row: ValidationRow): string {
+  if (row.status === "error") return t(`${VT}.tooltipActionError`);
+  if (row.status === "warning") return t(`${VT}.tooltipActionWarning`);
+  return t(`${VT}.tooltipActionOk`);
+}
 
 function statusBadge(status: ValidationRowStatus) {
   switch (status) {
@@ -37,27 +93,27 @@ function statusBadge(status: ValidationRowStatus) {
       return (
         <Badge
           variant="outline"
-          className="font-medium border-emerald-600/40 bg-emerald-600/10 text-emerald-800 dark:text-emerald-200"
+          className="border-emerald-600/40 bg-emerald-600/10 font-medium text-emerald-800 dark:text-emerald-200"
         >
-          Valid
+          {t(`${VT}.statusValid`)}
         </Badge>
       );
     case "warning":
       return (
         <Badge
           variant="outline"
-          className="font-medium border-amber-600/45 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+          className="border-amber-600/45 bg-amber-500/10 font-medium text-amber-900 dark:text-amber-200"
         >
-          Warning
+          {t(`${VT}.statusWarning`)}
         </Badge>
       );
     case "error":
       return (
         <Badge
           variant="outline"
-          className="font-medium border-destructive/50 bg-destructive/10 text-destructive"
+          className="border-destructive/50 bg-destructive/10 font-medium text-destructive"
         >
-          Error
+          {t(`${VT}.statusError`)}
         </Badge>
       );
   }
@@ -72,6 +128,13 @@ export function ValidationTable({ rows }: ValidationTableProps) {
   const [thicknessFilter, setThicknessFilter] = useState<string>(FILTER_ALL);
   const [materialFilter, setMaterialFilter] = useState<string>(FILTER_ALL);
   const [search, setSearch] = useState("");
+
+  const resetFilters = () => {
+    setStatusFilter(FILTER_ALL);
+    setThicknessFilter(FILTER_ALL);
+    setMaterialFilter(FILTER_ALL);
+    setSearch("");
+  };
 
   const thicknessOptions = useMemo(() => {
     const set = new Set<number>();
@@ -97,8 +160,8 @@ export function ValidationTable({ rows }: ValidationTableProps) {
       if (statusFilter !== FILTER_ALL && r.status !== statusFilter) return false;
 
       if (thicknessFilter !== FILTER_ALL) {
-        const t = Number.parseFloat(thicknessFilter);
-        if (!Number.isFinite(t) || Math.abs(r.thicknessMm - t) > 1e-6) return false;
+        const tVal = Number.parseFloat(thicknessFilter);
+        if (!Number.isFinite(tVal) || Math.abs(r.thicknessMm - tVal) > 1e-6) return false;
       }
 
       if (materialFilter !== FILTER_ALL) {
@@ -120,247 +183,370 @@ export function ValidationTable({ rows }: ValidationTableProps) {
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
           <div className="relative w-full max-w-sm shrink-0">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search part name…"
+              placeholder={t(`${VT}.searchPlaceholder`)}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-9"
+              className="h-9 ps-8 [color-scheme:dark]"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 min-w-0">
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Thickness (mm)</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t(`${VT}.filterThicknessLabel`)}
+              </span>
               <Select value={thicknessFilter} onValueChange={setThicknessFilter}>
-                <SelectTrigger className="h-9 w-full">
-                  <SelectValue placeholder="All thicknesses" />
+                <SelectTrigger className="h-9 w-full [color-scheme:dark]">
+                  <SelectValue placeholder={t(`${VT}.allThicknesses`)} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={FILTER_ALL}>All thicknesses</SelectItem>
-                  {thicknessOptions.map((t) => (
-                    <SelectItem key={t} value={String(t)}>
-                      {formatDecimal(t, t % 1 === 0 ? 0 : 2)}
+                  <SelectItem value={FILTER_ALL}>{t(`${VT}.allThicknesses`)}</SelectItem>
+                  {thicknessOptions.map((th) => (
+                    <SelectItem key={th} value={String(th)}>
+                      {formatDecimal(th, th % 1 === 0 ? 0 : 2)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Material</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t(`${VT}.filterMaterialLabel`)}
+              </span>
               <Select value={materialFilter} onValueChange={setMaterialFilter}>
-                <SelectTrigger className="h-9 w-full">
-                  <SelectValue placeholder="All materials" />
+                <SelectTrigger className="h-9 w-full [color-scheme:dark]">
+                  <SelectValue placeholder={t(`${VT}.allMaterials`)} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={FILTER_ALL}>All materials</SelectItem>
-                  {materialOptions.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
+                  <SelectItem value={FILTER_ALL}>{t(`${VT}.allMaterials`)}</SelectItem>
+                  {materialOptions.map((mat) => (
+                    <SelectItem key={mat} value={mat}>
+                      {mat}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Status</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {t(`${VT}.filterStatusLabel`)}
+              </span>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-full">
-                  <SelectValue placeholder="All statuses" />
+                <SelectTrigger className="h-9 w-full [color-scheme:dark]">
+                  <SelectValue placeholder={t(`${VT}.allStatuses`)} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={FILTER_ALL}>All statuses</SelectItem>
-                  <SelectItem value="valid">Valid</SelectItem>
-                  <SelectItem value="warning">Warning</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
+                  <SelectItem value={FILTER_ALL}>{t(`${VT}.allStatuses`)}</SelectItem>
+                  <SelectItem value="valid">{t(`${VT}.statusValid`)}</SelectItem>
+                  <SelectItem value="warning">{t(`${VT}.statusWarning`)}</SelectItem>
+                  <SelectItem value="error">{t(`${VT}.statusError`)}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 shrink-0 gap-1.5 [color-scheme:dark]"
+            onClick={resetFilters}
+          >
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+            {t(`${VT}.resetFilters`)}
+          </Button>
         </div>
       </div>
 
-      <div className="w-full rounded-md overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/55 hover:bg-muted/55 border-b border-border">
-              <TableHead
-                colSpan={3}
-                className="sticky left-0 z-20 min-w-[180px] bg-muted/55 text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-r border-border/80"
-              >
-                General
-              </TableHead>
-              <TableHead
-                colSpan={2}
-                className="text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-r border-border/60"
-              >
-                Length
-              </TableHead>
-              <TableHead
-                colSpan={2}
-                className="text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-r border-border/60"
-              >
-                Width
-              </TableHead>
-              <TableHead
-                colSpan={2}
-                className="text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-r border-border/60"
-              >
-                Area
-              </TableHead>
-              <TableHead
-                colSpan={2}
-                className="text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-r border-border/60"
-              >
-                Weight
-              </TableHead>
-              <TableHead
-                colSpan={2}
-                className="text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-r border-border/60"
-              >
-                Material
-              </TableHead>
-              <TableHead className="text-center py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground min-w-[88px]">
-                Status
-              </TableHead>
-            </TableRow>
-            <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border">
-              <TableHead className="min-w-[100px] sticky left-0 bg-muted/40 z-10 border-r border-border/80 py-2 text-xs">
-                Part name
-              </TableHead>
-              <TableHead className="text-right border-r border-border/40 py-2 text-xs">Qty</TableHead>
-              <TableHead className="text-right border-r border-border/40 py-2 text-xs">
-                Thickness (mm)
-              </TableHead>
-              <TableHead className="text-right py-2 text-xs">Excel L</TableHead>
-              <TableHead className="text-right border-r border-border/40 py-2 text-xs">DXF L</TableHead>
-              <TableHead className="text-right py-2 text-xs">Excel W</TableHead>
-              <TableHead className="text-right border-r border-border/40 py-2 text-xs">DXF W</TableHead>
-              <TableHead className="text-right py-2 text-xs">Excel area</TableHead>
-              <TableHead className="text-right border-r border-border/40 py-2 text-xs">DXF area</TableHead>
-              <TableHead className="text-right py-2 text-xs">Excel wt</TableHead>
-              <TableHead className="text-right border-r border-border/40 py-2 text-xs">DXF wt</TableHead>
-              <TableHead className="py-2 text-xs">Excel mat.</TableHead>
-              <TableHead className="border-r border-border/40 py-2 text-xs">DXF mat.</TableHead>
-              <TableHead className="min-w-[88px] py-2 text-xs">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={14} className="h-20 text-center text-muted-foreground text-sm">
-                  No rows match the current filters.
-                </TableCell>
+      <TooltipProvider delayDuration={250}>
+        <div className="min-w-0 rounded-md border border-white/[0.08]">
+          <Table
+            dir="rtl"
+            className="min-w-[1080px] border-separate border-spacing-0"
+            containerClassName="overflow-visible"
+          >
+            <TableHeader className="sticky top-0 z-40 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_tr]:border-b-0">
+              <TableRow className="border-b-0 hover:bg-transparent">
+                <TableHead
+                  colSpan={3}
+                  className="sticky start-0 z-50 min-w-[180px] bg-card py-3 text-start shadow-[1px_0_0_0_hsl(var(--border)/0.35)]"
+                >
+                  <SectionGroupTitle titleKey={`${VT}.groupGeneral`} />
+                </TableHead>
+                <TableHead colSpan={2} className={cn("bg-card py-3 text-start", SEC_BORDER)}>
+                  <SectionGroupTitle
+                    titleKey={`${VT}.groupLength`}
+                    unitKey={`${VT}.sectionUnitMm`}
+                  />
+                </TableHead>
+                <TableHead colSpan={2} className={cn("bg-card py-3 text-start", SEC_BORDER)}>
+                  <SectionGroupTitle
+                    titleKey={`${VT}.groupWidth`}
+                    unitKey={`${VT}.sectionUnitMm`}
+                  />
+                </TableHead>
+                <TableHead colSpan={2} className={cn("bg-card py-3 text-start", SEC_BORDER)}>
+                  <SectionGroupTitle
+                    titleKey={`${VT}.groupArea`}
+                    unitKey={`${VT}.sectionUnitM2`}
+                  />
+                </TableHead>
+                <TableHead colSpan={2} className={cn("bg-card py-3 text-start", SEC_BORDER)}>
+                  <SectionGroupTitle
+                    titleKey={`${VT}.groupWeight`}
+                    unitKey={`${VT}.sectionUnitKg`}
+                  />
+                </TableHead>
+                <TableHead colSpan={2} className={cn("bg-card py-3 text-start", SEC_BORDER)}>
+                  <SectionGroupTitle titleKey={`${VT}.groupMaterial`} />
+                </TableHead>
+                <TableHead className={cn("min-w-[88px] bg-card py-3 text-start", SEC_BORDER)}>
+                  <SectionGroupTitle titleKey={`${VT}.groupStatus`} />
+                </TableHead>
               </TableRow>
-            ) : (
-              filtered.map((r) => (
-                <TableRow
-                  key={r.id}
+              <TableRow className="border-b-0 bg-card hover:bg-transparent [&_th]:bg-card">
+                <TableHead
                   className={cn(
-                    "group h-10",
-                    r.status === "error" && "bg-destructive/[0.04]",
-                    r.status === "warning" && "bg-amber-500/[0.04]"
+                    "sticky start-0 z-50 min-w-[100px] bg-card py-3 text-start text-xs font-medium text-muted-foreground shadow-[1px_0_0_0_hsl(var(--border)/0.35)]",
+                    INNER_BORDER
                   )}
                 >
-                  <TableCell className="font-medium sticky left-0 bg-background group-hover:bg-muted/30 z-10 border-r border-border/80 py-2 text-sm">
-                    {r.partName}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums border-r border-border/40 py-2 text-sm">
-                    {formatInteger(r.qty)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums border-r border-border/40 py-2 text-sm">
-                    {formatDecimal(r.thicknessMm, r.thicknessMm % 1 === 0 ? 0 : 2)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums py-2 text-sm">
-                    {formatDecimal(r.excelLengthMm, 1)}
-                  </TableCell>
+                  {t(`${VT}.colPartName`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    INNER_BORDER
+                  )}
+                >
+                  {t(`${VT}.colQty`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    INNER_BORDER
+                  )}
+                >
+                  {t(`${VT}.colThickness`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    SEC_BORDER
+                  )}
+                >
+                  {t(`${VT}.colExcelLength`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    INNER_BORDER
+                  )}
+                >
+                  {t(`${VT}.colDxfLength`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    SEC_BORDER
+                  )}
+                >
+                  {t(`${VT}.colExcelWidth`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    INNER_BORDER
+                  )}
+                >
+                  {t(`${VT}.colDxfWidth`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    SEC_BORDER
+                  )}
+                >
+                  {t(`${VT}.colExcelArea`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    INNER_BORDER
+                  )}
+                >
+                  {t(`${VT}.colDxfArea`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    SEC_BORDER
+                  )}
+                >
+                  {t(`${VT}.colExcelWeight`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    INNER_BORDER
+                  )}
+                >
+                  {t(`${VT}.colDxfWeight`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    SEC_BORDER
+                  )}
+                >
+                  {t(`${VT}.colExcelMaterial`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    INNER_BORDER
+                  )}
+                >
+                  {t(`${VT}.colDxfMaterial`)}
+                </TableHead>
+                <TableHead
+                  className={cn(
+                    "min-w-[88px] bg-card py-3 text-start text-xs font-medium text-muted-foreground",
+                    SEC_BORDER
+                  )}
+                >
+                  {t(`${VT}.colStatus`)}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
                   <TableCell
-                    className={cn(
-                      "text-right tabular-nums border-r border-border/40 py-2 text-sm",
-                      r.excelLengthMm !== r.dxfLengthMm && "text-amber-800 dark:text-amber-200 font-medium"
-                    )}
+                    colSpan={14}
+                    className="h-20 text-center text-muted-foreground"
                   >
-                    {formatDecimal(r.dxfLengthMm, 1)}
+                    {t(`${VT}.emptyFiltered`)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums py-2 text-sm">
-                    {formatDecimal(r.excelWidthMm, 1)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right tabular-nums border-r border-border/40 py-2 text-sm",
-                      r.excelWidthMm !== r.dxfWidthMm && "text-amber-800 dark:text-amber-200 font-medium"
-                    )}
+                </TableRow>
+              ) : (
+                filtered.map((r) => (
+                  <TableRow
+                    key={r.id}
+                    className={cn(r.status === "error" && "bg-destructive/[0.04]")}
                   >
-                    {formatDecimal(r.dxfWidthMm, 1)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums py-2 text-sm">
-                    {formatDecimal(r.excelAreaM2, 3)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right tabular-nums border-r border-border/40 py-2 text-sm",
-                      Math.abs(r.excelAreaM2 - r.dxfAreaM2) > 0.001 &&
-                        "text-amber-800 dark:text-amber-200 font-medium"
-                    )}
-                  >
-                    {formatDecimal(r.dxfAreaM2, 3)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums py-2 text-sm">
-                    {formatDecimal(r.excelWeightKg, 1)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right tabular-nums border-r border-border/40 py-2 text-sm",
-                      Math.abs(r.excelWeightKg - r.dxfWeightKg) > 0.05 &&
-                        "text-amber-800 dark:text-amber-200 font-medium"
-                    )}
-                  >
-                    {formatDecimal(r.dxfWeightKg, 1)}
-                  </TableCell>
-                  <TableCell className="text-xs py-2">{r.excelMaterial}</TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-xs border-r border-border/40 py-2",
-                      r.excelMaterial !== r.dxfMaterial &&
-                        "text-destructive font-medium"
-                    )}
-                  >
-                    {r.dxfMaterial}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="cursor-pointer inline-block">
-                            {statusBadge(r.status)}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="left" className="max-w-sm">
-                          <div className="space-y-2">
+                    <TableCell
+                      className={cn(
+                        "group sticky start-0 z-30 bg-card font-medium shadow-[1px_0_0_0_hsl(var(--border)/0.35)] group-hover:bg-white/[0.04]",
+                        INNER_BORDER
+                      )}
+                    >
+                      {r.partName}
+                    </TableCell>
+                    <TableCell className={cn("tabular-nums text-start", INNER_BORDER)}>
+                      {formatInteger(r.qty)}
+                    </TableCell>
+                    <TableCell className={cn("tabular-nums text-start", INNER_BORDER)}>
+                      {formatDecimal(r.thicknessMm, r.thicknessMm % 1 === 0 ? 0 : 2)}
+                    </TableCell>
+                    <TableCell className={cn("tabular-nums text-start", SEC_BORDER)}>
+                      {formatDecimal(r.excelLengthMm, 1)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "tabular-nums text-start",
+                        INNER_BORDER,
+                        r.excelLengthMm !== r.dxfLengthMm &&
+                          "font-medium text-amber-800 dark:text-amber-200"
+                      )}
+                    >
+                      {formatDecimal(r.dxfLengthMm, 1)}
+                    </TableCell>
+                    <TableCell className={cn("tabular-nums text-start", SEC_BORDER)}>
+                      {formatDecimal(r.excelWidthMm, 1)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "tabular-nums text-start",
+                        INNER_BORDER,
+                        r.excelWidthMm !== r.dxfWidthMm &&
+                          "font-medium text-amber-800 dark:text-amber-200"
+                      )}
+                    >
+                      {formatDecimal(r.dxfWidthMm, 1)}
+                    </TableCell>
+                    <TableCell className={cn("tabular-nums text-start", SEC_BORDER)}>
+                      {formatDecimal(r.excelAreaM2, 3)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "tabular-nums text-start",
+                        INNER_BORDER,
+                        Math.abs(r.excelAreaM2 - r.dxfAreaM2) > 0.001 &&
+                          "font-medium text-amber-800 dark:text-amber-200"
+                      )}
+                    >
+                      {formatDecimal(r.dxfAreaM2, 3)}
+                    </TableCell>
+                    <TableCell className={cn("tabular-nums text-start", SEC_BORDER)}>
+                      {formatDecimal(r.excelWeightKg, 1)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "tabular-nums text-start",
+                        INNER_BORDER,
+                        Math.abs(r.excelWeightKg - r.dxfWeightKg) > 0.05 &&
+                          "font-medium text-amber-800 dark:text-amber-200"
+                      )}
+                    >
+                      {formatDecimal(r.dxfWeightKg, 1)}
+                    </TableCell>
+                    <TableCell className={cn("text-start text-xs", SEC_BORDER)}>
+                      {r.excelMaterial}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-start text-xs",
+                        INNER_BORDER,
+                        r.excelMaterial !== r.dxfMaterial && "font-medium text-destructive"
+                      )}
+                    >
+                      {r.dxfMaterial}
+                    </TableCell>
+                    <TableCell className={cn(SEC_BORDER)}>
+                      <div className="flex justify-start">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="inline-block cursor-pointer">{statusBadge(r.status)}</div>
+                          </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-sm text-start">
+                          <div className="space-y-2 text-xs">
                             {r.mismatchFields.length > 0 && (
                               <div>
-                                <p className="text-xs font-semibold">Mismatch Fields:</p>
-                                <p className="text-xs text-muted-foreground">{r.mismatchFields.join(", ")}</p>
+                                <p className="font-semibold">{t(`${VT}.tooltipMismatchTitle`)}</p>
+                                <p className="text-muted-foreground">{mismatchFieldsHebrew(r)}</p>
                               </div>
                             )}
                             <div>
-                              <p className="text-xs font-semibold">Reason:</p>
-                              <p className="text-xs text-muted-foreground">{r.suggestedReason}</p>
+                              <p className="font-semibold">{t(`${VT}.tooltipReasonTitle`)}</p>
+                              <p className="text-muted-foreground">{tooltipReasonText(r)}</p>
                             </div>
                             <div>
-                              <p className="text-xs font-semibold">Action:</p>
-                              <p className="text-xs text-muted-foreground">{r.actionRecommendation}</p>
+                              <p className="font-semibold">{t(`${VT}.tooltipActionTitle`)}</p>
+                              <p className="text-muted-foreground">{tooltipActionText(r)}</p>
                             </div>
                           </div>
                         </TooltipContent>
                       </Tooltip>
-                    </TooltipProvider>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </TooltipProvider>
     </div>
   );
 }
