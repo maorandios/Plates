@@ -26,6 +26,7 @@ import {
   bendAllowanceMm,
   buildForTemplate,
 } from "@/features/quick-quote/bend-plate/geometry";
+import { splitMaterialGradeAndFinish } from "@/features/quick-quote/lib/plateFields";
 
 export type { DxfPartGeometry, BendPlateQuoteItem, QuotePartRow };
 
@@ -56,6 +57,25 @@ function sanitizeText(s: string): string {
     .trim()
     .replace(/%/g, "%%")
     .slice(0, 250);
+}
+
+/**
+ * DXF MARKING line: `PartName+Grade+Thicknessmm` — only the steel grade (not finish · label),
+ * single `+` between segments, no gap before thickness.
+ */
+function plateMarkingLineText(part: QuotePartRow): string {
+  const gradeOnly = splitMaterialGradeAndFinish(part.material).grade;
+  const name = sanitizeText(part.partName);
+  const grade = sanitizeText(gradeOnly).replace(/\s/g, "");
+  const th = String(part.thicknessMm).replace(/\s/g, "");
+  return `${name}+${grade}+${th}mm`;
+}
+
+function bendPlateMarkingLineText(part: QuotePartRow, item: BendPlateQuoteItem): string {
+  const name = sanitizeText(part.partName);
+  const grade = sanitizeText(item.global.material).replace(/\s/g, "");
+  const th = String(item.global.thicknessMm).replace(/\s/g, "");
+  return `${name}+${grade}+${th}mm`;
 }
 
 function initDxf(): DxfWriter {
@@ -125,7 +145,7 @@ function dxfFromGeometry(
 
   addMarkingLine(
     dxf,
-    `${sanitizeText(part.partName)}+${sanitizeText(part.material)}+${part.thicknessMm}mm`,
+    plateMarkingLineText(part),
     bb.minX + padX, bb.minY + padY,
     usableW, textH
   );
@@ -237,9 +257,7 @@ function dxfFromBendPlate(
   const padY = Math.max(W * 0.04, textH * 1.5);
   const usableW = L * 0.92;
 
-  // Format: PartName + Material + Thickness
-  const markingLabel = `${sanitizeText(part.partName)}+${sanitizeText(item.global.material)}+${item.global.thicknessMm}mm`;
-  addMarkingLine(dxf, markingLabel, padX, padY, usableW, textH);
+  addMarkingLine(dxf, bendPlateMarkingLineText(part, item), padX, padY, usableW, textH);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,11 +284,7 @@ function dxfFromRect(dxf: DxfWriter, part: QuotePartRow): void {
   const padY = Math.max(W * 0.04, textH * 1.5);
   const usableW = L * 0.92;
 
-  addMarkingLine(
-    dxf,
-    `${sanitizeText(part.partName)}+${sanitizeText(part.material)}+${part.thicknessMm}mm`,
-    padX, padY, usableW, textH
-  );
+  addMarkingLine(dxf, plateMarkingLineText(part), padX, padY, usableW, textH);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,89 +1,22 @@
 /**
- * One-click export: ZIP containing one DXF per part + one Excel BOM.
+ * One-click export: ZIP containing one DXF per part + one Excel plate list.
  *
- * ZIP structure:
- *   {ref}-package.zip
+ * Download: `{quoteId}.zip`
+ *
+ * ZIP contents:
  *   ├── dxf/
  *   │   ├── BP-001.dxf      ← exact polygon (DXF-sourced parts)
  *   │   ├── SH-PL01.dxf     ← flat blank + bend profile (bend-plate parts)
  *   │   └── MA-PL01.dxf     ← rectangle (manual / excel parts)
- *   └── {ref}-BOM.xlsx
+ *   └── {quoteId}-plate-list.xlsx   ← RTL sheet matching טבלת סיכום columns
  */
 
-import * as XLSX from "xlsx";
 import type { DxfPartGeometry } from "@/types";
 import type { BendPlateQuoteItem } from "@/features/quick-quote/bend-plate/types";
 import type { QuotePartRow } from "@/features/quick-quote/types/quickQuote";
+import { buildUnifiedSummaryBomXlsxBuffer } from "@/features/quick-quote/lib/unifiedSummaryBomXlsx";
 import { getFileById, getFileData } from "@/lib/store";
 import { generatePartDxfString, safeFilenameBase } from "./generatePartDxf";
-
-// ---------------------------------------------------------------------------
-// Excel BOM builder
-// ---------------------------------------------------------------------------
-
-function buildExcelBom(parts: QuotePartRow[], bendMap: Map<string, BendPlateQuoteItem>): ArrayBuffer {
-  type BomRow = Record<string, string | number>;
-
-  const rows: BomRow[] = parts.map((p) => {
-    const bend = bendMap.get(p.id);
-    const base: BomRow = {
-      "Part Name":        p.partName,
-      "Source":           p.sourceRef ?? "—",
-      "Qty":              p.qty,
-      "Material":         p.material,
-      "Thickness (mm)":   p.thicknessMm,
-      "Length (mm)":      Math.round(p.lengthMm),
-      "Width (mm)":       Math.round(p.widthMm),
-      "Area (m²)":        +p.areaM2.toFixed(4),
-      "Weight/pc (kg)":   +p.weightKg.toFixed(3),
-      "Total Weight (kg)":+(p.weightKg * p.qty).toFixed(3),
-      "Cut Length (mm)":  Math.round(p.cutLengthMm),
-      "Pierce Count":     p.pierceCount,
-      "DXF File":         p.dxfFileName || "—",
-      "Notes":            p.notes || "",
-    };
-
-    // Extra bend-plate columns
-    if (bend) {
-      base["Template"]            = bend.template.toUpperCase();
-      base["Bend Count"]          = bend.calc.bendCount;
-      base["Inside Radius (mm)"]  = bend.global.insideRadiusMm;
-      base["Plate Width (mm)"]    = bend.global.plateWidthMm;
-      base["Developed Length (mm)"] = +bend.calc.developedLengthMm.toFixed(2);
-    }
-
-    return base;
-  });
-
-  const ws = XLSX.utils.json_to_sheet(rows);
-
-  // Column widths (approximate character widths)
-  ws["!cols"] = [
-    { wch: 20 }, // Part Name
-    { wch: 10 }, // Source
-    { wch: 6  }, // Qty
-    { wch: 18 }, // Material
-    { wch: 14 }, // Thickness
-    { wch: 12 }, // Length
-    { wch: 12 }, // Width
-    { wch: 10 }, // Area
-    { wch: 14 }, // Weight/pc
-    { wch: 16 }, // Total Weight
-    { wch: 14 }, // Cut Length
-    { wch: 13 }, // Pierce Count
-    { wch: 24 }, // DXF File
-    { wch: 28 }, // Notes
-    { wch: 12 }, // Template
-    { wch: 12 }, // Bend Count
-    { wch: 18 }, // Inside Radius
-    { wch: 16 }, // Plate Width
-    { wch: 20 }, // Developed Length
-  ];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Parts BOM");
-  return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-}
 
 // ---------------------------------------------------------------------------
 // Browser download helper
@@ -172,15 +105,36 @@ export async function exportPartsPackage(
   const geoMap = new Map<string, DxfPartGeometry>(
     dxfMethodGeometries.map((g) => [g.id, g])
   );
-  const bendMap = new Map<string, BendPlateQuoteItem>(
-    bendPlateQuoteItems.map((b) => [b.id, b])
-  );
-
+  const bendById = new Map(bendPlateQuoteItems.map((b) => [b.id, b]));
   const usedFilenames = new Set<string>();
 
+  function bendForPartRow(p: QuotePartRow): BendPlateQuoteItem | null {
+    let b = bendById.get(p.id) ?? null;
+    if (b) return b;
+    if (p.lineSourceIds?.length) {
+      for (const id of p.lineSourceIds) {
+        b = bendById.get(id) ?? null;
+        if (b) return b;
+      }
+    }
+    return null;
+  }
+
+  function geometryForPart(p: QuotePartRow): DxfPartGeometry | null {
+    let g = geoMap.get(p.id) ?? null;
+    if (g) return g;
+    if (p.lineSourceIds?.length) {
+      for (const id of p.lineSourceIds) {
+        g = geoMap.get(id) ?? null;
+        if (g) return g;
+      }
+    }
+    return null;
+  }
+
   for (const part of parts) {
-    const geometry = geoMap.get(part.id) ?? null;
-    const bendItem = bendMap.get(part.id) ?? null;
+    const geometry = geometryForPart(part);
+    const bendItem = bendForPartRow(part);
     const baseName = uniqueFilename(safeFilenameBase(part.partName), usedFilenames);
 
     if (geometry) {
@@ -198,10 +152,10 @@ export async function exportPartsPackage(
     dxfFolder.file(`${baseName}.dxf`, dxfText);
   }
 
-  // Excel BOM
-  const excelBuffer = buildExcelBom(parts, bendMap);
+  // Excel BOM (same columns & RTL styling as DXF↔Excel compare export pattern)
+  const excelBuffer = await buildUnifiedSummaryBomXlsxBuffer(parts);
   const safeRef = safeFilenameBase(referenceNumber) || "quote";
-  zip.file(`${safeRef}-BOM.xlsx`, excelBuffer);
+  zip.file(`${safeRef}-plate-list.xlsx`, excelBuffer);
 
   // Generate and download
   const blob = await zip.generateAsync({
@@ -210,5 +164,5 @@ export async function exportPartsPackage(
     compressionOptions: { level: 6 },
   });
 
-  triggerDownload(blob, `${safeRef}-package.zip`);
+  triggerDownload(blob, `${safeRef}.zip`);
 }

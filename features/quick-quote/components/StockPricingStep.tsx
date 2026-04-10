@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ChevronDown, Plus, Settings2, X } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +12,7 @@ import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import { nanoid } from "@/lib/utils/nanoid";
 import { formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 import {
   MATERIAL_TYPE_LABELS,
   type MaterialConfig,
@@ -21,6 +21,8 @@ import {
 import type { PurchasedSheetSize } from "@/types/settings";
 import type { QuoteSheetStockLine, ThicknessStockInput } from "../types/quickQuote";
 import { hasDuplicateSheetSizes } from "../lib/quoteStockAvailability";
+
+const SP = "quote.stockMaterialPhase" as const;
 
 function catalogLabel(
   c: PurchasedSheetSize,
@@ -37,7 +39,8 @@ function lineLabelForStockLine(
   line: QuoteSheetStockLine,
   catalog: PurchasedSheetSize[],
   materialConfig: MaterialConfig,
-  formatLengthValue: (mm: number) => string
+  formatLengthValue: (mm: number) => string,
+  settingsSuffix: string
 ): string {
   if (line.catalogId) {
     const c = catalog.find((x) => x.id === line.catalogId);
@@ -48,27 +51,21 @@ function lineLabelForStockLine(
     if (s) {
       const w = formatLengthValue(s.widthMm);
       const l = formatLengthValue(s.lengthMm);
-      return `${w} × ${l} · settings`;
+      return `${w} × ${l} · ${settingsSuffix}`;
     }
   }
-  return `${formatInteger(line.sheetLengthMm)} × ${formatInteger(line.sheetWidthMm)} mm`;
+  return `${formatInteger(line.sheetLengthMm)} × ${formatInteger(line.sheetWidthMm)} ${t(`${SP}.unitMm`)}`;
 }
 
 interface StockPricingStepProps {
   stockRows: ThicknessStockInput[];
   materialType: MaterialType;
-  currencyCode: string;
-  materialPricePerKg: number;
-  onMaterialPriceChange: (value: number) => void;
   onSheetsChange: (thicknessMm: number, sheets: QuoteSheetStockLine[]) => void;
 }
 
 export function StockPricingStep({
   stockRows,
   materialType,
-  currencyCode,
-  materialPricePerKg,
-  onMaterialPriceChange,
   onSheetsChange,
 }: StockPricingStepProps) {
   const { formatLengthValue } = useAppPreferences();
@@ -100,44 +97,21 @@ export function StockPricingStep({
   );
 
   const materialLabel = MATERIAL_TYPE_LABELS[materialType];
+  const settingsSuffix = t(`${SP}.fromSettingsSuffix`);
 
   return (
-    <div className="space-y-8">
-      <div className="w-full">
-        <h1 className="text-2xl font-semibold tracking-tight">Stock & pricing</h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-          {materialLabel} — price per kg and sheet stock per thickness (pre-filled from settings; remove unused lines).
+    <div className="space-y-8" dir="rtl">
+      <div className="w-full text-start">
+        <h1 className="text-2xl font-semibold tracking-tight">{t(`${SP}.title`)}</h1>
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base leading-relaxed">
+          {t(`${SP}.subtitle`, { material: materialLabel })}
         </p>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4 pb-6 border-b border-white/[0.08]">
-        <div className="space-y-1.5 max-w-xs">
-          <Label className="text-xs text-muted-foreground font-normal">
-            Material price ({currencyCode}/kg)
-          </Label>
-          <Input
-            type="number"
-            min={0}
-            step={0.01}
-            className="h-9 font-mono text-sm"
-            value={materialPricePerKg}
-            onChange={(e) => onMaterialPriceChange(Number(e.target.value))}
-          />
-        </div>
-      </div>
-
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Purchased stock by thickness
-          </h2>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5" asChild>
-            <Link href="/settings/materials">
-              <Settings2 className="h-3.5 w-3.5" />
-              Edit material &amp; sheet sizes
-            </Link>
-          </Button>
-        </div>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground text-start">
+          {t(`${SP}.stockByThickness`)}
+        </h2>
 
         <div className="flex flex-col gap-2">
           {stockRows.map((row, index) => {
@@ -185,22 +159,26 @@ export function StockPricingStep({
                 open={index === 0}
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 bg-muted/25 hover:bg-muted/40 text-sm font-medium [&::-webkit-details-marker]:hidden">
-                  <span className="min-w-0">
-                    {row.thicknessMm} mm
-                    <span className="font-normal text-muted-foreground ml-2">
-                      ({lineCount} sheet size{lineCount === 1 ? "" : "s"})
+                  <span className="min-w-0 text-start">
+                    {t(`${SP}.thicknessHeader`, {
+                      mm: formatInteger(Math.round(row.thicknessMm)),
+                    })}
+                    <span className="font-normal text-muted-foreground ms-2">
+                      {lineCount === 1
+                        ? t(`${SP}.sheetCountOne`)
+                        : t(`${SP}.sheetCountMany`, { n: lineCount })}
                     </span>
                   </span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground opacity-70" />
                 </summary>
                 <div className="border-t border-white/[0.08] px-4 py-4 space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground font-normal">
-                      Sheet sizes for this quote
+                    <Label className="text-xs text-muted-foreground font-normal block text-start">
+                      {t(`${SP}.sheetSizesLabel`)}
                     </Label>
                     {row.sheets.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic rounded-md border border-dashed border-white/15 px-3 py-2">
-                        Add at least one sheet size — use Add custom sheet size below.
+                      <p className="text-xs text-muted-foreground italic rounded-md border border-dashed border-white/15 px-3 py-2 text-start leading-relaxed">
+                        {t(`${SP}.emptySizesHint`)}
                       </p>
                     ) : (
                       <div className="flex flex-col gap-3">
@@ -210,21 +188,22 @@ export function StockPricingStep({
                               key={line.id}
                               className={cn(
                                 badgeVariants({ variant: "secondary" }),
-                                "inline-flex w-fit max-w-full items-center gap-1 pl-3 pr-1 py-1.5 h-auto font-normal"
+                                "inline-flex w-fit max-w-full items-center gap-1 ps-3 pe-1 py-1.5 h-auto font-normal"
                               )}
                             >
-                              <span className="text-left leading-snug pr-1">
+                              <span className="text-start leading-snug pe-1">
                                 {lineLabelForStockLine(
                                   line,
                                   purchasedCatalog,
                                   materialConfig,
-                                  formatLengthValue
+                                  formatLengthValue,
+                                  settingsSuffix
                                 )}
                               </span>
                               <button
                                 type="button"
                                 className="rounded-full p-1 text-muted-foreground hover:text-foreground hover:bg-background/60 shrink-0"
-                                aria-label="Remove sheet from quote"
+                                aria-label={t(`${SP}.removeSheetAria`)}
                                 onClick={() => removeLine(line.id)}
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -236,8 +215,8 @@ export function StockPricingStep({
                               className="flex flex-wrap items-end gap-3 gap-y-2 rounded-xl border-0 bg-white/[0.03] p-3"
                             >
                               <div className="space-y-1.5 flex-1 min-w-[120px]">
-                                <Label className="text-xs text-muted-foreground font-normal">
-                                  Sheet length (mm)
+                                <Label className="text-xs text-muted-foreground font-normal block text-start">
+                                  {t(`${SP}.sheetLength`)}
                                 </Label>
                                 <div className="flex gap-2 items-center">
                                   <Input
@@ -245,6 +224,7 @@ export function StockPricingStep({
                                     min={1}
                                     step={1}
                                     className="h-9 font-mono text-sm"
+                                    dir="ltr"
                                     value={
                                       line.sheetLengthMm > 0
                                         ? line.sheetLengthMm
@@ -257,13 +237,13 @@ export function StockPricingStep({
                                     }
                                   />
                                   <span className="text-xs text-muted-foreground shrink-0">
-                                    mm
+                                    {t(`${SP}.unitMm`)}
                                   </span>
                                 </div>
                               </div>
                               <div className="space-y-1.5 flex-1 min-w-[120px]">
-                                <Label className="text-xs text-muted-foreground font-normal">
-                                  Sheet width (mm)
+                                <Label className="text-xs text-muted-foreground font-normal block text-start">
+                                  {t(`${SP}.sheetWidth`)}
                                 </Label>
                                 <div className="flex gap-2 items-center">
                                   <Input
@@ -271,6 +251,7 @@ export function StockPricingStep({
                                     min={1}
                                     step={1}
                                     className="h-9 font-mono text-sm"
+                                    dir="ltr"
                                     value={
                                       line.sheetWidthMm > 0
                                         ? line.sheetWidthMm
@@ -283,7 +264,7 @@ export function StockPricingStep({
                                     }
                                   />
                                   <span className="text-xs text-muted-foreground shrink-0">
-                                    mm
+                                    {t(`${SP}.unitMm`)}
                                   </span>
                                 </div>
                               </div>
@@ -292,7 +273,7 @@ export function StockPricingStep({
                                 variant="ghost"
                                 size="icon"
                                 className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                                aria-label="Remove manual sheet"
+                                aria-label={t(`${SP}.removeManualAria`)}
                                 onClick={() => removeLine(line.id)}
                               >
                                 <X className="h-4 w-4" />
@@ -303,8 +284,8 @@ export function StockPricingStep({
                       </div>
                     )}
                     {dupInRow ? (
-                      <p className="text-xs text-destructive">
-                        Two or more lines use the same sheet size — change or remove one.
+                      <p className="text-xs text-destructive text-start leading-relaxed">
+                        {t(`${SP}.duplicateWarning`)}
                       </p>
                     ) : null}
                   </div>
@@ -317,7 +298,7 @@ export function StockPricingStep({
                     onClick={addManual}
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Add custom sheet size
+                    {t(`${SP}.addCustomSheet`)}
                   </Button>
                 </div>
               </details>
@@ -326,8 +307,8 @@ export function StockPricingStep({
         </div>
 
         {stockRows.length === 0 && (
-          <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-white/15 px-4 py-8 text-center">
-            No parts in this run — go back and select plates from validation.
+          <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-white/15 px-4 py-8 text-center leading-relaxed">
+            {t(`${SP}.noPartsHint`)}
           </p>
         )}
       </div>

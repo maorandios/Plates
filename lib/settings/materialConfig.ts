@@ -7,7 +7,49 @@ import {
   defaultCarbonSteelConfig,
   defaultStainlessSteelConfig,
   defaultAluminumConfig,
+  MATERIAL_FINISH_OPTIONS,
+  MATERIAL_GRADE_OPTIONS,
+  MATERIAL_TAG_LIST_SCHEMA_VERSION,
 } from "@/types/materials";
+
+function normalizeStringTagList(arr: unknown[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of arr) {
+    if (typeof x !== "string") continue;
+    const t = x.trim();
+    if (!t) continue;
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+
+/**
+ * v0/v1: re-merge full recommended palette (in order) plus any custom tags not in the palette.
+ * v2+: use stored list as-is (empty array allowed).
+ */
+function normalizeTagListField(
+  storedSchemaVersion: number,
+  o: Record<string, unknown>,
+  key: "enabledGrades" | "enabledFinishes",
+  palette: readonly string[]
+): string[] {
+  const fallback = [...palette];
+  if (!(key in o)) return fallback;
+  const raw = o[key];
+  if (!Array.isArray(raw)) return fallback;
+  const saved = normalizeStringTagList(raw);
+
+  if (storedSchemaVersion >= MATERIAL_TAG_LIST_SCHEMA_VERSION) {
+    return saved;
+  }
+
+  const paletteSet = new Set(palette);
+  const customs = saved.filter((s) => !paletteSet.has(s));
+  return [...palette, ...customs];
+}
 
 const STORAGE_KEY_PREFIX = "plate_material_config_";
 
@@ -28,6 +70,8 @@ function normalizeMaterialConfig(raw: unknown, materialType: MaterialType): Mate
   if (!raw || typeof raw !== "object") return base;
 
   const o = raw as Record<string, unknown>;
+  const storedSchemaVersion =
+    typeof o.tagListSchemaVersion === "number" ? o.tagListSchemaVersion : 0;
 
   const sheetsIn = o.stockSheets;
   let stockSheets: MaterialStockSheet[];
@@ -62,6 +106,19 @@ function normalizeMaterialConfig(raw: unknown, materialType: MaterialType): Mate
     materialPrice: typeof o.materialPrice === "number" ? o.materialPrice : base.materialPrice,
     defaultScrapPercent:
       typeof o.defaultScrapPercent === "number" ? o.defaultScrapPercent : base.defaultScrapPercent,
+    enabledGrades: normalizeTagListField(
+      storedSchemaVersion,
+      o,
+      "enabledGrades",
+      MATERIAL_GRADE_OPTIONS[materialType]
+    ),
+    enabledFinishes: normalizeTagListField(
+      storedSchemaVersion,
+      o,
+      "enabledFinishes",
+      MATERIAL_FINISH_OPTIONS[materialType]
+    ),
+    tagListSchemaVersion: MATERIAL_TAG_LIST_SCHEMA_VERSION,
     stockSheets,
     updatedAt: typeof o.updatedAt === "string" ? o.updatedAt : new Date().toISOString(),
   };
@@ -74,10 +131,18 @@ export function getMaterialConfig(materialType: MaterialType): MaterialConfig {
   }
 
   try {
-    const raw = localStorage.getItem(materialStorageKey(materialType));
+    const key = materialStorageKey(materialType);
+    const raw = localStorage.getItem(key);
     if (!raw) return defaultForType(materialType);
     const parsed = JSON.parse(raw) as unknown;
-    return normalizeMaterialConfig(parsed, materialType);
+    const rawObj = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    const prevSchema =
+      rawObj && typeof rawObj.tagListSchemaVersion === "number" ? rawObj.tagListSchemaVersion : 0;
+    const normalized = normalizeMaterialConfig(parsed, materialType);
+    if (prevSchema < MATERIAL_TAG_LIST_SCHEMA_VERSION) {
+      saveMaterialConfig(normalized);
+    }
+    return normalized;
   } catch {
     return defaultForType(materialType);
   }
@@ -90,6 +155,7 @@ export function saveMaterialConfig(config: MaterialConfig): void {
     const updated: MaterialConfig = {
       ...config,
       pricingMode: "perKg",
+      tagListSchemaVersion: MATERIAL_TAG_LIST_SCHEMA_VERSION,
       updatedAt: new Date().toISOString(),
     };
     localStorage.setItem(materialStorageKey(config.materialType), JSON.stringify(updated));

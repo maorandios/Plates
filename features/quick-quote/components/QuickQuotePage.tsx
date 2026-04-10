@@ -139,10 +139,8 @@ export function QuickQuotePage() {
 
   const stockPricingReady = useMemo(() => {
     if (thicknessStock.length === 0) return false;
-    const priceOk =
-      materialPricePerKg >= 0 && Number.isFinite(materialPricePerKg);
-    return priceOk && isThicknessStockComplete(thicknessStock);
-  }, [thicknessStock, materialPricePerKg]);
+    return isThicknessStockComplete(thicknessStock);
+  }, [thicknessStock]);
 
   const selection = useMemo(() => {
     const modernParts = mergeAllQuoteMethodParts(
@@ -620,9 +618,6 @@ export function QuickQuotePage() {
             <StockPricingStep
               stockRows={thicknessStock}
               materialType={materialType}
-              currencyCode={jobDetails.currency}
-              materialPricePerKg={materialPricePerKg}
-              onMaterialPriceChange={setMaterialPricePerKg}
               onSheetsChange={setSheetsForThickness}
             />
           )}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus, X } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -10,25 +11,170 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { t } from "@/lib/i18n";
 import type { MaterialConfig } from "@/types/materials";
+import { MATERIAL_TYPE_LABELS } from "@/types/materials";
+import { cn } from "@/lib/utils";
+
+const SK = "settings.materials" as const;
+
+/**
+ * Rounded-rectangle tag: full label visible (wrap if long, never ellipsis). Physical px for symmetric inset under RTL.
+ */
+const tagChipClass =
+  "inline-flex w-fit max-w-full min-w-0 items-center gap-2 rounded-md border border-border/80 bg-muted/70 py-1.5 pl-3 pr-3 text-sm font-medium text-foreground/90 shadow-sm transition-colors hover:bg-muted/85 hover:border-border dark:bg-muted/55 dark:hover:bg-muted/70";
+
+const tagChipTextClass =
+  "min-w-0 max-w-full whitespace-normal break-words text-start leading-normal";
+
+const tagChipInputClass =
+  "min-w-0 max-w-[min(18rem,100%)] border-0 bg-transparent py-0 text-sm font-medium leading-normal text-foreground/90 shadow-none outline-none ring-0 focus-visible:ring-0";
 
 interface MaterialPricingCardProps {
   config: MaterialConfig;
   onUpdate: (patch: Partial<MaterialConfig>) => void;
 }
 
-export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardProps) {
-  const [price, setPrice] = useState(config.materialPrice.toString());
-  const [density, setDensity] = useState(config.densityKgPerM3.toString());
-  const [markup, setMarkup] = useState(config.defaultMarkupPercent.toString());
-  const [scrap, setScrap] = useState(config.defaultScrapPercent.toString());
+function TagEditorSection({
+  titleId,
+  title,
+  values,
+  removeAria,
+  addButtonAria,
+  onChange,
+  valueDir = "auto",
+}: {
+  titleId: string;
+  title: string;
+  values: string[];
+  removeAria: (value: string) => string;
+  addButtonAria: string;
+  onChange: (next: string[]) => void;
+  valueDir?: "ltr" | "rtl" | "auto";
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setPrice(config.materialPrice.toString());
+    if (adding) inputRef.current?.focus();
+  }, [adding]);
+
+  function flushDraft() {
+    const next = draft.trim();
+    setDraft("");
+    setAdding(false);
+    if (!next || values.includes(next)) return;
+    onChange([...values, next]);
+  }
+
+  function removeAt(value: string) {
+    onChange(values.filter((v) => v !== value));
+  }
+
+  return (
+    <section
+      className="rounded-lg border border-border/50 bg-card/30 p-4 shadow-sm"
+      aria-labelledby={titleId}
+    >
+      <h3 id={titleId} className="text-start text-sm font-semibold text-foreground">
+        {title}
+      </h3>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {values.map((value) => (
+          <span key={value} dir="ltr" className={tagChipClass}>
+            <span dir={valueDir} className={tagChipTextClass}>
+              {value}
+            </span>
+            <button
+              type="button"
+              className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm p-0 text-muted-foreground/90 transition-colors hover:bg-background/75 hover:text-foreground"
+              onClick={() => removeAt(value)}
+              aria-label={removeAria(value)}
+            >
+              <X className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
+            </button>
+          </span>
+        ))}
+
+        {!adding ? (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            aria-label={addButtonAria}
+            className={cn(
+              "inline-flex w-fit max-w-full shrink-0 items-center gap-1.5 self-center rounded-md border border-dashed border-muted-foreground/35 bg-transparent py-1.5 pl-3 pr-3 text-sm font-medium text-muted-foreground transition-colors",
+              "hover:border-muted-foreground/55 hover:bg-muted/35 hover:text-foreground"
+            )}
+          >
+            <Plus className="size-3.5 shrink-0" aria-hidden />
+            <span>{t(`${SK}.tagAddLabel`)}</span>
+          </button>
+        ) : (
+          <span
+            dir="ltr"
+            className={cn(
+              tagChipClass,
+              "ring-offset-background focus-within:border-border focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+            )}
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              value={draft}
+              dir="auto"
+              aria-label={addButtonAria}
+              size={Math.min(48, Math.max(10, draft.length + 2))}
+              className={cn(tagChipInputClass, "text-start")}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  flushDraft();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setDraft("");
+                  setAdding(false);
+                }
+              }}
+              onBlur={() => {
+                const trimmed = draft.trim();
+                if (!trimmed) {
+                  setDraft("");
+                  setAdding(false);
+                  return;
+                }
+                flushDraft();
+              }}
+            />
+            <button
+              type="button"
+              className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm p-0 text-muted-foreground/90 transition-colors hover:bg-background/75 hover:text-foreground"
+              aria-label={t(`${SK}.cancel`)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+              }}
+              onClick={() => {
+                setDraft("");
+                setAdding(false);
+              }}
+            >
+              <X className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
+            </button>
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardProps) {
+  const [density, setDensity] = useState(config.densityKgPerM3.toString());
+
+  useEffect(() => {
     setDensity(config.densityKgPerM3.toString());
-    setMarkup(config.defaultMarkupPercent.toString());
-    setScrap(config.defaultScrapPercent.toString());
-  }, [config.materialPrice, config.densityKgPerM3, config.defaultMarkupPercent, config.defaultScrapPercent]);
+  }, [config.densityKgPerM3]);
 
   const persist = useCallback(
     (patch: Partial<MaterialConfig>) => {
@@ -36,15 +182,6 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
     },
     [onUpdate]
   );
-
-  function handlePriceBlur() {
-    const n = parseFloat(price);
-    if (Number.isFinite(n) && n >= 0) {
-      persist({ materialPrice: n });
-    } else {
-      setPrice(config.materialPrice.toString());
-    }
-  }
 
   function handleDensityBlur() {
     const n = parseFloat(density);
@@ -55,98 +192,57 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
     }
   }
 
-  function handleMarkupBlur() {
-    const n = parseFloat(markup);
-    if (Number.isFinite(n) && n >= 0) {
-      persist({ defaultMarkupPercent: n });
-    } else {
-      setMarkup(config.defaultMarkupPercent.toString());
-    }
-  }
-
-  function handleScrapBlur() {
-    const n = parseFloat(scrap);
-    if (Number.isFinite(n) && n >= 0) {
-      persist({ defaultScrapPercent: n });
-    } else {
-      setScrap(config.defaultScrapPercent.toString());
-    }
-  }
+  const materialLabel = MATERIAL_TYPE_LABELS[config.materialType];
+  const gradeTitleId = `${config.materialType}-grades-heading`;
+  const finishTitleId = `${config.materialType}-finishes-heading`;
 
   return (
     <Card className="shadow-none">
-      <CardHeader>
-        <CardTitle className="text-base">Basics Parameters</CardTitle>
-        <CardDescription>
-          Material cost, markup, and scrap defaults for {config.displayName}.
+      <CardHeader className="text-start space-y-1.5">
+        <CardTitle className="text-base">{t(`${SK}.basicsTitle`)}</CardTitle>
+        <CardDescription className="leading-relaxed">
+          {t(`${SK}.basicsDescription`, { material: materialLabel })}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4 max-w-lg">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor={`${config.materialType}-price`}>Material price (per kg)</Label>
-            <Input
-              id={`${config.materialType}-price`}
-              type="number"
-              step="0.01"
-              min="0"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              onBlur={handlePriceBlur}
-              placeholder="0.00"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`${config.materialType}-density`}>
-              Density (kg/m³)
-            </Label>
-            <Input
-              id={`${config.materialType}-density`}
-              type="number"
-              step="1"
-              min="1"
-              value={density}
-              onChange={(e) => setDensity(e.target.value)}
-              onBlur={handleDensityBlur}
-              placeholder="7850"
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Used to estimate weight from plate area.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor={`${config.materialType}-markup`}>Default markup (%)</Label>
-            <Input
-              id={`${config.materialType}-markup`}
-              type="number"
-              step="1"
-              min="0"
-              value={markup}
-              onChange={(e) => setMarkup(e.target.value)}
-              onBlur={handleMarkupBlur}
-              placeholder="20"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2 max-w-[calc(50%-0.5rem)]">
-          <Label htmlFor={`${config.materialType}-scrap`}>Default scrap (%)</Label>
+      <CardContent className="space-y-6">
+        <div className="space-y-2 text-start">
+          <Label htmlFor={`${config.materialType}-density`} className="text-start">
+            {t(`${SK}.density`)}
+          </Label>
           <Input
-            id={`${config.materialType}-scrap`}
+            id={`${config.materialType}-density`}
             type="number"
             step="1"
-            min="0"
-            value={scrap}
-            onChange={(e) => setScrap(e.target.value)}
-            onBlur={handleScrapBlur}
-            placeholder="15"
+            min="1"
+            dir="ltr"
+            className="text-end"
+            value={density}
+            onChange={(e) => setDensity(e.target.value)}
+            onBlur={handleDensityBlur}
+            placeholder="7850"
           />
-          <p className="text-[11px] text-muted-foreground">
-            Used for sheet estimation in quotes.
-          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{t(`${SK}.densityHint`)}</p>
+        </div>
+
+        <div className="space-y-4">
+          <TagEditorSection
+            titleId={gradeTitleId}
+            title={t(`${SK}.gradeSectionTitle`)}
+            values={config.enabledGrades}
+            removeAria={(v) => t(`${SK}.tagRemoveAria`, { value: v })}
+            addButtonAria={t(`${SK}.gradeAddButtonAria`)}
+            onChange={(enabledGrades) => persist({ enabledGrades })}
+            valueDir="ltr"
+          />
+          <TagEditorSection
+            titleId={finishTitleId}
+            title={t(`${SK}.finishSectionTitle`)}
+            values={config.enabledFinishes}
+            removeAria={(v) => t(`${SK}.tagRemoveAria`, { value: v })}
+            addButtonAria={t(`${SK}.finishAddButtonAria`)}
+            onChange={(enabledFinishes) => persist({ enabledFinishes })}
+            valueDir="auto"
+          />
         </div>
       </CardContent>
     </Card>

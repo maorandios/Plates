@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import {
   Card,
@@ -13,19 +13,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
-import type { MaterialStockSheet } from "@/types/materials";
+import { t } from "@/lib/i18n";
+import type { MaterialStockSheet, MaterialType } from "@/types/materials";
+
+const SK = "settings.materials" as const;
 
 interface StockSheetFormProps {
   sheet: MaterialStockSheet;
   isNew: boolean;
+  materialType: MaterialType;
   onSave: (sheet: MaterialStockSheet) => void;
   onCancel: () => void;
 }
 
-export function StockSheetForm({ sheet, isNew, onSave, onCancel }: StockSheetFormProps) {
+export function StockSheetForm({
+  sheet,
+  isNew,
+  materialType,
+  onSave,
+  onCancel,
+}: StockSheetFormProps) {
   const { parseLengthInputToMm, formatLengthValue, formatAreaValue } = useAppPreferences();
   const [width, setWidth] = useState(formatLengthValue(sheet.widthMm));
   const [length, setLength] = useState(formatLengthValue(sheet.lengthMm));
+
+  const idPrefix = `${materialType}-${sheet.id}`;
 
   useEffect(() => {
     setWidth(formatLengthValue(sheet.widthMm));
@@ -37,11 +49,11 @@ export function StockSheetForm({ sheet, isNew, onSave, onCancel }: StockSheetFor
     const lengthMm = parseLengthInputToMm(length);
 
     if (widthMm == null || !Number.isFinite(widthMm) || widthMm <= 0) {
-      alert("Width must be > 0");
+      alert(t(`${SK}.widthInvalid`));
       return;
     }
     if (lengthMm == null || !Number.isFinite(lengthMm) || lengthMm <= 0) {
-      alert("Length must be > 0");
+      alert(t(`${SK}.lengthInvalid`));
       return;
     }
 
@@ -63,51 +75,59 @@ export function StockSheetForm({ sheet, isNew, onSave, onCancel }: StockSheetFor
   })();
 
   return (
-    <Card className="border-2 border-primary/40 shadow-md">
-      <CardHeader>
+    <Card className="border-2 border-primary/40 shadow-md" dir="rtl">
+      <CardHeader className="text-start space-y-1.5">
         <CardTitle className="text-base">
-          {isNew ? "Add stock sheet" : "Edit stock sheet"}
+          {isNew ? t(`${SK}.formAddTitle`) : t(`${SK}.formEditTitle`)}
         </CardTitle>
-        <CardDescription>
-          Sheet size in stock. Applies to all thicknesses in the quote stock step.
-        </CardDescription>
+        <CardDescription className="leading-relaxed">{t(`${SK}.formDescription`)}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="sheet-width">Width</Label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2 text-start">
+            <Label htmlFor={`${idPrefix}-width`} className="text-start">
+              {t(`${SK}.colWidth`)}
+            </Label>
             <Input
-              id="sheet-width"
+              id={`${idPrefix}-width`}
               value={width}
               onChange={(e) => setWidth(e.target.value)}
               placeholder="1250"
               autoFocus={isNew}
+              dir="ltr"
+              className="text-start"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="sheet-length">Length</Label>
+          <div className="space-y-2 text-start">
+            <Label htmlFor={`${idPrefix}-length`} className="text-start">
+              {t(`${SK}.colLength`)}
+            </Label>
             <Input
-              id="sheet-length"
+              id={`${idPrefix}-length`}
               value={length}
               onChange={(e) => setLength(e.target.value)}
               placeholder="2500"
+              dir="ltr"
+              className="text-start"
             />
           </div>
         </div>
 
-        <div className="rounded-lg bg-muted/30 px-4 py-3">
-          <p className="text-xs text-muted-foreground mb-1">Preview area</p>
-          <p className="text-lg font-semibold tabular-nums">{previewAreaM2}</p>
+        <div className="rounded-lg bg-muted/30 px-4 py-3 text-start">
+          <p className="mb-1 text-xs text-muted-foreground">{t(`${SK}.previewArea`)}</p>
+          <p className="text-lg font-semibold tabular-nums" dir="ltr">
+            {previewAreaM2}
+          </p>
         </div>
 
-        <div className="flex gap-2 pt-2">
-          <Button type="button" size="sm" onClick={handleSave}>
-            <Check className="h-4 w-4 mr-1.5" />
-            Save
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Button type="button" size="sm" className="gap-1.5" onClick={handleSave}>
+            <Check className="h-4 w-4" />
+            {t(`${SK}.save`)}
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={onCancel}>
-            <X className="h-4 w-4 mr-1.5" />
-            Cancel
+          <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={onCancel}>
+            <X className="h-4 w-4" />
+            {t(`${SK}.cancel`)}
           </Button>
         </div>
       </CardContent>

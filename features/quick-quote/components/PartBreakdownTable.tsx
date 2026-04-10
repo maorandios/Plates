@@ -2,14 +2,23 @@
 
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronDown,
-  ChevronsUpDown,
   Eye,
+  Hash,
+  Layers,
+  LayoutGrid,
+  MoveHorizontal,
+  MoveVertical,
+  Package,
+  Palette,
+  RotateCcw,
   Search,
+  Square,
+  Tag,
   Trash2,
+  Weight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,13 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -37,9 +40,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card } from "@/components/ui/card";
 import type { DxfPartGeometry } from "@/types";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 import { jobSummaryFromParts } from "../lib/deriveQuoteSelection";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import {
@@ -53,8 +56,14 @@ import {
   parseMaterialPricePerKg,
 } from "../job-overview/materialCalculations";
 import { splitMaterialGradeAndFinish } from "../lib/plateFields";
+import { formatUnifiedSourceForRow, formatUnifiedSourceLabel } from "../lib/unifiedSourceColumnLabel";
 import type { QuotePartRow } from "../types/quickQuote";
 import { QuotePartGeometryPreview } from "./QuotePartGeometryPreview";
+import {
+  PART_PREVIEW_DIALOG_CONTENT_CLASS,
+  PreviewStatCell,
+  StatValueUnitLeft,
+} from "./partPreviewModalShared";
 
 type SortDir = "asc" | "desc";
 
@@ -70,6 +79,56 @@ type PartBreakdownSortKey =
   | "areaM2"
   | "lineWeightKg"
   | "preview";
+
+const PP = "quote.partsPhase" as const;
+const MOD = "quote.dxfPhase.partPreviewModal" as const;
+
+/** Matches method-phase metrics / sidebar accent. 1.25× former `text-2xl` / `1.65rem` sizes. */
+const METRIC_VALUE_ROW =
+  "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#00FF9F] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
+
+const METRIC_UNIT_CLASS =
+  "font-semibold tabular-nums text-muted-foreground text-[0.72em] leading-none";
+
+/** Matches manual phase preview control accent. */
+const PREVIEW_ICON_CLASS = "text-[#00E5FF]";
+const PREVIEW_STROKE = "#00E5FF";
+
+/** Horizontal + vertical corner stick; z above other header cells. `top-0` comes from headBase. */
+const STICKY_FIRST_HEAD =
+  "right-0 z-[50] shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]";
+const STICKY_FIRST_CELL =
+  "sticky right-0 z-20 bg-card shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.25)] group-hover/row:bg-white/[0.04]";
+
+function SummaryMetricCard({
+  icon: Icon,
+  title,
+  valueLine,
+}: {
+  icon: LucideIcon;
+  title: string;
+  valueLine: ReactNode;
+}) {
+  return (
+    <div className="flex h-full min-h-[8rem] min-w-0 flex-1 flex-col items-center justify-center gap-2 px-3 py-4 text-center sm:min-h-[9.5rem] sm:px-4 sm:py-5">
+      <Icon
+        className="h-5 w-5 shrink-0 text-muted-foreground/70 sm:h-6 sm:w-6"
+        strokeWidth={1.75}
+        aria-hidden
+      />
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </p>
+      <div className={METRIC_VALUE_ROW}>{valueLine}</div>
+    </div>
+  );
+}
+
+function finishLabel(code: string): string {
+  const key = `quote.finishLabels.${code}`;
+  const label = t(key);
+  return label === key ? code : label;
+}
 
 function comparePartRows(
   a: QuotePartRow,
@@ -122,7 +181,6 @@ function comparePartRows(
   return a.id.localeCompare(b.id, undefined, { numeric: true }) * sign;
 }
 
-/** Empty selection = no filter (show all). Non-empty = row must match one of the selected values (OR). */
 function filterPartRows(
   rows: QuotePartRow[],
   partNameQuery: string,
@@ -173,21 +231,6 @@ function deriveFilterOptions(parts: QuotePartRow[]) {
   };
 }
 
-const SORT_BUTTON_ARIA: Record<PartBreakdownSortKey, string> = {
-  sourceRef: "Ref",
-  partName: "part number",
-  qty: "quantity",
-  thicknessMm: "thickness",
-  materialGrade: "material grade",
-  finish: "finish",
-  widthMm: "width",
-  lengthMm: "length",
-  areaM2: "area",
-  lineWeightKg: "weight",
-  preview: "preview",
-};
-
-/** Part (5) + Dimensions (4 or 5 with material sell) + Preview (1) + optional Delete (1). */
 function columnCount(
   showRef: boolean,
   showDelete: boolean,
@@ -197,26 +240,23 @@ function columnCount(
   return (showRef ? 1 : 0) + 5 + dim + 1 + (showDelete ? 1 : 0);
 }
 
-/** Equal-width columns: share 100% across n columns (handles rounding). */
 function equalColumnWidthsPct(n: number): number[] {
   if (n <= 0) return [];
-  const base = Math.floor((10000 / n)) / 100;
+  const base = Math.floor(10000 / n) / 100;
   const arr = Array.from({ length: n }, () => base);
   const sum = arr.reduce((a, b) => a + b, 0);
   arr[n - 1] = Math.round((arr[n - 1] + (100 - sum)) * 100) / 100;
   return arr;
 }
 
-/** Vertical rules: standard column vs section boundary (Ref | Part | Dim | Actions). */
-const colRule = "border-r border-white/10";
-const sectionRule = "border-r border-white/[0.08]";
-
-const sectionHeadClass =
-  "text-center py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/55";
-const subHeadClass =
-  "h-auto py-2 px-3 text-left align-middle font-medium text-muted-foreground bg-white/[0.04] border-b border-white/[0.08]";
-
 type MultiSelectOption = { value: string; label: string };
+
+type MultiSelectI18n = {
+  all: string;
+  choose: string;
+  clear: string;
+  selectedCount: (n: number) => string;
+};
 
 function MultiSelectFilter({
   label,
@@ -224,24 +264,28 @@ function MultiSelectFilter({
   selected,
   onChange,
   disabled,
+  i18n,
 }: {
   label: string;
   options: MultiSelectOption[];
   selected: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
+  i18n: MultiSelectI18n;
 }) {
   const summary = useMemo(() => {
-    if (selected.length === 0) return "All";
+    if (selected.length === 0) return i18n.all;
     if (selected.length === 1) {
       return options.find((o) => o.value === selected[0])?.label ?? selected[0];
     }
-    return `${selected.length} selected`;
-  }, [selected, options]);
+    return i18n.selectedCount(selected.length);
+  }, [selected, options, i18n]);
 
   return (
     <div className="w-full min-w-[9rem] sm:w-[11rem]">
-      <span className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-muted-foreground text-start">
+        {label}
+      </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -250,7 +294,7 @@ function MultiSelectFilter({
             className="h-10 w-full justify-between gap-2 px-3 font-normal"
             disabled={disabled || options.length === 0}
           >
-            <span className="min-w-0 flex-1 truncate text-left">{summary}</span>
+            <span className="min-w-0 flex-1 truncate text-start">{summary}</span>
             <ChevronDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
           </Button>
         </DropdownMenuTrigger>
@@ -260,7 +304,7 @@ function MultiSelectFilter({
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            {selected.length > 0 ? `${selected.length} selected` : "Choose one or more"}
+            {selected.length > 0 ? i18n.selectedCount(selected.length) : i18n.choose}
           </DropdownMenuLabel>
           {selected.length > 0 ? (
             <>
@@ -270,7 +314,7 @@ function MultiSelectFilter({
                   onChange([]);
                 }}
               >
-                Clear selection
+                {i18n.clear}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
@@ -297,69 +341,12 @@ function MultiSelectFilter({
   );
 }
 
-function SortableColumnHead({
-  sortKey,
-  sortState,
-  onSort,
-  className,
-  thAriaLabel,
-  children,
-}: {
-  sortKey: PartBreakdownSortKey;
-  sortState: { key: PartBreakdownSortKey; dir: SortDir };
-  onSort: (key: PartBreakdownSortKey) => void;
-  className?: string;
-  thAriaLabel?: string;
-  children: ReactNode;
-}) {
-  const active = sortState.key === sortKey;
-  const sortHint = SORT_BUTTON_ARIA[sortKey];
-  const buttonLabel = thAriaLabel
-    ? `Sort by ${sortHint} (${thAriaLabel})`
-    : `Sort by ${sortHint}`;
-  return (
-    <TableHead
-      scope="col"
-      aria-sort={active ? (sortState.dir === "asc" ? "ascending" : "descending") : "none"}
-      className={`${className ?? ""} overflow-hidden`}
-    >
-      <button
-        type="button"
-        aria-label={buttonLabel}
-        onClick={() => onSort(sortKey)}
-        className="-mx-1 -my-1 flex w-full min-w-0 max-w-full items-center gap-2 rounded px-1 py-0.5 text-left font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
-          {children}
-        </span>
-        <span
-          className="inline-flex h-4 w-4 shrink-0 flex-none items-center justify-center"
-          aria-hidden
-        >
-          {active ? (
-            sortState.dir === "asc" ? (
-              <ArrowUp className="h-3.5 w-3.5" />
-            ) : (
-              <ArrowDown className="h-3.5 w-3.5" />
-            )
-          ) : (
-            <ChevronsUpDown className="h-3.5 w-3.5 opacity-45" />
-          )}
-        </span>
-      </button>
-    </TableHead>
-  );
-}
-
 interface PartBreakdownTableProps {
   parts: QuotePartRow[];
   currency: string;
-  /** When set, shows a delete action per row (e.g. merged quote lines step). */
   onDeletePart?: (row: QuotePartRow) => void;
-  /** With {@link materialPricePerKgByRow}, adds a material sell column from Pricing. */
   materialType?: MaterialType;
   materialPricePerKgByRow?: Record<string, string>;
-  /** DXF geometries from the quote session — used to show real outlines in the preview modal. */
   dxfPartGeometries?: DxfPartGeometry[] | null;
 }
 
@@ -372,16 +359,22 @@ export function PartBreakdownTable({
   dxfPartGeometries,
 }: PartBreakdownTableProps) {
   const [previewPart, setPreviewPart] = useState<QuotePartRow | null>(null);
-  const [sortState, setSortState] = useState<{
-    key: PartBreakdownSortKey;
-    dir: SortDir;
-  }>({ key: "partName", dir: "asc" });
 
   const [partNameSearch, setPartNameSearch] = useState("");
   const [filterRef, setFilterRef] = useState<string[]>([]);
   const [filterThickness, setFilterThickness] = useState<string[]>([]);
   const [filterGrade, setFilterGrade] = useState<string[]>([]);
   const [filterFinish, setFilterFinish] = useState<string[]>([]);
+
+  const filterI18n = useMemo<MultiSelectI18n>(
+    () => ({
+      all: t(`${PP}.filterAll`),
+      choose: t(`${PP}.filterChooseHint`),
+      clear: t(`${PP}.filterClear`),
+      selectedCount: (n) => t(`${PP}.filterSelectedCount`, { n }),
+    }),
+    []
+  );
 
   const showRefColumn = useMemo(
     () => parts.some((row) => Boolean(row.sourceRef?.trim())),
@@ -390,13 +383,8 @@ export function PartBreakdownTable({
   const showDelete = Boolean(onDeletePart);
   const showMaterialPricing = Boolean(materialType && materialPricePerKgByRow);
 
-  const dimCols = showMaterialPricing ? 5 : 4;
-
   const columnWidthsPct = useMemo(
-    () =>
-      equalColumnWidthsPct(
-        columnCount(showRefColumn, showDelete, showMaterialPricing)
-      ),
+    () => equalColumnWidthsPct(columnCount(showRefColumn, showDelete, showMaterialPricing)),
     [showRefColumn, showDelete, showMaterialPricing]
   );
 
@@ -406,14 +394,21 @@ export function PartBreakdownTable({
   const filterOptions = useMemo(() => deriveFilterOptions(parts), [parts]);
 
   const refFilterOptions = useMemo(
-    () => filterOptions.refs.map((r) => ({ value: r, label: r })),
-    [filterOptions.refs]
+    () =>
+      filterOptions.refs.map((r) => {
+        const sample = parts.find((p) => (p.sourceRef ?? "").trim() === r);
+        return {
+          value: r,
+          label: formatUnifiedSourceLabel(r, sample?.bendTemplateId),
+        };
+      }),
+    [filterOptions.refs, parts]
   );
   const thicknessFilterOptions = useMemo(
     () =>
-      filterOptions.thicknessesMm.map((t) => ({
-        value: String(t),
-        label: formatInteger(Math.round(t)),
+      filterOptions.thicknessesMm.map((th) => ({
+        value: String(th),
+        label: formatInteger(Math.round(th)),
       })),
     [filterOptions.thicknessesMm]
   );
@@ -422,7 +417,7 @@ export function PartBreakdownTable({
     [filterOptions.grades]
   );
   const finishFilterOptions = useMemo(
-    () => filterOptions.finishes.map((f) => ({ value: f, label: f })),
+    () => filterOptions.finishes.map((f) => ({ value: f, label: finishLabel(f) })),
     [filterOptions.finishes]
   );
 
@@ -441,9 +436,9 @@ export function PartBreakdownTable({
 
   const sortedParts = useMemo(() => {
     const next = [...filteredParts];
-    next.sort((a, b) => comparePartRows(a, b, sortState.key, sortState.dir));
+    next.sort((a, b) => comparePartRows(a, b, "partName", "asc"));
     return next;
-  }, [filteredParts, sortState.key, sortState.dir]);
+  }, [filteredParts]);
 
   const breakdownMetrics = useMemo(
     () => jobSummaryFromParts(filteredParts),
@@ -471,93 +466,79 @@ export function PartBreakdownTable({
   const showRefFilter = filterOptions.refs.length > 0;
   const colSpanEmpty = columnCount(showRefColumn, showDelete, showMaterialPricing);
 
-  function handleSort(key: PartBreakdownSortKey) {
-    setSortState((prev) =>
-      prev.key === key
-        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: "asc" }
-    );
-  }
-
   const p = previewPart;
   const totalWeightLine = p ? p.weightKg * p.qty : 0;
-  const cutLengthM = p ? p.cutLengthMm / 1000 : 0;
+  const lineAreaM2 = p ? p.areaM2 * p.qty : 0;
 
-  const pricingPreviewLayout =
-    Boolean(p) &&
-    showMaterialPricing &&
-    materialType != null &&
-    materialPricePerKgByRow != null;
+  const { finish: previewFinishLabel } = splitMaterialGradeAndFinish(p?.material ?? "");
 
-  const { grade: previewGradeLabel, finish: previewFinishLabel } =
-    splitMaterialGradeAndFinish(p?.material ?? "");
+  const headBase =
+    "sticky top-0 z-30 py-2 pe-3 ps-3 text-xs font-medium align-middle whitespace-nowrap bg-card border-e border-white/10";
+  const headStart = `${headBase} text-start`;
+  const headNum = `${headBase} text-start tabular-nums`;
 
-  const lineMaterialSellPreview =
-    p && pricingPreviewLayout && materialType && materialPricePerKgByRow
-      ? totalWeightLine *
-        parseMaterialPricePerKg(
-          materialPricePerKgByRow[materialPricingRowKey(p, materialType)] ?? ""
-        )
-      : 0;
-
-  const actionCols = showDelete ? 2 : 1;
-  const partCols = 5;
+  const cellBase = "py-2 pe-3 ps-3 align-middle text-sm border-b border-white/[0.06]";
+  const cellStart = `${cellBase} text-start`;
+  const cellNum = `${cellBase} text-start tabular-nums`;
 
   return (
-    <div className="rounded-xl border-0 overflow-hidden">
-      <div className="grid grid-cols-2 gap-3 border-b border-white/[0.08] bg-card/40 p-4 sm:grid-cols-4">
-        <Card className="border-0 p-4 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Plates
-          </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-            {formatInteger(breakdownMetrics.uniqueParts)}
-          </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Quote lines</p>
-        </Card>
-        <Card className="border-0 p-4 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Quantity
-          </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-            {formatInteger(breakdownMetrics.totalQty)}
-          </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Total pieces</p>
-        </Card>
-        <Card className="border-0 p-4 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Area
-          </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-            {formatDecimal(breakdownMetrics.totalPlateAreaM2, 2)}
-            <span className="ml-1 text-lg font-medium text-muted-foreground">m²</span>
-          </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Total plate area</p>
-        </Card>
-        <Card className="border-0 p-4 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Weight
-          </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-            {formatDecimal(breakdownMetrics.totalEstWeightKg, 1)}
-            <span className="ml-1 text-lg font-medium text-muted-foreground">kg</span>
-          </p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Estimated total</p>
-        </Card>
+    <div className="mt-4 flex w-full min-w-0 flex-col gap-4 sm:mt-5" dir="rtl">
+      <div className="overflow-hidden rounded-md border border-white/[0.08] bg-card">
+        <div
+          className={cn(
+            "grid grid-cols-2 items-stretch sm:grid-cols-4",
+            /* Mobile 2×2 only: column + row dividers (don’t use odd/e rules on sm — they fight not-last-child) */
+            "max-sm:[&>*:nth-child(odd)]:border-e max-sm:[&>*:nth-child(odd)]:border-white/[0.08]",
+            "max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(n+3)]:border-white/[0.08]",
+            /* sm+: vertical line between every card (all but the last) */
+            "sm:[&>*:not(:last-child)]:border-e sm:[&>*:not(:last-child)]:border-white/[0.08]"
+          )}
+        >
+          <SummaryMetricCard
+            icon={Layers}
+            title={t(`${PP}.cardPlateTypesLabel`)}
+            valueLine={<>{formatInteger(breakdownMetrics.uniqueParts)}</>}
+          />
+          <SummaryMetricCard
+            icon={Package}
+            title={t(`${PP}.cardPlateQtyLabel`)}
+            valueLine={<>{formatInteger(breakdownMetrics.totalQty)}</>}
+          />
+          <SummaryMetricCard
+            icon={LayoutGrid}
+            title={t(`${PP}.cardAreaLabel`)}
+            valueLine={
+              <>
+                <span>{formatDecimal(breakdownMetrics.totalPlateAreaM2, 2)}</span>
+                <span className={METRIC_UNIT_CLASS}>{t("methodMetrics.unitM2")}</span>
+              </>
+            }
+          />
+          <SummaryMetricCard
+            icon={Weight}
+            title={t(`${PP}.cardWeightLabel`)}
+            valueLine={
+              <>
+                <span>{formatDecimal(breakdownMetrics.totalEstWeightKg, 1)}</span>
+                <span className={METRIC_UNIT_CLASS}>{t("methodMetrics.unitKg")}</span>
+              </>
+            }
+          />
+        </div>
       </div>
 
-      <div className="border-b border-white/[0.08] bg-card/40 px-4 py-3">
+      <div className="rounded-md border border-white/[0.08] bg-card px-4 py-3 sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
           <div className="min-w-0 flex-1 lg:min-w-[220px] lg:max-w-md">
             <label
               htmlFor="part-breakdown-search"
-              className="mb-1.5 block text-xs font-medium text-muted-foreground"
+              className="mb-1.5 block text-xs font-medium text-muted-foreground text-start"
             >
-              Search part name
+              {t(`${PP}.searchLabel`)}
             </label>
             <div className="relative">
               <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                 aria-hidden
               />
               <Input
@@ -565,206 +546,146 @@ export function PartBreakdownTable({
                 type="search"
                 value={partNameSearch}
                 onChange={(e) => setPartNameSearch(e.target.value)}
-                placeholder="Type to filter…"
-                className="h-10 pl-9"
+                placeholder={t(`${PP}.searchPlaceholder`)}
+                className="h-10 pe-9"
                 autoComplete="off"
+                dir="rtl"
               />
             </div>
           </div>
 
           {showRefFilter ? (
             <MultiSelectFilter
-              label="Reference"
+              label={t(`${PP}.filterReference`)}
               options={refFilterOptions}
               selected={filterRef}
               onChange={setFilterRef}
+              i18n={filterI18n}
             />
           ) : null}
 
           <MultiSelectFilter
-            label="Thickness (mm)"
+            label={t(`${PP}.filterThickness`)}
             options={thicknessFilterOptions}
             selected={filterThickness}
             onChange={setFilterThickness}
             disabled={parts.length === 0}
+            i18n={filterI18n}
           />
 
           <MultiSelectFilter
-            label="Material grade"
+            label={t(`${PP}.filterMaterialGrade`)}
             options={gradeFilterOptions}
             selected={filterGrade}
             onChange={setFilterGrade}
             disabled={parts.length === 0}
+            i18n={filterI18n}
           />
 
           <MultiSelectFilter
-            label="Finish"
+            label={t(`${PP}.filterFinish`)}
             options={finishFilterOptions}
             selected={filterFinish}
             onChange={setFilterFinish}
             disabled={parts.length === 0}
+            i18n={filterI18n}
           />
 
-          {hasActiveFilters ? (
+          {parts.length > 0 ? (
             <div className="flex w-full shrink-0 lg:w-auto lg:pb-0">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-10"
+                className="h-10 gap-2"
+                disabled={!hasActiveFilters}
                 onClick={clearFilters}
               >
-                Clear filters
+                <RotateCcw className="h-4 w-4 shrink-0" aria-hidden />
+                {t(`${PP}.filterReset`)}
               </Button>
             </div>
           ) : null}
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto">
+      <div className="rounded-md border border-white/[0.08] bg-card">
         <Table
+          dir="rtl"
           className={cn(
-            "table-fixed w-full border-collapse",
+            "border-separate border-spacing-0",
             showRefColumn && showDelete && (showMaterialPricing ? "min-w-[1300px]" : "min-w-[1180px]"),
             showRefColumn && !showDelete && (showMaterialPricing ? "min-w-[1220px]" : "min-w-[1100px]"),
             !showRefColumn && showDelete && (showMaterialPricing ? "min-w-[1200px]" : "min-w-[1080px]"),
             !showRefColumn && !showDelete && (showMaterialPricing ? "min-w-[1100px]" : "min-w-[980px]")
           )}
+          containerClassName="overflow-visible"
         >
           <colgroup>
             {columnWidthsPct.map((pct, i) => (
               <col key={i} style={{ width: `${pct}%` }} />
             ))}
           </colgroup>
-          <TableHeader>
-            <TableRow className="border-b border-white/[0.06] hover:bg-white/[0.04]">
+          <TableHeader className="relative z-30 border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+            <TableRow className="border-b-0 hover:bg-transparent">
               {showRefColumn ? (
-                <TableHead colSpan={1} className={cn(sectionHeadClass, sectionRule)}>
-                  Ref
+                <TableHead
+                  scope="col"
+                  className={cn(headStart, "min-w-0", STICKY_FIRST_HEAD)}
+                >
+                  {t(`${PP}.colReference`)}
                 </TableHead>
               ) : null}
-              <TableHead colSpan={partCols} className={cn(sectionHeadClass, sectionRule)}>
-                Part
-              </TableHead>
               <TableHead
-                colSpan={dimCols}
-                className={cn(sectionHeadClass, sectionRule)}
+                scope="col"
+                className={cn(headStart, "min-w-0", !showRefColumn && STICKY_FIRST_HEAD)}
               >
-                Dimensions
+                {t(`${PP}.colPartNumber`)}
               </TableHead>
-              <TableHead colSpan={actionCols} className={cn(sectionHeadClass, "border-r-0")}>
-                Actions
+              <TableHead scope="col" className={headNum}>
+                {t(`${PP}.colQuantity`)}
               </TableHead>
-            </TableRow>
-            <TableRow className="bg-white/[0.04] hover:bg-white/[0.04] border-b border-white/[0.06]">
-              {showRefColumn ? (
-                <SortableColumnHead
-                  sortKey="sourceRef"
-                  sortState={sortState}
-                  onSort={handleSort}
-                  className={cn(subHeadClass, sectionRule, "min-w-0 whitespace-nowrap")}
-                >
-                  Ref
-                </SortableColumnHead>
-              ) : null}
-              <SortableColumnHead
-                sortKey="partName"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, colRule, "min-w-0")}
-              >
-                Part number
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="qty"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
-              >
-                Quantity
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="thicknessMm"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
-              >
-                Thickness (mm)
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="materialGrade"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, colRule, "min-w-0")}
-              >
-                Material grade
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="finish"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, sectionRule, "min-w-0")}
-              >
-                Finish
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="widthMm"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
-              >
-                Width (mm)
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="lengthMm"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
-              >
-                Length (mm)
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="areaM2"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, colRule, "whitespace-nowrap")}
-              >
-                Area (m²)
-              </SortableColumnHead>
-              <SortableColumnHead
-                sortKey="lineWeightKg"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(
-                  subHeadClass,
-                  showMaterialPricing ? colRule : sectionRule,
-                  "whitespace-nowrap"
-                )}
-              >
-                Weight (kg)
-              </SortableColumnHead>
+              <TableHead scope="col" className={headNum}>
+                {t(`${PP}.colThickness`)}
+              </TableHead>
+              <TableHead scope="col" className={headNum}>
+                {t(`${PP}.colLength`)}
+              </TableHead>
+              <TableHead scope="col" className={headNum}>
+                {t(`${PP}.colWidth`)}
+              </TableHead>
+              <TableHead scope="col" className={headNum}>
+                {t(`${PP}.colArea`)}
+              </TableHead>
+              <TableHead scope="col" className={headNum}>
+                {t(`${PP}.colWeight`)}
+              </TableHead>
+              <TableHead scope="col" className={cn(headStart, "min-w-0")}>
+                {t(`${PP}.colMaterialGrade`)}
+              </TableHead>
+              <TableHead scope="col" className={headStart}>
+                {t(`${PP}.colFinish`)}
+              </TableHead>
               {showMaterialPricing ? (
                 <TableHead
                   scope="col"
-                  className={cn(subHeadClass, sectionRule, "whitespace-nowrap text-right tabular-nums")}
-                  title="Line weight × price/kg from Calculations"
+                  className={cn(headNum)}
+                  title={t(`${PP}.materialPriceTooltip`)}
                 >
-                  Material ({priceHeaderSymbol})
+                  {t(`${PP}.colMaterialPrice`, { symbol: priceHeaderSymbol })}
                 </TableHead>
               ) : null}
-              <SortableColumnHead
-                sortKey="preview"
-                sortState={sortState}
-                onSort={handleSort}
-                className={cn(subHeadClass, showDelete ? colRule : "border-r-0")}
+              <TableHead
+                scope="col"
+                className={cn(headBase, "min-w-[4.5rem] text-center", !showDelete && "border-e-0")}
               >
-                Preview
-              </SortableColumnHead>
+                {t(`${PP}.colPreview`)}
+              </TableHead>
               {showDelete ? (
-                <TableHead scope="col" className={cn(subHeadClass, "w-[1%] border-r-0")}>
-                  <span className="sr-only">Delete</span>
+                <TableHead scope="col" className={cn(headBase, "w-[1%] border-e-0 text-center")}>
+                  <span className="sr-only">{t(`${PP}.colDelete`)}</span>
                   <span aria-hidden className="text-muted-foreground">
-                    Delete
+                    {t(`${PP}.colDelete`)}
                   </span>
                 </TableHead>
               ) : null}
@@ -778,8 +699,8 @@ export function PartBreakdownTable({
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   {parts.length === 0
-                    ? "No parts in this quote."
-                    : "No rows match your search and filters."}
+                    ? t(`${PP}.emptyNoParts`)
+                    : t(`${PP}.emptyNoFilterMatch`)}
                 </TableCell>
               </TableRow>
             ) : null}
@@ -787,135 +708,103 @@ export function PartBreakdownTable({
               const lineWeightKg = row.weightKg * row.qty;
               const { grade, finish } = splitMaterialGradeAndFinish(row.material);
               return (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className="group/row hover:bg-white/[0.03]">
                   {showRefColumn ? (
                     <TableCell
                       className={cn(
-                        "py-2 px-3 text-left align-middle text-xs font-medium whitespace-nowrap min-w-0",
-                        sectionRule
+                        cellStart,
+                        "text-xs font-medium min-w-0 border-e border-white/10",
+                        STICKY_FIRST_CELL
                       )}
                     >
-                      <span
-                        className="truncate block"
-                        title={row.sourceRef ?? ""}
-                      >
-                        {row.sourceRef ?? "—"}
+                      <span className="truncate block" title={formatUnifiedSourceForRow(row)}>
+                        {formatUnifiedSourceForRow(row)}
                       </span>
                     </TableCell>
                   ) : null}
                   <TableCell
                     className={cn(
-                      "py-2 px-3 text-left align-middle font-medium min-w-0",
-                      colRule
+                      cellStart,
+                      "font-medium min-w-0 border-e border-white/10",
+                      !showRefColumn && STICKY_FIRST_CELL
                     )}
                   >
                     <span className="truncate block" title={row.partName}>
                       {row.partName}
                     </span>
                   </TableCell>
-                  <TableCell
-                    className={cn(
-                      "py-2 px-3 text-left align-middle tabular-nums",
-                      colRule
-                    )}
-                  >
+                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
                     {row.qty}
                   </TableCell>
-                  <TableCell
-                    className={cn(
-                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
-                      colRule
-                    )}
-                  >
+                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
                     {formatInteger(Math.round(row.thicknessMm))}
                   </TableCell>
-                  <TableCell
-                    className={cn("py-2 px-3 text-left align-middle text-xs min-w-0", colRule)}
-                  >
+                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                    {formatDecimal(row.lengthMm, 2)}
+                  </TableCell>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                    {formatDecimal(row.widthMm, 2)}
+                  </TableCell>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                    {formatDecimal(row.areaM2, 3)}
+                  </TableCell>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                    {formatDecimal(lineWeightKg, 2)}
+                  </TableCell>
+                  <TableCell className={cn(cellStart, "text-xs min-w-0 border-e border-white/10")}>
                     <span className="truncate block" title={grade}>
                       {grade}
                     </span>
                   </TableCell>
-                  <TableCell
-                    className={cn("py-2 px-3 text-left align-middle text-xs min-w-0", sectionRule)}
-                  >
-                    <span className="truncate block" title={finish}>
-                      {finish}
+                  <TableCell className={cn(cellStart, "text-xs min-w-0 border-e border-white/10")}>
+                    <span className="truncate block" title={finishLabel(finish)}>
+                      {finishLabel(finish)}
                     </span>
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
-                      colRule
-                    )}
-                  >
-                    {formatDecimal(row.widthMm, 2)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
-                      colRule
-                    )}
-                  >
-                    {formatDecimal(row.lengthMm, 2)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
-                      colRule
-                    )}
-                  >
-                    {formatDecimal(row.areaM2, 3)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "py-2 px-3 text-left align-middle tabular-nums text-xs",
-                      showMaterialPricing ? colRule : sectionRule
-                    )}
-                  >
-                    {formatDecimal(lineWeightKg, 2)}
                   </TableCell>
                   {showMaterialPricing && materialType && materialPricePerKgByRow ? (
                     <TableCell
                       className={cn(
-                        "py-2 px-3 text-right align-middle tabular-nums text-xs font-medium text-foreground",
-                        sectionRule
+                        cellNum,
+                        "text-xs font-medium text-foreground border-e border-white/10"
                       )}
                     >
                       {fmtAmount(
                         lineWeightKg *
                           parseMaterialPricePerKg(
-                            materialPricePerKgByRow[materialPricingRowKey(row, materialType)] ??
-                              ""
+                            materialPricePerKgByRow[materialPricingRowKey(row, materialType)] ?? ""
                           )
                       )}
                     </TableCell>
                   ) : null}
                   <TableCell
                     className={cn(
-                      "py-1.5 px-3 text-left align-middle",
-                      showDelete ? colRule : "border-r-0"
+                      cellBase,
+                      "text-center border-e border-white/10",
+                      !showDelete && "border-e-0"
                     )}
                   >
-                    <Button
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                      aria-label={`Preview ${row.partName}`}
+                      aria-label={t(`${PP}.ariaPreviewRow`, { name: row.partName })}
                       onClick={() => setPreviewPart(row)}
+                      className={cn(
+                        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+                        PREVIEW_ICON_CLASS,
+                        "hover:bg-white/5",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      )}
                     >
-                      <Eye className="h-4 w-4" strokeWidth={1.75} />
-                    </Button>
+                      <Eye className="h-4 w-4" stroke={PREVIEW_STROKE} strokeWidth={2} aria-hidden />
+                    </button>
                   </TableCell>
                   {showDelete ? (
-                    <TableCell className="py-1.5 px-3 text-left align-middle border-r-0">
+                    <TableCell className={cn(cellBase, "text-center border-e-0")}>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                        aria-label={`Remove ${row.partName} from quote`}
+                        aria-label={t(`${PP}.ariaDeleteRow`, { name: row.partName })}
                         onClick={() => onDeletePart?.(row)}
                       >
                         <Trash2 className="h-4 w-4" strokeWidth={1.75} />
@@ -935,177 +824,131 @@ export function PartBreakdownTable({
           if (!open) setPreviewPart(null);
         }}
       >
-        <DialogContent
-          className={cn(
-            pricingPreviewLayout
-              ? "w-[min(100vw-1.5rem,72rem)] max-w-[72rem] sm:max-w-[72rem] gap-0 p-0 overflow-hidden"
-              : "sm:max-w-lg"
-          )}
-        >
-          {p && (
-            <>
-              <DialogHeader
-                className={cn(
-                  "px-6 pt-6 pb-2 text-left",
-                  pricingPreviewLayout && "border-b border-white/[0.08] bg-card/40 px-6 py-4 sm:py-5"
-                )}
-              >
-                <DialogTitle className="font-mono text-base sm:text-lg">{p.partName}</DialogTitle>
-                <DialogDescription>
-                  {pricingPreviewLayout
-                    ? "Plate line detail — material pricing uses your price/kg for this grade, thickness, and finish."
-                    : "Plate line detail from the quote breakdown."}
-                </DialogDescription>
-              </DialogHeader>
+        <DialogContent showCloseButton={false} className={cn(PART_PREVIEW_DIALOG_CONTENT_CLASS)}>
+          {p ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden" dir="rtl">
+              <DialogTitle className="sr-only">{p.partName}</DialogTitle>
+              <DialogDescription className="sr-only">{t(`${MOD}.a11yTitle`)}</DialogDescription>
 
-              {pricingPreviewLayout ? (
-                <div className="grid md:grid-cols-2 md:divide-x md:divide-border min-h-[min(60vh,420px)]">
-                  <div className="p-6 min-w-0 flex flex-col">
-                    <dl className="space-y-2.5 text-sm flex-1">
-                      {p.sourceRef ? (
-                        <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                          <dt className="text-muted-foreground shrink-0">Ref</dt>
-                          <dd className="font-medium text-right min-w-0">{p.sourceRef}</dd>
-                        </div>
-                      ) : null}
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Quantity</dt>
-                        <dd className="tabular-nums font-medium">{p.qty}</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Material grade</dt>
-                        <dd className="font-medium text-right min-w-0">{previewGradeLabel}</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Finish</dt>
-                        <dd className="font-medium text-right min-w-0">{previewFinishLabel}</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Thickness</dt>
-                        <dd className="tabular-nums">
-                          {formatInteger(Math.round(p.thicknessMm))} mm
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Width</dt>
-                        <dd className="tabular-nums">{formatDecimal(p.widthMm, 2)} mm</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Length</dt>
-                        <dd className="tabular-nums">{formatDecimal(p.lengthMm, 2)} mm</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Area (per plate)</dt>
-                        <dd className="tabular-nums">{formatDecimal(p.areaM2, 3)} m²</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Total weight (line)</dt>
-                        <dd className="tabular-nums">{formatDecimal(totalWeightLine, 2)} kg</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Cut length (per plate)</dt>
-                        <dd className="tabular-nums">{formatDecimal(cutLengthM, 2)} m</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 border-b border-white/[0.08] pb-2.5">
-                        <dt className="text-muted-foreground shrink-0">Pierce count</dt>
-                        <dd className="tabular-nums">{p.pierceCount}</dd>
-                      </div>
-                      <div className="flex justify-between gap-6 pb-0">
-                        <dt className="text-muted-foreground shrink-0">Line price</dt>
-                        <dd className="tabular-nums font-semibold text-foreground">
-                          {formatQuickQuoteCurrency(lineMaterialSellPreview, currency)}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                  <div className="p-6 min-w-0 flex flex-col bg-muted/10">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
-                      Plate geometry
-                    </p>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div
+                  className="flex min-h-[min(45vh,475px)] flex-1 shrink-0 items-center justify-center px-5 py-6"
+                  dir="ltr"
+                >
+                  <div className="relative flex h-[min(425px,52vh)] w-full min-w-0 max-w-full items-center justify-center overflow-hidden bg-transparent">
                     <QuotePartGeometryPreview
                       part={p}
                       dxfGeometries={dxfPartGeometries}
-                      className="flex-1 border-0 bg-transparent min-h-[240px]"
+                      rectangleAppearance="dxfPreviewModal"
+                      className="min-h-0 w-full max-w-full border-0 bg-transparent shadow-none [&>div]:min-h-0 [&>div]:bg-transparent [&_svg]:max-h-[min(400px,48vh)]"
                     />
                   </div>
                 </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 text-sm px-6 pb-6">
-                  <dl className="space-y-2 sm:col-span-2">
-                    {p.sourceRef ? (
-                      <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                        <dt className="text-muted-foreground">Ref</dt>
-                        <dd className="font-medium text-right">{p.sourceRef}</dd>
-                      </div>
-                    ) : null}
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Quantity</dt>
-                      <dd className="tabular-nums font-medium">{p.qty}</dd>
+
+                <div className="w-full shrink-0 border-t border-white/10">
+                  <div dir="ltr" className="w-full overflow-hidden">
+                    <div className="grid w-full grid-cols-4 grid-rows-2">
+                      {(
+                        [
+                          {
+                            key: "finish",
+                            icon: Palette,
+                            label: t(`${MOD}.finish`),
+                            value: finishLabel(previewFinishLabel),
+                          },
+                          {
+                            key: "thickness",
+                            icon: Layers,
+                            label: t(`${MOD}.thickness`),
+                            value: (
+                              <StatValueUnitLeft
+                                numericText={formatDecimal(Number(p.thicknessMm) || 0, 1)}
+                                unitSuffix={t(`${MOD}.mmSuffix`)}
+                              />
+                            ),
+                          },
+                          {
+                            key: "quantity",
+                            icon: Hash,
+                            label: t(`${MOD}.quantity`),
+                            value: Math.max(0, Math.floor(p.qty)),
+                          },
+                          {
+                            key: "plateName",
+                            icon: Tag,
+                            label: t(`${MOD}.plateName`),
+                            value: p.partName,
+                          },
+                          {
+                            key: "weight",
+                            icon: Weight,
+                            label: t(`${MOD}.weight`),
+                            value:
+                              totalWeightLine > 0 ? (
+                                <StatValueUnitLeft
+                                  numericText={formatDecimal(totalWeightLine, 2)}
+                                  unitSuffix={t(`${MOD}.kgSuffix`)}
+                                />
+                              ) : (
+                                "-"
+                              ),
+                          },
+                          {
+                            key: "area",
+                            icon: Square,
+                            label: t(`${MOD}.area`),
+                            value:
+                              lineAreaM2 > 0 ? (
+                                <StatValueUnitLeft
+                                  numericText={formatDecimal(lineAreaM2, 4)}
+                                  unitSuffix={t(`${MOD}.m2Suffix`)}
+                                />
+                              ) : (
+                                "-"
+                              ),
+                          },
+                          {
+                            key: "length",
+                            icon: MoveHorizontal,
+                            label: t(`${MOD}.length`),
+                            value: (
+                              <StatValueUnitLeft
+                                numericText={formatDecimal(p.lengthMm, 1)}
+                                unitSuffix={t(`${MOD}.mmSuffix`)}
+                              />
+                            ),
+                          },
+                          {
+                            key: "width",
+                            icon: MoveVertical,
+                            label: t(`${MOD}.width`),
+                            value: (
+                              <StatValueUnitLeft
+                                numericText={formatDecimal(p.widthMm, 1)}
+                                unitSuffix={t(`${MOD}.mmSuffix`)}
+                              />
+                            ),
+                          },
+                        ] as const
+                      ).map((cell, i) => (
+                        <PreviewStatCell
+                          key={cell.key}
+                          icon={cell.icon}
+                          label={cell.label}
+                          value={cell.value}
+                          className={cn(
+                            "border-b border-solid border-[#00FF9F]/20",
+                            i % 4 === 0 && "border-s",
+                            i % 4 !== 3 && "border-e"
+                          )}
+                        />
+                      ))}
                     </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Material</dt>
-                      <dd className="font-medium text-right">{p.material}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Thickness</dt>
-                      <dd className="tabular-nums">
-                        {formatInteger(Math.round(p.thicknessMm))} mm
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Width × length</dt>
-                      <dd className="tabular-nums">
-                        {formatDecimal(p.widthMm, 2)} × {formatDecimal(p.lengthMm, 2)} mm
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Area (per plate)</dt>
-                      <dd className="tabular-nums">{formatDecimal(p.areaM2, 3)} m²</dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Total weight (line)</dt>
-                      <dd className="tabular-nums">{formatDecimal(totalWeightLine, 2)} kg</dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Cut length (per plate)</dt>
-                      <dd className="tabular-nums">{formatDecimal(cutLengthM, 2)} m</dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Pierce count</dt>
-                      <dd className="tabular-nums">{p.pierceCount}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Line price (est.)</dt>
-                      <dd className="tabular-nums font-medium">
-                        <span className="tabular-nums text-foreground" aria-hidden>
-                          {priceHeaderSymbol}
-                        </span>{" "}
-                        {fmtAmount(p.estimatedLineCost)}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">DXF file</dt>
-                      <dd className="font-mono text-xs text-right break-all">{p.dxfFileName}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b border-white/[0.08] pb-2">
-                      <dt className="text-muted-foreground">Excel ref</dt>
-                      <dd className="font-mono text-xs">{p.excelRowRef}</dd>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <dt className="text-muted-foreground mb-1">Notes</dt>
-                      <dd className="text-foreground leading-relaxed">{p.notes?.trim() || "—"}</dd>
-                    </div>
-                  </dl>
-                  <div className="sm:col-span-2">
-                    <QuotePartGeometryPreview
-                      part={p}
-                      dxfGeometries={dxfPartGeometries}
-                    />
                   </div>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

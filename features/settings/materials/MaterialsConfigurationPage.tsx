@@ -1,63 +1,63 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getMaterialConfig,
   saveMaterialConfig,
   subscribeMaterialConfigChanged,
 } from "@/lib/settings/materialConfig";
+import { t } from "@/lib/i18n";
 import type { MaterialConfig, MaterialType } from "@/types/materials";
-import { MATERIAL_TYPE_LABELS, MATERIAL_TYPE_OPTIONS } from "@/types/materials";
+import { MATERIAL_TYPE_LABELS } from "@/types/materials";
+
+/** Visual column order: פלדה → אלומיניום → נירוסטה */
+const SETTINGS_MATERIAL_COLUMN_ORDER: MaterialType[] = [
+  "carbonSteel",
+  "aluminum",
+  "stainlessSteel",
+];
 import { MaterialPricingCard } from "./MaterialPricingCard";
 import { StockSheetsTable } from "./StockSheetsTable";
 
-export function MaterialsConfigurationPage() {
-  const [activeTab, setActiveTab] = useState<MaterialType>("carbonSteel");
-  const [config, setConfig] = useState<MaterialConfig | null>(null);
+const SK = "settings.materials" as const;
+
+function MaterialTypeSettingsColumn({ materialType }: { materialType: MaterialType }) {
+  const [config, setConfig] = useState<MaterialConfig>(() => getMaterialConfig(materialType));
 
   useEffect(() => {
-    const sync = () => setConfig(getMaterialConfig(activeTab));
-    sync();
-    return subscribeMaterialConfigChanged(activeTab, sync);
-  }, [activeTab]);
+    const sync = () => setConfig(getMaterialConfig(materialType));
+    return subscribeMaterialConfigChanged(materialType, sync);
+  }, [materialType]);
 
-  const handleUpdate = useCallback(
-    (patch: Partial<MaterialConfig>) => {
-      if (!config) return;
-      const next = { ...config, ...patch };
+  const handleUpdate = useCallback((patch: Partial<MaterialConfig>) => {
+    setConfig((prev) => {
+      const next = { ...prev, ...patch };
       saveMaterialConfig(next);
-      setConfig(next);
-    },
-    [config]
-  );
+      return next;
+    });
+  }, []);
 
-  if (!config) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-sm text-muted-foreground">Loading configuration...</p>
-      </div>
-    );
-  }
+  const materialLabel = MATERIAL_TYPE_LABELS[materialType];
 
   return (
-    <div className="space-y-6 pb-12">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MaterialType)}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
-          {MATERIAL_TYPE_OPTIONS.map((mat) => (
-            <TabsTrigger key={mat} value={mat}>
-              {MATERIAL_TYPE_LABELS[mat]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <div className="flex min-w-0 flex-col gap-6 rounded-xl border border-white/[0.08] bg-card/40 p-4 sm:p-5">
+      <h2 className="border-b border-white/10 pb-3 text-start text-base font-semibold text-foreground">
+        {t(`${SK}.columnHeading`, { material: materialLabel })}
+      </h2>
+      <MaterialPricingCard config={config} onUpdate={handleUpdate} />
+      <StockSheetsTable config={config} onUpdate={handleUpdate} />
+    </div>
+  );
+}
 
-        {MATERIAL_TYPE_OPTIONS.map((mat) => (
-          <TabsContent key={mat} value={mat} className="space-y-6 mt-6">
-            <MaterialPricingCard config={config} onUpdate={handleUpdate} />
-            <StockSheetsTable config={config} onUpdate={handleUpdate} />
-          </TabsContent>
+export function MaterialsConfigurationPage() {
+  return (
+    <div className="w-full pb-12">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        {SETTINGS_MATERIAL_COLUMN_ORDER.map((mat) => (
+          <MaterialTypeSettingsColumn key={mat} materialType={mat} />
         ))}
-      </Tabs>
+      </div>
     </div>
   );
 }
