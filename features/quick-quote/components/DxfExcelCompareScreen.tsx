@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import {
   Factory,
   FileCode,
+  FileDown,
   FileSpreadsheet,
   MoveHorizontal,
   MoveVertical,
@@ -11,6 +12,7 @@ import {
   Weight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Tooltip,
@@ -35,6 +37,9 @@ import type { ValidationRow, ValidationSummary } from "../types/quickQuote";
 export interface DxfExcelCompareScreenProps {
   summary: ValidationSummary;
   rows: ValidationRow[];
+  /** Excel comparison export (DXF quote method — same action as former header control). */
+  onExportXlsx?: () => void;
+  exportXlsxDisabled?: boolean;
 }
 
 /**
@@ -43,6 +48,8 @@ export interface DxfExcelCompareScreenProps {
 export function DxfExcelCompareScreen({
   summary,
   rows,
+  onExportXlsx,
+  exportXlsxDisabled = false,
 }: DxfExcelCompareScreenProps) {
   const metrics = useMemo(
     () => ({
@@ -59,22 +66,37 @@ export function DxfExcelCompareScreen({
     <div className="mt-3 min-w-0 w-full rounded-xl border border-white/10 bg-card sm:mt-4">
       {/* Scrolls with the DXF phase panel — not a separate sticky band */}
       <div className="border-b border-white/10 px-4 pb-4 pt-4 sm:px-6 sm:pb-5 sm:pt-5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h2 className="text-pretty text-lg font-semibold leading-snug text-foreground sm:text-xl">
-            {t("quote.dxfPhase.excelDxfCompare.title")}
-          </h2>
-          <span
-            className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/[0.14] px-3 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200"
-            role="status"
-          >
+        <div className="flex flex-wrap items-start justify-between gap-3 gap-y-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 className="text-pretty text-lg font-semibold leading-snug text-foreground sm:text-xl">
+              {t("quote.dxfPhase.excelDxfCompare.title")}
+            </h2>
             <span
-              className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgb(16_185_129/0.35)]"
-              aria-hidden
-            />
-            {t("quote.dxfPhase.excelDxfCompare.rowsCheckedLine", {
-              n: formatInteger(summary.totalRows),
-            })}
-          </span>
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/[0.14] px-3 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200"
+              role="status"
+            >
+              <span
+                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgb(16_185_129/0.35)]"
+                aria-hidden
+              />
+              {t("quote.dxfPhase.excelDxfCompare.rowsCheckedLine", {
+                n: formatInteger(summary.totalRows),
+              })}
+            </span>
+          </div>
+          {onExportXlsx ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 [color-scheme:dark]"
+              disabled={exportXlsxDisabled}
+              onClick={() => onExportXlsx()}
+            >
+              <FileDown className="h-4 w-4 shrink-0" aria-hidden />
+              {t("quote.dxfPhase.excelDxfCompare.exportXlsx")}
+            </Button>
+          ) : null}
         </div>
         <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
           {t("quote.dxfPhase.excelDxfCompare.description")}

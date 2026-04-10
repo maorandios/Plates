@@ -113,6 +113,10 @@ export function QuickQuotePage() {
     setBendPlateQuoteItems((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
+  const handleBendPlateResetAll = useCallback(() => {
+    setBendPlateQuoteItems([]);
+  }, []);
+
   const advanceTo = useCallback((s: QuickQuoteStep) => {
     setStep(s);
     setHighestStepReached((h) => (s > h ? s : h));
@@ -590,6 +594,7 @@ export function QuickQuotePage() {
               onBendPlateAddItem={handleBendPlateAddItem}
               onBendPlateUpdateItem={handleBendPlateUpdateItem}
               onBendPlateRemoveItem={handleBendPlateRemoveItem}
+              onBendPlateResetAll={handleBendPlateResetAll}
               onDxfMethodGeometriesChange={setDxfMethodGeometries}
               dxfMethodGeometries={dxfMethodGeometries}
               dxfMethodExcel={dxfMethodExcel}

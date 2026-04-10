@@ -8,7 +8,18 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { ArrowLeft, Check, Pencil, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  LayoutGrid,
+  Package,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Save,
+  Trash2,
+  Weight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,12 +50,11 @@ import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { nanoid } from "@/lib/utils/nanoid";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
+import { type MaterialType } from "@/types/materials";
 import {
   DEFAULT_PLATE_FINISH,
   PLATE_FINISH_OPTIONS,
   defaultMaterialGradeForFamily,
-  plateFinishLabel,
   type PlateFinish,
 } from "../lib/plateFields";
 import type {
@@ -64,23 +74,43 @@ import {
   createFormStateForTemplate,
   formStateFromQuoteItem,
 } from "./defaults";
-import { getBendEditorValidationLines } from "./bendEditorValidation";
-import { OmegaProfileGlyph } from "./BendTemplateShapeGlyph";
+import { getBendEditorValidationIssueCodes } from "./bendEditorValidation";
+import { MethodPhaseMetricStrip } from "../components/method-phases/MethodPhaseMetricStrip";
+import { BendTemplatePickerGlyph } from "./BendTemplateShapeGlyph";
 import { ProfilePreview2D } from "./ProfilePreview2D";
 import { ProfilePreview3D } from "./ProfilePreview3D";
 
-const TEMPLATE_OPTIONS: { id: BendTemplateId; label: string; hint: string }[] = [
-  { id: "l", label: "L", hint: "Two legs" },
-  { id: "u", label: "U", hint: "Channel" },
-  { id: "z", label: "Z", hint: "Zig-zag" },
-  { id: "omega", label: "Omega", hint: "5 segments · Ω profile" },
-  { id: "gutter", label: "Gutter", hint: "5 segments · U-tray, outward lips" },
-  { id: "custom", label: "Custom", hint: "≤ 7 segments · signed path turns" },
+const BP = "quote.bendPlatePhase";
+const ED = `${BP}.editor`;
+
+const TEMPLATE_IDS: BendTemplateId[] = ["l", "u", "z", "omega", "gutter", "custom"];
+
+/** Shape-picker grid: columns swapped vs `TEMPLATE_IDS` row-major order (right column first). */
+const TEMPLATE_IDS_SHAPE_PICKER: BendTemplateId[] = [
+  "u",
+  "l",
+  "omega",
+  "z",
+  "custom",
+  "gutter",
 ];
 
 function templateLabel(id: BendTemplateId): string {
-  const o = TEMPLATE_OPTIONS.find((x) => x.id === id);
-  return o?.label ?? id;
+  return t(`${BP}.template.${id}.name`);
+}
+
+function bendEditorValidationMessages(form: BendPlateFormState): string[] {
+  return getBendEditorValidationIssueCodes(form).map((code) => {
+    if (code.startsWith("customLen:")) {
+      const i = Number.parseInt(code.slice("customLen:".length), 10);
+      return t(`${BP}.issues.customLen`, { n: Number.isFinite(i) ? i + 1 : 1 });
+    }
+    if (code.startsWith("customTurn:")) {
+      const i = Number.parseInt(code.slice("customTurn:".length), 10);
+      return t(`${BP}.issues.customTurn`, { n: Number.isFinite(i) ? i + 1 : 1 });
+    }
+    return t(`${BP}.issues.${code}`);
+  });
 }
 
 /** Loose decimal text while typing (allows "-", "-.", partial numbers). */
@@ -141,7 +171,7 @@ function NumField({
         type="text"
         inputMode="decimal"
         autoComplete="off"
-        className="h-9 font-mono tabular-nums text-sm"
+        className="h-9 tabular-nums text-sm"
         value={display}
         onFocus={() => {
           setFocused(true);
@@ -206,35 +236,11 @@ function aggregateMetrics(items: BendPlateQuoteItem[]) {
   };
 }
 
-/** Fill parent (Quick Quote step 3 shell uses flex-1 min-h-0). */
+/** Fill parent (Quick Quote step 2 method setup uses flex-1 min-h-0). */
 const BEND_PLATE_FILL =
   "flex h-full min-h-0 w-full max-h-full flex-col overflow-hidden";
 
-/** One row in the left sidebar — matches Manual add parts metric strips. */
-function BendPlateHubMetricStrip({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-}) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 px-5 py-5 sm:px-7 sm:py-6">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </p>
-      <p
-        className="font-semibold tabular-nums tracking-tight text-foreground leading-none
-          text-[clamp(2rem,6.5vmin,4.25rem)]"
-      >
-        {value}
-      </p>
-      <p className="text-[11px] text-muted-foreground leading-snug pt-1 max-w-[18rem]">{sub}</p>
-    </div>
-  );
-}
+const BEND_HUB_VIEWPORT = "flex h-full min-h-0 max-h-full flex-col";
 
 interface BendPlateBuilderProps {
   materialType: MaterialType;
@@ -242,6 +248,7 @@ interface BendPlateBuilderProps {
   onAddItem: (item: BendPlateQuoteItem) => void;
   onUpdateItem: (item: BendPlateQuoteItem) => void;
   onRemoveItem: (id: string) => void;
+  onResetAll: () => void;
   /** Return to the quote method step. */
   onBack: () => void;
   /** Finish this phase and return to the quote method step (e.g. after validation). */
@@ -254,6 +261,7 @@ export function BendPlateBuilder({
   onAddItem,
   onUpdateItem,
   onRemoveItem,
+  onResetAll,
   onBack,
   onComplete,
 }: BendPlateBuilderProps) {
@@ -349,12 +357,12 @@ export function BendPlateBuilder({
 
   return (
     <BendPlateHub
-      materialType={materialType}
       quoteItems={quoteItems}
       hubMetrics={hubMetrics}
       onSelectTemplate={openNewEditor}
       onEdit={openEditEditor}
       onRemove={onRemoveItem}
+      onResetAll={onResetAll}
       onBack={onBack}
       onComplete={onComplete}
     />
@@ -362,27 +370,30 @@ export function BendPlateBuilder({
 }
 
 function BendPlateHub({
-  materialType,
   quoteItems,
   hubMetrics,
   onSelectTemplate,
   onEdit,
   onRemove,
+  onResetAll,
   onBack,
   onComplete,
 }: {
-  materialType: MaterialType;
   quoteItems: BendPlateQuoteItem[];
   hubMetrics: ReturnType<typeof aggregateMetrics>;
-  onSelectTemplate: (t: BendTemplateId) => void;
+  onSelectTemplate: (id: BendTemplateId) => void;
   onEdit: (item: BendPlateQuoteItem) => void;
   onRemove: (id: string) => void;
+  onResetAll: () => void;
   onBack: () => void;
   onComplete: () => void;
 }) {
-  const plateTypeLabel = MATERIAL_TYPE_LABELS[materialType];
   const [shapePickerOpen, setShapePickerOpen] = useState(false);
   const [hubValidationOpen, setHubValidationOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+
+  const primaryDisabled = quoteItems.length === 0;
+  const canReset = quoteItems.length > 0;
 
   const pickShape = (id: BendTemplateId) => {
     setShapePickerOpen(false);
@@ -397,283 +408,325 @@ function BendPlateHub({
     onComplete();
   }
 
+  function handleResetClick() {
+    setResetConfirmOpen(true);
+  }
+
+  function confirmResetSession() {
+    setResetConfirmOpen(false);
+    onResetAll();
+  }
+
   return (
-    <div className={cn(BEND_PLATE_FILL)}>
-      <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(420px,42vw)] shrink-0 flex-col">
+    <div className={cn("flex w-full min-w-0 flex-col gap-0", BEND_HUB_VIEWPORT)} dir="rtl">
+      <div className="flex min-h-0 min-w-0 flex-1 gap-0">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
-              Bent plate builder
+            <h1 className="text-xl font-semibold text-foreground leading-snug">
+              {t(`${BP}.sidebarTitle`)}
             </h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Use <span className="font-medium text-foreground">Add part</span> to choose a shape,
-              configure it in the editor, then complete to add it to the list. Edit or remove lines
-              anytime.
-            </p>
-            <p className="text-xs text-muted-foreground pt-1">
-              Plate type from General:{" "}
-              <span className="font-medium text-foreground">{plateTypeLabel}</span>
-            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">{t(`${BP}.sidebarIntro`)}</p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border/70">
-            <BendPlateHubMetricStrip
-              label="Quantity"
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
+            <MethodPhaseMetricStrip
+              icon={Package}
+              label={t("methodMetrics.quantity")}
               value={formatInteger(hubMetrics.totalQty)}
-              sub="Total pieces across configured plates"
             />
-            <BendPlateHubMetricStrip
-              label="Area (m²)"
-              value={formatDecimal(hubMetrics.totalAreaM2, 3)}
-              sub="Σ blank area × quantity per line"
+            <MethodPhaseMetricStrip
+              icon={LayoutGrid}
+              label={t("methodMetrics.area")}
+              value={formatDecimal(hubMetrics.totalAreaM2, 2)}
+              valueUnit={t("methodMetrics.unitM2")}
             />
-            <BendPlateHubMetricStrip
-              label="Weight (kg)"
-              value={formatDecimal(hubMetrics.totalWeightKg, 2)}
-              sub="Estimated from geometry and density (General)"
+            <MethodPhaseMetricStrip
+              icon={Weight}
+              label={t("methodMetrics.weight")}
+              value={formatDecimal(hubMetrics.totalWeightKg, 1)}
+              valueUnit={t("methodMetrics.unitKg")}
             />
           </div>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 ds-surface-header sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-foreground">Configured plates</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {quoteItems.length === 0
-                    ? "No plates yet — use Add part to choose L, U, Z, or Custom and configure your first line."
-                    : `${formatInteger(quoteItems.length)} line(s) on this quote`}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="default"
-                  className="gap-2"
-                  onClick={onBack}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Button>
-                <Button
-                  type="button"
-                  size="default"
-                  className="gap-2"
-                  onClick={handleHubCompleteClick}
-                >
-                  <Check className="h-4 w-4" />
-                  Complete
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="p-4 sm:p-5">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
               {quoteItems.length === 0 ? (
-                <div
-                  className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 ds-empty-state"
-                >
-                  <p className="text-sm text-muted-foreground text-center max-w-sm">
-                    No bent plates yet. Add a part to pick a profile shape and open the editor.
+                <div className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 py-8">
+                  <p className="text-sm text-muted-foreground text-center max-w-sm leading-relaxed">
+                    {t(`${BP}.emptyState`)}
                   </p>
-                  <Button
-                    type="button"
-                    size="default"
-                    className="gap-2"
-                    onClick={() => setShapePickerOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add part
-                  </Button>
+                  <div className="flex justify-center">
+                    <Button
+                      type="button"
+                      size="default"
+                      className="gap-2"
+                      onClick={() => setShapePickerOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" aria-hidden />
+                      {t(`${BP}.addPart`)}
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <>
-                <div className="rounded-xl border-0 overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableHead className="text-xs font-semibold w-12 text-center">#</TableHead>
-                        <TableHead className="text-xs font-semibold w-[72px]">Shape</TableHead>
-                        <TableHead className="text-xs font-semibold w-[120px] text-right">
-                          Thickness (mm)
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold w-[120px] text-right">
-                          Width (mm)
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold w-[120px] text-right">
-                          Length (mm)
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold w-[100px] text-right">
-                          Quantity
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold w-[120px] text-right">
-                          Area (m²)
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold w-[120px] text-right">
-                          Weight (kg)
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold min-w-[140px]">
-                          Material grade
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold min-w-[100px]">Finish</TableHead>
-                        <TableHead className="text-xs font-semibold w-[100px] text-right">
-                          Actions
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {quoteItems.map((it, index) => {
-                        const q = Math.max(0, Math.floor(it.global.quantity) || 0);
-                        const lineArea = it.calc.areaM2 * q;
-                        return (
-                          <TableRow key={it.id}>
-                            <TableCell className="py-2 text-center text-muted-foreground text-sm tabular-nums">
-                              {index + 1}
-                            </TableCell>
-                            <TableCell className="py-2 font-medium capitalize tabular-nums">
-                              {templateLabel(it.template)}
-                            </TableCell>
-                            <TableCell className="py-2 text-right tabular-nums text-sm">
-                              {formatDecimal(it.global.thicknessMm, 2)}
-                            </TableCell>
-                            <TableCell className="py-2 text-right tabular-nums text-sm">
-                              {formatDecimal(it.calc.blankWidthMm, 1)}
-                            </TableCell>
-                            <TableCell className="py-2 text-right tabular-nums text-sm">
-                              {formatDecimal(it.calc.blankLengthMm, 1)}
-                            </TableCell>
-                            <TableCell className="py-2 text-right tabular-nums text-sm">
-                              {formatInteger(q)}
-                            </TableCell>
-                            <TableCell className="py-2 text-right tabular-nums text-sm">
-                              {formatDecimal(lineArea, 3)}
-                            </TableCell>
-                            <TableCell className="py-2 text-right tabular-nums text-sm">
-                              {formatDecimal(it.calc.weightKg, 2)}
-                            </TableCell>
-                            <TableCell className="py-2 text-muted-foreground max-w-[180px] truncate text-sm">
-                              {it.global.material || "—"}
-                            </TableCell>
-                            <TableCell className="py-2 text-muted-foreground whitespace-nowrap text-sm">
-                              {plateFinishLabel(it.global.finish)}
-                            </TableCell>
-                            <TableCell className="py-2 text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  aria-label="Edit"
-                                  onClick={() => onEdit(it)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  aria-label="Delete"
-                                  onClick={() => onRemove(it.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 gap-1.5"
-                  onClick={() => setShapePickerOpen(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  Add part
-                </Button>
+                  <div className="max-h-[min(70vh,800px)] overflow-auto rounded-md border border-white/[0.08] bg-card">
+                    <Table
+                      className="border-separate border-spacing-0"
+                      containerClassName="overflow-visible"
+                    >
+                      <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+                        <TableRow className="border-b-0 hover:bg-transparent">
+                          <TableHead
+                            className={cn(
+                              "min-w-[3.5rem] sticky top-0 right-0 z-40 bg-card py-2 pe-3 ps-3 text-center text-xs font-medium shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]"
+                            )}
+                          >
+                            {t(`${BP}.colIndex`)}
+                          </TableHead>
+                          <TableHead className="min-w-[72px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colShape`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colThickness`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colWidth`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colLength`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colQuantity`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colArea`)}
+                          </TableHead>
+                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colWeight`)}
+                          </TableHead>
+                          <TableHead className="min-w-[120px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colMaterial`)}
+                          </TableHead>
+                          <TableHead className="min-w-[100px] py-2 pe-3 ps-3 text-xs font-medium">
+                            {t(`${BP}.colFinish`)}
+                          </TableHead>
+                          <TableHead className="min-w-[5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
+                            {t(`${BP}.colActions`)}
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {quoteItems.map((it, index) => {
+                          const q = Math.max(0, Math.floor(it.global.quantity) || 0);
+                          const lineArea = it.calc.areaM2 * q;
+                          return (
+                            <TableRow key={it.id} className="group/row">
+                              <TableCell
+                                className={cn(
+                                  "sticky right-0 z-20 bg-card py-2 pe-3 ps-3 text-center text-sm tabular-nums text-muted-foreground shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.25)]",
+                                  "group-hover/row:bg-white/[0.04]"
+                                )}
+                              >
+                                {index + 1}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm font-medium tabular-nums">
+                                {templateLabel(it.template)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
+                                {formatDecimal(it.global.thicknessMm, 2)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
+                                {formatDecimal(it.calc.blankWidthMm, 1)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
+                                {formatDecimal(it.calc.blankLengthMm, 1)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
+                                {formatInteger(q)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
+                                {formatDecimal(lineArea, 3)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
+                                {formatDecimal(it.calc.weightKg, 2)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm text-muted-foreground max-w-[180px] truncate">
+                                {it.global.material || "—"}
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3 text-sm text-muted-foreground whitespace-nowrap">
+                                {t(`quote.finishLabels.${it.global.finish}`)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-2 ps-2">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    aria-label={t(`${BP}.editRowAria`)}
+                                    onClick={() => onEdit(it)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    aria-label={t(`${BP}.deleteRowAria`)}
+                                    onClick={() => onRemove(it.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="mt-4 flex justify-start" dir="rtl">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="inline-flex shrink-0 gap-1.5"
+                      onClick={() => setShapePickerOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" aria-hidden />
+                      {t(`${BP}.addPart`)}
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
           </div>
-
-          <Dialog open={shapePickerOpen} onOpenChange={setShapePickerOpen}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Add bent plate</DialogTitle>
-                <DialogDescription>
-                  Choose a profile shape. You will configure dimensions and material in the editor next.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                {TEMPLATE_OPTIONS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => pickShape(t.id)}
-                    className={cn(
-                      "rounded-xl border-2 text-left transition-all",
-                      t.id === "omega" ? "px-3 py-3" : "px-4 py-4",
-                      "border-white/[0.08] bg-card hover:border-primary/50 hover:bg-white/[0.04] hover:shadow-sm",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    )}
-                  >
-                    {t.id === "omega" ? (
-                      <>
-                        <div
-                          className="mb-2 flex h-[4.25rem] items-center justify-center rounded-lg bg-muted/60 px-1"
-                          aria-hidden
-                        >
-                          <OmegaProfileGlyph className="h-11 w-[4.75rem] text-foreground" />
-                        </div>
-                        <span className="block text-lg font-bold text-foreground leading-tight tracking-tight">
-                          {t.label}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground leading-snug block mt-1">
-                          {t.hint}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="block text-lg font-bold text-foreground leading-tight tracking-tight">
-                          {t.label}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground leading-snug block mt-1">
-                          {t.hint}
-                        </span>
-                      </>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={hubValidationOpen} onOpenChange={setHubValidationOpen}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add a plate first</DialogTitle>
-                <DialogDescription>
-                  Add at least one bent plate line before completing this step.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button type="button" onClick={() => setHubValidationOpen(false)}>
-                  OK
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
+
+      <div
+        className="shrink-0 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+        dir="ltr"
+      >
+        <div className="flex flex-wrap items-center justify-start gap-2">
+          <Button
+            type="button"
+            className="gap-2"
+            disabled={primaryDisabled}
+            onClick={handleHubCompleteClick}
+          >
+            <Check className="h-4 w-4" aria-hidden />
+            {t(`${BP}.complete`)}
+          </Button>
+          <Button type="button" variant="outline" className="inline-flex flex-row gap-2" onClick={onBack}>
+            <span>{t(`${BP}.back`)}</span>
+            <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={handleResetClick}
+            disabled={!canReset}
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            {t(`${BP}.reset`)}
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={shapePickerOpen} onOpenChange={setShapePickerOpen}>
+        <DialogContent
+          className={cn(
+            "flex w-[calc(100vw-1.5rem)] max-w-xl flex-col gap-0 overflow-hidden border-white/10 bg-card p-0 sm:rounded-xl"
+          )}
+          dir="rtl"
+          showCloseButton={false}
+        >
+          <div className="shrink-0 border-b border-white/10 px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+            <DialogHeader className="sm:text-start gap-2 space-y-0">
+              <DialogTitle className="text-base sm:text-lg">{t(`${BP}.shapePickerTitle`)}</DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed">
+                {t(`${BP}.shapePickerDescription`)}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div dir="ltr" className="w-full shrink-0 overflow-hidden border-t border-solid border-[#00FF9F]/20">
+            <div
+              className={cn(
+                "grid w-full min-h-[21rem] grid-cols-2 sm:min-h-[22.5rem]",
+                "[grid-template-rows:repeat(3,minmax(0,1fr))]"
+              )}
+            >
+              {TEMPLATE_IDS_SHAPE_PICKER.map((tid, i) => (
+                <button
+                  key={tid}
+                  type="button"
+                  dir="rtl"
+                  onClick={() => pickShape(tid)}
+                  className={cn(
+                    "flex min-h-0 min-w-0 flex-col items-center justify-center gap-3 px-4 py-4 text-center transition-colors",
+                    "bg-card hover:bg-white/[0.03]",
+                    "border-b border-solid border-[#00FF9F]/20",
+                    i % 2 === 0 && "border-s border-e border-solid border-[#00FF9F]/20",
+                    i % 2 === 1 && "border-e border-solid border-[#00FF9F]/20",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                    "active:bg-white/[0.05]"
+                  )}
+                >
+                  <div
+                    className="flex min-h-[3.75rem] w-full shrink-0 items-center justify-center"
+                    aria-hidden
+                  >
+                    <BendTemplatePickerGlyph
+                      id={tid}
+                      className="h-9 w-[4.25rem] shrink-0"
+                    />
+                  </div>
+                  <span className="block w-full text-center text-base font-bold leading-tight tracking-tight text-foreground sm:text-lg">
+                    {templateLabel(tid)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={hubValidationOpen} onOpenChange={setHubValidationOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${BP}.hubValidationTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${BP}.hubValidationDescription`)}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-start">
+            <Button type="button" onClick={() => setHubValidationOpen(false)}>
+              {t(`${BP}.hubValidationOk`)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${BP}.confirmResetTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${BP}.confirmResetDescription`)}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
+            <Button type="button" variant="outline" onClick={() => setResetConfirmOpen(false)}>
+              {t(`${BP}.cancel`)}
+            </Button>
+            <Button type="button" onClick={confirmResetSession}>
+              {t(`${BP}.confirmResetAction`)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -725,9 +778,9 @@ function BendPlateShapeEditor({
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
 
   const handleSaveClick = useCallback(() => {
-    const lines = getBendEditorValidationLines(form);
-    if (lines) {
-      setSaveValidationLines(lines);
+    const codes = getBendEditorValidationIssueCodes(form);
+    if (codes.length > 0) {
+      setSaveValidationLines(bendEditorValidationMessages(form));
       setSaveValidationOpen(true);
       return;
     }
@@ -735,8 +788,8 @@ function BendPlateShapeEditor({
   }, [form, onComplete]);
 
   const handleBackClick = useCallback(() => {
-    const lines = getBendEditorValidationLines(form);
-    if (lines) {
+    const codes = getBendEditorValidationIssueCodes(form);
+    if (codes.length > 0) {
       setBackConfirmOpen(true);
       return;
     }
@@ -749,38 +802,39 @@ function BendPlateShapeEditor({
   }, [onCancel]);
 
   return (
-    <div className={cn(BEND_PLATE_FILL)}>
-      <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
-        <aside className="flex w-2/5 min-w-0 flex-col bg-card">
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
-            <div className="space-y-6">
+    <div className={cn(BEND_PLATE_FILL)} dir="rtl">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <aside className="flex w-2/5 min-w-0 flex-col border-e border-white/[0.08] bg-card/60">
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5">
+              <div className="space-y-6">
               <div className="space-y-3">
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Global parameters
+                  {t(`${ED}.globalTitle`)}
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   <NumField
-                    label="Thickness (mm)"
+                    label={t(`${ED}.thicknessMm`)}
                     value={form.global.thicknessMm}
                     onChange={(n) => patchGlobal({ thicknessMm: Math.max(0, n) })}
                     min={0}
                     step={0.01}
                   />
                   <NumField
-                    label="Plate width (mm)"
+                    label={t(`${ED}.plateWidthMm`)}
                     value={form.global.plateWidthMm}
                     onChange={(n) => patchGlobal({ plateWidthMm: Math.max(0, n) })}
                     min={0}
                   />
                   <NumField
-                    label="Inside bend radius (mm)"
+                    label={t(`${ED}.insideRadiusMm`)}
                     value={form.global.insideRadiusMm}
                     onChange={(n) => patchGlobal({ insideRadiusMm: Math.max(0, n) })}
                     min={0}
                     step={0.01}
                   />
                   <NumField
-                    label="Quantity"
+                    label={t(`${ED}.quantity`)}
                     value={form.global.quantity}
                     onChange={(n) =>
                       patchGlobal({ quantity: Math.max(0, Math.floor(Number.isFinite(n) ? n : 0)) })
@@ -790,16 +844,20 @@ function BendPlateShapeEditor({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground font-normal">Material grade</Label>
+                    <Label className="text-xs text-muted-foreground font-normal">
+                      {t(`${ED}.materialGrade`)}
+                    </Label>
                     <Input
                       className="h-9 text-sm"
                       value={form.global.material}
                       onChange={(e) => patchGlobal({ material: e.target.value })}
-                      placeholder="e.g. S235"
+                      placeholder={t(`${ED}.materialPlaceholder`)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground font-normal">Finish</Label>
+                    <Label className="text-xs text-muted-foreground font-normal">
+                      {t(`${ED}.finish`)}
+                    </Label>
                     <Select
                       value={form.global.finish}
                       onValueChange={(v) => patchGlobal({ finish: v as PlateFinish })}
@@ -807,7 +865,7 @@ function BendPlateShapeEditor({
                       <SelectTrigger className="h-9">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent dir="rtl">
                         {PLATE_FINISH_OPTIONS.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
                             {t(`quote.finishLabels.${o.value}`)}
@@ -823,13 +881,13 @@ function BendPlateShapeEditor({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Template dimensions
+                      {t(`${ED}.templateDimsTitle`)}
                     </h2>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {form.template === "custom"
-                        ? "mm · turn after each segment (+ = CCW, − = CW); 0° = straight"
-                        : "mm · included angle between legs (side view); 180° = straight"}
-                    </p>
+                    {form.template === "custom" ? (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {t(`${ED}.templateDimsHintCustom`)}
+                      </p>
+                    ) : null}
                   </div>
                   <Button
                     type="button"
@@ -839,57 +897,67 @@ function BendPlateShapeEditor({
                     onClick={resetTemplateShape}
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
-                    Reset shape
+                    {t(`${ED}.resetShape`)}
                   </Button>
                 </div>
                 <TemplateFields form={form} setForm={setForm} />
               </div>
             </div>
-          </div>
-          <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] bg-card px-4 py-3 sm:px-5">
-            <Button type="button" variant="outline" className="gap-2" onClick={handleBackClick}>
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-            <Button type="button" className="gap-2" onClick={handleSaveClick}>
-              <Save className="h-4 w-4" />
-              Save
-            </Button>
-          </div>
-        </aside>
+            </div>
+          </aside>
 
-        <div className="flex w-3/5 min-w-0 min-h-0 flex-col overflow-hidden bg-background">
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="relative flex min-h-0 flex-1 overflow-hidden bg-[#0f1419] p-1.5 sm:p-2">
-              <ProfilePreview2D
-                pts={pts}
-                segments={profileSegmentDims}
-                bendAnglesDeg={profileBendAnglesDeg}
-                fill
-                className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
-              />
-            </div>
-            <div className="shrink-0 border-t border-border/80 bg-background px-3 py-2.5 sm:px-4 flex justify-center sm:justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                className="min-w-[8rem]"
-                onClick={() => setPreview3dOpen(true)}
-              >
-                Preview 3D
-              </Button>
+          <div className="flex w-3/5 min-h-0 min-w-0 flex-col overflow-hidden bg-background">
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="relative flex min-h-0 flex-1 overflow-hidden bg-[#0f1419] p-1.5 sm:p-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className={cn(
+                    "absolute left-2 top-2 z-10 gap-1.5 shadow-md sm:left-3 sm:top-3",
+                    "[color-scheme:dark]"
+                  )}
+                  onClick={() => setPreview3dOpen(true)}
+                >
+                  {t(`${ED}.preview3d`)}
+                </Button>
+                <ProfilePreview2D
+                  pts={pts}
+                  segments={profileSegmentDims}
+                  bendAnglesDeg={profileBendAnglesDeg}
+                  fill
+                  className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
+                />
+              </div>
             </div>
           </div>
+        </div>
+
+        <div
+          className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+          dir="ltr"
+        >
+          <Button type="button" className="gap-2" onClick={handleSaveClick}>
+            <Save className="h-4 w-4" aria-hidden />
+            {t(`${ED}.save`)}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="inline-flex flex-row gap-2"
+            onClick={handleBackClick}
+          >
+            <span>{t(`${ED}.back`)}</span>
+            <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+          </Button>
         </div>
       </div>
 
       <Dialog open={preview3dOpen} onOpenChange={setPreview3dOpen}>
-        <DialogContent className="max-w-[min(96vw,56rem)] gap-0 p-0">
-          <DialogHeader className="border-b border-white/[0.08] px-6 py-4 text-left">
-            <DialogTitle>3D preview</DialogTitle>
-            <DialogDescription className="text-sm">
-              Extruded profile — width matches plate width.
-            </DialogDescription>
+        <DialogContent className="max-w-[min(96vw,56rem)] gap-0 p-0" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="border-b border-white/[0.08] px-6 py-4 sm:text-start">
+            <DialogTitle>{t(`${ED}.preview3dTitle`)}</DialogTitle>
+            <DialogDescription className="text-sm">{t(`${ED}.preview3dDescription`)}</DialogDescription>
           </DialogHeader>
           <div className="relative min-h-[min(70vh,560px)] w-full bg-[#0f1419] p-4 sm:p-5">
             <ProfilePreview3D
@@ -900,50 +968,45 @@ function BendPlateShapeEditor({
               className="h-full min-h-[min(64vh,500px)] w-full rounded-md border-0 bg-transparent"
             />
           </div>
-          <DialogFooter className="border-t border-white/[0.08] px-6 py-3 sm:justify-end">
+          <DialogFooter className="border-t border-white/[0.08] px-6 py-3 sm:justify-start">
             <Button type="button" variant="outline" onClick={() => setPreview3dOpen(false)}>
-              Close
+              {t(`${ED}.close`)}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={saveValidationOpen} onOpenChange={setSaveValidationOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Complete fields first</DialogTitle>
-            <DialogDescription>
-              Fix the following before you can save this plate line.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${ED}.saveValidationTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${ED}.saveValidationDescription`)}</DialogDescription>
           </DialogHeader>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-foreground">
+          <ul className="list-disc space-y-1.5 ps-5 text-sm text-foreground">
             {saveValidationLines.map((line, i) => (
               <li key={i}>{line}</li>
             ))}
           </ul>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-start">
             <Button type="button" onClick={() => setSaveValidationOpen(false)}>
-              OK
+              {t(`${BP}.hubValidationOk`)}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={backConfirmOpen} onOpenChange={setBackConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Discard incomplete edits?</DialogTitle>
-            <DialogDescription>
-              Some values are still missing or invalid. Going back will discard your changes on this
-              plate.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>
+          <DialogHeader className="sm:text-start">
+            <DialogTitle>{t(`${ED}.editorBackTitle`)}</DialogTitle>
+            <DialogDescription>{t(`${ED}.editorBackDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
             <Button type="button" variant="outline" onClick={() => setBackConfirmOpen(false)}>
-              Cancel
+              {t(`${ED}.cancel`)}
             </Button>
             <Button type="button" variant="default" onClick={confirmBackDiscard}>
-              Discard and go back
+              {t(`${ED}.discardBack`)}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -962,24 +1025,24 @@ function TemplateFields({
   form: BendPlateFormState;
   setForm: Dispatch<SetStateAction<BendPlateFormState>>;
 }) {
-  const t = form.template;
+  const tmpl = form.template;
 
-  if (t === "l") {
+  if (tmpl === "l") {
     return (
       <div className="space-y-3">
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Leg A — bend
+            {t(`${ED}.l.legABend`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="A (mm)"
+              label={t(`${ED}.l.dimA`)}
               value={form.l.aMm}
               onChange={(n) => setForm((s) => ({ ...s, l: { ...s.l, aMm: Math.max(0, n) } }))}
               min={0}
             />
             <NumField
-              label="Included angle (°)"
+              label={t(`${ED}.l.includedAngle`)}
               value={form.l.angleDeg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -993,10 +1056,10 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Leg B
+            {t(`${ED}.l.legB`)}
           </p>
           <NumField
-            label="B (mm)"
+            label={t(`${ED}.l.dimB`)}
             value={form.l.bMm}
             onChange={(n) => setForm((s) => ({ ...s, l: { ...s.l, bMm: Math.max(0, n) } }))}
             min={0}
@@ -1006,17 +1069,17 @@ function TemplateFields({
     );
   }
 
-  if (t === "u") {
+  if (tmpl === "u") {
     const block = form.u;
     return (
       <div className="space-y-3">
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Leg A — bend 1
+            {t(`${ED}.u.legA`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="A (mm)"
+              label={t(`${ED}.u.dimA`)}
               value={block.aMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, u: { ...s.u, aMm: Math.max(0, n) } }))
@@ -1024,7 +1087,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 1 (°)"
+              label={t(`${ED}.u.includedAngle1`)}
               value={block.angle1Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1038,11 +1101,11 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Leg B — bend 2
+            {t(`${ED}.u.legB`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="B (mm)"
+              label={t(`${ED}.u.dimB`)}
               value={block.bMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, u: { ...s.u, bMm: Math.max(0, n) } }))
@@ -1050,7 +1113,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 2 (°)"
+              label={t(`${ED}.u.includedAngle2`)}
               value={block.angle2Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1064,10 +1127,10 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Leg C
+            {t(`${ED}.u.legC`)}
           </p>
           <NumField
-            label="C (mm)"
+            label={t(`${ED}.u.dimC`)}
             value={block.cMm}
             onChange={(n) =>
               setForm((s) => ({ ...s, u: { ...s.u, cMm: Math.max(0, n) } }))
@@ -1079,17 +1142,17 @@ function TemplateFields({
     );
   }
 
-  if (t === "z") {
+  if (tmpl === "z") {
     const block = form.z;
     return (
       <div className="space-y-3">
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Leg A — bend 1
+            {t(`${ED}.z.legA`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="A (mm)"
+              label={t(`${ED}.z.dimA`)}
               value={block.aMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, z: { ...s.z, aMm: Math.max(0, n) } }))
@@ -1097,7 +1160,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 1 (°)"
+              label={t(`${ED}.z.includedAngle1`)}
               value={block.angle1Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1111,11 +1174,11 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Leg B — bend 2
+            {t(`${ED}.z.legB`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="B (mm)"
+              label={t(`${ED}.z.dimB`)}
               value={block.bMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, z: { ...s.z, bMm: Math.max(0, n) } }))
@@ -1123,7 +1186,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 2 (°)"
+              label={t(`${ED}.z.includedAngle2`)}
               value={block.angle2Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1137,10 +1200,10 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Leg C
+            {t(`${ED}.z.legC`)}
           </p>
           <NumField
-            label="C (mm)"
+            label={t(`${ED}.z.dimC`)}
             value={block.cMm}
             onChange={(n) =>
               setForm((s) => ({ ...s, z: { ...s.z, cMm: Math.max(0, n) } }))
@@ -1152,17 +1215,17 @@ function TemplateFields({
     );
   }
 
-  if (t === "omega") {
+  if (tmpl === "omega") {
     const o = form.omega;
     return (
       <div className="space-y-3">
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Left flange A — bend 1
+            {t(`${ED}.omega.leftFlangeA`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="A (mm)"
+              label={t(`${ED}.omega.dimA`)}
               value={o.aMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, omega: { ...s.omega, aMm: Math.max(0, n) } }))
@@ -1170,7 +1233,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 1 (°)"
+              label={t(`${ED}.omega.angN`, { n: 1 })}
               value={o.angle1Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1184,11 +1247,11 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Left wall B — bend 2
+            {t(`${ED}.omega.leftWallB`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="B (mm)"
+              label={t(`${ED}.omega.dimB`)}
               value={o.bMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, omega: { ...s.omega, bMm: Math.max(0, n) } }))
@@ -1196,7 +1259,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 2 (°)"
+              label={t(`${ED}.omega.angN`, { n: 2 })}
               value={o.angle2Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1210,11 +1273,11 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Top C — bend 3
+            {t(`${ED}.omega.topC`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="C (mm)"
+              label={t(`${ED}.omega.dimC`)}
               value={o.cMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, omega: { ...s.omega, cMm: Math.max(0, n) } }))
@@ -1222,7 +1285,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 3 (°)"
+              label={t(`${ED}.omega.angN`, { n: 3 })}
               value={o.angle3Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1236,11 +1299,11 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Right wall D — bend 4
+            {t(`${ED}.omega.rightWallD`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="D (mm)"
+              label={t(`${ED}.omega.dimD`)}
               value={o.dMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, omega: { ...s.omega, dMm: Math.max(0, n) } }))
@@ -1248,7 +1311,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 4 (°)"
+              label={t(`${ED}.omega.angN`, { n: 4 })}
               value={o.angle4Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1262,10 +1325,10 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Right flange E
+            {t(`${ED}.omega.rightFlangeE`)}
           </p>
           <NumField
-            label="E (mm)"
+            label={t(`${ED}.omega.dimE`)}
             value={o.eMm}
             onChange={(n) =>
               setForm((s) => ({ ...s, omega: { ...s.omega, eMm: Math.max(0, n) } }))
@@ -1277,17 +1340,17 @@ function TemplateFields({
     );
   }
 
-  if (t === "gutter") {
+  if (tmpl === "gutter") {
     const g = form.gutter;
     return (
       <div className="space-y-3">
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Left lip A — bend 1
+            {t(`${ED}.gutter.leftLipA`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="A (mm)"
+              label={t(`${ED}.gutter.dimA`)}
               value={g.aMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, gutter: { ...s.gutter, aMm: Math.max(0, n) } }))
@@ -1295,7 +1358,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 1 (°)"
+              label={t(`${ED}.gutter.angN`, { n: 1 })}
               value={g.angle1Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1309,11 +1372,11 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Left wall B — bend 2
+            {t(`${ED}.gutter.leftWallB`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="B (mm)"
+              label={t(`${ED}.gutter.dimB`)}
               value={g.bMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, gutter: { ...s.gutter, bMm: Math.max(0, n) } }))
@@ -1321,7 +1384,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 2 (°)"
+              label={t(`${ED}.gutter.angN`, { n: 2 })}
               value={g.angle2Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1335,11 +1398,11 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Floor C — bend 3
+            {t(`${ED}.gutter.floorC`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="C (mm)"
+              label={t(`${ED}.gutter.dimC`)}
               value={g.cMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, gutter: { ...s.gutter, cMm: Math.max(0, n) } }))
@@ -1347,7 +1410,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 3 (°)"
+              label={t(`${ED}.gutter.angN`, { n: 3 })}
               value={g.angle3Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1361,11 +1424,11 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Right wall D — bend 4
+            {t(`${ED}.gutter.rightWallD`)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <NumField
-              label="D (mm)"
+              label={t(`${ED}.gutter.dimD`)}
               value={g.dMm}
               onChange={(n) =>
                 setForm((s) => ({ ...s, gutter: { ...s.gutter, dMm: Math.max(0, n) } }))
@@ -1373,7 +1436,7 @@ function TemplateFields({
               min={0}
             />
             <NumField
-              label="Included angle 4 (°)"
+              label={t(`${ED}.gutter.angN`, { n: 4 })}
               value={g.angle4Deg}
               onChange={(n) =>
                 setForm((s) => ({
@@ -1387,10 +1450,10 @@ function TemplateFields({
         </div>
         <div className={SEGMENT_DIM_BOX}>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Right lip E
+            {t(`${ED}.gutter.rightLipE`)}
           </p>
           <NumField
-            label="E (mm)"
+            label={t(`${ED}.gutter.dimE`)}
             value={g.eMm}
             onChange={(n) =>
               setForm((s) => ({ ...s, gutter: { ...s.gutter, eMm: Math.max(0, n) } }))
@@ -1402,13 +1465,13 @@ function TemplateFields({
     );
   }
 
-  if (t === "custom") {
+  if (tmpl === "custom") {
     const c = form.custom;
     const n = Math.min(7, Math.max(2, c.segmentCount));
     return (
       <div className="space-y-4">
         <div className="max-w-xs space-y-1.5">
-          <Label className="text-xs text-muted-foreground font-normal">Segment count</Label>
+          <Label className="text-xs text-muted-foreground font-normal">{t(`${ED}.segmentCount`)}</Label>
           <Select
             value={String(n)}
             onValueChange={(v) => {
@@ -1422,10 +1485,10 @@ function TemplateFields({
             <SelectTrigger className="h-9">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent dir="rtl">
               {[2, 3, 4, 5, 6, 7].map((x) => (
                 <SelectItem key={x} value={String(x)}>
-                  {x} segments
+                  {t(`${ED}.segmentsN`, { n: x })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1437,11 +1500,13 @@ function TemplateFields({
             return (
               <div key={`seg-${i}`} className={SEGMENT_DIM_BOX}>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {isLast ? `Segment ${i + 1} (end)` : `Segment ${i + 1} — bend`}
+                  {isLast
+                    ? t(`${ED}.segmentEnd`, { n: i + 1 })
+                    : t(`${ED}.segmentBend`, { n: i + 1 })}
                 </p>
                 {isLast ? (
                   <NumField
-                    label={`Length (mm)`}
+                    label={t(`${ED}.lengthMm`)}
                     value={c.segmentsMm[i] ?? 0}
                     onChange={(v) =>
                       setForm((s) => {
@@ -1456,7 +1521,7 @@ function TemplateFields({
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
                     <NumField
-                      label={`Segment ${i + 1} (mm)`}
+                      label={t(`${ED}.segmentLenLabel`, { n: i + 1 })}
                       value={c.segmentsMm[i] ?? 0}
                       onChange={(v) =>
                         setForm((s) => {
@@ -1469,7 +1534,7 @@ function TemplateFields({
                       min={0}
                     />
                     <NumField
-                      label={`Turn after (${i + 1}) (°)`}
+                      label={t(`${ED}.turnAfterDeg`, { n: i + 1 })}
                       value={c.anglesDeg[i] ?? 0}
                       onChange={(v) =>
                         setForm((s) => {

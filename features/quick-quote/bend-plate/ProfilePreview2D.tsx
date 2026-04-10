@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import type { Point2 } from "./geometry";
@@ -11,9 +11,10 @@ function formatDimMm(n: number): string {
   return Number.isInteger(r) ? formatInteger(Math.round(r)) : formatDecimal(r, 1);
 }
 
-function formatAngleDeg(n: number): string {
+/** Numeric part only for angle markup (degree sign drawn separately for even type). */
+function formatAngleDegMain(n: number): string {
   const r = Math.round(n * 10) / 10;
-  return Number.isInteger(r) ? `${formatInteger(Math.round(r))}°` : `${formatDecimal(r, 1)}°`;
+  return Number.isInteger(r) ? formatInteger(Math.round(r)) : formatDecimal(r, 1);
 }
 
 /** Circular arc from p + r*u1 to p + r*u2 along the shorter great-circle path (internal angle). */
@@ -52,8 +53,85 @@ function arcPathBetweenRays(
 /** Slate dimension strokes — same family as plate builder feature dims (`#64748b`). */
 const DIM_STROKE = "#94a3b8";
 const DIM_STROKE_MUTED = "#64748b";
-/** Bend angle arc / label — slightly warmer so it reads as angle vs length. */
-const ANGLE_STROKE = "#b4a892";
+/** Profile polyline + vertex markers (matches `<path stroke="…">`). */
+const PROFILE_STROKE = "hsl(142 70% 45%)";
+/**
+ * With `vectorEffect="non-scaling-stroke"`, keep this near 1–1.5 so the profile
+ * stays a thin hairline at any zoom — do not scale with viewBox (large values
+ * look comically thick on screen when the diagram is wide).
+ */
+const PROFILE_PATH_STROKE_WIDTH = 1.15;
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(Math.max(n, lo), hi);
+}
+
+/** On-screen px for ∠ label — tied to shorter leg at the bend, capped near segment label px. */
+function angleLabelFontUser(
+  legMinUser: number,
+  meetScale: number,
+  segmentLabelPx: number
+): number {
+  const legPx = legMinUser * meetScale;
+  const anglePx = clamp(
+    Math.min(legPx * 0.48, segmentLabelPx * 1.02),
+    3.55,
+    10.8
+  );
+  return anglePx / meetScale;
+}
+
+/** Optional per-vertex arc hairline (px) from shorter leg so the arc matches the corner scale. */
+function angleArcStrokePx(
+  legMinUser: number,
+  meetScale: number,
+  fallbackArcStrokePx: number
+): number {
+  const legPx = legMinUser * meetScale;
+  return clamp(Math.min(legPx * 0.045, fallbackArcStrokePx * 1.15), 0.62, 1.28);
+}
+
+/**
+ * Sizes annotations from how large the viewBox actually renders (meet scale), so labels and
+ * dim graphics stay ~constant *relative to the shape* and bounded in px (readable, never huge).
+ */
+function annotationStylesForView(
+  viewPxW: number,
+  viewPxH: number,
+  vbW: number,
+  vbH: number
+) {
+  const vw = Math.max(viewPxW, 1);
+  const vh = Math.max(viewPxH, 1);
+  const bw = Math.max(vbW, 1);
+  const bh = Math.max(vbH, 1);
+  const scale = Math.min(vw / bw, vh / bh);
+  const geomLongPx = Math.max(bw, bh) * scale;
+
+  const labelPx = clamp(geomLongPx * 0.0225, 10.5, 12.75);
+  const labelFontUser = labelPx / scale;
+  const segmentLabelFontUser = labelFontUser * 1.25 * 1.25;
+  const segmentLabelPx = segmentLabelFontUser * scale;
+
+  const dimStrokePx = clamp(geomLongPx * 0.002, 0.72, 1.12);
+  const extStrokePx = dimStrokePx * 0.92;
+  const dashLenPx = clamp(geomLongPx * 0.011, 3.2, 5.8);
+  const dashGapPx = clamp(geomLongPx * 0.0085, 2.4, 4.5);
+  const arcStrokePx = clamp(dimStrokePx * 1.05, 0.78, 1.18);
+  const nodePx = clamp(geomLongPx * 0.0068, 2.1, 3.6);
+  const nodeRadiusUser = nodePx / scale;
+
+  return {
+    meetScale: scale,
+    segmentLabelPx,
+    segmentLabelFontUser,
+    dimStrokePx,
+    extStrokePx,
+    dashArray: `${dashLenPx}px ${dashGapPx}px`,
+    arcStrokePx,
+    nodeRadiusUser,
+  };
+}
 
 export interface BendProfileSegmentDim {
   label: string;
@@ -78,27 +156,39 @@ export function ProfilePreview2D({
   className,
   fill,
 }: ProfilePreview2DProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [viewPx, setViewPx] = useState({ w: 320, h: 240 });
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const apply = (entry?: ResizeObserverEntry) => {
+      const cr = entry?.contentRect ?? el.getBoundingClientRect();
+      setViewPx({ w: cr.width, h: cr.height });
+    };
+    apply();
+    const ro = new ResizeObserver((entries) => apply(entries[0]));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const svg = useMemo(() => {
     if (pts.length < 2) {
       return {
         pathD: "",
         vb: "0 0 100 100",
-        strokeW: 0.8,
-        nodeR: 2,
+        vbW: 100,
+        vbH: 100,
+        strokeW: PROFILE_PATH_STROKE_WIDTH,
         ptsLocal: [] as Point2[],
         dimLayers: null as null | {
           extenders: { x1: number; y1: number; x2: number; y2: number }[];
           dimLines: { x1: number; y1: number; x2: number; y2: number }[];
           labels: { x: number; y: number; text: string; angle: number }[];
-          dimStrokeW: number;
-          dash: string;
-          fontSize: number;
         },
         angleMarkup: null as null | {
-          arcs: string[];
-          labels: { x: number; y: number; text: string }[];
-          arcStrokeW: number;
-          fontSize: number;
+          arcs: { path: string; legMin: number }[];
+          labels: { x: number; y: number; legMin: number; degMain: string }[];
         },
       };
     }
@@ -134,12 +224,8 @@ export function ProfilePreview2D({
       pts.length >= 3 &&
       bendAnglesDeg.length === pts.length - 2;
 
-    const rArc = Math.max(span0 * 0.045, 4);
-    const angleTextGap = Math.max(span0 * 0.055, 4);
-    const fsAngle = Math.max(span0 * 0.032, 2.4);
-
-    const arcData: { p: Point2; u1: Point2; u2: Point2; r: number }[] = [];
-    const angleLabelsRaw: { x: number; y: number; text: string }[] = [];
+    const arcData: { p: Point2; u1: Point2; u2: Point2; r: number; legMin: number }[] = [];
+    const angleLabelsRaw: { x: number; y: number; legMin: number; degMain: string }[] = [];
 
     const extenders: { x1: number; y1: number; x2: number; y2: number }[] = [];
     const dimLines: { x1: number; y1: number; x2: number; y2: number }[] = [];
@@ -147,10 +233,6 @@ export function ProfilePreview2D({
 
     const offset = Math.max(span0 * 0.09, 5);
     const textGap = Math.max(span0 * 0.055, 3.5);
-    const dimStrokeW = Math.max(span0 * 0.0018, 0.35);
-    const dashLen = Math.max(span0 * 0.014, 0.9);
-    const dashGap = Math.max(span0 * 0.01, 0.7);
-    const dash = `${dashLen} ${dashGap}`;
 
     if (showDims) {
       for (let i = 0; i < nSeg; i++) {
@@ -222,13 +304,22 @@ export function ProfilePreview2D({
         bx /= bl;
         by /= bl;
 
-        arcData.push({ p, u1, u2, r: rArc });
-        const tx = p.x + bx * (rArc + angleTextGap);
-        const ty = p.y + by * (rArc + angleTextGap);
+        const legMin = Math.min(lenIn, lenOut);
+        const rArcMax = legMin * 0.42;
+        const rArcLocal = clamp(legMin * 0.34, 2.5, rArcMax);
+        const angleTextGapLocal = Math.min(
+          Math.max(rArcLocal * 0.52, 2),
+          legMin * 0.2
+        );
+
+        arcData.push({ p, u1, u2, r: rArcLocal, legMin });
+        const tx = p.x + bx * (rArcLocal + angleTextGapLocal);
+        const ty = p.y + by * (rArcLocal + angleTextGapLocal);
         angleLabelsRaw.push({
           x: tx,
           y: ty,
-          text: `∠ ${formatAngleDeg(bendAnglesDeg![k])}`,
+          legMin,
+          degMain: formatAngleDegMain(bendAnglesDeg![k]),
         });
       }
     }
@@ -254,10 +345,12 @@ export function ProfilePreview2D({
       expand(d.x1, d.y1);
       expand(d.x2, d.y2);
     }
-    const fs = Math.max(span0 * 0.038, 2.8);
+    /** User-space bbox pad for labels (text is drawn in px; pad tracks mm span). */
+    const labelBoxUnit = Math.max(span0 * 0.04, 6);
+    const segLabelBox = 1.25 * 1.25;
     for (const lb of labels) {
-      const hw = lb.text.length * fs * 0.32;
-      const hh = fs * 0.65;
+      const hw = lb.text.length * labelBoxUnit * 0.32 * segLabelBox;
+      const hh = labelBoxUnit * 0.72 * segLabelBox;
       expand(lb.x - hw, lb.y - hh);
       expand(lb.x + hw, lb.y + hh);
     }
@@ -274,8 +367,10 @@ export function ProfilePreview2D({
       }
     }
     for (const lb of angleLabelsRaw) {
-      const hw = lb.text.length * fsAngle * 0.3;
-      const hh = fsAngle * 0.65;
+      const box = Math.max(lb.legMin * 0.4, 3);
+      const approxChars = 2 + lb.degMain.length + 1;
+      const hw = approxChars * box * 0.22;
+      const hh = box * 0.5;
       expand(lb.x - hw, lb.y - hh);
       expand(lb.x + hw, lb.y + hh);
     }
@@ -301,8 +396,7 @@ export function ProfilePreview2D({
       .join(" ");
 
     const shiftedPts = ptsLocal.map((p) => shift(p));
-    const strokeW = Math.max(vbW * 0.004, 0.8);
-    const nodeR = Math.max(vbW * 0.012, 1.2);
+    const strokeW = PROFILE_PATH_STROKE_WIDTH;
 
     const dimLayers =
       showDims && extenders.length > 0
@@ -325,9 +419,6 @@ export function ProfilePreview2D({
               text: lb.text,
               angle: lb.angle,
             })),
-            dimStrokeW,
-            dash,
-            fontSize: fs,
           }
         : null;
 
@@ -335,31 +426,37 @@ export function ProfilePreview2D({
       arcData.length > 0
         ? {
             arcs: arcData
-              .map((d) => arcPathBetweenRays(shift(d.p), d.u1, d.u2, d.r))
-              .filter((x): x is string => !!x),
+              .map((d) => {
+                const path = arcPathBetweenRays(shift(d.p), d.u1, d.u2, d.r);
+                return path ? { path, legMin: d.legMin } : null;
+              })
+              .filter((x): x is { path: string; legMin: number } => x !== null),
             labels: angleLabelsRaw.map((lb) => ({
               x: lb.x + shiftX,
               y: lb.y + shiftY,
-              text: lb.text,
+              legMin: lb.legMin,
+              degMain: lb.degMain,
             })),
-            arcStrokeW: Math.max(dimStrokeW * 1.15, 0.42),
-            fontSize: fsAngle,
           }
         : null;
 
     return {
       pathD,
       vb: `0 0 ${vbW.toFixed(2)} ${vbH.toFixed(2)}`,
+      vbW,
+      vbH,
       strokeW,
-      nodeR,
       ptsLocal: shiftedPts,
       dimLayers,
       angleMarkup,
     };
   }, [pts, segments, bendAnglesDeg]);
 
+  const ann = annotationStylesForView(viewPx.w, viewPx.h, svg.vbW, svg.vbH);
+
   return (
     <div
+      ref={wrapRef}
       className={cn(
         "flex items-center justify-center overflow-hidden",
         fill
@@ -375,6 +472,12 @@ export function ProfilePreview2D({
             ? "h-full w-full min-h-0 max-h-full max-w-full"
             : "max-h-[280px] w-full max-w-full"
         }
+        style={{
+          fontFamily:
+            'var(--font-noto-sans-hebrew), "Noto Sans Hebrew", sans-serif',
+          /* Do not inherit body letter-spacing (-2%) — it crams CAD dimension strings. */
+          letterSpacing: 0,
+        }}
         preserveAspectRatio="xMidYMid meet"
         aria-label="Side profile preview"
       >
@@ -392,9 +495,10 @@ export function ProfilePreview2D({
                       x2={e.x2}
                       y2={e.y2}
                       stroke={DIM_STROKE_MUTED}
-                      strokeWidth={dl.dimStrokeW}
-                      strokeDasharray={dl.dash}
-                      opacity={0.85}
+                      strokeWidth={`${ann.extStrokePx}px`}
+                      strokeDasharray={ann.dashArray}
+                      vectorEffect="non-scaling-stroke"
+                      opacity={0.92}
                     />
                   ))}
                   {dl.dimLines.map((e, i) => (
@@ -405,9 +509,10 @@ export function ProfilePreview2D({
                       x2={e.x2}
                       y2={e.y2}
                       stroke={DIM_STROKE}
-                      strokeWidth={dl.dimStrokeW}
-                      strokeDasharray={dl.dash}
-                      opacity={0.95}
+                      strokeWidth={`${ann.dimStrokePx}px`}
+                      strokeDasharray={ann.dashArray}
+                      vectorEffect="non-scaling-stroke"
+                      opacity={0.98}
                     />
                   ))}
                   {dl.labels.map((lb, i) => (
@@ -416,9 +521,10 @@ export function ProfilePreview2D({
                       x={lb.x}
                       y={lb.y}
                       fill={DIM_STROKE}
-                      fontSize={dl.fontSize}
+                      fontSize={ann.segmentLabelFontUser}
                       fontWeight={600}
-                      fontFamily="ui-sans-serif, system-ui, sans-serif"
+                      letterSpacing="0.06em"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
                       textAnchor="middle"
                       dominantBaseline="middle"
                       transform={`rotate(${lb.angle}, ${lb.x}, ${lb.y})`}
@@ -435,7 +541,7 @@ export function ProfilePreview2D({
           <path
             d={svg.pathD}
             fill="none"
-            stroke="hsl(142 70% 45%)"
+            stroke={PROFILE_STROKE}
             strokeWidth={svg.strokeW}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -444,15 +550,16 @@ export function ProfilePreview2D({
         ) : null}
         {svg.angleMarkup ? (
           <g aria-hidden>
-            {svg.angleMarkup.arcs.map((d, i) => (
+            {svg.angleMarkup.arcs.map((a, i) => (
               <path
                 key={`ang-arc-${i}`}
-                d={d}
+                d={a.path}
                 fill="none"
-                stroke={ANGLE_STROKE}
-                strokeWidth={svg.angleMarkup!.arcStrokeW}
+                stroke={DIM_STROKE}
+                strokeWidth={`${angleArcStrokePx(a.legMin, ann.meetScale, ann.arcStrokePx)}px`}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
                 opacity={0.95}
               />
             ))}
@@ -463,29 +570,37 @@ export function ProfilePreview2D({
             key={i}
             cx={p.x}
             cy={p.y}
-            r={svg.nodeR}
-            fill="hsl(210 15% 85%)"
-            stroke="hsl(142 70% 45%)"
-            strokeWidth={svg.nodeR * 0.15}
+            r={ann.nodeRadiusUser}
+            fill={PROFILE_STROKE}
           />
         ))}
         {svg.angleMarkup ? (
           <g aria-hidden>
-            {svg.angleMarkup.labels.map((lb, i) => (
-              <text
-                key={`ang-lbl-${i}`}
-                x={lb.x}
-                y={lb.y}
-                fill={ANGLE_STROKE}
-                fontSize={svg.angleMarkup!.fontSize}
-                fontWeight={600}
-                fontFamily="ui-sans-serif, system-ui, sans-serif"
-                textAnchor="middle"
-                dominantBaseline="middle"
-              >
-                {lb.text}
-              </text>
-            ))}
+            {svg.angleMarkup.labels.map((lb, i) => {
+              const angFu = angleLabelFontUser(lb.legMin, ann.meetScale, ann.segmentLabelPx);
+              return (
+                <text
+                  key={`ang-lbl-${i}`}
+                  x={lb.x}
+                  y={lb.y}
+                  fill={DIM_STROKE}
+                  fontSize={angFu}
+                  fontWeight={600}
+                  letterSpacing="0.03em"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  <tspan fontSize="0.82em">∠</tspan>
+                  <tspan fontSize="0.82em"> </tspan>
+                  <tspan fontWeight={700} fontSize="1em">
+                    {lb.degMain}
+                  </tspan>
+                  <tspan fontWeight={600} fontSize="0.72em">
+                    °
+                  </tspan>
+                </text>
+              );
+            })}
           </g>
         ) : null}
       </svg>

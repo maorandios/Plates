@@ -700,11 +700,6 @@ export function ExcelUploadStep({
   const uploadInputId =
     variant === "quoteImport" ? "excel-upload-quote-import" : "excel-upload";
 
-  const excelImportStripe = useMemo(() => {
-    if (variant !== "quoteImport") return "";
-    return t(`${EI}.stripeDataEntry`);
-  }, [variant]);
-
   const handleExcelReset = useCallback(() => {
     setPhaseResetConfirmOpen(true);
   }, []);
@@ -1477,14 +1472,6 @@ export function ExcelUploadStep({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-          <div
-            className="flex shrink-0 items-center gap-3 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4"
-            dir="rtl"
-          >
-            <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
-              {excelImportStripe}
-            </p>
-          </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
               {mainColumn}

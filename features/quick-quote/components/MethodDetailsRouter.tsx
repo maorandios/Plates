@@ -34,6 +34,7 @@ interface MethodDetailsRouterProps {
   onBendPlateAddItem: (item: BendPlateQuoteItem) => void;
   onBendPlateUpdateItem: (item: BendPlateQuoteItem) => void;
   onBendPlateRemoveItem: (id: string) => void;
+  onBendPlateResetAll: () => void;
   onDxfMethodGeometriesChange: (geometries: DxfPartGeometry[]) => void;
   dxfMethodGeometries: DxfPartGeometry[];
   dxfMethodExcel: DxfMethodExcelSnapshot | null;
@@ -54,6 +55,7 @@ export function MethodDetailsRouter({
   onBendPlateAddItem,
   onBendPlateUpdateItem,
   onBendPlateRemoveItem,
+  onBendPlateResetAll,
   onDxfMethodGeometriesChange,
   dxfMethodGeometries,
   dxfMethodExcel,
@@ -121,16 +123,19 @@ export function MethodDetailsRouter({
         </div>
       );
     case "bendPlate":
-      return shell(
-        <BendPlateQuotePhase
-          materialType={materialType}
-          quoteItems={bendPlateQuoteItems}
-          onAddItem={onBendPlateAddItem}
-          onUpdateItem={onBendPlateUpdateItem}
-          onRemoveItem={onBendPlateRemoveItem}
-          onBack={onBackToMethodPicker}
-          onComplete={onBackToMethodPicker}
-        />
+      return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <BendPlateQuotePhase
+            materialType={materialType}
+            quoteItems={bendPlateQuoteItems}
+            onAddItem={onBendPlateAddItem}
+            onUpdateItem={onBendPlateUpdateItem}
+            onRemoveItem={onBendPlateRemoveItem}
+            onResetAll={onBendPlateResetAll}
+            onBack={onBackToMethodPicker}
+            onComplete={onBackToMethodPicker}
+          />
+        </div>
       );
     default: {
       const _exhaustive: never = method;

@@ -10,6 +10,7 @@ interface BendPlateQuotePhaseProps {
   onAddItem: (item: BendPlateQuoteItem) => void;
   onUpdateItem: (item: BendPlateQuoteItem) => void;
   onRemoveItem: (id: string) => void;
+  onResetAll: () => void;
   onBack: () => void;
   onComplete: () => void;
 }
@@ -20,6 +21,7 @@ export function BendPlateQuotePhase({
   onAddItem,
   onUpdateItem,
   onRemoveItem,
+  onResetAll,
   onBack,
   onComplete,
 }: BendPlateQuotePhaseProps) {
@@ -30,6 +32,7 @@ export function BendPlateQuotePhase({
       onAddItem={onAddItem}
       onUpdateItem={onUpdateItem}
       onRemoveItem={onRemoveItem}
+      onResetAll={onResetAll}
       onBack={onBack}
       onComplete={onComplete}
     />

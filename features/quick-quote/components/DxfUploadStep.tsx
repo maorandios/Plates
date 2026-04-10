@@ -930,6 +930,15 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     });
   }, [metrics, onPhaseMetricsChange]);
 
+  const handleExportCompareXlsx = useCallback(() => {
+    if (!validationRows || validationRows.length === 0) return;
+    void downloadExcelDxfCompareXlsx(validationRows, {
+      projectName: excelExportProjectName,
+    }).catch((err) => {
+      console.error(err);
+    });
+  }, [validationRows, excelExportProjectName]);
+
   useEffect(() => {
     if (!onDxfNavStateChange) return;
     const canGoNext =
@@ -1016,14 +1025,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         !optionalExcelFile &&
         subStep === 1 &&
         !excelMappingModalOpen,
-      exportExcelDxfCompareXlsx: () => {
-        if (!validationRows || validationRows.length === 0) return;
-        void downloadExcelDxfCompareXlsx(validationRows, {
-          projectName: excelExportProjectName,
-        }).catch((err) => {
-          console.error(err);
-        });
-      },
+      exportExcelDxfCompareXlsx: handleExportCompareXlsx,
     }),
     [
       metrics.validParts,
@@ -1040,8 +1042,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       subStep,
       excelMappingModalOpen,
       excelCompareScreenOpen,
-      validationRows,
-      excelExportProjectName,
+      handleExportCompareXlsx,
     ]
   );
 
@@ -1546,7 +1547,12 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
           validationSummary &&
           validationRows &&
           validationRows.length > 0 ? (
-            <DxfExcelCompareScreen summary={validationSummary} rows={validationRows} />
+            <DxfExcelCompareScreen
+              summary={validationSummary}
+              rows={validationRows}
+              onExportXlsx={handleExportCompareXlsx}
+              exportXlsxDisabled={!validationRows?.length}
+            />
           ) : (
             <>
               {mappedExcelRows?.length &&

@@ -5,7 +5,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  FileDown,
   LayoutGrid,
   Package,
   RotateCcw,
@@ -193,30 +192,8 @@ export function DxfQuotePhase({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-          <div
-            className="flex shrink-0 items-center gap-3 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4"
-            dir="rtl"
-          >
-            <p className="min-w-0 flex-1 text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
-              {t("quote.dxfPhase.stripe")}
-            </p>
-            {dxfNavState?.isExcelCompareScreenOpen ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="shrink-0 gap-1.5 [color-scheme:dark]"
-                disabled={!dxfNavState?.canExportExcelDxfCompare}
-                onClick={() => dxfRef.current?.exportExcelDxfCompareXlsx()}
-              >
-                <FileDown className="h-4 w-4 shrink-0" aria-hidden />
-                {t("quote.dxfPhase.excelDxfCompare.exportXlsx")}
-              </Button>
-            ) : null}
-          </div>
-
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-0 sm:px-5 sm:pb-5">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
               <DxfUploadStep
                 ref={dxfRef}
                 materialType={materialType}
@@ -263,7 +240,19 @@ export function DxfQuotePhase({
               </>
             )}
           </Button>
-          {!dxfNavState?.isReviewStep ? (
+          {dxfNavState?.isExcelCompareScreenOpen ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="inline-flex flex-row gap-2"
+              onClick={() => {
+                dxfRef.current?.attemptBackWithinPhase();
+              }}
+            >
+              <span>{t("quote.dxfPhase.back")}</span>
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            </Button>
+          ) : !dxfNavState?.isReviewStep ? (
             <Button
               type="button"
               variant="outline"
