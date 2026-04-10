@@ -66,21 +66,6 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.min(Math.max(n, lo), hi);
 }
 
-/** On-screen px for ∠ label — tied to shorter leg at the bend, capped near segment label px. */
-function angleLabelFontUser(
-  legMinUser: number,
-  meetScale: number,
-  segmentLabelPx: number
-): number {
-  const legPx = legMinUser * meetScale;
-  const anglePx = clamp(
-    Math.min(legPx * 0.48, segmentLabelPx * 1.02),
-    3.55,
-    10.8
-  );
-  return anglePx / meetScale;
-}
-
 /** Optional per-vertex arc hairline (px) from shorter leg so the arc matches the corner scale. */
 function angleArcStrokePx(
   legMinUser: number,
@@ -111,7 +96,6 @@ function annotationStylesForView(
   const labelPx = clamp(geomLongPx * 0.0225, 10.5, 12.75);
   const labelFontUser = labelPx / scale;
   const segmentLabelFontUser = labelFontUser * 1.25 * 1.25;
-  const segmentLabelPx = segmentLabelFontUser * scale;
 
   const dimStrokePx = clamp(geomLongPx * 0.002, 0.72, 1.12);
   const extStrokePx = dimStrokePx * 0.92;
@@ -123,7 +107,6 @@ function annotationStylesForView(
 
   return {
     meetScale: scale,
-    segmentLabelPx,
     segmentLabelFontUser,
     dimStrokePx,
     extStrokePx,
@@ -305,10 +288,11 @@ export function ProfilePreview2D({
         by /= bl;
 
         const legMin = Math.min(lenIn, lenOut);
-        const rArcMax = legMin * 0.42;
-        const rArcLocal = clamp(legMin * 0.34, 2.5, rArcMax);
+        /** Arc radius ÷2 vs previous (0.42/0.34 caps) — smaller tick between the two segments. */
+        const rArcMax = legMin * 0.21;
+        const rArcLocal = clamp(legMin * 0.17, 1.25, rArcMax);
         const angleTextGapLocal = Math.min(
-          Math.max(rArcLocal * 0.52, 2),
+          Math.max(rArcLocal * 0.52, 1.2),
           legMin * 0.2
         );
 
@@ -367,10 +351,9 @@ export function ProfilePreview2D({
       }
     }
     for (const lb of angleLabelsRaw) {
-      const box = Math.max(lb.legMin * 0.4, 3);
-      const approxChars = 2 + lb.degMain.length + 1;
-      const hw = approxChars * box * 0.22;
-      const hh = box * 0.5;
+      const approxChars = lb.degMain.length + 1;
+      const hw = approxChars * labelBoxUnit * 0.32 * segLabelBox;
+      const hh = labelBoxUnit * 0.72 * segLabelBox;
       expand(lb.x - hw, lb.y - hh);
       expand(lb.x + hw, lb.y + hh);
     }
@@ -576,31 +559,25 @@ export function ProfilePreview2D({
         ))}
         {svg.angleMarkup ? (
           <g aria-hidden>
-            {svg.angleMarkup.labels.map((lb, i) => {
-              const angFu = angleLabelFontUser(lb.legMin, ann.meetScale, ann.segmentLabelPx);
-              return (
-                <text
-                  key={`ang-lbl-${i}`}
-                  x={lb.x}
-                  y={lb.y}
-                  fill={DIM_STROKE}
-                  fontSize={angFu}
-                  fontWeight={600}
-                  letterSpacing="0.03em"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                >
-                  <tspan fontSize="0.82em">∠</tspan>
-                  <tspan fontSize="0.82em"> </tspan>
-                  <tspan fontWeight={700} fontSize="1em">
-                    {lb.degMain}
-                  </tspan>
-                  <tspan fontWeight={600} fontSize="0.72em">
-                    °
-                  </tspan>
-                </text>
-              );
-            })}
+            {svg.angleMarkup.labels.map((lb, i) => (
+              <text
+                key={`ang-lbl-${i}`}
+                x={lb.x}
+                y={lb.y}
+                fill={DIM_STROKE}
+                fontSize={ann.segmentLabelFontUser}
+                fontWeight={600}
+                letterSpacing="0.06em"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                <tspan fontWeight={700}>{lb.degMain}</tspan>
+                <tspan fontWeight={600} fontSize="0.9em">
+                  °
+                </tspan>
+              </text>
+            ))}
           </g>
         ) : null}
       </svg>

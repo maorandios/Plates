@@ -512,8 +512,11 @@ function BendPlateHub({
                           <TableHead className="min-w-[100px] py-2 pe-3 ps-3 text-xs font-medium">
                             {t(`${BP}.colFinish`)}
                           </TableHead>
-                          <TableHead className="min-w-[5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
-                            {t(`${BP}.colActions`)}
+                          <TableHead className="min-w-[4.5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
+                            {t(`${BP}.colEdit`)}
+                          </TableHead>
+                          <TableHead className="min-w-[4.5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
+                            {t(`${BP}.colDelete`)}
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -559,7 +562,7 @@ function BendPlateHub({
                                 {t(`quote.finishLabels.${it.global.finish}`)}
                               </TableCell>
                               <TableCell className="py-2 pe-2 ps-2">
-                                <div className="flex items-center justify-center gap-1">
+                                <div className="flex justify-center">
                                   <Button
                                     type="button"
                                     variant="ghost"
@@ -570,6 +573,10 @@ function BendPlateHub({
                                   >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-2 pe-2 ps-2">
+                                <div className="flex justify-center">
                                   <Button
                                     type="button"
                                     variant="ghost"
@@ -968,7 +975,7 @@ function BendPlateShapeEditor({
               className="h-full min-h-[min(64vh,500px)] w-full rounded-md border-0 bg-transparent"
             />
           </div>
-          <DialogFooter className="border-t border-white/[0.08] px-6 py-3 sm:justify-start">
+          <DialogFooter className="border-t border-white/[0.08] px-6 py-3">
             <Button type="button" variant="outline" onClick={() => setPreview3dOpen(false)}>
               {t(`${ED}.close`)}
             </Button>
