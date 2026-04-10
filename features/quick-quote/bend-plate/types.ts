@@ -1,11 +1,10 @@
-import type { PlateFinish } from "../lib/plateFields";
-
 export type BendTemplateId = "l" | "u" | "z" | "omega" | "gutter" | "custom";
 
 export interface BendPlateGlobalParams {
   /** Steel grade / designation (e.g. S235). */
   material: string;
-  finish: PlateFinish;
+  /** גימור label from Settings (e.g. ללא). Legacy carbon|galvanized|paint normalized on load). */
+  finish: string;
   thicknessMm: number;
   plateWidthMm: number;
   insideRadiusMm: number;

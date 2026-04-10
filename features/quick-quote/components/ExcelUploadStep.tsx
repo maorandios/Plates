@@ -54,6 +54,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { MaterialType } from "@/types/materials";
+import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
@@ -65,12 +66,11 @@ import {
 } from "@/lib/parsers/excelParser";
 import type { ColumnMapping, ExcelRow } from "@/types";
 import type { ExcelHeadersResult } from "@/lib/parsers/excelParser";
+import { defaultMaterialGradeForFamily } from "../lib/plateFields";
 import {
-  DEFAULT_PLATE_FINISH,
-  PLATE_FINISH_OPTIONS,
-  defaultMaterialGradeForFamily,
-  type PlateFinish,
-} from "../lib/plateFields";
+  normalizeFinishFromImport,
+  selectOptionsWithCurrent,
+} from "../lib/materialSettingsOptions";
 import type { ManualQuotePartRow } from "../types/quickQuote";
 import {
   excelRowsToManualQuoteRows,
@@ -276,14 +276,6 @@ function parseCellNumber(raw: string): number | undefined {
   if (!t) return undefined;
   const n = parseFloat(t.replace(",", "."));
   return Number.isFinite(n) ? n : undefined;
-}
-
-function finishStringToPlateFinish(s: string | undefined): PlateFinish {
-  const v = (s ?? "").trim().toLowerCase();
-  if (v === "galvanized" || v === "paint" || v === "carbon") return v;
-  if (v.includes("galvan")) return "galvanized";
-  if (v.includes("paint")) return "paint";
-  return DEFAULT_PLATE_FINISH;
 }
 
 const QUOTE_IMPORT_PHASE_VIEWPORT =
@@ -626,6 +618,14 @@ export function ExcelUploadStep({
     [quoteImportMaterialType]
   );
 
+  const quoteImportMaterialConfig = useMemo(
+    () =>
+      quoteImportMaterialType != null
+        ? getMaterialConfig(quoteImportMaterialType)
+        : null,
+    [quoteImportMaterialType]
+  );
+
   const quoteImportPreviewPart = useMemo(() => {
     if (!importPreviewRowId || !parsedRows || !quoteImportMaterialType) return null;
     const row = parsedRows.find((r) => r.id === importPreviewRowId);
@@ -660,9 +660,22 @@ export function ExcelUploadStep({
       lengthMm: row.length ?? 0,
       totalWeightKg,
       totalAreaM2,
-      finish: finishStringToPlateFinish(row.finish),
+      finish:
+        quoteImportMaterialType && quoteImportMaterialConfig
+          ? normalizeFinishFromImport(
+              quoteImportMaterialType,
+              row.finish,
+              quoteImportMaterialConfig
+            )
+          : (row.finish ?? "").trim(),
     };
-  }, [importPreviewRowId, parsedRows, quoteImportDensityKgPerM3]);
+  }, [
+    importPreviewRowId,
+    parsedRows,
+    quoteImportDensityKgPerM3,
+    quoteImportMaterialType,
+    quoteImportMaterialConfig,
+  ]);
 
   useEffect(() => {
     if (variant !== "quoteImport" || subStep !== 3 || !onQuoteImportRowsChange) return;
@@ -1105,7 +1118,6 @@ export function ExcelUploadStep({
                   </TableHeader>
                   <TableBody>
                     {parsedRows.map((row) => {
-                      const finishVal = finishStringToPlateFinish(row.finish);
                       const rho =
                         quoteImportDensityKgPerM3 != null &&
                         Number.isFinite(quoteImportDensityKgPerM3)
@@ -1117,6 +1129,14 @@ export function ExcelUploadStep({
                       );
                       const matDisplay =
                         (row.material ?? "").trim() || quoteImportDefaultMaterialGrade;
+                      const finishDisplay =
+                        quoteImportMaterialType && quoteImportMaterialConfig
+                          ? normalizeFinishFromImport(
+                              quoteImportMaterialType,
+                              row.finish,
+                              quoteImportMaterialConfig
+                            )
+                          : (row.finish ?? "").trim();
                       const canPreview =
                         (row.width ?? 0) > 0 && (row.length ?? 0) > 0;
                       return (
@@ -1194,35 +1214,69 @@ export function ExcelUploadStep({
                             {totalAreaM2 > 0 ? formatDecimal(totalAreaM2, 4) : "—"}
                           </TableCell>
                           <TableCell className="py-2 pe-3 ps-3">
-                            <Input
-                              className="h-8 min-w-[7rem] [color-scheme:dark]"
-                              value={matDisplay}
-                              placeholder={t(`${DXF_RV}.gradePlaceholder`)}
-                              onChange={(e) =>
-                                patchParsedRow(row.id, { material: e.target.value })
-                              }
-                            />
+                            {quoteImportMaterialType && quoteImportMaterialConfig ? (
+                              <Select
+                                value={matDisplay}
+                                onValueChange={(v) =>
+                                  patchParsedRow(row.id, { material: v })
+                                }
+                              >
+                                <SelectTrigger className="h-8 min-w-[7rem] max-w-[200px] [color-scheme:dark]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {selectOptionsWithCurrent(
+                                    quoteImportMaterialConfig.enabledGrades,
+                                    matDisplay
+                                  ).map((g) => (
+                                    <SelectItem key={g} value={g}>
+                                      {g}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                className="h-8 min-w-[7rem] [color-scheme:dark]"
+                                value={matDisplay}
+                                placeholder={t(`${DXF_RV}.gradePlaceholder`)}
+                                onChange={(e) =>
+                                  patchParsedRow(row.id, { material: e.target.value })
+                                }
+                              />
+                            )}
                           </TableCell>
                           <TableCell className="py-2 pe-3 ps-3">
-                            <Select
-                              value={finishVal}
-                              onValueChange={(v) =>
-                                patchParsedRow(row.id, {
-                                  finish: v as PlateFinish,
-                                })
-                              }
-                            >
-                              <SelectTrigger className="h-8 w-[140px] [color-scheme:dark]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {PLATE_FINISH_OPTIONS.map((o) => (
-                                  <SelectItem key={o.value} value={o.value}>
-                                    {t(`quote.finishLabels.${o.value}`)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            {quoteImportMaterialType && quoteImportMaterialConfig ? (
+                              <Select
+                                value={finishDisplay}
+                                onValueChange={(v) =>
+                                  patchParsedRow(row.id, { finish: v })
+                                }
+                              >
+                                <SelectTrigger className="h-8 w-[160px] max-w-[220px] [color-scheme:dark]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {selectOptionsWithCurrent(
+                                    quoteImportMaterialConfig.enabledFinishes,
+                                    finishDisplay
+                                  ).map((f) => (
+                                    <SelectItem key={f} value={f}>
+                                      {f}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                className="h-8 w-[140px] [color-scheme:dark]"
+                                value={(row.finish ?? "").trim()}
+                                onChange={(e) =>
+                                  patchParsedRow(row.id, { finish: e.target.value })
+                                }
+                              />
+                            )}
                           </TableCell>
                           <TableCell className="py-2 pe-3 ps-3">
                             <button
@@ -1603,9 +1657,7 @@ export function ExcelUploadStep({
                             key: "finish",
                             icon: Palette,
                             label: t("quote.dxfPhase.partPreviewModal.finish"),
-                            value: t(
-                              `quote.finishLabels.${excelImportPreviewStats.finish}`
-                            ),
+                            value: excelImportPreviewStats.finish,
                           },
                           {
                             key: "thickness",

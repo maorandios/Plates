@@ -66,12 +66,13 @@ import { formatDecimal } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import { parseDxfFile } from "@/lib/parsers/dxfParser";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
+import { defaultMaterialGradeForFamily } from "../lib/plateFields";
 import {
-  DEFAULT_PLATE_FINISH,
-  PLATE_FINISH_OPTIONS,
-  defaultMaterialGradeForFamily,
-  type PlateFinish,
-} from "../lib/plateFields";
+  normalizeFinishFromImport,
+  normalizeStoredReviewFinish,
+  phase2DefaultFinish,
+  selectOptionsWithCurrent,
+} from "../lib/materialSettingsOptions";
 import { PlateGeometryCanvas } from "@/components/parts/PlateGeometryCanvas";
 import type { DxfPartGeometry, ExcelRow } from "@/types";
 import type { MaterialType } from "@/types/materials";
@@ -233,8 +234,8 @@ interface DxfFileUpload {
   thicknessMm: number;
   /** Review table: material grade (editable; seeded from DXF after parse). */
   materialGrade: string;
-  /** Review table: finish (editable; default carbon = “Carbon steel”). */
-  finish: PlateFinish;
+  /** Review table: גימור (settings labels). */
+  finish: string;
 }
 
 /**
@@ -254,7 +255,7 @@ function restoredGeometriesToUploads(
       lastModified: Date.now(),
     });
     const qty = Math.max(1, Math.floor(Number(g.reviewQuantity ?? 1)) || 1);
-    const finish = (g.reviewFinish as PlateFinish) ?? DEFAULT_PLATE_FINISH;
+    const finish = normalizeStoredReviewFinish(g.reviewFinish, materialType);
     return {
       file,
       content: "",
@@ -519,13 +520,14 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     setNoExcelDefaultsBannerDismissed(true);
   }, []);
 
+  const materialConfig = useMemo(() => getMaterialConfig(materialType), [materialType]);
+
   const previewPartStats = useMemo(() => {
     if (previewUploadIndex === null) return null;
     const upload = uploadedFiles[previewUploadIndex];
     const geom = upload?.parsed?.processedGeometry;
     if (!geom || !upload) return null;
     const bbox = geom.boundingBox;
-    const materialConfig = getMaterialConfig(materialType);
     const densityKgPerM3 = materialConfig.densityKgPerM3;
     const thMm = clampPositiveThicknessMm(upload.thicknessMm);
     const unitWeightKg =
@@ -554,7 +556,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       totalAreaM2,
       finish: upload.finish,
     };
-  }, [previewUploadIndex, uploadedFiles, materialType]);
+  }, [previewUploadIndex, uploadedFiles, materialConfig]);
 
   useEffect(() => {
     if (previewUploadIndex === null) return;
@@ -612,7 +614,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
             quantity: 1,
             thicknessMm: DXF_QUOTE_DEFAULT_THICKNESS_MM,
             materialGrade: "",
-            finish: "carbon" satisfies PlateFinish,
+            finish: phase2DefaultFinish(materialType),
           };
         })
       );
@@ -623,7 +625,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         error instanceof Error ? error.message : "Failed to read DXF files"
       );
     }
-  }, []);
+  }, [materialType]);
 
   const handleFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1703,7 +1705,6 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                       const geom = upload.parsed?.processedGeometry;
                       const bbox = geom?.boundingBox;
 
-                      const materialConfig = getMaterialConfig(materialType);
                       const densityKgPerM3 = materialConfig.densityKgPerM3;
                       const thMm = clampPositiveThicknessMm(upload.thicknessMm);
                       const unitWeightKg =
@@ -1806,33 +1807,56 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                             {geom?.preparation?.manufacturing?.cutInner?.length ?? 0}
                           </TableCell>
                           <TableCell>
-                            <Input
-                              className="h-8 min-w-[7rem] [color-scheme:dark]"
-                              value={upload.materialGrade}
-                              onChange={(e) =>
-                                updateUploadRow(index, {
-                                  materialGrade: e.target.value,
-                                })
-                              }
-                              placeholder={t("quote.dxfPhase.dxfReviewTable.gradePlaceholder")}
-                            />
-                          </TableCell>
-                          <TableCell>
                             <Select
-                              value={upload.finish}
+                              value={
+                                upload.materialGrade.trim() ||
+                                defaultMaterialGradeForFamily(materialType)
+                              }
                               onValueChange={(v) =>
-                                updateUploadRow(index, {
-                                  finish: v as PlateFinish,
-                                })
+                                updateUploadRow(index, { materialGrade: v })
                               }
                             >
-                              <SelectTrigger className="h-8 w-[140px] [color-scheme:dark]">
+                              <SelectTrigger className="h-8 min-w-[7rem] max-w-[200px] [color-scheme:dark]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {PLATE_FINISH_OPTIONS.map((o) => (
-                                  <SelectItem key={o.value} value={o.value}>
-                                    {t(`quote.finishLabels.${o.value}`)}
+                                {selectOptionsWithCurrent(
+                                  materialConfig.enabledGrades,
+                                  upload.materialGrade.trim() ||
+                                    defaultMaterialGradeForFamily(materialType)
+                                ).map((g) => (
+                                  <SelectItem key={g} value={g}>
+                                    {g}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={normalizeFinishFromImport(
+                                materialType,
+                                upload.finish,
+                                materialConfig
+                              )}
+                              onValueChange={(v) =>
+                                updateUploadRow(index, { finish: v })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[160px] max-w-[220px] [color-scheme:dark]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectOptionsWithCurrent(
+                                  materialConfig.enabledFinishes,
+                                  normalizeFinishFromImport(
+                                    materialType,
+                                    upload.finish,
+                                    materialConfig
+                                  )
+                                ).map((f) => (
+                                  <SelectItem key={f} value={f}>
+                                    {f}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1966,7 +1990,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                             key: "finish",
                             icon: Palette,
                             label: t("quote.dxfPhase.partPreviewModal.finish"),
-                            value: t(`quote.finishLabels.${previewPartStats.finish}`),
+                            value: previewPartStats.finish,
                           },
                           {
                             key: "thickness",

@@ -9,11 +9,8 @@ import {
   materialPricingRowKey,
   parseMaterialPricePerKg,
 } from "../job-overview/materialCalculations";
-import {
-  DEFAULT_PLATE_FINISH,
-  formatMaterialGradeAndFinish,
-  parsePlateFinishFromLabelOrValue,
-} from "./plateFields";
+import { formatMaterialGradeAndFinish } from "./plateFields";
+import { normalizeFinishFromImport } from "./materialSettingsOptions";
 import type { QuotePartRow } from "../types/quickQuote";
 
 export type FinalizeDraftLineItem = {
@@ -56,9 +53,11 @@ export function recalcFinalizeLineMetrics(
   const unitWeightKg = unitAreaM2 * (t / 1000) * rho;
   const lineWeightKg = unitWeightKg * q;
 
-  const finish =
-    parsePlateFinishFromLabelOrValue(row.finish) ?? DEFAULT_PLATE_FINISH;
-  const material = formatMaterialGradeAndFinish(row.material_grade, finish);
+  const finishLabel = normalizeFinishFromImport(
+    materialType,
+    row.finish.trim() || undefined
+  );
+  const material = formatMaterialGradeAndFinish(row.material_grade, finishLabel);
   const forKey: QuotePartRow = {
     id: "__finalize__",
     partName: row.part_number,

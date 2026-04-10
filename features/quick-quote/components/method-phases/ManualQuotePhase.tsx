@@ -43,12 +43,12 @@ import { nanoid } from "@/lib/utils/nanoid";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import type { MaterialType } from "@/types/materials";
+import { defaultMaterialGradeForFamily } from "../../lib/plateFields";
 import {
-  DEFAULT_PLATE_FINISH,
-  PLATE_FINISH_OPTIONS,
-  defaultMaterialGradeForFamily,
-} from "../../lib/plateFields";
-import type { PlateFinish } from "../../lib/plateFields";
+  normalizeFinishFromImport,
+  phase2DefaultFinish,
+  selectOptionsWithCurrent,
+} from "../../lib/materialSettingsOptions";
 import type { ManualQuotePartRow } from "../../types/quickQuote";
 import {
   computeManualQuoteMetrics,
@@ -84,7 +84,7 @@ function createRow(materialType: MaterialType): ManualQuotePartRow {
     lengthMm: 0,
     quantity: 0,
     material: defaultMaterialGradeForFamily(materialType),
-    finish: DEFAULT_PLATE_FINISH,
+    finish: phase2DefaultFinish(materialType),
     sourceMethod: "manualAdd",
     clientPartLabel: "",
   };
@@ -398,30 +398,55 @@ export function ManualQuotePhase({
                                   : "—"}
                               </TableCell>
                               <TableCell className="py-2 pe-3 ps-3">
-                                <Input
-                                  className="h-8 min-w-[7rem] text-sm [color-scheme:dark]"
-                                  value={row.material}
-                                  onChange={(e) =>
-                                    patchRow(row.id, { material: e.target.value })
-                                  }
-                                  placeholder={t(`${MP}.gradePlaceholder`)}
-                                  aria-label={t(`${MP}.ariaMaterial`)}
-                                />
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3">
                                 <Select
-                                  value={row.finish}
-                                  onValueChange={(v) =>
-                                    patchRow(row.id, { finish: v as PlateFinish })
+                                  value={
+                                    (row.material || "").trim() ||
+                                    defaultMaterialGradeForFamily(materialType)
                                   }
+                                  onValueChange={(v) => patchRow(row.id, { material: v })}
                                 >
-                                  <SelectTrigger className="h-8 w-[140px] text-sm [color-scheme:dark]">
+                                  <SelectTrigger
+                                    className="h-8 min-w-[7rem] max-w-[200px] text-sm [color-scheme:dark]"
+                                    aria-label={t(`${MP}.ariaMaterial`)}
+                                  >
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {PLATE_FINISH_OPTIONS.map((o) => (
-                                      <SelectItem key={o.value} value={o.value}>
-                                        {t(`quote.finishLabels.${o.value}`)}
+                                    {selectOptionsWithCurrent(
+                                      materialConfig.enabledGrades,
+                                      (row.material || "").trim() ||
+                                        defaultMaterialGradeForFamily(materialType)
+                                    ).map((g) => (
+                                      <SelectItem key={g} value={g}>
+                                        {g}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell className="py-2 pe-3 ps-3">
+                                <Select
+                                  value={normalizeFinishFromImport(
+                                    materialType,
+                                    row.finish,
+                                    materialConfig
+                                  )}
+                                  onValueChange={(v) => patchRow(row.id, { finish: v })}
+                                >
+                                  <SelectTrigger className="h-8 w-[160px] max-w-[220px] text-sm [color-scheme:dark]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {selectOptionsWithCurrent(
+                                      materialConfig.enabledFinishes,
+                                      normalizeFinishFromImport(
+                                        materialType,
+                                        row.finish,
+                                        materialConfig
+                                      )
+                                    ).map((f) => (
+                                      <SelectItem key={f} value={f}>
+                                        {f}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>

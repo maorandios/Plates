@@ -1,7 +1,5 @@
 import type { ExcelRow } from "@/types";
 import type { BendTemplateId } from "../bend-plate/types";
-import type { PlateFinish } from "../lib/plateFields";
-
 /**
  * Optional Excel BOM attached to the DXF quote method — persisted in parent so returning after
  * Complete restores the file + mapping alongside approved DXF geometries.
@@ -32,7 +30,8 @@ export interface ManualQuotePartRow {
   quantity: number;
   /** Steel grade / designation (e.g. S235). */
   material: string;
-  finish: PlateFinish;
+  /** גימור label from Settings (e.g. ללא, גלוון חם). */
+  finish: string;
   /**
    * Which quote method created this row — used when merging several methods into one BOM.
    */

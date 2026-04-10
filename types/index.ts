@@ -175,8 +175,8 @@ export interface DxfPartGeometry {
   processedGeometry: ProcessedGeometry | null;
   /** Quick Quote DXF review step: BOM quantity (default 1 when omitted). */
   reviewQuantity?: number;
-  /** Quick Quote DXF review step: plate finish (default carbon when omitted). */
-  reviewFinish?: "carbon" | "galvanized" | "paint";
+  /** Quick Quote DXF review step: גימור (settings label); legacy values carbon|galvanized|paint are normalized on load). */
+  reviewFinish?: string;
   /** Quick Quote DXF review step: plate thickness (mm); merged from Excel BOM when mapped. */
   reviewThicknessMm?: number;
 }

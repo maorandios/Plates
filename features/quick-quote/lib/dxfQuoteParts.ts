@@ -1,11 +1,8 @@
 import type { DxfPartGeometry } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import type { QuotePartRow } from "../types/quickQuote";
-import {
-  DEFAULT_PLATE_FINISH,
-  defaultMaterialGradeForFamily,
-  formatMaterialGradeAndFinish,
-} from "./plateFields";
+import { defaultMaterialGradeForFamily, formatMaterialGradeAndFinish } from "./plateFields";
+import { normalizeStoredReviewFinish } from "./materialSettingsOptions";
 
 /** Default plate thickness (mm) when quoting from DXF area only (matches {@link DxfUploadStep}). */
 export const DXF_QUOTE_DEFAULT_THICKNESS_MM = 2;
@@ -53,7 +50,7 @@ export function dxfGeometriesToQuoteParts(
             ? "warning"
             : "valid";
       const qty = Math.max(1, Math.floor(g.reviewQuantity ?? 1) || 1);
-      const finish = g.reviewFinish ?? DEFAULT_PLATE_FINISH;
+      const finish = normalizeStoredReviewFinish(g.reviewFinish, materialType);
 
       return {
         id: g.id,

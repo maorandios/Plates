@@ -93,7 +93,7 @@ export function ManualPartPreviewDialog({
                           key: "finish",
                           icon: Palette,
                           label: t("quote.dxfPhase.partPreviewModal.finish"),
-                          value: t(`quote.finishLabels.${row.finish}`),
+                          value: row.finish,
                         },
                         {
                           key: "thickness",

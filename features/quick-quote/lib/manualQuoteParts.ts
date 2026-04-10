@@ -1,12 +1,10 @@
 import type { ExcelRow } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import {
-  DEFAULT_PLATE_FINISH,
   defaultMaterialGradeForFamily,
   formatMaterialGradeAndFinish,
-  parsePlateFinishFromLabelOrValue,
-  plateFinishLabel,
 } from "./plateFields";
+import { normalizeFinishFromImport } from "./materialSettingsOptions";
 import { QUOTE_METHOD_LABEL } from "./mergeQuotePlates";
 import type { QuotePartRow } from "../types/quickQuote";
 import type { ManualQuotePartRow } from "../types/quickQuote";
@@ -117,7 +115,7 @@ export function excelRowsToManualQuoteRows(
       lengthMm: r.length ?? 0,
       quantity: Math.max(1, Math.floor(r.quantity) || 1),
       material: (r.material ?? "").trim() || defaultMaterialGradeForFamily(materialType),
-      finish: parsePlateFinishFromLabelOrValue(r.finish) ?? DEFAULT_PLATE_FINISH,
+      finish: normalizeFinishFromImport(materialType, r.finish),
       sourceMethod: "excelImport",
       clientPartLabel: partNumber,
     };
@@ -142,7 +140,7 @@ export function manualQuoteRowsToRestoredExcelRows(
     material: (r.material ?? "").trim() || defaultMat,
     width: r.widthMm > 0 ? r.widthMm : undefined,
     length: r.lengthMm > 0 ? r.lengthMm : undefined,
-    finish: plateFinishLabel(r.finish),
+    finish: r.finish,
     rawRow: {},
   }));
 }

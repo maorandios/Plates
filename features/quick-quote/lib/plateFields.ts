@@ -12,6 +12,13 @@ export const PLATE_FINISH_OPTIONS: { value: PlateFinish; label: string }[] = [
 
 export const DEFAULT_PLATE_FINISH: PlateFinish = "carbon";
 
+/** Legacy quick-quote finish codes → Settings גימור labels (carbon default is now \"ללא\"). */
+export const LEGACY_PLATE_FINISH_TO_SETTINGS_FINISH: Record<PlateFinish, string> = {
+  carbon: "ללא",
+  galvanized: "גלוון חם",
+  paint: "צבוע",
+};
+
 function finishLabelKey(f: PlateFinish): string {
   return `quote.finishLabels.${f}`;
 }
@@ -19,7 +26,9 @@ function finishLabelKey(f: PlateFinish): string {
 /** Default material grade label for the selected material family (General step). */
 export function defaultMaterialGradeForFamily(materialType: MaterialType): string {
   if (materialType === "carbonSteel") return "S235";
-  return "";
+  if (materialType === "aluminum") return "1015";
+  if (materialType === "stainlessSteel") return "304";
+  return "S235";
 }
 
 export function plateFinishLabel(finish: PlateFinish | undefined): string {
@@ -46,14 +55,23 @@ export function parsePlateFinishFromLabelOrValue(
   return undefined;
 }
 
-/** Single line for quote tables / BOM-style display. */
+/** Single line for quote tables / BOM-style display (finish = settings label or legacy code). */
 export function formatMaterialGradeAndFinish(
   grade: string,
-  finish?: PlateFinish
+  finish?: string | PlateFinish
 ): string {
   const g = grade.trim() || "—";
-  const f = finish ?? DEFAULT_PLATE_FINISH;
-  return `${g} · ${plateFinishLabel(f)}`;
+  let f: string;
+  if (finish == null || finish === "") {
+    f = "ללא";
+  } else if (finish === "carbon" || finish === "galvanized" || finish === "paint") {
+    f = LEGACY_PLATE_FINISH_TO_SETTINGS_FINISH[finish];
+  } else if (typeof finish === "string") {
+    f = finish.trim() || "ללא";
+  } else {
+    f = LEGACY_PLATE_FINISH_TO_SETTINGS_FINISH[finish];
+  }
+  return `${g} · ${f}`;
 }
 
 /** Split a {@link formatMaterialGradeAndFinish} string back into grade and finish labels. */

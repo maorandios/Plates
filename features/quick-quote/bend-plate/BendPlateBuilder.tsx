@@ -51,12 +51,13 @@ import { nanoid } from "@/lib/utils/nanoid";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { type MaterialType } from "@/types/materials";
+import { getMaterialConfig } from "@/lib/settings/materialConfig";
+import { defaultMaterialGradeForFamily } from "../lib/plateFields";
 import {
-  DEFAULT_PLATE_FINISH,
-  PLATE_FINISH_OPTIONS,
-  defaultMaterialGradeForFamily,
-  type PlateFinish,
-} from "../lib/plateFields";
+  normalizeFinishFromImport,
+  phase2DefaultFinish,
+  selectOptionsWithCurrent,
+} from "../lib/materialSettingsOptions";
 import type {
   BendPlateFormState,
   BendPlateQuoteItem,
@@ -97,6 +98,14 @@ const TEMPLATE_IDS_SHAPE_PICKER: BendTemplateId[] = [
 
 function templateLabel(id: BendTemplateId): string {
   return t(`${BP}.template.${id}.name`);
+}
+
+/** Hub / labels: legacy PlateFinish codes → i18n; settings Hebrew strings pass through. */
+function bendPlateFinishDisplay(finish: string): string {
+  if (finish === "carbon" || finish === "galvanized" || finish === "paint") {
+    return t(`quote.finishLabels.${finish}`);
+  }
+  return finish;
 }
 
 function bendEditorValidationMessages(form: BendPlateFormState): string[] {
@@ -294,7 +303,7 @@ export function BendPlateBuilder({
         global: {
           ...next.global,
           material: defaultMaterialGradeForFamily(materialType),
-          finish: next.global.finish ?? DEFAULT_PLATE_FINISH,
+          finish: phase2DefaultFinish(materialType),
         },
       };
     });
@@ -305,13 +314,12 @@ export function BendPlateBuilder({
     (item: BendPlateQuoteItem) => {
       setEditingId(item.id);
       setForm(() => {
-        const next = formStateFromQuoteItem(item);
+        const next = formStateFromQuoteItem(item, materialType);
         return {
           ...next,
           global: {
             ...next.global,
             material: next.global.material || defaultMaterialGradeForFamily(materialType),
-            finish: next.global.finish ?? DEFAULT_PLATE_FINISH,
           },
         };
       });
@@ -343,6 +351,7 @@ export function BendPlateBuilder({
   if (screen === "editor") {
     return (
       <BendPlateShapeEditor
+        materialType={materialType}
         form={form}
         setForm={setForm}
         pts={pts}
@@ -559,7 +568,7 @@ function BendPlateHub({
                                 {it.global.material || "—"}
                               </TableCell>
                               <TableCell className="py-2 pe-3 ps-3 text-sm text-muted-foreground whitespace-nowrap">
-                                {t(`quote.finishLabels.${it.global.finish}`)}
+                                {bendPlateFinishDisplay(it.global.finish)}
                               </TableCell>
                               <TableCell className="py-2 pe-2 ps-2">
                                 <div className="flex justify-center">
@@ -739,6 +748,7 @@ function BendPlateHub({
 }
 
 function BendPlateShapeEditor({
+  materialType,
   form,
   setForm,
   pts,
@@ -748,6 +758,7 @@ function BendPlateShapeEditor({
   onComplete,
   onCancel,
 }: {
+  materialType: MaterialType;
   form: BendPlateFormState;
   setForm: Dispatch<SetStateAction<BendPlateFormState>>;
   pts: Point2[];
@@ -783,6 +794,16 @@ function BendPlateShapeEditor({
   const [saveValidationOpen, setSaveValidationOpen] = useState(false);
   const [saveValidationLines, setSaveValidationLines] = useState<string[]>([]);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
+
+  const materialConfig = useMemo(() => getMaterialConfig(materialType), [materialType]);
+
+  const gradeSelectValue =
+    (form.global.material || "").trim() || defaultMaterialGradeForFamily(materialType);
+  const finishSelectValue = normalizeFinishFromImport(
+    materialType,
+    form.global.finish,
+    materialConfig
+  );
 
   const handleSaveClick = useCallback(() => {
     const codes = getBendEditorValidationIssueCodes(form);
@@ -854,28 +875,43 @@ function BendPlateShapeEditor({
                     <Label className="text-xs text-muted-foreground font-normal">
                       {t(`${ED}.materialGrade`)}
                     </Label>
-                    <Input
-                      className="h-9 text-sm"
-                      value={form.global.material}
-                      onChange={(e) => patchGlobal({ material: e.target.value })}
-                      placeholder={t(`${ED}.materialPlaceholder`)}
-                    />
+                    <Select
+                      value={gradeSelectValue}
+                      onValueChange={(v) => patchGlobal({ material: v })}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent dir="rtl">
+                        {selectOptionsWithCurrent(
+                          materialConfig.enabledGrades,
+                          gradeSelectValue
+                        ).map((g) => (
+                          <SelectItem key={g} value={g}>
+                            {g}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground font-normal">
                       {t(`${ED}.finish`)}
                     </Label>
                     <Select
-                      value={form.global.finish}
-                      onValueChange={(v) => patchGlobal({ finish: v as PlateFinish })}
+                      value={finishSelectValue}
+                      onValueChange={(v) => patchGlobal({ finish: v })}
                     >
-                      <SelectTrigger className="h-9">
+                      <SelectTrigger className="h-9 max-w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent dir="rtl">
-                        {PLATE_FINISH_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {t(`quote.finishLabels.${o.value}`)}
+                        {selectOptionsWithCurrent(
+                          materialConfig.enabledFinishes,
+                          finishSelectValue
+                        ).map((f) => (
+                          <SelectItem key={f} value={f}>
+                            {f}
                           </SelectItem>
                         ))}
                       </SelectContent>

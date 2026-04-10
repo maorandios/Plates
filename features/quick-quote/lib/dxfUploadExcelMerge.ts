@@ -2,12 +2,15 @@ import type { ExcelRow } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import { normalizeName } from "@/lib/matching/matcher";
 import { defaultMaterialGradeForFamily } from "./plateFields";
+import { normalizeFinishFromImport } from "./materialSettingsOptions";
 
 /** Row shape used while parsing DXF in {@link DxfUploadStep} before merge. */
 export type DxfUploadRowForMerge = {
   file: { name: string };
   parsed: { guessedPartName: string; materialGrade?: string } | null;
   materialGrade: string;
+  /** גימור (settings label); Excel BOM can set when row matches. */
+  finish: string;
   quantity: number;
   /** Plate thickness (mm); default before merge; Excel can overwrite when mapped. */
   thicknessMm: number;
@@ -64,6 +67,10 @@ export function mergeExcelIntoDxfUploads<T extends DxfUploadRowForMerge>(
     if (best) {
       const qty = Math.max(1, Math.floor(Number(best.quantity)) || 1);
       const mat = (best.material || "").trim() || fromDxf;
+      const finExcel = (best.finish || "").trim();
+      const nextFinish = finExcel
+        ? normalizeFinishFromImport(materialType, finExcel)
+        : upload.finish;
       const thickFromExcel =
         typeof best.thickness === "number" &&
         Number.isFinite(best.thickness) &&
@@ -74,6 +81,7 @@ export function mergeExcelIntoDxfUploads<T extends DxfUploadRowForMerge>(
         ...upload,
         quantity: qty,
         materialGrade: mat,
+        finish: nextFinish,
         thicknessMm: thickFromExcel,
       } as T;
     }

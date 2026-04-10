@@ -1,5 +1,6 @@
-import { DEFAULT_PLATE_FINISH } from "../lib/plateFields";
+import type { MaterialType } from "@/types/materials";
 import { internalAngleToTurnDeg } from "./geometry";
+import { normalizeStoredReviewFinish } from "../lib/materialSettingsOptions";
 import type { BendPlateFormState, BendPlateQuoteItem, BendTemplateId } from "./types";
 
 function roundAngleDeg(n: number): number {
@@ -88,7 +89,7 @@ function migrateLegacyHatQuoteToForm(
     global: {
       ...base.global,
       ...global,
-      finish: global.finish ?? DEFAULT_PLATE_FINISH,
+      finish: String(global.finish ?? ""),
     },
     custom: {
       segmentCount: 5,
@@ -135,7 +136,7 @@ export function createDefaultBendPlateFormState(): BendPlateFormState {
     template: "l",
     global: {
       material: "",
-      finish: DEFAULT_PLATE_FINISH,
+      finish: "",
       thicknessMm: 0,
       plateWidthMm: 0,
       insideRadiusMm: 0,
@@ -180,7 +181,10 @@ export function createFormStateForTemplate(template: BendTemplateId): BendPlateF
 }
 
 /** Rehydrate editor state from a saved quote line (edit). */
-export function formStateFromQuoteItem(item: BendPlateQuoteItem): BendPlateFormState {
+export function formStateFromQuoteItem(
+  item: BendPlateQuoteItem,
+  materialType: MaterialType
+): BendPlateFormState {
   const legacy = item as unknown as {
     template?: string;
     hat?: {
@@ -198,7 +202,14 @@ export function formStateFromQuoteItem(item: BendPlateQuoteItem): BendPlateFormS
     bendAngleSemantic?: BendPlateQuoteItem["bendAngleSemantic"];
   };
   if (legacy.template === "hat" && legacy.hat) {
-    return migrateLegacyHatQuoteToForm(legacy.global, legacy.hat, legacy.bendAngleSemantic);
+    const migrated = migrateLegacyHatQuoteToForm(legacy.global, legacy.hat, legacy.bendAngleSemantic);
+    return {
+      ...migrated,
+      global: {
+        ...migrated.global,
+        finish: normalizeStoredReviewFinish(migrated.global.finish, materialType),
+      },
+    };
   }
 
   const def = createDefaultBendPlateFormState();
@@ -215,7 +226,7 @@ export function formStateFromQuoteItem(item: BendPlateQuoteItem): BendPlateFormS
     template: item.template,
     global: {
       ...item.global,
-      finish: item.global.finish ?? DEFAULT_PLATE_FINISH,
+      finish: normalizeStoredReviewFinish(item.global.finish, materialType),
     },
     l: { ...item.l },
     u: { ...item.u },
