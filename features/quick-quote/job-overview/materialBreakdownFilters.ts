@@ -1,6 +1,10 @@
 import { thicknessGroupKey } from "@/lib/nesting/stockConfiguration";
+import { t } from "@/lib/i18n";
+import { splitMaterialGradeAndFinish } from "../lib/plateFields";
 import type { QuotePartRow, ThicknessStockInput } from "../types/quickQuote";
 import { buildMaterialBreakdown, stockLinesForThickness } from "./jobOverview.utils";
+
+const QA = "quote.quantityAnalysis" as const;
 
 export const MATERIAL_FILTER_ALL = "__all__";
 
@@ -11,12 +15,13 @@ function safeQty(p: QuotePartRow): number {
   return typeof q === "number" && Number.isFinite(q) ? Math.max(0, Math.round(q)) : 0;
 }
 
-/** Unique material grades from parts (trimmed), sorted. */
+/** Unique material grades from parts (סיווג only; גימור excluded), sorted. */
 export function uniqueMaterialGrades(parts: QuotePartRow[]): string[] {
   const set = new Set<string>();
   for (const p of parts) {
-    const m = (p.material || "—").trim() || "—";
-    set.add(m);
+    const raw = (p.material || "—").trim() || "—";
+    const { grade } = splitMaterialGradeAndFinish(raw);
+    set.add(grade);
   }
   return [...set].sort((a, b) => a.localeCompare(b));
 }
@@ -35,7 +40,9 @@ export function uniqueThicknessOptions(
   return [...byKey.entries()]
     .map(([key, v]) => ({
       key,
-      label: `${v.thicknessMm} mm`,
+      label: t(`${QA}.filterThicknessOptionMm`, {
+        n: String(v.thicknessMm),
+      }),
       thicknessMm: v.thicknessMm,
     }))
     .sort((a, b) => a.thicknessMm - b.thicknessMm);
@@ -122,7 +129,11 @@ export function filterPartsForMaterialBreakdown(
   let out = parts;
 
   if (filters.materialKey !== MATERIAL_FILTER_ALL) {
-    out = out.filter((p) => ((p.material || "—").trim() || "—") === filters.materialKey);
+    out = out.filter((p) => {
+      const raw = (p.material || "—").trim() || "—";
+      const { grade } = splitMaterialGradeAndFinish(raw);
+      return grade === filters.materialKey;
+    });
   }
 
   if (filters.thicknessKey !== MATERIAL_FILTER_ALL) {

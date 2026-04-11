@@ -132,8 +132,8 @@
       "utilBandLow": "יעילות נמוכה",
       "utilBandModerate": "יעילות בינונית",
       "utilBandGood": "יעילות טובה",
-      "materialSectionTitle": "פילוח חומר",
-      "materialSectionIntro": "ללא מסננים, הגרפים מציגים שורה אחת לכל עובי (כל הסיווגים ומידות הלוח יחד). כשמסננים לפי סיווג, עובי או מידת לוח — כל שורה היא ריצת קינון נפרדת. איפוס מסיר את המסננים.",
+      "materialSectionTitle": "ניתוח גראפי חומר גלם",
+      "materialSectionIntro": "סקירת החומר גלם הדרוש בפילוח לפי קטגוריות",
       "statStockLines": "שורות מלאי",
       "statStockLinesSubFiltered": "סיווג × עובי × מידת לוח",
       "statStockLinesSubRollup": "לפי עובי (הכל משולב)",
@@ -144,10 +144,11 @@
       "statGrossStockSub": "שטח לוחות שנרכשו (אריזה)",
       "filterMaterial": "סיווג חומר",
       "filterThickness": "עובי",
-      "filterSheetSize": "מידת לוח",
+      "filterSheetSize": "מידת פלטת מלאי",
+      "filterThicknessOptionMm": "{{n}} מ״מ",
       "filterAllGrades": "כל הסיווגים",
       "filterAllThicknesses": "כל העוביים",
-      "filterAllSheets": "כל מידות הלוח",
+      "filterAllSheets": "כל מידות פלטת המלאי",
       "filterNoStockSizes": "אין מידות מלאי",
       "resetChart": "איפוס תרשים",
       "emptyFiltered": "אין חלקים שמתאימים למסננים. שינוי או איפוס.",
@@ -208,7 +209,8 @@
       "unitKg": "ק״ג",
       "unitM2": "מ״ר",
       "unitM": "מ׳",
-      "unitCutLengthLaser": "מ״א"
+      "unitCutLengthLaser": "מ״א",
+      "unitMm": "מ״מ"
     },
     "methods": {
       "dxf": {

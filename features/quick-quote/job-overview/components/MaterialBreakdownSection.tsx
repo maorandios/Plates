@@ -17,7 +17,6 @@ import type { QuotePartRow, ThicknessStockInput } from "../../types/quickQuote";
 import {
   aggregateStockSheetBreakdownByThickness,
   buildStockSheetSizeBreakdown,
-  formatAreaM2,
 } from "../jobOverview.utils";
 import {
   filterPartsForMaterialBreakdown,
@@ -26,6 +25,7 @@ import {
   uniqueMaterialGrades,
   uniqueSheetSizeOptions,
   uniqueThicknessOptions,
+  type SheetSizeOption,
   type MaterialBreakdownViewFilters,
 } from "../materialBreakdownFilters";
 import { MaterialBreakdownBarChart } from "./MaterialBreakdownBarChart";
@@ -47,26 +47,10 @@ interface MaterialBreakdownSectionProps {
   currencyCode: string;
 }
 
-function StatCard({
-  title,
-  value,
-  subtext,
-}: {
-  title: string;
-  value: string;
-  subtext: string;
-}) {
-  return (
-    <div className="rounded-xl border-0 bg-card px-4 py-4 shadow-sm">
-      <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-        {title}
-      </p>
-      <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground mt-1.5">
-        {value}
-      </p>
-      <p className="text-xs text-muted-foreground mt-1 leading-snug">{subtext}</p>
-    </div>
-  );
+function formatStockSheetOptionLabel(s: SheetSizeOption): string {
+  const l = Math.round(s.lengthMm);
+  const w = Math.round(s.widthMm);
+  return `${l.toLocaleString("he-IL")} × ${w.toLocaleString("he-IL")} ${t(`${QA}.unitMm`)}`;
 }
 
 export function MaterialBreakdownSection({
@@ -103,20 +87,6 @@ export function MaterialBreakdownSection({
     return detailStockRows;
   }, [detailStockRows, filtersActive]);
 
-  const stockTotals = useMemo(() => {
-    let gross = 0;
-    let sheets = 0;
-    for (const r of stockRows) {
-      gross += r.grossStockAreaM2;
-      sheets += r.sheetCount;
-    }
-    return {
-      grossStockAreaM2: gross,
-      sheetCount: sheets,
-      sizeCount: stockRows.length,
-    };
-  }, [stockRows]);
-
   const filtered = filtersActive;
 
   function resetFilters() {
@@ -126,6 +96,126 @@ export function MaterialBreakdownSection({
   const scopeLabel = filtered
     ? t(`${QA}.chartScopeFiltered`)
     : t(`${QA}.chartScopeFull`);
+
+  const filterGrid = (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="space-y-1.5 min-w-0">
+        <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
+          {t(`${QA}.filterMaterial`)}
+        </span>
+        <Select
+          value={filters.materialKey}
+          onValueChange={(v) =>
+            setFilters((f) => ({ ...f, materialKey: v }))
+          }
+        >
+          <SelectTrigger
+            className={cn(
+              "h-10 w-full font-normal",
+              filters.materialKey !== MATERIAL_FILTER_ALL &&
+                "ring-2 ring-foreground/15 border-foreground/25"
+            )}
+          >
+            <SelectValue placeholder={t(`${QA}.filterAllGrades`)} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={MATERIAL_FILTER_ALL}>
+              {t(`${QA}.filterAllGrades`)}
+            </SelectItem>
+            {materialOptions.map((m) => (
+              <SelectItem key={m} value={m}>
+                {m}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5 min-w-0">
+        <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
+          {t(`${QA}.filterThickness`)}
+        </span>
+        <Select
+          value={filters.thicknessKey}
+          onValueChange={(v) =>
+            setFilters((f) => ({ ...f, thicknessKey: v }))
+          }
+        >
+          <SelectTrigger
+            className={cn(
+              "h-10 w-full font-normal",
+              filters.thicknessKey !== MATERIAL_FILTER_ALL &&
+                "ring-2 ring-foreground/15 border-foreground/25"
+            )}
+          >
+            <SelectValue placeholder={t(`${QA}.filterAllThicknesses`)} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={MATERIAL_FILTER_ALL}>
+              {t(`${QA}.filterAllThicknesses`)}
+            </SelectItem>
+            {thicknessOptions.map((opt) => (
+              <SelectItem key={opt.key} value={opt.key}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5 min-w-0">
+        <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
+          {t(`${QA}.filterSheetSize`)}
+        </span>
+        <Select
+          value={filters.sheetKey}
+          onValueChange={(v) =>
+            setFilters((f) => ({ ...f, sheetKey: v }))
+          }
+          disabled={sheetOptions.length === 0}
+        >
+          <SelectTrigger
+            className={cn(
+              "h-10 w-full font-normal",
+              filters.sheetKey !== MATERIAL_FILTER_ALL &&
+                "ring-2 ring-foreground/15 border-foreground/25"
+            )}
+          >
+            <SelectValue
+              placeholder={
+                sheetOptions.length === 0
+                  ? t(`${QA}.filterNoStockSizes`)
+                  : t(`${QA}.filterAllSheets`)
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={MATERIAL_FILTER_ALL}>
+              {t(`${QA}.filterAllSheets`)}
+            </SelectItem>
+            {sheetOptions.map((s) => (
+              <SelectItem key={s.key} value={s.key}>
+                {formatStockSheetOptionLabel(s)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5 flex items-end">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 w-full gap-2 font-normal"
+          onClick={resetFilters}
+          disabled={!filtered}
+        >
+          <RotateCcw className="h-4 w-4 shrink-0" />
+          {t(`${QA}.resetChart`)}
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <section className="space-y-6" dir="rtl">
@@ -138,172 +228,38 @@ export function MaterialBreakdownSection({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StatCard
-          title={t(`${QA}.statStockLines`)}
-          value={String(stockTotals.sizeCount)}
-          subtext={
-            filtered
-              ? t(`${QA}.statStockLinesSubFiltered`)
-              : t(`${QA}.statStockLinesSubRollup`)
-          }
-        />
-        <StatCard
-          title={t(`${QA}.statTotalSheets`)}
-          value={stockTotals.sheetCount.toLocaleString("he-IL")}
-          subtext={
-            filtered
-              ? t(`${QA}.statTotalSheetsSubFiltered`)
-              : t(`${QA}.statTotalSheetsSubFull`)
-          }
-        />
-        <StatCard
-          title={t(`${QA}.statGrossStock`)}
-          value={formatAreaM2(stockTotals.grossStockAreaM2)}
-          subtext={t(`${QA}.statGrossStockSub`)}
-        />
-      </div>
-
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 flex-1 min-w-0">
-          <div className="space-y-1.5 min-w-0">
-            <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
-              {t(`${QA}.filterMaterial`)}
-            </span>
-            <Select
-              value={filters.materialKey}
-              onValueChange={(v) =>
-                setFilters((f) => ({ ...f, materialKey: v }))
-              }
-            >
-              <SelectTrigger
-                className={cn(
-                  "h-10 w-full font-normal",
-                  filters.materialKey !== MATERIAL_FILTER_ALL &&
-                    "ring-2 ring-foreground/15 border-foreground/25"
-                )}
-              >
-                <SelectValue placeholder={t(`${QA}.filterAllGrades`)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={MATERIAL_FILTER_ALL}>
-                  {t(`${QA}.filterAllGrades`)}
-                </SelectItem>
-                {materialOptions.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5 min-w-0">
-            <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
-              {t(`${QA}.filterThickness`)}
-            </span>
-            <Select
-              value={filters.thicknessKey}
-              onValueChange={(v) =>
-                setFilters((f) => ({ ...f, thicknessKey: v }))
-              }
-            >
-              <SelectTrigger
-                className={cn(
-                  "h-10 w-full font-normal",
-                  filters.thicknessKey !== MATERIAL_FILTER_ALL &&
-                    "ring-2 ring-foreground/15 border-foreground/25"
-                )}
-              >
-                <SelectValue placeholder={t(`${QA}.filterAllThicknesses`)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={MATERIAL_FILTER_ALL}>
-                  {t(`${QA}.filterAllThicknesses`)}
-                </SelectItem>
-                {thicknessOptions.map((t) => (
-                  <SelectItem key={t.key} value={t.key}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5 min-w-0">
-            <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
-              {t(`${QA}.filterSheetSize`)}
-            </span>
-            <Select
-              value={filters.sheetKey}
-              onValueChange={(v) =>
-                setFilters((f) => ({ ...f, sheetKey: v }))
-              }
-              disabled={sheetOptions.length === 0}
-            >
-              <SelectTrigger
-                className={cn(
-                  "h-10 w-full font-normal",
-                  filters.sheetKey !== MATERIAL_FILTER_ALL &&
-                    "ring-2 ring-foreground/15 border-foreground/25"
-                )}
-              >
-                <SelectValue
-                  placeholder={
-                    sheetOptions.length === 0
-                      ? "No stock sizes"
-                      : "All sheet sizes"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={MATERIAL_FILTER_ALL}>All sheet sizes</SelectItem>
-                {sheetOptions.map((s) => (
-                  <SelectItem key={s.key} value={s.key}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5 flex items-end">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 w-full gap-2 font-normal"
-              onClick={resetFilters}
-              disabled={!filtered}
-            >
-              <RotateCcw className="h-4 w-4 shrink-0" />
-              {t(`${QA}.resetChart`)}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <Card className="shadow-sm overflow-hidden">
-        <CardContent className="p-3 sm:p-4">
-          {stockRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-white/15 rounded-xl leading-relaxed px-2">
-              {filteredParts.length === 0
-                ? t(`${QA}.emptyFiltered`)
-                : !thicknessStockProvided
-                  ? t(`${QA}.emptyNoStock`)
-                  : t(`${QA}.emptyNoNesting`)}
-            </p>
-          ) : (
-            <Tabs defaultValue="bars" className="w-full">
-              <TabsList className="mb-3 grid w-full grid-cols-2 sm:inline-flex sm:w-auto sm:max-w-full">
-                <TabsTrigger value="bars" className="gap-2">
-                  <BarChart3 className="h-4 w-4 shrink-0" aria-hidden />
-                  {t(`${QA}.tabColumns`)}
-                </TabsTrigger>
-                <TabsTrigger value="table" className="gap-2">
-                  <Table2 className="h-4 w-4 shrink-0" aria-hidden />
-                  {t(`${QA}.tabTable`)}
-                </TabsTrigger>
-              </TabsList>
+      {stockRows.length === 0 ? (
+        <>
+          {filterGrid}
+          <Card className="shadow-sm overflow-hidden">
+            <CardContent className="p-3 sm:p-4">
+              <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-white/15 rounded-xl leading-relaxed px-2">
+                {filteredParts.length === 0
+                  ? t(`${QA}.emptyFiltered`)
+                  : !thicknessStockProvided
+                    ? t(`${QA}.emptyNoStock`)
+                    : t(`${QA}.emptyNoNesting`)}
+              </p>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <Tabs defaultValue="bars" dir="rtl" className="w-full space-y-6">
+          {filterGrid}
+          <Card className="shadow-sm overflow-hidden">
+            <CardContent className="p-3 sm:p-4">
+              <div className="mb-3 flex w-full justify-center">
+                <TabsList className="inline-flex h-10 w-auto max-w-full gap-1">
+                  <TabsTrigger value="bars" className="gap-2 px-4">
+                    <BarChart3 className="h-4 w-4 shrink-0" aria-hidden />
+                    {t(`${QA}.tabColumns`)}
+                  </TabsTrigger>
+                  <TabsTrigger value="table" className="gap-2 px-4">
+                    <Table2 className="h-4 w-4 shrink-0" aria-hidden />
+                    {t(`${QA}.tabTable`)}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
               <TabsContent value="bars" className="mt-0">
                 <MaterialBreakdownBarChart
                   key={`bars-${filters.materialKey}-${filters.thicknessKey}-${filters.sheetKey}`}
@@ -320,10 +276,10 @@ export function MaterialBreakdownSection({
                   groupedByThickness={!filtered}
                 />
               </TabsContent>
-            </Tabs>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </Tabs>
+      )}
     </section>
   );
 }

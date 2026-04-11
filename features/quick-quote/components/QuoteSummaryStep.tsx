@@ -59,18 +59,18 @@ export function QuoteSummaryStep({
 
           <Separator />
 
-          <NestingPreviewSection
-            parts={parts}
-            thicknessStock={thicknessStock}
-          />
-
-          <Separator />
-
           <MaterialBreakdownSection
             parts={parts}
             thicknessStock={thicknessStock}
             thicknessStockProvided={thicknessStockProvided}
             currencyCode={jobDetails.currency}
+          />
+
+          <Separator />
+
+          <NestingPreviewSection
+            parts={parts}
+            thicknessStock={thicknessStock}
           />
         </div>
       </div>

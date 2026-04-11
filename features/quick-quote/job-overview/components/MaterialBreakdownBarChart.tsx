@@ -18,6 +18,11 @@ import type { StockSheetSizeBreakdownRow } from "../jobOverview.types";
 
 const QA = "quote.quantityAnalysis" as const;
 
+/** Axis tick / label typography vs original design */
+const AXIS_X_TICK = 9 * 1.25; // 11.25
+const AXIS_Y_TICK = 11 * 1.25; // 13.75
+const AXIS_Y_LABEL = 11 * 1.25;
+
 interface MaterialBreakdownBarChartProps {
   rows: StockSheetSizeBreakdownRow[];
   shareScopeLabel?: string;
@@ -76,12 +81,12 @@ export function MaterialBreakdownBarChart({
   }
 
   return (
-    <div className="space-y-2" dir="rtl">
-      <div className="w-full h-[min(400px,52vh)] min-h-[280px]">
+    <div className="space-y-2">
+      <div className="w-full h-[min(400px,52vh)] min-h-[280px]" dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
-            margin={{ top: 8, right: 12, left: 8, bottom: 4 }}
+            margin={{ top: 8, right: 8, left: 12, bottom: 4 }}
           >
             <CartesianGrid
               strokeDasharray="4 4"
@@ -90,28 +95,34 @@ export function MaterialBreakdownBarChart({
             />
             <XAxis
               dataKey="name"
-              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+              tick={{
+                fontSize: AXIS_X_TICK,
+                fill: "hsl(var(--muted-foreground))",
+              }}
               tickLine={false}
               axisLine={{ stroke: "hsl(var(--border))" }}
               interval={0}
               angle={data.length > 3 ? -32 : 0}
               textAnchor={data.length > 3 ? "end" : "middle"}
-              height={data.length > 3 ? 72 : 40}
+              height={data.length > 3 ? 84 : 46}
             />
             <YAxis
-              orientation="right"
+              orientation="left"
               domain={[0, 100]}
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              tick={{
+                fontSize: AXIS_Y_TICK,
+                fill: "hsl(var(--muted-foreground))",
+              }}
               tickLine={false}
               axisLine={{ stroke: "hsl(var(--border))" }}
-              width={44}
+              width={50}
               tickFormatter={(v) => `${v}%`}
               label={{
                 value: t(`${QA}.chartYLabel`),
                 angle: -90,
-                position: "insideRight",
-                offset: 10,
-                fontSize: 11,
+                position: "insideLeft",
+                offset: 0,
+                fontSize: AXIS_Y_LABEL,
                 fill: "hsl(var(--muted-foreground))",
               }}
             />
@@ -126,7 +137,10 @@ export function MaterialBreakdownBarChart({
                   thicknessMm: number;
                 };
                 return (
-                  <div className="rounded-md bg-popover px-3 py-2.5 text-xs shadow-md max-w-sm space-y-1.5 text-start">
+                  <div
+                    className="rounded-md bg-popover px-3 py-2.5 text-xs shadow-md max-w-sm space-y-1.5 text-start"
+                    dir="rtl"
+                  >
                     <p className="font-semibold text-foreground leading-snug">{p.fullName}</p>
                     <p className="text-muted-foreground">
                       {scope} · {p.material} · {formatDecimal(p.thicknessMm, 1)} מ״מ
@@ -197,7 +211,10 @@ export function MaterialBreakdownBarChart({
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-[11px] text-muted-foreground px-1 text-start leading-relaxed">
+      <p
+        className="text-[11px] text-muted-foreground px-1 text-start leading-relaxed"
+        dir="rtl"
+      >
         {groupedByThickness
           ? t(`${QA}.chartCaptionGrouped`)
           : t(`${QA}.chartCaptionDetail`)}{" "}
