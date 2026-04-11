@@ -7,6 +7,14 @@ import type {
 
 export type ComplexityLevel = "Low" | "Medium" | "High";
 
+/** Keys into `quote.quantityAnalysis.complexityDetail.*` */
+export type ComplexityDetailId =
+  | "moderate"
+  | "simple"
+  | "highDense"
+  | "highHeavy"
+  | "mediumPierce";
+
 export type UtilizationBand = "Low efficiency" | "Moderate efficiency" | "Good efficiency";
 
 export interface MaterialBreakdownRow {
@@ -64,7 +72,7 @@ export interface JobOverviewModel {
   totalCutLengthMm: number;
   totalPierceCount: number;
   complexity: ComplexityLevel;
-  complexitySubtext: string;
+  complexityDetailId: ComplexityDetailId;
   materialBreakdown: MaterialBreakdownRow[];
 }
 

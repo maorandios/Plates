@@ -8,7 +8,6 @@ import { GeneralSection } from "./GeneralSection";
 import { MethodDetailsRouter } from "./MethodDetailsRouter";
 import { MergedQuoteLinesStep } from "./MergedQuoteLinesStep";
 import { QuoteMethodPickerPhase } from "./QuoteMethodPickerPhase";
-import { CalculationStep } from "./CalculationStep";
 import { QuoteStepper } from "./QuoteStepper";
 import { QuickQuoteBottomBar } from "./QuickQuoteBottomBar";
 import { QuoteFinalizeExportStep } from "./QuoteFinalizeExportStep";
@@ -74,7 +73,6 @@ export function QuickQuotePage() {
     referenceNumber: generateQuoteReference(),
   }));
   const [materialType, setMaterialType] = useState<MaterialType>("carbonSteel");
-  const [calcRunId, setCalcRunId] = useState(0);
   const [thicknessStock, setThicknessStock] = useState<ThicknessStockInput[]>([]);
   const [materialPricePerKg, setMaterialPricePerKg] = useState(
     () => MOCK_MFG_PARAMETERS.materialRatePerKg
@@ -84,9 +82,6 @@ export function QuickQuotePage() {
     Record<string, string>
   >({});
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
-  /** Step 5 (calculation): mock pipeline must finish before global Continue enables. */
-  const [calculationReady, setCalculationReady] = useState(false);
-
   const [manualQuoteRows, setManualQuoteRows] = useState<ManualQuotePartRow[]>([]);
 
   /** Plates from the Import Excel list method only (separate from manual rows). */
@@ -122,10 +117,6 @@ export function QuickQuotePage() {
     setHighestStepReached((h) => (s > h ? s : h));
     if (s === 2) setQuoteMethodSubView("picker");
   }, []);
-
-  useEffect(() => {
-    setCalculationReady(false);
-  }, [step]);
 
   const goToStep = useCallback(
     (s: QuickQuoteStep) => {
@@ -278,19 +269,16 @@ export function QuickQuotePage() {
     advanceTo(3);
   }, [advanceTo]);
 
-  const handleContinueFromStockToCalculation = () => {
-    setCalcRunId((id) => id + 1);
+  const handleContinueFromStockToQuantityAnalysis = () => {
     advanceTo(5);
   };
 
-  const handleBackFromCalculationToStock = () => advanceTo(4);
-  const handleViewQuote = () => advanceTo(6);
   const handleContinueFromQuoteToPricing = useCallback(() => {
-    advanceTo(7);
-  }, [advanceTo]);
-  const handleBackFromQuote = () => advanceTo(5);
-  const handleBackFromPricing = useCallback(() => {
     advanceTo(6);
+  }, [advanceTo]);
+  const handleBackFromQuote = () => advanceTo(4);
+  const handleBackFromPricing = useCallback(() => {
+    advanceTo(5);
   }, [advanceTo]);
   const handleBackToValidationFromQuote = useCallback(() => {
     advanceTo(3);
@@ -316,15 +304,15 @@ export function QuickQuotePage() {
     if (qid) {
       markQuoteComplete(qid);
     }
-    advanceTo(8);
+    advanceTo(7);
   }, [advanceTo, buildFinalizeDraft]);
 
   const handleBackFromFinalize = useCallback(() => {
-    advanceTo(7);
+    advanceTo(6);
   }, [advanceTo]);
 
   useEffect(() => {
-    if (step === 8 && pdfExportDraft === null) {
+    if (step === 7 && pdfExportDraft === null) {
       setPdfExportDraft(buildFinalizeDraft());
     }
   }, [step, pdfExportDraft, buildFinalizeDraft]);
@@ -430,17 +418,9 @@ export function QuickQuotePage() {
           showContinue: true,
           canContinue: stockPricingReady,
           onBack: handleBackFromStockToValidation,
-          onContinue: handleContinueFromStockToCalculation,
+          onContinue: handleContinueFromStockToQuantityAnalysis,
         };
       case 5:
-        return {
-          showBack: true,
-          showContinue: true,
-          canContinue: calculationReady,
-          onBack: handleBackFromCalculationToStock,
-          onContinue: handleViewQuote,
-        };
-      case 6:
         return {
           showBack: true,
           showContinue: true,
@@ -448,7 +428,7 @@ export function QuickQuotePage() {
           onBack: handleBackFromQuote,
           onContinue: handleContinueFromQuoteToPricing,
         };
-      case 7:
+      case 6:
         return {
           showBack: true,
           showContinue: true,
@@ -456,7 +436,7 @@ export function QuickQuotePage() {
           onBack: handleBackFromPricing,
           onContinue: handleContinueToFinalize,
         };
-      case 8:
+      case 7:
         return {
           showBack: true,
           showContinue: false,
@@ -474,7 +454,6 @@ export function QuickQuotePage() {
     step,
     quoteMethodSubView,
     hasAnyQuoteMethodData,
-    calculationReady,
     stockPricingReady,
     canContinueFromGeneral,
     handleContinueFromGeneral,
@@ -483,9 +462,7 @@ export function QuickQuotePage() {
     handleBackFromMergedLines,
     handleContinueFromMergedLines,
     handleBackFromStockToValidation,
-    handleContinueFromStockToCalculation,
-    handleBackFromCalculationToStock,
-    handleViewQuote,
+    handleContinueFromStockToQuantityAnalysis,
     handleBackFromQuote,
     handleContinueFromQuoteToPricing,
     handleBackFromPricing,
@@ -501,6 +478,7 @@ export function QuickQuotePage() {
 
   return (
     <div
+      dir="rtl"
       className={cn(
         "flex min-h-0 flex-1 flex-col",
         !methodSetupScrollFriendly && "overflow-hidden"
@@ -617,25 +595,13 @@ export function QuickQuotePage() {
           {step === 4 && (
             <StockPricingStep
               stockRows={thicknessStock}
+              parts={mergedQuotePartsList}
               materialType={materialType}
               onSheetsChange={setSheetsForThickness}
             />
           )}
 
           {step === 5 && (
-            <CalculationStep
-              key={calcRunId}
-              runId={calcRunId}
-              jobDetails={jobDetails}
-              dxfFileCount={dxfMethodGeometries.length}
-              uniquePlatesInRun={selection.parts.length}
-              totalPartsQty={selection.jobSummary.totalQty}
-              validationSummary={selection.validationSummary}
-              onCalculationReadyChange={setCalculationReady}
-            />
-          )}
-
-          {step === 6 && (
             <QuoteSummaryStep
               jobDetails={jobDetails}
               jobSummary={selection.jobSummary}
@@ -648,7 +614,7 @@ export function QuickQuotePage() {
             />
           )}
 
-          {step === 7 && (
+          {step === 6 && (
             <PricingStep
               parts={selection.parts}
               materialType={materialType}
@@ -659,7 +625,7 @@ export function QuickQuotePage() {
             />
           )}
 
-          {step === 8 && pdfExportDraft && (
+          {step === 7 && pdfExportDraft && (
             <QuoteFinalizeExportStep
               draft={pdfExportDraft}
               setDraft={(action) => {

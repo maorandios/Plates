@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { BarChart3, RotateCcw, Table2 } from "lucide-react";
+import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -31,6 +32,8 @@ import { MaterialBreakdownBarChart } from "./MaterialBreakdownBarChart";
 import { MaterialBreakdownTable } from "./MaterialBreakdownTable";
 import { cn } from "@/lib/utils";
 
+const QA = "quote.quantityAnalysis" as const;
+
 const DEFAULT_FILTERS: MaterialBreakdownViewFilters = {
   materialKey: MATERIAL_FILTER_ALL,
   thicknessKey: MATERIAL_FILTER_ALL,
@@ -55,7 +58,7 @@ function StatCard({
 }) {
   return (
     <div className="rounded-xl border-0 bg-card px-4 py-4 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">
         {title}
       </p>
       <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground mt-1.5">
@@ -120,52 +123,52 @@ export function MaterialBreakdownSection({
     setFilters(DEFAULT_FILTERS);
   }
 
+  const scopeLabel = filtered
+    ? t(`${QA}.chartScopeFiltered`)
+    : t(`${QA}.chartScopeFull`);
+
   return (
-    <section className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Material breakdown
+    <section className="space-y-6" dir="rtl">
+      <div className="space-y-1 text-start">
+        <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">
+          {t(`${QA}.materialSectionTitle`)}
         </h2>
-        <p className="text-sm text-muted-foreground">
-          With no filters, charts roll up to{" "}
-          <span className="font-medium text-foreground">one row per thickness</span>{" "}
-          (all materials and sheet sizes combined). When you filter material, thickness, or sheet size,
-          each line is one nesting run: grade × thickness × chosen stock (same rect-pack rules as the
-          quote). Reset clears filters.
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {t(`${QA}.materialSectionIntro`)}
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
-          title="Stock lines"
+          title={t(`${QA}.statStockLines`)}
           value={String(stockTotals.sizeCount)}
           subtext={
             filtered
-              ? "Material × thickness × sheet size (nesting each)"
-              : "Per thickness (all materials & sizes combined)"
+              ? t(`${QA}.statStockLinesSubFiltered`)
+              : t(`${QA}.statStockLinesSubRollup`)
           }
         />
         <StatCard
-          title="Total sheets"
-          value={stockTotals.sheetCount.toLocaleString()}
+          title={t(`${QA}.statTotalSheets`)}
+          value={stockTotals.sheetCount.toLocaleString("he-IL")}
           subtext={
             filtered
-              ? "Sheets to buy for the filtered selection"
-              : "Sheets to buy (full job, all sizes)"
+              ? t(`${QA}.statTotalSheetsSubFiltered`)
+              : t(`${QA}.statTotalSheetsSubFull`)
           }
         />
         <StatCard
-          title="Gross stock"
+          title={t(`${QA}.statGrossStock`)}
           value={formatAreaM2(stockTotals.grossStockAreaM2)}
-          subtext="Purchased sheet area (rect-pack)"
+          subtext={t(`${QA}.statGrossStockSub`)}
         />
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 flex-1 min-w-0">
           <div className="space-y-1.5 min-w-0">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Material grade
+            <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
+              {t(`${QA}.filterMaterial`)}
             </span>
             <Select
               value={filters.materialKey}
@@ -180,10 +183,12 @@ export function MaterialBreakdownSection({
                     "ring-2 ring-foreground/15 border-foreground/25"
                 )}
               >
-                <SelectValue placeholder="All grades" />
+                <SelectValue placeholder={t(`${QA}.filterAllGrades`)} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={MATERIAL_FILTER_ALL}>All grades</SelectItem>
+                <SelectItem value={MATERIAL_FILTER_ALL}>
+                  {t(`${QA}.filterAllGrades`)}
+                </SelectItem>
                 {materialOptions.map((m) => (
                   <SelectItem key={m} value={m}>
                     {m}
@@ -194,8 +199,8 @@ export function MaterialBreakdownSection({
           </div>
 
           <div className="space-y-1.5 min-w-0">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Thickness
+            <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
+              {t(`${QA}.filterThickness`)}
             </span>
             <Select
               value={filters.thicknessKey}
@@ -210,10 +215,12 @@ export function MaterialBreakdownSection({
                     "ring-2 ring-foreground/15 border-foreground/25"
                 )}
               >
-                <SelectValue placeholder="All thicknesses" />
+                <SelectValue placeholder={t(`${QA}.filterAllThicknesses`)} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={MATERIAL_FILTER_ALL}>All thicknesses</SelectItem>
+                <SelectItem value={MATERIAL_FILTER_ALL}>
+                  {t(`${QA}.filterAllThicknesses`)}
+                </SelectItem>
                 {thicknessOptions.map((t) => (
                   <SelectItem key={t.key} value={t.key}>
                     {t.label}
@@ -224,8 +231,8 @@ export function MaterialBreakdownSection({
           </div>
 
           <div className="space-y-1.5 min-w-0">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Sheet size
+            <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
+              {t(`${QA}.filterSheetSize`)}
             </span>
             <Select
               value={filters.sheetKey}
@@ -269,7 +276,7 @@ export function MaterialBreakdownSection({
               disabled={!filtered}
             >
               <RotateCcw className="h-4 w-4 shrink-0" />
-              Reset chart
+              {t(`${QA}.resetChart`)}
             </Button>
           </div>
         </div>
@@ -278,30 +285,30 @@ export function MaterialBreakdownSection({
       <Card className="shadow-sm overflow-hidden">
         <CardContent className="p-3 sm:p-4">
           {stockRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-white/15 rounded-xl">
+            <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-white/15 rounded-xl leading-relaxed px-2">
               {filteredParts.length === 0
-                ? "No parts match the current filters. Change or reset filters."
+                ? t(`${QA}.emptyFiltered`)
                 : !thicknessStockProvided
-                  ? "Complete Stock & pricing so we can estimate sheet sizes, nesting, and waste."
-                  : "No nesting data for this selection."}
+                  ? t(`${QA}.emptyNoStock`)
+                  : t(`${QA}.emptyNoNesting`)}
             </p>
           ) : (
             <Tabs defaultValue="bars" className="w-full">
               <TabsList className="mb-3 grid w-full grid-cols-2 sm:inline-flex sm:w-auto sm:max-w-full">
                 <TabsTrigger value="bars" className="gap-2">
                   <BarChart3 className="h-4 w-4 shrink-0" aria-hidden />
-                  Columns
+                  {t(`${QA}.tabColumns`)}
                 </TabsTrigger>
                 <TabsTrigger value="table" className="gap-2">
                   <Table2 className="h-4 w-4 shrink-0" aria-hidden />
-                  Table
+                  {t(`${QA}.tabTable`)}
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="bars" className="mt-0">
                 <MaterialBreakdownBarChart
                   key={`bars-${filters.materialKey}-${filters.thicknessKey}-${filters.sheetKey}`}
                   rows={stockRows}
-                  shareScopeLabel={filtered ? "filtered selection" : "full job"}
+                  shareScopeLabel={scopeLabel}
                   groupedByThickness={!filtered}
                 />
               </TabsContent>
@@ -309,7 +316,7 @@ export function MaterialBreakdownSection({
                 <MaterialBreakdownTable
                   key={`table-${filters.materialKey}-${filters.thicknessKey}-${filters.sheetKey}`}
                   rows={stockRows}
-                  shareScopeLabel={filtered ? "filtered selection" : "full job"}
+                  shareScopeLabel={scopeLabel}
                   groupedByThickness={!filtered}
                 />
               </TabsContent>

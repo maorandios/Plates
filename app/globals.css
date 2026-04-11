@@ -229,3 +229,15 @@ button.excel-dxf-mismatch-banner:focus-visible {
   outline: none !important;
   box-shadow: 0 0 0 2px rgb(255 0 123 / 0.55) !important;
 }
+
+/* Quantity analysis metrics — same neon-on-dark language as Excel–DXF mismatch (green pair). */
+div.job-overview-analysis-card--rose {
+  background-color: #1c0004 !important;
+  border-color: #ff007b !important;
+  color: #ff006f !important;
+}
+div.job-overview-analysis-card--emerald {
+  background-color: #001910 !important;
+  border-color: #00ff88 !important;
+  color: #00ff99 !important;
+}

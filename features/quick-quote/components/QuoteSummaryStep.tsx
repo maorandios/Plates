@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
-import { FileSpreadsheet, Save, Sparkles } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { t } from "@/lib/i18n";
 import { JobOverviewSection } from "../job-overview/components/JobOverviewSection";
 import { MaterialBreakdownSection } from "../job-overview/components/MaterialBreakdownSection";
 import { NestingPreviewSection } from "../job-overview/components/NestingPreviewSection";
@@ -15,6 +13,9 @@ import type {
   QuotePartRow,
   ThicknessStockInput,
 } from "../types/quickQuote";
+
+const QA = "quote.quantityAnalysis" as const;
+
 interface QuoteSummaryStepProps {
   jobDetails: QuickQuoteJobDetails;
   jobSummary: JobSummaryMetrics;
@@ -34,45 +35,17 @@ export function QuoteSummaryStep({
 }: QuoteSummaryStepProps) {
   const thicknessStockProvided = Boolean(thicknessStock?.length);
 
-  const quoteDate = useMemo(
-    () =>
-      new Intl.DateTimeFormat(undefined, {
-        dateStyle: "medium",
-      }).format(new Date()),
-    []
-  );
-
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12" dir="rtl">
       <div className="ds-surface overflow-hidden print:shadow-none">
-        <div className="ds-surface-header py-4 sm:px-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight font-mono truncate">
-                {jobDetails.referenceNumber || "Quote"}
-              </h1>
-              <Badge variant="secondary" className="shrink-0 font-normal">
-                Draft quote
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {jobDetails.customerName || "Customer —"}
+        <div className="ds-surface-header py-5 sm:px-6 border-b border-white/[0.06]">
+          <div className="min-w-0 space-y-1.5 text-start">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+              {t(`${QA}.pageTitle`)}
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-3xl">
+              {t(`${QA}.pageSubtitle`)}
             </p>
-            <p className="text-xs text-muted-foreground">{quoteDate}</p>
-          </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
-            <Button type="button" variant="outline" size="sm" disabled>
-              <FileSpreadsheet className="h-4 w-4 mr-1.5" />
-              Export Excel
-            </Button>
-            <Button type="button" variant="outline" size="sm" disabled>
-              <Save className="h-4 w-4 mr-1.5" />
-              Save quote
-            </Button>
-            <Button type="button" size="sm" disabled>
-              <Sparkles className="h-4 w-4 mr-1.5" />
-              Generate final price
-            </Button>
           </div>
         </div>
 
@@ -102,13 +75,17 @@ export function QuoteSummaryStep({
         </div>
       </div>
 
-      <div className="flex flex-wrap justify-between gap-3">
-        <Button type="button" variant="ghost" className="text-muted-foreground" onClick={onBackToValidation}>
-          ← Back to quote setup
+      <div className="flex flex-wrap justify-between gap-3 text-start">
+        <Button
+          type="button"
+          variant="ghost"
+          className="text-muted-foreground"
+          onClick={onBackToValidation}
+        >
+          {t(`${QA}.backToSetup`)}
         </Button>
-        <p className="text-xs text-muted-foreground">
-          This quote workspace is a UI prototype. Actions and figures are not persisted or sent
-          to a server.
+        <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
+          {t(`${QA}.prototypeNote`)}
         </p>
       </div>
     </div>

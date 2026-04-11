@@ -3,24 +3,22 @@
 import { useMemo, useState } from "react";
 import { rectPackWithPlacements } from "@/lib/quotes/rectPackNesting";
 import type { SheetLayout } from "@/lib/quotes/rectPackNesting";
+import { t } from "@/lib/i18n";
 import type { QuotePartRow, ThicknessStockInput } from "../../types/quickQuote";
+
+const QA = "quote.quantityAnalysis" as const;
 
 interface NestingPreviewSectionProps {
   parts: QuotePartRow[];
   thicknessStock?: ThicknessStockInput[] | null;
 }
 
-// ---------------------------------------------------------------------------
-// Single sheet SVG
-// ---------------------------------------------------------------------------
-
-const PREVIEW_W = 320; // px — fixed display width per sheet thumbnail
+const PREVIEW_W = 320;
 
 function SheetSvg({ layout }: { layout: SheetLayout }) {
   const { sheetWidthMm, sheetLengthMm, placements, utilizationPct } = layout;
   const scale = PREVIEW_W / sheetWidthMm;
   const svgH = Math.round(sheetLengthMm * scale);
-  // stroke width scales with sheet so it always reads cleanly
   const strokeW = Math.max(0.8, sheetWidthMm / 400);
 
   return (
@@ -29,9 +27,11 @@ function SheetSvg({ layout }: { layout: SheetLayout }) {
       height={svgH}
       viewBox={`0 0 ${sheetWidthMm} ${sheetLengthMm}`}
       style={{ display: "block" }}
-      aria-label={`Sheet ${layout.sheetIndex + 1} — ${utilizationPct}% utilization`}
+      aria-label={t(`${QA}.nestingSheetAria`, {
+        n: layout.sheetIndex + 1,
+        pct: utilizationPct.toFixed(1),
+      })}
     >
-      {/* Sheet background */}
       <rect
         width={sheetWidthMm}
         height={sheetLengthMm}
@@ -40,7 +40,6 @@ function SheetSvg({ layout }: { layout: SheetLayout }) {
         strokeWidth={strokeW * 1.5}
       />
 
-      {/* Grid lines (faint) */}
       {[0.25, 0.5, 0.75].map((f) => (
         <g key={f}>
           <line
@@ -64,7 +63,6 @@ function SheetSvg({ layout }: { layout: SheetLayout }) {
         </g>
       ))}
 
-      {/* Placed parts */}
       {placements.map((p, i) => (
         <rect
           key={i}
@@ -79,7 +77,6 @@ function SheetSvg({ layout }: { layout: SheetLayout }) {
         />
       ))}
 
-      {/* Dimension labels (mm) */}
       <text
         x={sheetWidthMm / 2}
         y={sheetLengthMm + sheetLengthMm * 0.06}
@@ -88,15 +85,11 @@ function SheetSvg({ layout }: { layout: SheetLayout }) {
         fill="currentColor"
         fontFamily="monospace"
       >
-        {Math.round(sheetWidthMm)} × {Math.round(sheetLengthMm)} mm
+        {Math.round(sheetWidthMm)} × {Math.round(sheetLengthMm)} מ״מ
       </text>
     </svg>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Sheet card with label + caption
-// ---------------------------------------------------------------------------
 
 function SheetCard({
   layout,
@@ -109,35 +102,43 @@ function SheetCard({
     layout.sheetIndex === layout.totalSheetsForThickness - 1 &&
     layout.totalSheetsForThickness > 1;
 
+  const plateLabel =
+    layout.placements.length === 1
+      ? t(`${QA}.nestingPlatesOnSheet`)
+      : t(`${QA}.nestingPlatesOnSheetMany`, {
+          n: layout.placements.length,
+        });
+
   return (
     <div className="flex flex-col gap-2 shrink-0">
-      {/* Label row */}
-      <div className="flex items-center gap-2 px-1">
+      <div className="flex items-center gap-2 px-1 flex-wrap">
         <span className="text-xs font-medium text-foreground">
-          Sheet {layout.sheetIndex + 1}
+          {t(`${QA}.nestingSheet`, { n: layout.sheetIndex + 1 })}
           {layout.totalSheetsForThickness > 1
-            ? ` / ${layout.totalSheetsForThickness}`
+            ? ` · ${t(`${QA}.nestingSheetOf`, {
+                current: layout.sheetIndex + 1,
+                total: layout.totalSheetsForThickness,
+              })}`
             : ""}
         </span>
         {showThickness && (
           <span className="text-xs text-muted-foreground">
-            · {layout.thicknessMm} mm thick
+            · {t(`${QA}.nestingThick`, { n: layout.thicknessMm })}
           </span>
         )}
         <span
-          className={`ml-auto text-xs font-mono font-semibold ${
+          className={`ms-auto text-xs font-mono font-semibold ${
             layout.utilizationPct >= 68
               ? "text-green-600 dark:text-green-400"
               : layout.utilizationPct >= 48
-              ? "text-yellow-600 dark:text-yellow-400"
-              : "text-red-500 dark:text-red-400"
+                ? "text-yellow-600 dark:text-yellow-400"
+                : "text-red-500 dark:text-red-400"
           }`}
         >
           {layout.utilizationPct.toFixed(1)}%
         </span>
       </div>
 
-      {/* SVG sheet */}
       <div
         className="rounded-md overflow-hidden border border-border"
         style={{ width: PREVIEW_W }}
@@ -145,20 +146,13 @@ function SheetCard({
         <SheetSvg layout={layout} />
       </div>
 
-      {/* Caption */}
-      <p className="text-xs text-muted-foreground px-1">
-        {layout.placements.length} plate
-        {layout.placements.length !== 1 ? "s" : ""} ·{" "}
-        {layout.netAreaM2.toFixed(2)} m² net
-        {isLast && " · last sheet"}
+      <p className="text-xs text-muted-foreground px-1 text-start">
+        {plateLabel} · {t(`${QA}.nestingNetM2`, { n: layout.netAreaM2.toFixed(2) })}
+        {isLast ? t(`${QA}.nestingLastSheet`) : ""}
       </p>
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Main section
-// ---------------------------------------------------------------------------
 
 export function NestingPreviewSection({
   parts,
@@ -169,7 +163,6 @@ export function NestingPreviewSection({
   const result = useMemo(() => {
     if (!parts.length || !thicknessStock?.length) return null;
 
-    // Collect all unique sheet sizes
     const sizeMap = new Map<
       string,
       { sheetWidthMm: number; sheetLengthMm: number }
@@ -204,9 +197,9 @@ export function NestingPreviewSection({
 
   if (!result || result.layouts.length === 0) return null;
 
-  const multipleThicknesses = new Set(result.layouts.map((l) => l.thicknessMm)).size > 1;
+  const multipleThicknesses =
+    new Set(result.layouts.map((l) => l.thicknessMm)).size > 1;
 
-  // Group layouts by thickness for display
   const grouped = new Map<number, SheetLayout[]>();
   for (const layout of result.layouts) {
     const th = layout.thicknessMm;
@@ -220,18 +213,20 @@ export function NestingPreviewSection({
   const totalActualSheets = result.summary.estimatedSheetCount;
   const hiddenSheets = totalActualSheets - totalDisplaySheets;
 
+  const sheetsSummary =
+    totalActualSheets === 1
+      ? t(`${QA}.nestingFooterSheetsOne`)
+      : t(`${QA}.nestingFooterSheets`, { n: totalActualSheets });
+
   return (
-    <section className="space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Nesting layout
+    <section className="space-y-4" dir="rtl">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1 text-start min-w-0">
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">
+            {t(`${QA}.nestingTitle`)}
           </h2>
-          <p className="text-xs text-muted-foreground max-w-prose">
-            Bounding-box nest estimate — parts sorted and rotated (0°/90°)
-            automatically, 0 mm gap between plates and sheet edges. Showing up to 3 sheets
-            per thickness.
+          <p className="text-xs text-muted-foreground max-w-prose leading-relaxed">
+            {t(`${QA}.nestingIntro`)}
           </p>
         </div>
         <button
@@ -239,7 +234,7 @@ export function NestingPreviewSection({
           className="shrink-0 text-xs text-muted-foreground underline-offset-2 hover:underline hover:text-foreground transition-colors"
           onClick={() => setExpanded((v) => !v)}
         >
-          {expanded ? "Hide" : "Show"} layout
+          {expanded ? t(`${QA}.nestingHide`) : t(`${QA}.nestingShow`)}
         </button>
       </div>
 
@@ -248,16 +243,16 @@ export function NestingPreviewSection({
           {thicknessEntries.map(([thicknessMm, layouts]) => (
             <div key={thicknessMm} className="space-y-3">
               {multipleThicknesses && (
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  {thicknessMm} mm thick ·{" "}
-                  {layouts[0].totalSheetsForThickness} sheet
-                  {layouts[0].totalSheetsForThickness !== 1 ? "s" : ""} total
+                <p className="text-xs font-medium text-muted-foreground tracking-wide text-start">
+                  {t(`${QA}.nestingThicknessLine`, {
+                    mm: thicknessMm,
+                    sheets: layouts[0].totalSheetsForThickness,
+                  })}
                 </p>
               )}
 
-              {/* Horizontally scrollable sheet row */}
               <div
-                className="flex gap-4 overflow-x-auto pb-2"
+                className="flex gap-4 overflow-x-auto pb-2 flex-row-reverse"
                 style={{ scrollbarWidth: "thin" }}
               >
                 {layouts.map((layout) => (
@@ -268,17 +263,23 @@ export function NestingPreviewSection({
                   />
                 ))}
 
-                {/* "More sheets" placeholder */}
                 {layouts[0].totalSheetsForThickness > layouts.length && (
                   <div className="flex flex-col gap-2 shrink-0">
                     <div className="h-5" />
                     <div
-                      className="rounded-md border border-dashed border-border bg-muted/40 flex items-center justify-center text-xs text-muted-foreground font-medium"
-                      style={{ width: PREVIEW_W, height: Math.round((PREVIEW_W * layouts[0].sheetLengthMm) / layouts[0].sheetWidthMm) }}
+                      className="rounded-md border border-dashed border-border bg-muted/40 flex items-center justify-center text-xs text-muted-foreground font-medium px-2 text-center leading-snug"
+                      style={{
+                        width: PREVIEW_W,
+                        height: Math.round(
+                          (PREVIEW_W * layouts[0].sheetLengthMm) /
+                            layouts[0].sheetWidthMm
+                        ),
+                      }}
                     >
-                      +{layouts[0].totalSheetsForThickness - layouts.length} more sheet
-                      {layouts[0].totalSheetsForThickness - layouts.length !== 1 ? "s" : ""}{" "}
-                      at same layout
+                      {t(`${QA}.nestingMoreSheets`, {
+                        n:
+                          layouts[0].totalSheetsForThickness - layouts.length,
+                      })}
                     </div>
                   </div>
                 )}
@@ -286,32 +287,30 @@ export function NestingPreviewSection({
             </div>
           ))}
 
-          {/* Summary footer */}
-          <div className="rounded-md bg-muted/50 px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+          <div className="rounded-md bg-muted/50 px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground text-start justify-end">
             <span>
-              <span className="font-medium text-foreground">
-                {totalActualSheets}
-              </span>{" "}
-              total sheet{totalActualSheets !== 1 ? "s" : ""}
-              {hiddenSheets > 0 && ` (${hiddenSheets} not previewed)`}
+              <span className="font-medium text-foreground">{sheetsSummary}</span>
+              {hiddenSheets > 0
+                ? t(`${QA}.nestingFooterNotPreviewed`, { n: hiddenSheets })
+                : ""}
             </span>
             <span>
               <span className="font-medium text-foreground">
-                {result.summary.totalSheetAreaM2.toFixed(2)} m²
+                {result.summary.totalSheetAreaM2.toFixed(2)} {t(`${QA}.unitM2`)}
               </span>{" "}
-              gross material
+              {t(`${QA}.nestingFooterGross`)}
             </span>
             <span>
               <span className="font-medium text-foreground">
-                {result.summary.totalWasteAreaM2.toFixed(2)} m²
+                {result.summary.totalWasteAreaM2.toFixed(2)} {t(`${QA}.unitM2`)}
               </span>{" "}
-              waste (offcuts)
+              {t(`${QA}.nestingFooterWaste`)}
             </span>
             <span>
               <span className="font-medium text-foreground">
                 {result.summary.utilizationPct.toFixed(1)}%
               </span>{" "}
-              overall utilization
+              {t(`${QA}.nestingFooterUtil`)}
             </span>
           </div>
         </div>

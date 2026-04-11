@@ -9,8 +9,10 @@ export interface QuoteListRecord {
   referenceNumber: string;
   customerName: string;
   status: QuoteListStatus;
-  /** Wizard step 1–8 when last updated. */
+  /** Wizard step 1–7 when last updated. */
   currentStep: number;
+  /** 2 = 7-step wizard; omit/1 = legacy 8-step (migration in {@link migrateWizardStep}). */
+  wizardSchema?: number;
   createdAt: string;
   updatedAt: string;
   /** Global client directory id when chosen on General step. */
@@ -51,16 +53,29 @@ function numOrUndef(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
 
+/** Map legacy 8-step sessions (incl. removed calculation step) onto 7-step flow. */
+function migrateWizardStep(raw: unknown, wizardSchema?: number): number {
+  const s = typeof raw === "number" && Number.isFinite(raw) ? raw : 1;
+  if (wizardSchema != null && wizardSchema >= 2) {
+    if (s < 1) return 1;
+    if (s > 7) return 7;
+    return Math.floor(s);
+  }
+  if (s < 1) return 1;
+  if (s <= 4) return s;
+  if (s === 5) return 5;
+  if (s === 6) return 5;
+  if (s === 7) return 6;
+  return 7;
+}
+
 function normalizeRecord(r: QuoteListRecord): QuoteListRecord {
   return {
     id: r.id,
     referenceNumber: r.referenceNumber,
     customerName: typeof r.customerName === "string" ? r.customerName : "",
     status: r.status === "complete" ? "complete" : "in_progress",
-    currentStep:
-      typeof r.currentStep === "number" && r.currentStep >= 1 && r.currentStep <= 8
-        ? r.currentStep
-        : 1,
+    currentStep: migrateWizardStep(r.currentStep, r.wizardSchema),
     createdAt: typeof r.createdAt === "string" ? r.createdAt : new Date().toISOString(),
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : new Date().toISOString(),
     customerClientId:
@@ -69,6 +84,7 @@ function normalizeRecord(r: QuoteListRecord): QuoteListRecord {
     totalWeightKg: numOrUndef(r.totalWeightKg),
     totalAreaM2: numOrUndef(r.totalAreaM2),
     totalItemQty: numOrUndef(r.totalItemQty),
+    wizardSchema: r.wizardSchema === 2 ? 2 : undefined,
   };
 }
 
@@ -112,6 +128,7 @@ export function upsertQuoteInProgress(
       referenceNumber: patch.referenceNumber,
       customerName: patch.customerName,
       currentStep: patch.currentStep,
+      wizardSchema: 2,
       projectName: patch.projectName ?? prev.projectName,
       customerClientId: patch.customerClientId ?? prev.customerClientId,
       updatedAt: now,
@@ -124,6 +141,7 @@ export function upsertQuoteInProgress(
       customerName: patch.customerName,
       status: "in_progress",
       currentStep: patch.currentStep,
+      wizardSchema: 2,
       createdAt: now,
       updatedAt: now,
       projectName: patch.projectName,
@@ -154,7 +172,12 @@ export function patchQuoteSession(
   const i = list.findIndex((q) => q.id === id);
   if (i < 0) return;
   const now = new Date().toISOString();
-  list[i] = { ...list[i], ...partial, updatedAt: now };
+  list[i] = {
+    ...list[i],
+    ...partial,
+    wizardSchema: 2,
+    updatedAt: now,
+  };
   save(list);
 }
 
@@ -166,7 +189,8 @@ export function markQuoteComplete(id: string): void {
   list[i] = {
     ...list[i],
     status: "complete",
-    currentStep: 8,
+    currentStep: 7,
+    wizardSchema: 2,
     updatedAt: now,
   };
   save(list);

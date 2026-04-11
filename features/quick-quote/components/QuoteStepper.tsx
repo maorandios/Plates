@@ -10,8 +10,7 @@ const STEP_KEYS = [
   "quote.steps.quoteMethod",
   "quote.steps.parts",
   "quote.steps.stockPricing",
-  "quote.steps.calculation",
-  "quote.steps.quote",
+  "quote.steps.quantityAnalysis",
   "quote.steps.pricing",
   "quote.steps.finalize",
 ] as const;

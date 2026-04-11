@@ -28,7 +28,7 @@ export function QuickQuoteBottomBar({
 }: QuickQuoteBottomBarProps) {
   const showBackBtn = showBack && currentStep > 1 && onBack;
   const showContinueBtn =
-    showContinue && currentStep < 8 && onContinue;
+    showContinue && currentStep < 7 && onContinue;
 
   if (!showBackBtn && !showContinueBtn) {
     return null;

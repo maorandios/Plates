@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
+import { t } from "@/lib/i18n";
 import {
   Table,
   TableBody,
@@ -12,7 +13,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { StockSheetSizeBreakdownRow } from "../jobOverview.types";
-import { formatAreaM2 } from "../jobOverview.utils";
+const QA = "quote.quantityAnalysis" as const;
+
+function formatAreaM2He(m2: number): string {
+  const a = Math.max(0, m2);
+  return `${a.toLocaleString("he-IL", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${t(`${QA}.unitM2`)}`;
+}
 
 interface MaterialBreakdownTableProps {
   rows: StockSheetSizeBreakdownRow[];
@@ -24,7 +33,7 @@ function sheetSizeLabel(r: StockSheetSizeBreakdownRow): string {
   const w = Math.round(r.sheetWidthMm);
   const l = Math.round(r.sheetLengthMm);
   if (w <= 0 || l <= 0) return "—";
-  return `${w.toLocaleString()} × ${l.toLocaleString()} mm`;
+  return `${w.toLocaleString("he-IL")} × ${l.toLocaleString("he-IL")} מ״מ`;
 }
 
 function clampPct(n: number): number {
@@ -65,21 +74,23 @@ function wasteShareHeatCellClass(wastePct: number): string {
 function utilHeatRowClass(pct: number): string {
   const u = clampPct(pct);
   if (u >= 85)
-    return "border-l-4 border-l-emerald-500 bg-emerald-500/[0.05] dark:bg-emerald-500/[0.09]";
+    return "border-s-4 border-s-emerald-500 bg-emerald-500/[0.05] dark:bg-emerald-500/[0.09]";
   if (u >= 72)
-    return "border-l-4 border-l-lime-500 bg-lime-500/[0.05] dark:bg-lime-500/[0.08]";
+    return "border-s-4 border-s-lime-500 bg-lime-500/[0.05] dark:bg-lime-500/[0.08]";
   if (u >= 58)
-    return "border-l-4 border-l-amber-500 bg-amber-400/[0.06] dark:bg-amber-500/[0.09]";
+    return "border-s-4 border-s-amber-500 bg-amber-400/[0.06] dark:bg-amber-500/[0.09]";
   if (u >= 42)
-    return "border-l-4 border-l-orange-500 bg-orange-400/[0.07] dark:bg-orange-500/[0.1]";
-  return "border-l-4 border-l-red-500 bg-red-500/[0.06] dark:bg-red-500/[0.11]";
+    return "border-s-4 border-s-orange-500 bg-orange-400/[0.07] dark:bg-orange-500/[0.1]";
+  return "border-s-4 border-s-red-500 bg-red-500/[0.06] dark:bg-red-500/[0.11]";
 }
 
 export function MaterialBreakdownTable({
   rows,
-  shareScopeLabel = "job",
+  shareScopeLabel,
   groupedByThickness = false,
 }: MaterialBreakdownTableProps) {
+  const scope =
+    shareScopeLabel ?? t(`${QA}.chartScopeFull`);
   const totals = useMemo(() => {
     let gross = 0;
     let net = 0;
@@ -104,33 +115,45 @@ export function MaterialBreakdownTable({
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-border rounded-lg">
-        No part rows available.
+        {t(`${QA}.noPartRows`)}
       </p>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" dir="rtl">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className="min-w-[100px]">Material</TableHead>
-            <TableHead className="text-right tabular-nums w-[88px]">Thick. (mm)</TableHead>
-            <TableHead className="min-w-[120px]">Sheet size</TableHead>
-            <TableHead className="text-right tabular-nums w-[80px]">Sheets</TableHead>
-            <TableHead className="text-right tabular-nums min-w-[96px]">Gross</TableHead>
-            <TableHead className="text-right tabular-nums min-w-[96px]">Net</TableHead>
-            <TableHead
-              className="text-right tabular-nums min-w-[96px]"
-              title="Cell color: higher waste share of gross = worse (redder)"
-            >
-              Waste
+            <TableHead className="min-w-[100px] text-start">
+              {t(`${QA}.tableColMaterial`)}
+            </TableHead>
+            <TableHead className="text-start tabular-nums w-[88px]">
+              {t(`${QA}.tableColThick`)}
+            </TableHead>
+            <TableHead className="min-w-[120px] text-start">
+              {t(`${QA}.tableColSheetSize`)}
+            </TableHead>
+            <TableHead className="text-start tabular-nums w-[80px]">
+              {t(`${QA}.tableColSheets`)}
+            </TableHead>
+            <TableHead className="text-start tabular-nums min-w-[96px]">
+              {t(`${QA}.tableColGross`)}
+            </TableHead>
+            <TableHead className="text-start tabular-nums min-w-[96px]">
+              {t(`${QA}.tableColNet`)}
             </TableHead>
             <TableHead
-              className="text-right tabular-nums w-[104px] min-w-[104px]"
-              title="Cell color: higher utilization = better (greener)"
+              className="text-start tabular-nums min-w-[96px]"
+              title={t(`${QA}.tableWasteTitle`)}
             >
-              Util.
+              {t(`${QA}.tableColWaste`)}
+            </TableHead>
+            <TableHead
+              className="text-start tabular-nums w-[104px] min-w-[104px]"
+              title={t(`${QA}.tableUtilTitle`)}
+            >
+              {t(`${QA}.tableColUtil`)}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -140,28 +163,28 @@ export function MaterialBreakdownTable({
             return (
               <TableRow key={r.label} className={utilHeatRowClass(r.utilizationPct)}>
                 <TableCell className="font-medium text-foreground">{r.material}</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">
+                <TableCell className="text-start tabular-nums text-muted-foreground">
                   {formatDecimal(r.thicknessMm, 1)}
                 </TableCell>
-                <TableCell className="text-muted-foreground tabular-nums">
+                <TableCell className="text-muted-foreground tabular-nums text-start" dir="ltr">
                   {sheetSizeLabel(r)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">
+                <TableCell className="text-start tabular-nums text-muted-foreground">
                   {formatInteger(r.sheetCount)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">
-                  {formatAreaM2(r.grossStockAreaM2)}
+                <TableCell className="text-start tabular-nums text-muted-foreground">
+                  {formatAreaM2He(r.grossStockAreaM2)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">
-                  {formatAreaM2(r.netPlateAreaM2)}
+                <TableCell className="text-start tabular-nums text-muted-foreground">
+                  {formatAreaM2He(r.netPlateAreaM2)}
                 </TableCell>
                 <TableCell
-                  className={`text-right tabular-nums ${wasteShareHeatCellClass(wShare)}`}
+                  className={`text-start tabular-nums ${wasteShareHeatCellClass(wShare)}`}
                 >
-                  {formatAreaM2(r.wasteAreaM2)}
+                  {formatAreaM2He(r.wasteAreaM2)}
                 </TableCell>
                 <TableCell
-                  className={`text-right tabular-nums ${utilHeatCellClass(r.utilizationPct)}`}
+                  className={`text-start tabular-nums ${utilHeatCellClass(r.utilizationPct)}`}
                 >
                   {formatDecimal(r.utilizationPct, 1)}%
                 </TableCell>
@@ -173,29 +196,29 @@ export function MaterialBreakdownTable({
           <TableRow
             className={`hover:bg-muted/50 ${utilHeatRowClass(totals.utilizationPct)}`}
           >
-            <TableCell className="font-medium" colSpan={3}>
-              Total ({shareScopeLabel})
+            <TableCell className="font-medium text-start" colSpan={3}>
+              {t(`${QA}.tableTotal`, { scope })}
             </TableCell>
-            <TableCell className="text-right tabular-nums font-medium">
+            <TableCell className="text-start tabular-nums font-medium">
               {formatInteger(totals.sheetCount)}
             </TableCell>
-            <TableCell className="text-right tabular-nums font-medium">
-              {formatAreaM2(totals.grossStockAreaM2)}
+            <TableCell className="text-start tabular-nums font-medium">
+              {formatAreaM2He(totals.grossStockAreaM2)}
             </TableCell>
-            <TableCell className="text-right tabular-nums font-medium">
-              {formatAreaM2(totals.netPlateAreaM2)}
+            <TableCell className="text-start tabular-nums font-medium">
+              {formatAreaM2He(totals.netPlateAreaM2)}
             </TableCell>
             <TableCell
-              className={`text-right tabular-nums font-medium ${wasteShareHeatCellClass(
+              className={`text-start tabular-nums font-medium ${wasteShareHeatCellClass(
                 totals.grossStockAreaM2 > 0
                   ? (totals.wasteAreaM2 / totals.grossStockAreaM2) * 100
                   : 0
               )}`}
             >
-              {formatAreaM2(totals.wasteAreaM2)}
+              {formatAreaM2He(totals.wasteAreaM2)}
             </TableCell>
             <TableCell
-              className={`text-right tabular-nums font-medium ${utilHeatCellClass(
+              className={`text-start tabular-nums font-medium ${utilHeatCellClass(
                 totals.utilizationPct
               )}`}
             >
@@ -204,24 +227,24 @@ export function MaterialBreakdownTable({
           </TableRow>
         </TableFooter>
       </Table>
-      <div className="space-y-2 px-1">
+      <div className="space-y-2 px-1 text-start">
         <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-          <span className="shrink-0 font-medium text-foreground">Util. heat</span>
+          <span className="shrink-0 font-medium text-foreground">
+            {t(`${QA}.tableHeatLabel`)}
+          </span>
           <div
             className="h-2.5 min-w-[140px] flex-1 max-w-xs rounded-sm bg-gradient-to-r from-red-500/40 via-amber-400/35 via-lime-500/35 to-emerald-500/40 dark:from-red-500/30 dark:via-amber-500/25 dark:via-lime-500/25 dark:to-emerald-500/30"
-            title="Poor → strong utilization"
+            title={`${t(`${QA}.tableHeatPoor`)} → ${t(`${QA}.tableHeatStrong`)}`}
           />
-          <span className="tabular-nums text-[10px]">poor</span>
-          <span className="text-muted-foreground/70">→</span>
-          <span className="tabular-nums text-[10px]">strong</span>
+          <span className="tabular-nums text-[10px]">{t(`${QA}.tableHeatPoor`)}</span>
+          <span className="text-muted-foreground/70">←</span>
+          <span className="tabular-nums text-[10px]">{t(`${QA}.tableHeatStrong`)}</span>
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
           {groupedByThickness
-            ? "One row per thickness (all materials and sheet sizes summed). "
-            : "One row per material + thickness + chosen stock size (separate nesting run each). "}
-          Rows and Util./Waste cells are tinted: greener = better material use, redder = worse. Waste
-          column uses the inverse scale (more waste share = redder). Gross = sheets × sheet area;
-          waste = gross − net.
+            ? t(`${QA}.tableFootnoteGrouped`)
+            : t(`${QA}.tableFootnoteDetail`)}{" "}
+          {t(`${QA}.tableFootnoteTint`)}
         </p>
       </div>
     </div>

@@ -12,6 +12,7 @@ import type {
 } from "../types/quickQuote";
 import type {
   BuildJobOverviewInput,
+  ComplexityDetailId,
   ComplexityLevel,
   JobOverviewModel,
   MaterialBreakdownRow,
@@ -387,8 +388,8 @@ export function aggregateStockSheetBreakdownByThickness(
 
 function classifyComplexity(
   jobSummary: JobSummaryMetrics,
-  parts: QuotePartRow[]
-): { level: ComplexityLevel; subtext: string } {
+  _parts: QuotePartRow[]
+): { level: ComplexityLevel; detailId: ComplexityDetailId } {
   const unique = Math.max(0, jobSummary.uniqueParts);
   const cutMm = safeFinite(jobSummary.totalCutLengthMm);
   const pierce = safeFinite(jobSummary.totalPierceCount);
@@ -408,28 +409,25 @@ function classifyComplexity(
   if (score >= 7) level = "High";
   else if (score >= 4) level = "Medium";
 
-  let subtext = "Moderate cut load and part count for this run.";
+  let detailId: ComplexityDetailId = "moderate";
   if (level === "Low") {
-    subtext = "Relatively simple mix of plates and cut paths.";
+    detailId = "simple";
   } else if (level === "High") {
-    subtext =
-      piercePerPart > 20
-        ? "Dense geometry and high pierce count."
-        : "Heavy cut length or many distinct parts.";
+    detailId = piercePerPart > 20 ? "highDense" : "highHeavy";
   }
 
   if (level === "Medium" && pierce > 180) {
-    subtext = "Elevated pierce workload; review hole clusters and starts.";
+    detailId = "mediumPierce";
   }
 
-  return { level, subtext };
+  return { level, detailId };
 }
 
 export function buildJobOverview(input: BuildJobOverviewInput): JobOverviewModel {
   const { jobSummary, mfgParams, parts, thicknessStock } = input;
 
   const materialBreakdown = buildMaterialBreakdown(parts, thicknessStock);
-  const { level: complexity, subtext: complexitySubtext } = classifyComplexity(
+  const { level: complexity, detailId: complexityDetailId } = classifyComplexity(
     jobSummary,
     parts
   );
@@ -448,7 +446,7 @@ export function buildJobOverview(input: BuildJobOverviewInput): JobOverviewModel
     totalCutLengthMm: safeFinite(jobSummary.totalCutLengthMm),
     totalPierceCount: Math.max(0, Math.round(safeFinite(jobSummary.totalPierceCount))),
     complexity,
-    complexitySubtext,
+    complexityDetailId,
     materialBreakdown,
   };
 

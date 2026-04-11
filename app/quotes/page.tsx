@@ -26,7 +26,7 @@ import {
 import { t } from "@/lib/i18n";
 
 function listStepLabel(step: number): string {
-  if (step >= 1 && step <= 8) {
+  if (step >= 1 && step <= 7) {
     return t(`quotes.listStepLabels.${step}` as `quotes.listStepLabels.${number}`);
   }
   return t("quotes.stepFallback", { n: step });

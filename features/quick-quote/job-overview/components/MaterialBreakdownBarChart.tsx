@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { formatDecimal } from "@/lib/formatNumbers";
+import { t } from "@/lib/i18n";
 import {
   Bar,
   BarChart,
@@ -15,10 +16,11 @@ import {
 } from "recharts";
 import type { StockSheetSizeBreakdownRow } from "../jobOverview.types";
 
+const QA = "quote.quantityAnalysis" as const;
+
 interface MaterialBreakdownBarChartProps {
   rows: StockSheetSizeBreakdownRow[];
   shareScopeLabel?: string;
-  /** Full job with no filters: one bar per thickness (all materials & sizes combined). */
   groupedByThickness?: boolean;
 }
 
@@ -27,7 +29,6 @@ function truncateLabel(s: string, max: number) {
   return `${s.slice(0, max - 1)}…`;
 }
 
-/** Stack to 100%: util + waste; derive waste from util to avoid rounding gaps. */
 function stackPercents(r: StockSheetSizeBreakdownRow): {
   utilizationPct: number;
   wastePct: number;
@@ -41,9 +42,12 @@ function stackPercents(r: StockSheetSizeBreakdownRow): {
 
 export function MaterialBreakdownBarChart({
   rows,
-  shareScopeLabel = "job",
+  shareScopeLabel,
   groupedByThickness = false,
 }: MaterialBreakdownBarChartProps) {
+  const scope =
+    shareScopeLabel ?? t(`${QA}.chartScopeFull`);
+
   const data = useMemo(
     () =>
       rows.map((r) => {
@@ -60,21 +64,24 @@ export function MaterialBreakdownBarChart({
     [rows]
   );
 
+  const utilName = t(`${QA}.chartLegendUtil`);
+  const wasteName = t(`${QA}.chartLegendWaste`);
+
   if (data.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-border rounded-lg">
-        No part rows available.
+        {t(`${QA}.noPartRows`)}
       </p>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" dir="rtl">
       <div className="w-full h-[min(400px,52vh)] min-h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
-            margin={{ top: 8, right: 8, left: 4, bottom: 4 }}
+            margin={{ top: 8, right: 12, left: 8, bottom: 4 }}
           >
             <CartesianGrid
               strokeDasharray="4 4"
@@ -92,6 +99,7 @@ export function MaterialBreakdownBarChart({
               height={data.length > 3 ? 72 : 40}
             />
             <YAxis
+              orientation="right"
               domain={[0, 100]}
               tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
               tickLine={false}
@@ -99,10 +107,10 @@ export function MaterialBreakdownBarChart({
               width={44}
               tickFormatter={(v) => `${v}%`}
               label={{
-                value: "% of gross stock (each bar = 100%)",
+                value: t(`${QA}.chartYLabel`),
                 angle: -90,
-                position: "insideLeft",
-                offset: 8,
+                position: "insideRight",
+                offset: 10,
                 fontSize: 11,
                 fill: "hsl(var(--muted-foreground))",
               }}
@@ -118,15 +126,19 @@ export function MaterialBreakdownBarChart({
                   thicknessMm: number;
                 };
                 return (
-                  <div className="rounded-md bg-popover px-3 py-2.5 text-xs shadow-md max-w-sm space-y-1.5">
+                  <div className="rounded-md bg-popover px-3 py-2.5 text-xs shadow-md max-w-sm space-y-1.5 text-start">
                     <p className="font-semibold text-foreground leading-snug">{p.fullName}</p>
                     <p className="text-muted-foreground">
-                      {shareScopeLabel} · {p.material} · {formatDecimal(p.thicknessMm, 1)} mm
+                      {scope} · {p.material} · {formatDecimal(p.thicknessMm, 1)} מ״מ
                     </p>
                     <p className="text-muted-foreground tabular-nums">
-                      <span className="text-primary font-medium">Util</span>{" "}
+                      <span className="text-primary font-medium">
+                        {t(`${QA}.chartTooltipUtil`)}
+                      </span>{" "}
                       {formatDecimal(p.utilizationPct, 1)}% ·{" "}
-                      <span className="text-destructive font-medium">Waste</span>{" "}
+                      <span className="text-destructive font-medium">
+                        {t(`${QA}.chartTooltipWaste`)}
+                      </span>{" "}
                       {formatDecimal(p.wastePct, 1)}%
                     </p>
                   </div>
@@ -139,11 +151,10 @@ export function MaterialBreakdownBarChart({
                 <span className="text-muted-foreground">{value}</span>
               )}
             />
-            {/* Bottom segment: utilization (net ÷ gross) */}
             <Bar
               dataKey="utilizationPct"
               stackId="full"
-              name="Utilization"
+              name={utilName}
               fill="hsl(var(--primary))"
               radius={[0, 0, 6, 6]}
               maxBarSize={56}
@@ -157,15 +168,14 @@ export function MaterialBreakdownBarChart({
                 formatter={(label) => {
                   const v = typeof label === "number" ? label : Number(label);
                   if (!Number.isFinite(v) || v < 5) return "";
-                  return `Util ${v.toFixed(0)}%`;
+                  return t(`${QA}.chartLabelUtil`, { v: Math.round(v) });
                 }}
               />
             </Bar>
-            {/* Top segment: waste — rounded top corners */}
             <Bar
               dataKey="wastePct"
               stackId="full"
-              name="Waste"
+              name={wasteName}
               fill="hsl(var(--destructive))"
               fillOpacity={0.92}
               radius={[6, 6, 0, 0]}
@@ -180,21 +190,19 @@ export function MaterialBreakdownBarChart({
                 formatter={(label) => {
                   const v = typeof label === "number" ? label : Number(label);
                   if (!Number.isFinite(v) || v < 5) return "";
-                  return `Waste ${v.toFixed(0)}%`;
+                  return t(`${QA}.chartLabelWaste`, { v: Math.round(v) });
                 }}
               />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-[11px] text-muted-foreground px-1">
+      <p className="text-[11px] text-muted-foreground px-1 text-start leading-relaxed">
         {groupedByThickness
-          ? "One bar per thickness (all materials and sheet sizes combined)."
-          : "One bar per line (material + thickness + sheet size)."}{" "}
-        Each bar is 100% of gross stock:{" "}
-        <span className="text-primary font-medium">Util</span> (net ÷ gross) stacked below,{" "}
-        <span className="text-destructive font-medium">Waste</span> on top. Labels show inside each
-        segment when there is room. {shareScopeLabel} scope.
+          ? t(`${QA}.chartCaptionGrouped`)
+          : t(`${QA}.chartCaptionDetail`)}{" "}
+        {t(`${QA}.chartCaptionStack`)}{" "}
+        <span className="text-foreground/90">{scope}</span>
       </p>
     </div>
   );
