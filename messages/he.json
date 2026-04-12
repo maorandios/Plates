@@ -70,6 +70,21 @@
       "pricing": "תמחור",
       "finalize": "סיום"
     },
+    "pricingPhase": {
+      "pageTitle": "תמחור חומרים",
+      "pageSubtitle": "הגדרת מחיר לכל סוג חומר הנמצא בהצעה לפי משקל",
+      "partsSectionTitle": "חלקים",
+      "calculationsEmptyCard": "אין עדיין חלקים בהצעה.",
+      "colMetalType": "סוג המתכת",
+      "colThicknessMm": "עובי (מ״מ)",
+      "colSteelGrade": "דרגת פלדה",
+      "colFinish": "גימור",
+      "colWeightKg": "משקל (ק״ג)",
+      "colPricePerKg": "מחיר ({{symbol}} / ק״ג)",
+      "colLineTotal": "סיכום ({{symbol}})",
+      "footerTotalForBilling": "סה״כ לחיוב",
+      "priceInputAria": "מחיר לק״ג עבור {{family}} {{thickness}} מ״מ {{grade}}"
+    },
     "quantityAnalysis": {
       "pageTitle": "ניתוח כמויות חומר גלם",
       "pageSubtitle": "הצגת פילוח חומר הגלם הדרוש אל מול דרישת הלקוח",

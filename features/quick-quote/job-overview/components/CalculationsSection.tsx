@@ -1,8 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { Calculator } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -14,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDecimal } from "@/lib/formatNumbers";
+import { t } from "@/lib/i18n";
 import type { MaterialType } from "@/types/materials";
 import {
   formatQuickQuoteCurrency,
@@ -24,6 +23,8 @@ import {
   parseMaterialPricePerKg,
 } from "../materialCalculations";
 import type { QuotePartRow } from "../../types/quickQuote";
+
+const PF = "quote.pricingPhase" as const;
 
 interface CalculationsSectionProps {
   parts: QuotePartRow[];
@@ -63,125 +64,102 @@ export function CalculationsSection({
 
   if (parts.length === 0) {
     return (
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-            <Calculator className="h-4 w-4 shrink-0" aria-hidden />
-            Calculations
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Add parts to the quote to list material combinations and estimate material sell price
-            per job (priced per kg).
-          </p>
+      <section dir="rtl">
+        <div className="rounded-md border border-dashed border-white/15 px-4 py-12 text-center text-sm leading-relaxed text-muted-foreground">
+          {t(`${PF}.calculationsEmptyCard`)}
         </div>
-        <Card className="border-0">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No parts in this quote yet.
-          </CardContent>
-        </Card>
       </section>
     );
   }
 
   return (
-    <section className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-          <Calculator className="h-4 w-4 shrink-0" aria-hidden />
-          Calculations
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Each row is a distinct combination of{" "}
-          <span className="text-foreground/90">steel family</span> (from your quote material),{" "}
-          <span className="text-foreground/90">thickness</span>,{" "}
-          <span className="text-foreground/90">grade</span>, and{" "}
-          <span className="text-foreground/90">finish</span> detected on the BOM. Enter your target
-          sell price per kg; we multiply by the rolled-up weight for that combination to show a line
-          total and a job material total.
-        </p>
-      </div>
-
-      <Card className="shadow-sm overflow-hidden">
-        <CardContent className="p-0 sm:p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="min-w-[120px] whitespace-nowrap">Steel family</TableHead>
-                  <TableHead className="text-right tabular-nums w-[100px]">Thick. (mm)</TableHead>
-                  <TableHead className="min-w-[100px]">Grade</TableHead>
-                  <TableHead className="min-w-[100px]">Finish</TableHead>
-                  <TableHead className="text-right tabular-nums min-w-[100px]">
-                    Weight (kg)
-                  </TableHead>
-                  <TableHead className="text-right min-w-[120px] whitespace-nowrap">
-                    Price ({currencyCode} / kg)
-                  </TableHead>
-                  <TableHead className="text-right min-w-[120px] whitespace-nowrap">
-                    Line total ({currencySymbol})
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lines.map((line) => (
-                  <TableRow key={line.rowKey}>
-                    <TableCell className="font-medium text-foreground">
-                      {line.steelFamilyLabel}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatDecimal(line.thicknessMm, 1)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{line.grade}</TableCell>
-                    <TableCell className="text-muted-foreground">{line.finish}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatDecimal(line.totalWeightKg, 2)}
-                    </TableCell>
-                    <TableCell className="text-right p-2">
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="—"
-                        autoComplete="off"
-                        className="h-9 max-w-[140px] ml-auto tabular-nums text-right"
-                        value={pricePerKgByRow[line.rowKey] ?? ""}
-                        onChange={(e) =>
-                          onPricePerKgByRowChange((prev) => ({
-                            ...prev,
-                            [line.rowKey]: e.target.value,
-                          }))
-                        }
-                        aria-label={`Price per kg for ${line.steelFamilyLabel} ${line.thicknessMm} mm ${line.grade}`}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium text-foreground">
-                      {formatQuickQuoteCurrency(
-                        lineTotals[line.rowKey] ?? 0,
-                        currencyCode
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow className="hover:bg-muted/50">
-                  <TableCell colSpan={6} className="text-right font-medium">
-                    Material total ({currencyCode})
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums font-semibold">
+    <section dir="rtl">
+      <div className="overflow-x-auto rounded-md border border-white/[0.08]">
+        <Table
+          dir="rtl"
+          containerClassName="overflow-visible"
+          className="min-w-[48rem] text-start [&_th]:text-start [&_td]:text-start"
+        >
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="min-w-[7.5rem] whitespace-nowrap font-medium">
+                {t(`${PF}.colMetalType`)}
+              </TableHead>
+              <TableHead className="min-w-[5rem] tabular-nums font-medium">
+                {t(`${PF}.colThicknessMm`)}
+              </TableHead>
+              <TableHead className="min-w-[6rem] font-medium">{t(`${PF}.colSteelGrade`)}</TableHead>
+              <TableHead className="min-w-[5rem] font-medium">{t(`${PF}.colFinish`)}</TableHead>
+              <TableHead className="min-w-[6rem] tabular-nums font-medium">
+                {t(`${PF}.colWeightKg`)}
+              </TableHead>
+              <TableHead className="min-w-[8rem] whitespace-nowrap font-medium">
+                {t(`${PF}.colPricePerKg`, { symbol: currencySymbol })}
+              </TableHead>
+              <TableHead className="min-w-[7rem] whitespace-nowrap font-medium">
+                {t(`${PF}.colLineTotal`, { symbol: currencySymbol })}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lines.map((line) => (
+              <TableRow key={line.rowKey}>
+                <TableCell className="font-medium text-foreground">{line.steelFamilyLabel}</TableCell>
+                <TableCell className="tabular-nums text-muted-foreground">
+                  {formatDecimal(line.thicknessMm, 1)}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{line.grade}</TableCell>
+                <TableCell className="text-muted-foreground">{line.finish}</TableCell>
+                <TableCell className="tabular-nums text-muted-foreground">
+                  {formatDecimal(line.totalWeightKg, 2)}
+                </TableCell>
+                <TableCell className="p-2">
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="—"
+                    autoComplete="off"
+                    dir="rtl"
+                    className="h-9 max-w-[140px] tabular-nums text-start"
+                    value={pricePerKgByRow[line.rowKey] ?? ""}
+                    onChange={(e) =>
+                      onPricePerKgByRowChange((prev) => ({
+                        ...prev,
+                        [line.rowKey]: e.target.value,
+                      }))
+                    }
+                    aria-label={t(`${PF}.priceInputAria`, {
+                      family: line.steelFamilyLabel,
+                      thickness: formatDecimal(line.thicknessMm, 1),
+                      grade: line.grade,
+                    })}
+                  />
+                </TableCell>
+                <TableCell className="tabular-nums font-medium text-foreground">
+                  {formatQuickQuoteCurrency(lineTotals[line.rowKey] ?? 0, currencyCode)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+          <TableFooter className="border-t border-white/10 bg-muted/35 p-0 [&>tr]:border-b-0">
+            <TableRow className="border-0 bg-transparent hover:bg-transparent data-[state=selected]:bg-transparent">
+              <TableCell colSpan={7} className="bg-inherit py-3.5">
+                <div
+                  className="flex flex-wrap items-baseline justify-end gap-2.5"
+                  dir="rtl"
+                >
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {t(`${PF}.footerTotalForBilling`)}
+                  </span>
+                  <span className="tabular-nums text-base font-semibold text-foreground">
                     {formatQuickQuoteCurrency(grandTotal, currencyCode)}
-                  </TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <p className="text-[11px] text-muted-foreground px-1">
-        Weight is net plate weight from the BOM (per part × qty), summed for each combination. Prices
-        you enter here are not saved to the server in this prototype — use them to plan your
-        material sell before final quoting.
-      </p>
+                  </span>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
     </section>
   );
 }
