@@ -1,14 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatDecimal } from "@/lib/formatNumbers";
+import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { t } from "@/lib/i18n";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   LabelList,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -18,20 +17,20 @@ import type { StockSheetSizeBreakdownRow } from "../jobOverview.types";
 
 const QA = "quote.quantityAnalysis" as const;
 
-/** Axis tick / label typography vs original design */
-const AXIS_X_TICK = 9 * 1.25; // 11.25
-const AXIS_Y_TICK = 11 * 1.25; // 13.75
-const AXIS_Y_LABEL = 11 * 1.25;
+/** Phase 5 material breakdown stacked bars */
+const CHART_UTIL = "#004E53";
+const CHART_WASTE = "#530021";
+const CHART_HOVER_BG = "#111C21";
+/** 1.25× former default (~56px auto cap); use explicit `barSize` so width actually changes */
+const BAR_WIDTH_PX = Math.round(56 * 1.25);
+const BAR_LABEL_FONT = 11 * 1.25; // 13.75 — % labels on bars
+
+/** Axis typography — prior sizes ÷1.25 */
+const AXIS_X_TICK = 18;
+const AXIS_Y_TICK = 11;
 
 interface MaterialBreakdownBarChartProps {
   rows: StockSheetSizeBreakdownRow[];
-  shareScopeLabel?: string;
-  groupedByThickness?: boolean;
-}
-
-function truncateLabel(s: string, max: number) {
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}…`;
 }
 
 function stackPercents(r: StockSheetSizeBreakdownRow): {
@@ -45,28 +44,20 @@ function stackPercents(r: StockSheetSizeBreakdownRow): {
   return { utilizationPct: u, wastePct: w };
 }
 
-export function MaterialBreakdownBarChart({
-  rows,
-  shareScopeLabel,
-  groupedByThickness = false,
-}: MaterialBreakdownBarChartProps) {
-  const scope =
-    shareScopeLabel ?? t(`${QA}.chartScopeFull`);
-
+export function MaterialBreakdownBarChart({ rows }: MaterialBreakdownBarChartProps) {
   const data = useMemo(
     () =>
       rows.map((r) => {
         const { utilizationPct, wastePct } = stackPercents(r);
+        const mmDisplay = formatInteger(Math.round(r.thicknessMm));
         return {
-          name: truncateLabel(r.label, 28),
-          fullName: r.label,
+          name: t(`${QA}.chartAxisPlateThickness`, { mm: mmDisplay }),
           utilizationPct,
           wastePct,
-          material: r.material,
           thicknessMm: r.thicknessMm,
         };
       }),
-    [rows]
+    [rows, t]
   );
 
   const utilName = t(`${QA}.chartLegendUtil`);
@@ -86,7 +77,9 @@ export function MaterialBreakdownBarChart({
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
-            margin={{ top: 8, right: 8, left: 12, bottom: 4 }}
+            margin={{ top: 8, right: 8, left: 12, bottom: 10 }}
+            barCategoryGap="2%"
+            barGap={0}
           >
             <CartesianGrid
               strokeDasharray="4 4"
@@ -104,7 +97,7 @@ export function MaterialBreakdownBarChart({
               interval={0}
               angle={data.length > 3 ? -32 : 0}
               textAnchor={data.length > 3 ? "end" : "middle"}
-              height={data.length > 3 ? 84 : 46}
+              height={data.length > 3 ? 120 : 56}
             />
             <YAxis
               orientation="left"
@@ -115,74 +108,61 @@ export function MaterialBreakdownBarChart({
               }}
               tickLine={false}
               axisLine={{ stroke: "hsl(var(--border))" }}
-              width={50}
+              width={40}
               tickFormatter={(v) => `${v}%`}
-              label={{
-                value: t(`${QA}.chartYLabel`),
-                angle: -90,
-                position: "insideLeft",
-                offset: 0,
-                fontSize: AXIS_Y_LABEL,
-                fill: "hsl(var(--muted-foreground))",
-              }}
             />
             <Tooltip
+              cursor={{ fill: CHART_HOVER_BG }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const p = payload[0].payload as {
-                  fullName: string;
                   utilizationPct: number;
                   wastePct: number;
-                  material: string;
                   thicknessMm: number;
                 };
                 return (
                   <div
-                    className="rounded-md bg-popover px-3 py-2.5 text-xs shadow-md max-w-sm space-y-1.5 text-start"
+                    className="max-w-sm space-y-1.5 rounded-md bg-popover px-3 py-2.5 text-start text-xs shadow-md"
                     dir="rtl"
                   >
-                    <p className="font-semibold text-foreground leading-snug">{p.fullName}</p>
-                    <p className="text-muted-foreground">
-                      {scope} · {p.material} · {formatDecimal(p.thicknessMm, 1)} מ״מ
+                    <p className="tabular-nums text-foreground">
+                      {t(`${QA}.chartTooltipLineThickness`, {
+                        mm: formatDecimal(p.thicknessMm, 1),
+                      })}
                     </p>
-                    <p className="text-muted-foreground tabular-nums">
-                      <span className="text-primary font-medium">
-                        {t(`${QA}.chartTooltipUtil`)}
-                      </span>{" "}
-                      {formatDecimal(p.utilizationPct, 1)}% ·{" "}
-                      <span className="text-destructive font-medium">
-                        {t(`${QA}.chartTooltipWaste`)}
-                      </span>{" "}
-                      {formatDecimal(p.wastePct, 1)}%
+                    <p className="tabular-nums text-primary">
+                      {t(`${QA}.chartTooltipLineUtil`, {
+                        pct: formatDecimal(p.utilizationPct, 1),
+                      })}
+                    </p>
+                    <p className="tabular-nums text-destructive">
+                      {t(`${QA}.chartTooltipLineWaste`, {
+                        pct: formatDecimal(p.wastePct, 1),
+                      })}
                     </p>
                   </div>
                 );
               }}
             />
-            <Legend
-              wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-              formatter={(value) => (
-                <span className="text-muted-foreground">{value}</span>
-              )}
-            />
             <Bar
               dataKey="utilizationPct"
               stackId="full"
               name={utilName}
-              fill="hsl(var(--primary))"
+              fill={CHART_UTIL}
               radius={[0, 0, 6, 6]}
-              maxBarSize={56}
+              barSize={BAR_WIDTH_PX}
+              activeBar={false}
             >
               <LabelList
                 dataKey="utilizationPct"
                 position="center"
-                fill="hsl(var(--primary-foreground))"
-                fontSize={11}
+                fill="#f4fafb"
+                fontSize={BAR_LABEL_FONT}
                 fontWeight={600}
                 formatter={(label) => {
                   const v = typeof label === "number" ? label : Number(label);
                   if (!Number.isFinite(v) || v < 5) return "";
-                  return t(`${QA}.chartLabelUtil`, { v: Math.round(v) });
+                  return `${Math.round(v)}%`;
                 }}
               />
             </Bar>
@@ -190,37 +170,53 @@ export function MaterialBreakdownBarChart({
               dataKey="wastePct"
               stackId="full"
               name={wasteName}
-              fill="hsl(var(--destructive))"
-              fillOpacity={0.92}
+              fill={CHART_WASTE}
               radius={[6, 6, 0, 0]}
-              maxBarSize={56}
+              barSize={BAR_WIDTH_PX}
+              activeBar={false}
             >
               <LabelList
                 dataKey="wastePct"
                 position="center"
-                fill="hsl(var(--destructive-foreground))"
-                fontSize={11}
+                fill="#fceff4"
+                fontSize={BAR_LABEL_FONT}
                 fontWeight={600}
                 formatter={(label) => {
                   const v = typeof label === "number" ? label : Number(label);
                   if (!Number.isFinite(v) || v < 5) return "";
-                  return t(`${QA}.chartLabelWaste`, { v: Math.round(v) });
+                  return `${Math.round(v)}%`;
                 }}
               />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p
-        className="text-[11px] text-muted-foreground px-1 text-start leading-relaxed"
+
+      <div
+        className="flex flex-wrap items-center justify-center gap-3 pt-4 sm:gap-5"
         dir="rtl"
       >
-        {groupedByThickness
-          ? t(`${QA}.chartCaptionGrouped`)
-          : t(`${QA}.chartCaptionDetail`)}{" "}
-        {t(`${QA}.chartCaptionStack`)}{" "}
-        <span className="text-foreground/90">{scope}</span>
-      </p>
+        <div className="flex items-center gap-2.5 rounded-2xl bg-white/[0.06] px-4 py-2">
+          <span
+            className="h-3 w-8 shrink-0 rounded-md"
+            style={{ backgroundColor: CHART_UTIL }}
+            aria-hidden
+          />
+          <span className="text-[11px] font-semibold tracking-wide text-foreground/95">
+            {utilName}
+          </span>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-2xl bg-white/[0.06] px-4 py-2">
+          <span
+            className="h-3 w-8 shrink-0 rounded-md"
+            style={{ backgroundColor: CHART_WASTE }}
+            aria-hidden
+          />
+          <span className="text-[11px] font-semibold tracking-wide text-foreground/95">
+            {wasteName}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

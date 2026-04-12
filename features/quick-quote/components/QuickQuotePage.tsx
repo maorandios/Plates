@@ -280,10 +280,6 @@ export function QuickQuotePage() {
   const handleBackFromPricing = useCallback(() => {
     advanceTo(5);
   }, [advanceTo]);
-  const handleBackToValidationFromQuote = useCallback(() => {
-    advanceTo(3);
-  }, [advanceTo]);
-
   const buildFinalizeDraft = useCallback(
     (): QuotePdfFullPayload =>
       buildQuotePdfFullPayload(
@@ -610,7 +606,6 @@ export function QuickQuotePage() {
               thicknessStock={
                 thicknessStock.length > 0 ? thicknessStock : undefined
               }
-              onBackToValidation={handleBackToValidationFromQuote}
             />
           )}
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { t } from "@/lib/i18n";
 import { JobOverviewSection } from "../job-overview/components/JobOverviewSection";
@@ -22,7 +21,6 @@ interface QuoteSummaryStepProps {
   parts: QuotePartRow[];
   mfgParams: ManufacturingParameters;
   thicknessStock?: ThicknessStockInput[];
-  onBackToValidation: () => void;
 }
 
 export function QuoteSummaryStep({
@@ -31,7 +29,6 @@ export function QuoteSummaryStep({
   parts,
   mfgParams,
   thicknessStock,
-  onBackToValidation,
 }: QuoteSummaryStepProps) {
   const thicknessStockProvided = Boolean(thicknessStock?.length);
 
@@ -73,20 +70,6 @@ export function QuoteSummaryStep({
             thicknessStock={thicknessStock}
           />
         </div>
-      </div>
-
-      <div className="flex flex-wrap justify-between gap-3 text-start">
-        <Button
-          type="button"
-          variant="ghost"
-          className="text-muted-foreground"
-          onClick={onBackToValidation}
-        >
-          {t(`${QA}.backToSetup`)}
-        </Button>
-        <p className="text-xs text-muted-foreground max-w-md leading-relaxed">
-          {t(`${QA}.prototypeNote`)}
-        </p>
       </div>
     </div>
   );
