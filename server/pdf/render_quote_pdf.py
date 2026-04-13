@@ -22,26 +22,17 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from quote_pdf_formatters import (
     format_currency,
-    format_date_display,
+    format_date_il,
     format_int_space,
     format_kg,
     format_m2,
-    format_mm_one,
+    format_mm_one_he,
     format_qty,
-    format_size_mm,
-    format_thickness_mm,
+    format_thickness_mm_he,
 )
 from quote_pdf_types import QuotePdfPayload
 
 DIR = Path(__file__).resolve().parent
-
-DEFAULT_NOTES = [
-    "Based on uploaded DXF files and provided quote information.",
-    "Final production nesting is not included at this quotation stage.",
-    "Surface treatment is excluded unless explicitly stated.",
-    "Delivery is excluded unless explicitly stated.",
-]
-
 
 def _logo_data_uri(logo_path: str | None) -> str | None:
     if not logo_path:
@@ -60,62 +51,65 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
     q = payload.quote
     cur = q.currency.strip()
     cc = payload.company
+    pr = payload.pricing
 
-    summary_cards = [
-        {"label": "Total parts", "value": format_int_space(payload.summary.total_parts), "hint": None},
-        {"label": "Total quantity", "value": format_qty(payload.summary.total_quantity), "hint": None},
-        {"label": "Total weight", "value": format_kg(payload.summary.total_weight_kg), "hint": None},
-        {"label": "Net plate area", "value": format_m2(payload.summary.net_plate_area_m2), "hint": None},
+    area_sum_lines = sum(float(it.area_m2) for it in payload.items)
+
+    kpi_cards = [
+        {"label": "סוגי פלטות", "value": format_int_space(payload.summary.total_parts)},
+        {"label": "כמות פלטות", "value": format_qty(payload.summary.total_quantity)},
+        {"label": "שטח (מ״ר)", "value": format_m2(area_sum_lines)},
+        {"label": "משקל (ק״ג)", "value": format_kg(payload.summary.total_weight_kg)},
+        {"label": "הצעת מחיר", "value": format_currency(pr.total_price, cur)},
+    ]
+
+    technical_rows = [
+        {"label": "שטח נטו (לפי מערכת)", "value": format_m2(payload.summary.net_plate_area_m2)},
         {
-            "label": "Est. material required",
+            "label": "שטח חומר גלם משוער",
             "value": format_m2(payload.summary.gross_material_area_m2),
-            "hint": None,
         },
     ]
     if payload.summary.estimated_sheet_count is not None:
-        summary_cards.append(
+        technical_rows.append(
             {
-                "label": "Estimated sheets",
+                "label": "מספר לוחות משוער",
                 "value": format_int_space(int(payload.summary.estimated_sheet_count)),
-                "hint": None,
             }
         )
 
-    scope_primary = (q.scope_text or "").strip() or (
-        "Supply and cutting of steel plates based on the provided drawings and quote data."
-    )
-    scope_secondary = "Material grades and thicknesses are as listed in the part breakdown below."
+    scope_text = (q.scope_text or "").strip()
+    scope_has = bool(scope_text)
 
     item_rows = []
     for it in payload.items:
+        desc = (it.description or "").strip() or "—"
         item_rows.append(
             {
+                "description": desc,
                 "part_number": it.part_number,
                 "qty": format_qty(it.qty),
-                "thickness": format_thickness_mm(it.thickness_mm) if it.thickness_mm else "—",
+                "thickness": format_thickness_mm_he(it.thickness_mm) if it.thickness_mm else "—",
                 "material_type": (it.material_type or "").strip() or "—",
                 "material_grade": (it.material_grade or "").strip() or "—",
                 "finish": (it.finish or "").strip() or "—",
-                "width_mm": format_mm_one(it.width_mm) if it.width_mm else "—",
-                "length_mm": format_mm_one(it.length_mm) if it.length_mm else "—",
+                "width_mm": format_mm_one_he(it.width_mm) if it.width_mm else "—",
+                "length_mm": format_mm_one_he(it.length_mm) if it.length_mm else "—",
                 "area_m2": format_m2(it.area_m2) if it.area_m2 else "—",
                 "weight": format_kg(it.weight_kg),
                 "line_total": format_currency(it.line_total, cur),
             }
         )
 
-    pr = payload.pricing
     discount_fmt = format_currency(pr.discount, cur) if pr.discount else None
     net = max(0.0, float(pr.total_price) - (float(pr.discount) if pr.discount else 0.0))
     vat_rate = float(pr.vat_rate)
     vat_amount = round(net * vat_rate, 2)
     vat_pct = int(round(vat_rate * 100))
-    pricing_vat_label = f"VAT ({vat_pct}%)"
+    pricing_vat_label = f"מע״מ ({vat_pct}%)"
 
     raw_notes = list(q.notes) if q.notes else []
     notes_lines = [str(x).strip() for x in raw_notes if str(x).strip()]
-    if not notes_lines:
-        notes_lines = list(DEFAULT_NOTES)
     raw_terms = list(q.terms) if q.terms else []
     terms_lines = [str(x).strip() for x in raw_terms if str(x).strip()]
 
@@ -133,26 +127,29 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
         "company_website": cc.website or "",
         "company_address_lines": company_address_lines,
         "quote_number": q.quote_number,
-        "quote_date": format_date_display(q.quote_date),
-        "valid_until": format_date_display(q.valid_until),
+        "quote_date": format_date_il(q.quote_date),
+        "valid_until": format_date_il(q.valid_until),
         "customer_name": q.customer_name or "",
         "customer_company": q.customer_company or "",
         "project_name": q.project_name or "",
         "reference_number": q.reference_number or "",
         "currency": cur,
         "prepared_by": q.prepared_by or "",
-        "summary_cards": summary_cards,
-        "scope_primary": scope_primary,
-        "scope_secondary": scope_secondary,
+        "kpi_cards": kpi_cards,
+        "technical_rows": technical_rows,
+        "scope_has": scope_has,
+        "scope_text": scope_text,
         "item_rows": item_rows,
-        "pricing_total_price": format_currency(pr.total_price, cur),
+        "pricing_subtotal": format_currency(pr.total_price, cur),
         "pricing_discount": discount_fmt,
+        "pricing_net_after_discount": format_currency(net, cur),
         "pricing_vat_label": pricing_vat_label,
         "pricing_vat_amount": format_currency(vat_amount, cur),
         "pricing_total_incl_vat": format_currency(pr.total_incl_vat, cur),
+        "has_discount": pr.discount is not None and float(pr.discount) > 0,
         "notes_lines": notes_lines,
         "terms_lines": terms_lines,
-        "footer_generated": "Quotation document — generated electronically.",
+        "footer_generated": "מסמך הופק אלקטרונית · ללא חתימה ידנית.",
     }
 
 
@@ -176,13 +173,16 @@ async def html_to_pdf_bytes(html: str) -> bytes:
             await page.set_content(html, wait_until="networkidle", timeout=60_000)
             pdf = await page.pdf(
                 format="A4",
+                landscape=False,
                 print_background=True,
-                prefer_css_page_size=True,
+                # Let Playwright/Chromium apply margins below (CSS @page alone is unreliable here).
+                prefer_css_page_size=False,
+                # Standard print margins (~1 in / 2.5 cm), common for A4 business documents.
                 margin={
-                    "top": "16mm",
-                    "right": "14mm",
-                    "bottom": "16mm",
-                    "left": "14mm",
+                    "top": "25mm",
+                    "right": "25mm",
+                    "bottom": "25mm",
+                    "left": "25mm",
                 },
             )
             return pdf

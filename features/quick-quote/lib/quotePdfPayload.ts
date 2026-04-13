@@ -127,13 +127,6 @@ function addDaysIso(isoDate: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-const DEFAULT_NOTES = [
-  "Based on uploaded DXF files and provided quote information.",
-  "Final production nesting is not included at this quotation stage.",
-  "Surface treatment is excluded unless explicitly stated.",
-  "Delivery is excluded unless explicitly stated.",
-];
-
 function envCompanyDefaults(): QuotePdfCompanyBlock {
   return {
     name: process.env.NEXT_PUBLIC_QUOTE_COMPANY_NAME?.trim() || "Fabrication partner",
@@ -238,8 +231,7 @@ export function buildQuotePdfRequestBody(
   const totalPrice = sumLineTotalsRounded(items);
   const totalInclVat = computeQuoteTotalInclVat(totalPrice, discountInitial, vatRate);
 
-  const notes =
-    options?.notes && options.notes.length > 0 ? options.notes : [...DEFAULT_NOTES];
+  const notes = options?.notes ?? [];
   const terms = options?.terms && options.terms.length > 0 ? options.terms : [];
 
   const rawNotes = jobDetails.notes?.trim() ?? "";

@@ -10,7 +10,10 @@ import { MergedQuoteLinesStep } from "./MergedQuoteLinesStep";
 import { QuoteMethodPickerPhase } from "./QuoteMethodPickerPhase";
 import { QuoteStepper } from "./QuoteStepper";
 import { QuickQuoteBottomBar } from "./QuickQuoteBottomBar";
-import { QuoteFinalizeExportStep } from "./QuoteFinalizeExportStep";
+import {
+  QuoteFinalizeExportStep,
+  type FinalizeExportToolbar,
+} from "./QuoteFinalizeExportStep";
 import { PricingStep } from "./PricingStep";
 import { QuoteSummaryStep } from "./QuoteSummaryStep";
 import { StockPricingStep } from "./StockPricingStep";
@@ -82,6 +85,8 @@ export function QuickQuotePage() {
     Record<string, string>
   >({});
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
+  const [finalizeExportToolbar, setFinalizeExportToolbar] =
+    useState<FinalizeExportToolbar | null>(null);
   const [manualQuoteRows, setManualQuoteRows] = useState<ManualQuotePartRow[]>([]);
 
   /** Plates from the Import Excel list method only (separate from manual rows). */
@@ -312,6 +317,10 @@ export function QuickQuotePage() {
       setPdfExportDraft(buildFinalizeDraft());
     }
   }, [step, pdfExportDraft, buildFinalizeDraft]);
+
+  useEffect(() => {
+    if (step !== 7) setFinalizeExportToolbar(null);
+  }, [step]);
 
   useEffect(() => {
     const qid = quoteListSessionIdRef.current;
@@ -633,6 +642,7 @@ export function QuickQuotePage() {
                   return typeof action === "function" ? action(prev) : action;
                 });
               }}
+              onExportControlsChange={setFinalizeExportToolbar}
               materialFamilyLabel={MATERIAL_TYPE_LABELS[materialType]}
               materialType={materialType}
               materialPricePerKgByRow={materialPricePerKgByRow}
@@ -649,6 +659,17 @@ export function QuickQuotePage() {
           canContinue={stepNav.canContinue ?? false}
           onBack={stepNav.onBack}
           onContinue={stepNav.onContinue}
+          exportQuotePdf={
+            step === 7 && finalizeExportToolbar
+              ? {
+                  label: t("quote.finalizePhase.exportQuoteProduce"),
+                  loadingLabel: t("quote.finalizePhase.exporting"),
+                  disabled: finalizeExportToolbar.disabled,
+                  loading: finalizeExportToolbar.exporting,
+                  onClick: () => void finalizeExportToolbar.exportPdf(),
+                }
+              : undefined
+          }
         />
       </div>
     </div>

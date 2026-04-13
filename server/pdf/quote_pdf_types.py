@@ -64,6 +64,10 @@ class LineItem(BaseModel):
     weight_kg: float = Field(..., ge=0, description="Line total weight (e.g. unit × qty)")
     line_total: float = Field(..., ge=0)
     plate_shape: str = Field(default="flat")
+    description: str = Field(
+        default="",
+        description="Hebrew plate-type label (finalize תיאור), e.g. סטנדרט / זוית.",
+    )
 
 
 class PricingBlock(BaseModel):

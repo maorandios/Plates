@@ -90,6 +90,7 @@
       "pageSubtitle": "צור את הצעת המחיר הסופית להגשה",
       "badgeReviewExport": "סקירה וייצוא",
       "exportPdf": "ייצוא PDF",
+      "exportQuoteProduce": "הפקת הצעת מחיר",
       "exporting": "מייצא…",
       "exportFailed": "ייצוא PDF נכשל.",
       "companyTitle": "חברה (כותרת מסמך)",
@@ -150,8 +151,8 @@
       "discountOptional": "הנחה (אופציונלי)",
       "vatLabel": "מע״מ ({{pct}}%)",
       "totalInclVat": "סה״כ כולל מע״מ",
-      "notesTitle": "הערות והנחות",
-      "notesDesc": "שורה אחת לכל נקודה."
+      "notesTitle": "היערות",
+      "notesPlaceholder": "הזנת היערות שתרצה להציג בהצעת המחיר ללקוח"
     },
     "quantityAnalysis": {
       "pageTitle": "ניתוח כמויות חומר גלם",

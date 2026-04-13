@@ -44,6 +44,18 @@ def format_date_display(value: str) -> str:
     return v
 
 
+def format_date_il(value: str) -> str:
+    """DD/MM/YYYY for Hebrew quotation PDFs."""
+    v = (value or "").strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+        try:
+            d = date.fromisoformat(v)
+            return d.strftime("%d/%m/%Y")
+        except ValueError:
+            pass
+    return v
+
+
 def format_kg(kg: float | int) -> str:
     q = _dec(kg).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return f"{q:,.2f} kg"
@@ -63,6 +75,20 @@ def format_mm_one(mm: float | int) -> str:
     """Single dimension in millimetres (for part breakdown columns)."""
     q = int(round(float(mm)))
     return f"{q:,} mm".replace(",", " ")
+
+
+def format_mm_one_he(mm: float | int) -> str:
+    """Millimetres with Hebrew unit label (for RTL PDF)."""
+    q = int(round(float(mm)))
+    return f"{q:,} מ״מ".replace(",", " ")
+
+
+def format_thickness_mm_he(mm: float | int) -> str:
+    q = _dec(mm).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    s = f"{q.normalize()}"
+    if s.endswith(".0"):
+        s = s[:-2]
+    return f"{s} מ״מ"
 
 
 def format_size_mm(length_mm: float | int, width_mm: float | int) -> str:

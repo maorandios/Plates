@@ -2,12 +2,11 @@
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Copy,
   Eye,
-  FileDown,
   Hash,
   Layers,
   LayoutGrid,
@@ -23,7 +22,7 @@ import {
 import type { DxfPartGeometry } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -179,9 +178,18 @@ function parseDdMmYyyyToIso(display: string): string | null {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** Wired to the bottom bar “הפקת הצעת מחיר” action on finalize (step 7). */
+export interface FinalizeExportToolbar {
+  exportPdf: () => Promise<void>;
+  exporting: boolean;
+  disabled: boolean;
+}
+
 interface QuoteFinalizeExportStepProps {
   draft: QuotePdfFullPayload;
   setDraft: React.Dispatch<React.SetStateAction<QuotePdfFullPayload>>;
+  /** Reports export handler + state for {@link QuickQuoteBottomBar} on step 7. */
+  onExportControlsChange?: (controls: FinalizeExportToolbar | null) => void;
   /** Material family from General (Carbon / Stainless / Aluminum) — not editable in the table. */
   materialFamilyLabel: string;
   materialType: MaterialType;
@@ -240,6 +248,7 @@ function summarizeJobFromItems(items: FinalizeDraftLineItem[]) {
 export function QuoteFinalizeExportStep({
   draft,
   setDraft,
+  onExportControlsChange,
   materialFamilyLabel,
   materialType,
   materialPricePerKgByRow,
@@ -445,7 +454,7 @@ export function QuoteFinalizeExportStep({
     );
   }
 
-  async function handleExportPdf() {
+  const handleExportPdf = useCallback(async () => {
     if (draft.items.length === 0) return;
     setExporting(true);
     try {
@@ -480,6 +489,7 @@ export function QuoteFinalizeExportStep({
           ...it,
           material_type: materialFamilyLabel,
           plate_shape: it.plate_shape ?? "flat",
+          description: finalizePlateTypeLabel(it.plate_shape),
           thickness_mm: roundToMaxDecimals(it.thickness_mm, 3),
           width_mm: roundToMaxDecimals(it.width_mm, 3),
           length_mm: roundToMaxDecimals(it.length_mm, 3),
@@ -533,7 +543,40 @@ export function QuoteFinalizeExportStep({
     } finally {
       setExporting(false);
     }
-  }
+  }, [
+    draft,
+    quoteDateDisplay,
+    validUntilDisplay,
+    materialFamilyLabel,
+    setDraft,
+  ]);
+
+  const onExportControlsChangeRef = useRef(onExportControlsChange);
+  onExportControlsChangeRef.current = onExportControlsChange;
+
+  useEffect(() => {
+    if (!onExportControlsChange) return;
+    onExportControlsChange({
+      exportPdf: handleExportPdf,
+      exporting,
+      disabled:
+        exporting ||
+        draft.items.length === 0 ||
+        !draft.company.name.trim(),
+    });
+  }, [
+    onExportControlsChange,
+    handleExportPdf,
+    exporting,
+    draft.items.length,
+    draft.company.name,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      onExportControlsChangeRef.current?.(null);
+    };
+  }, []);
 
   const notesText = draft.quote.notes.join("\n");
 
@@ -569,7 +612,7 @@ export function QuoteFinalizeExportStep({
       {/* Top padding aligns with other quick-quote steps (main uses !pt-0 on step 7 for sticky thead). */}
       {/* No overflow-hidden on ds-surface: it breaks sticky table headers inside the scrollable PageContainer. */}
       <div className="ds-surface text-start">
-        <div className="ds-surface-header flex flex-col gap-4 py-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="ds-surface-header flex flex-col gap-4 py-4 sm:px-6">
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
@@ -580,17 +623,6 @@ export function QuoteFinalizeExportStep({
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">{t(`${FP}.pageSubtitle`)}</p>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              disabled={exporting || draft.items.length === 0 || !draft.company.name.trim()}
-              onClick={() => void handleExportPdf()}
-            >
-              {exporting ? t(`${FP}.exporting`) : t(`${FP}.exportPdf`)}
-              <FileDown className="ms-1.5 h-4 w-4" aria-hidden />
-            </Button>
           </div>
         </div>
 
@@ -1361,24 +1393,26 @@ export function QuoteFinalizeExportStep({
           <Card dir="rtl" className="text-start">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">{t(`${FP}.notesTitle`)}</CardTitle>
-              <CardDescription>{t(`${FP}.notesDesc`)}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Textarea
-                rows={6}
-                dir="rtl"
-                className="text-start"
-                value={notesText}
-                onChange={(e) =>
-                  setDraft((d) => ({
-                    ...d,
-                    quote: {
-                      ...d.quote,
-                      notes: e.target.value.split("\n"),
-                    },
-                  }))
-                }
-              />
+            <CardContent className="flex justify-start">
+              <div className="w-full max-w-xl">
+                <Textarea
+                  rows={6}
+                  dir="rtl"
+                  className="min-h-[9rem] w-full text-start"
+                  placeholder={t(`${FP}.notesPlaceholder`)}
+                  value={notesText}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      quote: {
+                        ...d.quote,
+                        notes: e.target.value.split("\n"),
+                      },
+                    }))
+                  }
+                />
+              </div>
             </CardContent>
           </Card>
         </div>

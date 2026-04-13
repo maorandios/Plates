@@ -1,126 +1,169 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Quotation {{ quote_number }}</title>
+  <title>הצעת מחיר {{ quote_number }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet" />
   <style>{{ css_text | safe }}</style>
 </head>
 <body>
   <div class="doc">
     <header class="header">
-      <div class="brand">
-        {% if logo_data_uri %}
-        <img class="logo" src="{{ logo_data_uri }}" alt="" />
-        {% endif %}
-        <div class="brand-text">
-          <div class="brand-name">{{ company_name }}</div>
-          {% if company_address_lines %}
-          <div class="brand-address">
-            {% for line in company_address_lines %}<span>{{ line }}</span>{% if not loop.last %}<br />{% endif %}{% endfor %}
-          </div>
+      <div class="header-accent"></div>
+      <div class="header-inner">
+        <div class="brand">
+          {% if logo_data_uri %}
+          <img class="logo" src="{{ logo_data_uri }}" alt="" />
           {% endif %}
+          <div class="brand-text">
+            <div class="brand-name">{{ company_name }}</div>
+            {% if company_address_lines %}
+            <div class="brand-address">
+              {% for line in company_address_lines %}<span>{{ line }}</span>{% if not loop.last %}<br />{% endif %}{% endfor %}
+            </div>
+            {% endif %}
+            <div class="brand-contact">
+              {% if company_phone %}<span class="ci">{{ company_phone }}</span>{% endif %}
+              {% if company_email %}<span class="ci">{{ company_email }}</span>{% endif %}
+              {% if company_website %}<span class="ci">{{ company_website }}</span>{% endif %}
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="meta">
-        <h1 class="doc-title">QUOTATION</h1>
-        <div class="meta-row"><span class="label">Quote no.</span><span class="value">{{ quote_number }}</span></div>
-        <div class="meta-row"><span class="label">Date</span><span class="value">{{ quote_date }}</span></div>
-        <div class="meta-row"><span class="label">Valid until</span><span class="value">{{ valid_until }}</span></div>
+        <div class="doc-headline">
+          <p class="doc-kicker">הצעת מחיר</p>
+          <h1 class="doc-title">{{ quote_number }}</h1>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">תאריך</span>
+              <span class="meta-value num" dir="ltr">{{ quote_date }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">בתוקף עד</span>
+              <span class="meta-value num" dir="ltr">{{ valid_until }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">מטבע</span>
+              <span class="meta-value num" dir="ltr">{{ currency }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
     <section class="section">
-      <h2 class="section-title">Customer &amp; quote details</h2>
+      <h2 class="section-title">פרטי לקוח והצעה</h2>
       <div class="grid-2">
-        <div>
+        <div class="panel">
           <div class="kv">
-            <div class="label">Customer</div>
-            <div class="value">{{ customer_name or "—" }}</div>
+            <div class="kv-label">שם לקוח</div>
+            <div class="kv-value">{{ customer_name or "—" }}</div>
           </div>
           <div class="kv">
-            <div class="label">Company</div>
-            <div class="value">{{ customer_company or "—" }}</div>
+            <div class="kv-label">חברה</div>
+            <div class="kv-value">{{ customer_company or "—" }}</div>
           </div>
           <div class="kv">
-            <div class="label">Project / job</div>
-            <div class="value">{{ project_name or "—" }}</div>
+            <div class="kv-label">פרויקט / עבודה</div>
+            <div class="kv-value">{{ project_name or "—" }}</div>
           </div>
         </div>
-        <div>
+        <div class="panel">
           <div class="kv">
-            <div class="label">Reference</div>
-            <div class="value">{{ reference_number or "—" }}</div>
+            <div class="kv-label">אסמכתא / מספר</div>
+            <div class="kv-value num" dir="ltr">{{ reference_number or "—" }}</div>
           </div>
+          {% if prepared_by %}
           <div class="kv">
-            <div class="label">Currency</div>
-            <div class="value">{{ currency }}</div>
+            <div class="kv-label">הוכן ע״י</div>
+            <div class="kv-value">{{ prepared_by }}</div>
           </div>
-          <div class="kv">
-            <div class="label">Prepared by</div>
-            <div class="value">{{ prepared_by or "—" }}</div>
-          </div>
+          {% endif %}
         </div>
       </div>
     </section>
 
     <section class="section">
-      <h2 class="section-title">Job summary</h2>
-      <div class="cards">
-        {% for card in summary_cards %}
-        <div class="card">
-          <div class="label">{{ card.label }}</div>
-          <div class="value">{{ card.value }}</div>
-          {% if card.hint %}<div class="hint">{{ card.hint }}</div>{% endif %}
+      <h2 class="section-title">מדדי סיכום</h2>
+      <div class="kpi-row">
+        {% for card in kpi_cards %}
+        <div class="kpi-card">
+          <div class="kpi-label">{{ card.label }}</div>
+          <div class="kpi-value">{% if loop.last %}<span class="num" dir="ltr">{{ card.value }}</span>{% else %}{{ card.value }}{% endif %}</div>
         </div>
         {% endfor %}
       </div>
+      <div class="tech-box">
+        <p class="tech-title">נתונים טכניים נוספים</p>
+        <div class="tech-grid">
+          {% for row in technical_rows %}
+          <div class="tech-item">
+            <span class="tech-label">{{ row.label }}</span>
+            <span class="tech-val">{{ row.value }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
     </section>
 
+    {% if scope_has %}
     <section class="section">
-      <h2 class="section-title">Scope of work</h2>
-      <p class="scope-text">{{ scope_primary }}</p>
-      {% if scope_secondary %}
-      <p class="scope-text secondary">{{ scope_secondary }}</p>
-      {% endif %}
+      <h2 class="section-title">היקף העבודה</h2>
+      <p class="scope-block">{{ scope_text }}</p>
     </section>
+    {% endif %}
 
-    <section class="section">
-      <h2 class="section-title">Part breakdown</h2>
+    <section class="section break-inside">
+      <h2 class="section-title">פירוט פלטות</h2>
       <div class="table-wrap">
         <table class="parts">
+          <colgroup>
+            <col style="width: 9%" />
+            <col style="width: 8%" />
+            <col style="width: 9%" />
+            <col style="width: 5%" />
+            <col style="width: 6%" />
+            <col style="width: 6%" />
+            <col style="width: 6%" />
+            <col style="width: 7%" />
+            <col style="width: 8%" />
+            <col style="width: 8%" />
+            <col style="width: 7%" />
+            <col style="width: 11%" />
+          </colgroup>
           <thead>
             <tr>
-              <th class="part-name">Part number</th>
-              <th class="qty">Quantity</th>
-              <th>Thickness</th>
-              <th>Material type</th>
-              <th>Material grade</th>
-              <th>Finish</th>
-              <th class="num">Width (mm)</th>
-              <th class="num">Length (mm)</th>
-              <th class="num">Area (m²)</th>
-              <th class="num">Weight (kg)</th>
-              <th class="num">Price</th>
+              <th>תיאור</th>
+              <th>סוג חומר</th>
+              <th>מספר חלק</th>
+              <th class="cen">כמות</th>
+              <th class="num">עובי (מ״מ)</th>
+              <th class="num">אורך (מ״מ)</th>
+              <th class="num">רוחב (מ״מ)</th>
+              <th class="num">שטח (מ״ר)</th>
+              <th class="num">משקל (ק״ג)</th>
+              <th>דרגת פלדה</th>
+              <th>גימור</th>
+              <th class="num">מחיר</th>
             </tr>
           </thead>
           <tbody>
             {% for row in item_rows %}
             <tr>
-              <td class="part-name">{{ row.part_number }}</td>
-              <td class="qty">{{ row.qty }}</td>
-              <td>{{ row.thickness }}</td>
+              <td class="desc">{{ row.description }}</td>
               <td>{{ row.material_type }}</td>
+              <td class="pn num" dir="ltr">{{ row.part_number }}</td>
+              <td class="cen">{{ row.qty }}</td>
+              <td class="num" dir="ltr">{{ row.thickness }}</td>
+              <td class="num" dir="ltr">{{ row.length_mm }}</td>
+              <td class="num" dir="ltr">{{ row.width_mm }}</td>
+              <td class="num" dir="ltr">{{ row.area_m2 }}</td>
+              <td class="num" dir="ltr">{{ row.weight }}</td>
               <td>{{ row.material_grade }}</td>
               <td>{{ row.finish }}</td>
-              <td class="num">{{ row.width_mm }}</td>
-              <td class="num">{{ row.length_mm }}</td>
-              <td class="num">{{ row.area_m2 }}</td>
-              <td class="num">{{ row.weight }}</td>
-              <td class="num">{{ row.line_total }}</td>
+              <td class="num price" dir="ltr">{{ row.line_total }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -128,43 +171,50 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section pricing-section">
+      <h2 class="section-title">סיכום מחיר</h2>
       <div class="pricing-wrap">
         <div class="pricing-box">
           <div class="pricing-row">
-            <span class="plabel">Total price</span>
-            <span class="pvalue">{{ pricing_total_price }}</span>
+            <span class="plabel">הצעת מחיר לפני מע״מ</span>
+            <span class="pvalue num" dir="ltr">{{ pricing_subtotal }}</span>
           </div>
-          {% if pricing_discount %}
+          {% if has_discount %}
+          <div class="pricing-row muted">
+            <span class="plabel">הנחה</span>
+            <span class="pvalue num" dir="ltr">{{ pricing_discount }}</span>
+          </div>
           <div class="pricing-row">
-            <span class="plabel">Discount</span>
-            <span class="pvalue">{{ pricing_discount }}</span>
+            <span class="plabel">סה״כ אחרי הנחה (לפני מע״מ)</span>
+            <span class="pvalue num" dir="ltr">{{ pricing_net_after_discount }}</span>
           </div>
           {% endif %}
           <div class="pricing-row muted">
             <span class="plabel">{{ pricing_vat_label }}</span>
-            <span class="pvalue">{{ pricing_vat_amount }}</span>
+            <span class="pvalue num" dir="ltr">{{ pricing_vat_amount }}</span>
           </div>
           <div class="pricing-row total-final">
-            <span class="plabel">Total incl. VAT</span>
-            <span class="pvalue">{{ pricing_total_incl_vat }}</span>
+            <span class="plabel">סה״כ כולל מע״מ</span>
+            <span class="pvalue num" dir="ltr">{{ pricing_total_incl_vat }}</span>
           </div>
         </div>
       </div>
     </section>
 
+    {% if notes_lines %}
     <section class="section">
-      <h2 class="section-title">Notes &amp; assumptions</h2>
+      <h2 class="section-title">הערות</h2>
       <ul class="bullets">
         {% for line in notes_lines %}
         <li>{{ line }}</li>
         {% endfor %}
       </ul>
     </section>
+    {% endif %}
 
     {% if terms_lines %}
     <section class="section">
-      <h2 class="section-title">Terms</h2>
+      <h2 class="section-title">תנאים</h2>
       <ul class="bullets">
         {% for line in terms_lines %}
         <li>{{ line }}</li>
@@ -174,16 +224,13 @@
     {% endif %}
 
     <footer class="footer">
-      <div class="footer-left">
-        <span><strong>{{ company_name }}</strong></span>
+      <div class="footer-main">
+        <span class="fn"><strong>{{ company_name }}</strong></span>
         {% if company_address_lines %}
-        <span class="footer-address">{% for line in company_address_lines %}{{ line }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+        <span class="fa">{% for line in company_address_lines %}{{ line }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
         {% endif %}
-        {% if company_email %}<span>{{ company_email }}</span>{% endif %}
-        {% if company_phone %}<span>{{ company_phone }}</span>{% endif %}
-        {% if company_website %}<span>{{ company_website }}</span>{% endif %}
       </div>
-      <div class="footer-right">{{ footer_generated }}</div>
+      <div class="footer-note">{{ footer_generated }}</div>
     </footer>
   </div>
 </body>
