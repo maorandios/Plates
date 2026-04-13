@@ -48,6 +48,8 @@ const itemSchema = z.object({
   weight_kg: z.number().nonnegative(),
   line_total: z.number().nonnegative(),
   plate_shape: z.string().optional(),
+  description: z.string().optional(),
+  source_row_id: z.string().optional(),
 });
 
 const pricingSchema = z.object({

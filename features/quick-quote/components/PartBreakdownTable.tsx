@@ -291,6 +291,7 @@ function MultiSelectFilter({
           <Button
             type="button"
             variant="outline"
+            dir="rtl"
             className="h-10 w-full justify-between gap-2 px-3 font-normal"
             disabled={disabled || options.length === 0}
           >
@@ -300,6 +301,7 @@ function MultiSelectFilter({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
+          dir="rtl"
           className="max-h-64 w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >

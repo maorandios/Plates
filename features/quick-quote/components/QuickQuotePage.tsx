@@ -501,7 +501,11 @@ export function QuickQuotePage() {
                     (step === 2 && quoteMethodSubView === "picker")) &&
                     "overflow-hidden"
                 )
-              : "overflow-y-auto"
+              : cn(
+                  "overflow-y-auto",
+                  /* Finalize: drop main top padding so sticky table thead can sit flush under the stepper (p-6 top was leaving a ~24px strip). */
+                  step === 7 && "!pt-0"
+                )
           )}
         >
         <div
@@ -632,6 +636,8 @@ export function QuickQuotePage() {
               materialFamilyLabel={MATERIAL_TYPE_LABELS[materialType]}
               materialType={materialType}
               materialPricePerKgByRow={materialPricePerKgByRow}
+              quotePartsForPreview={selection.parts}
+              dxfPartGeometries={dxfMethodGeometries}
             />
           )}
         </div>

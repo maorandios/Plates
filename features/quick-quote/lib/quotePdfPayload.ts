@@ -29,6 +29,14 @@ function lineMaterialSellFromPart(
   return lineWeightKg * pricePerKg;
 }
 
+/** Sum of line sell prices; 2 dp on the total (same rule as finalize step / PDF rows). */
+function sumLineTotalsRounded(
+  items: Array<{ line_total: number }>
+): number {
+  const raw = items.reduce((s, it) => s + Math.max(0, it.line_total), 0);
+  return Math.round(raw * 100) / 100;
+}
+
 /** Sender / letterhead block (editable before PDF export). */
 export interface QuotePdfCompanyBlock {
   name: string;
@@ -81,6 +89,10 @@ export interface QuotePdfRequestBody {
     line_total: number;
     /** `flat` or bend template id (l, u, z, omega, gutter, custom). */
     plate_shape: string;
+    /** Optional: mirrors part notes / finalize “תיאור”. */
+    description?: string;
+    /** Optional: stable id from merged quote row (client-only; PDF may ignore). */
+    source_row_id?: string;
   }>;
   /** Finalize-step pricing: total before VAT, optional discount, VAT rate, total incl. VAT. */
   pricing: {
@@ -176,7 +188,7 @@ export function buildQuotePdfRequestBody(
   jobSummary: JobSummaryMetrics,
   parts: QuotePartRow[],
   mfgParams: ManufacturingParameters,
-  pricing: PricingSummary,
+  _pricing: PricingSummary,
   materialType: MaterialType,
   materialPricePerKgByRow: Record<string, string>,
   options?: {
@@ -192,10 +204,8 @@ export function buildQuotePdfRequestBody(
   const validDays = options?.validDays ?? 14;
   const validUntil = addDaysIso(quoteDate, validDays);
 
-  const totalPrice = Math.max(0, pricing.finalEstimatedPrice);
   const discountInitial: number | null = null;
   const vatRate = 0.18;
-  const totalInclVat = computeQuoteTotalInclVat(totalPrice, discountInitial, vatRate);
 
   const materialFamilyLabel = MATERIAL_TYPE_LABELS[materialType];
 
@@ -219,8 +229,14 @@ export function buildQuotePdfRequestBody(
       weight_kg: p.weightKg * p.qty,
       line_total: Math.max(0, lineSell),
       plate_shape: p.bendTemplateId ?? "flat",
+      description: (p.notes ?? "").trim(),
+      source_row_id: p.id,
     };
   });
+
+  /** Must match the table: subtotal = sum of line totals, not Phase 6 `finalEstimatedPrice` (can differ due to rounding). */
+  const totalPrice = sumLineTotalsRounded(items);
+  const totalInclVat = computeQuoteTotalInclVat(totalPrice, discountInitial, vatRate);
 
   const notes =
     options?.notes && options.notes.length > 0 ? options.notes : [...DEFAULT_NOTES];

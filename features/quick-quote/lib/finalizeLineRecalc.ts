@@ -9,6 +9,7 @@ import {
   materialPricingRowKey,
   parseMaterialPricePerKg,
 } from "../job-overview/materialCalculations";
+import type { BendTemplateId } from "../bend-plate/types";
 import { formatMaterialGradeAndFinish } from "./plateFields";
 import { normalizeFinishFromImport } from "./materialSettingsOptions";
 import type { QuotePartRow } from "../types/quickQuote";
@@ -26,7 +27,13 @@ export type FinalizeDraftLineItem = {
   weight_kg: number;
   line_total: number;
   plate_shape: string;
+  /** Stable id from merged {@link QuotePartRow} — DXF preview lookup. */
+  source_row_id?: string;
+  /** Free-text description (maps to part notes). */
+  description?: string;
 };
+
+const BEND_SHAPE_IDS = new Set<string>(["l", "u", "z", "omega", "gutter", "custom"]);
 
 function roundN(n: number, decimals: number): number {
   const p = 10 ** decimals;
@@ -85,5 +92,54 @@ export function recalcFinalizeLineMetrics(
     area_m2: roundN(lineAreaM2, 6),
     weight_kg: roundN(lineWeightKg, 6),
     line_total: roundN(lineTotal, 6),
+  };
+}
+
+/**
+ * Build a {@link QuotePartRow} for the shared plate preview modal from a finalize line
+ * (merged with the original BOM row when available so DXF geometry resolves).
+ */
+export function finalizeDraftLineToQuotePart(
+  row: FinalizeDraftLineItem,
+  materialType: MaterialType,
+  base: QuotePartRow | undefined
+): QuotePartRow {
+  const q = Math.max(0, Math.floor(row.qty));
+  const w = Math.max(0, row.width_mm);
+  const len = Math.max(0, row.length_mm);
+  const t = Math.max(0, row.thickness_mm);
+  const rho = getMaterialConfig(materialType).densityKgPerM3;
+  const unitAreaM2 = (w * len) / 1_000_000;
+  const unitWeightKg = unitAreaM2 * (t / 1000) * rho;
+  const finishLabel = normalizeFinishFromImport(
+    materialType,
+    row.finish.trim() || undefined
+  );
+  const material = formatMaterialGradeAndFinish(row.material_grade, finishLabel);
+  const shape = (row.plate_shape || "flat").toLowerCase();
+  const bendTemplateId = BEND_SHAPE_IDS.has(shape)
+    ? (shape as BendTemplateId)
+    : undefined;
+
+  return {
+    id: base?.id ?? row.source_row_id ?? "__finalize__",
+    lineSourceIds: base?.lineSourceIds,
+    sourceRef: base?.sourceRef,
+    partName: row.part_number,
+    qty: q,
+    material,
+    thicknessMm: t,
+    lengthMm: len,
+    widthMm: w,
+    areaM2: unitAreaM2,
+    weightKg: unitWeightKg,
+    cutLengthMm: base?.cutLengthMm ?? 0,
+    pierceCount: base?.pierceCount ?? 0,
+    validationStatus: "valid",
+    estimatedLineCost: 0,
+    bendTemplateId,
+    dxfFileName: base?.dxfFileName ?? "—",
+    excelRowRef: base?.excelRowRef ?? "—",
+    notes: row.description ?? "",
   };
 }

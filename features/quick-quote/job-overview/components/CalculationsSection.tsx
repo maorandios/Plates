@@ -143,18 +143,14 @@ export function CalculationsSection({
           </TableBody>
           <TableFooter className="border-t border-white/10 bg-muted/35 p-0 [&>tr]:border-b-0">
             <TableRow className="border-0 bg-transparent hover:bg-transparent data-[state=selected]:bg-transparent">
-              <TableCell colSpan={7} className="bg-inherit py-3.5">
-                <div
-                  className="flex flex-wrap items-baseline justify-end gap-2.5"
-                  dir="rtl"
-                >
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {t(`${PF}.footerTotalForBilling`)}
-                  </span>
-                  <span className="tabular-nums text-base font-semibold text-foreground">
-                    {formatQuickQuoteCurrency(grandTotal, currencyCode)}
-                  </span>
-                </div>
+              <TableCell colSpan={5} className="bg-inherit py-3.5" />
+              <TableCell className="bg-black/[0.22] py-3.5 text-start align-middle dark:bg-black/35">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {t(`${PF}.footerTotalForBilling`)}
+                </span>
+              </TableCell>
+              <TableCell className="bg-black/[0.22] py-3.5 text-start align-middle tabular-nums text-base font-semibold text-foreground dark:bg-black/35">
+                {formatQuickQuoteCurrency(grandTotal, currencyCode)}
               </TableCell>
             </TableRow>
           </TableFooter>
