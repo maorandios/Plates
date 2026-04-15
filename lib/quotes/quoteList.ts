@@ -27,6 +27,7 @@ export interface QuoteListRecord {
 
 const STORAGE_KEY = "plate_quotes_list_v1";
 const CHANGED_EVENT = "plate-quotes-list-changed";
+const MAX_QUOTES_LIST_SIZE = 200;
 
 function load(): QuoteListRecord[] {
   if (typeof window === "undefined") return [];
@@ -90,11 +91,25 @@ function normalizeRecord(r: QuoteListRecord): QuoteListRecord {
 
 function save(list: QuoteListRecord[]): void {
   if (typeof window === "undefined") return;
+  const sorted = [...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const capped =
+    sorted.length > MAX_QUOTES_LIST_SIZE
+      ? sorted.slice(0, MAX_QUOTES_LIST_SIZE)
+      : sorted;
   try {
-    const sorted = [...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(capped));
     window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
   } catch (e) {
+    if (e instanceof DOMException && e.name === "QuotaExceededError") {
+      const pruned = capped.filter((q) => q.status !== "complete").slice(0, 50);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+        window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+        return;
+      } catch {
+        /* still over quota — fall through */
+      }
+    }
     console.warn("[PLATE] Failed to save quotes list", e);
   }
 }

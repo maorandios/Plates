@@ -34,7 +34,14 @@ export function calculateViewTransform(
 ): ViewTransform {
   const { width: gw, height: gh, minX, minY } = geomBounds;
 
-  if (gw <= 0 || gh <= 0) {
+  if (
+    gw <= 0 ||
+    gh <= 0 ||
+    !Number.isFinite(gw) ||
+    !Number.isFinite(gh) ||
+    !Number.isFinite(minX) ||
+    !Number.isFinite(minY)
+  ) {
     return {
       scale: 1,
       offsetX: canvasWidth / 2,
@@ -43,12 +50,13 @@ export function calculateViewTransform(
     };
   }
 
-  const availableWidth = canvasWidth - 2 * padding;
-  const availableHeight = canvasHeight - 2 * padding;
+  const availableWidth = Math.max(1, canvasWidth - 2 * padding);
+  const availableHeight = Math.max(1, canvasHeight - 2 * padding);
 
   const scaleX = availableWidth / gw;
   const scaleY = availableHeight / gh;
-  const scale = Math.min(scaleX, scaleY);
+  const rawScale = Math.min(scaleX, scaleY);
+  const scale = Math.min(rawScale, 1e6);
 
   // Center of geometry in DXF coordinates
   const geomCenterX = minX + gw / 2;

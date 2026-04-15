@@ -128,6 +128,7 @@ export function MergedQuoteLinesStep({
               parts={parts}
               currency={currency}
               onDeletePart={onDeletePart}
+              dxfPartGeometries={dxfMethodGeometries}
             />
           )}
         </div>

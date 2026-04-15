@@ -950,7 +950,9 @@
     "finishLabels": {
       "carbon": "פח שחור",
       "galvanized": "פח מגולוון",
-      "paint": "פח צבוע"
+      "paint": "פח צבוע",
+      "ללא": "ללא",
+      "—": "—"
     }
   },
   "dashboard": {

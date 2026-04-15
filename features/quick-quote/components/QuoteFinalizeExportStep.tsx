@@ -554,10 +554,17 @@ export function QuoteFinalizeExportStep({
   const onExportControlsChangeRef = useRef(onExportControlsChange);
   onExportControlsChangeRef.current = onExportControlsChange;
 
+  const handleExportPdfRef = useRef(handleExportPdf);
+  handleExportPdfRef.current = handleExportPdf;
+
+  const stableExportPdf = useCallback(
+    (...args: Parameters<typeof handleExportPdf>) => handleExportPdfRef.current(...args),
+    []
+  );
+
   useEffect(() => {
-    if (!onExportControlsChange) return;
-    onExportControlsChange({
-      exportPdf: handleExportPdf,
+    onExportControlsChangeRef.current?.({
+      exportPdf: stableExportPdf,
       exporting,
       disabled:
         exporting ||
@@ -565,8 +572,7 @@ export function QuoteFinalizeExportStep({
         !draft.company.name.trim(),
     });
   }, [
-    onExportControlsChange,
-    handleExportPdf,
+    stableExportPdf,
     exporting,
     draft.items.length,
     draft.company.name,

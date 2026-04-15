@@ -172,11 +172,18 @@ export function PlateGeometryCanvas({
 
   const outerPoints = useMemo(() => {
     if (geometry.outer.length === 0) return [];
-    return transformContour(geometry.outer, transform);
+    const pts = transformContour(geometry.outer, transform);
+    if (pts.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y)))
+      return [];
+    return pts;
   }, [geometry.outer, transform]);
 
   const holePointsArray = useMemo(() => {
-    return geometry.holes.map((hole) => transformContour(hole, transform));
+    return geometry.holes
+      .map((hole) => transformContour(hole, transform))
+      .filter((pts) =>
+        pts.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y))
+      );
   }, [geometry.holes, transform]);
 
   const debugLayers = useMemo(() => {

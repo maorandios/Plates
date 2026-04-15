@@ -87,6 +87,15 @@ export function QuickQuotePage() {
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
   const [finalizeExportToolbar, setFinalizeExportToolbar] =
     useState<FinalizeExportToolbar | null>(null);
+  const stableSetFinalizeDraft = useCallback(
+    (action: React.SetStateAction<QuotePdfFullPayload>) => {
+      setPdfExportDraft((prev) => {
+        if (prev === null) return prev;
+        return typeof action === "function" ? action(prev) : action;
+      });
+    },
+    []
+  );
   const [manualQuoteRows, setManualQuoteRows] = useState<ManualQuotePartRow[]>([]);
 
   /** Plates from the Import Excel list method only (separate from manual rows). */
@@ -636,12 +645,7 @@ export function QuickQuotePage() {
           {step === 7 && pdfExportDraft && (
             <QuoteFinalizeExportStep
               draft={pdfExportDraft}
-              setDraft={(action) => {
-                setPdfExportDraft((prev) => {
-                  if (prev === null) return prev;
-                  return typeof action === "function" ? action(prev) : action;
-                });
-              }}
+              setDraft={stableSetFinalizeDraft}
               onExportControlsChange={setFinalizeExportToolbar}
               materialFamilyLabel={MATERIAL_TYPE_LABELS[materialType]}
               materialType={materialType}
