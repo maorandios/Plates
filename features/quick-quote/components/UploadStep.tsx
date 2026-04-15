@@ -119,7 +119,7 @@ export function UploadStep({
               <span className="text-muted-foreground">Excel</span>
               <span className="font-medium">
                 {excelFile ? (
-                  <span className="text-emerald-700 dark:text-emerald-400">
+                  <span className="text-primary/85 dark:text-primary">
                     Uploaded
                   </span>
                 ) : (
@@ -141,7 +141,7 @@ export function UploadStep({
               <span
                 className={
                   canContinue
-                    ? "font-medium text-emerald-700 dark:text-emerald-400 text-right"
+                    ? "font-medium text-primary/85 dark:text-primary text-right"
                     : "font-medium text-muted-foreground text-right"
                 }
               >

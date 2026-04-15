@@ -335,7 +335,7 @@ function SummaryTile({
     <Card
       className={
         variant === "ok"
-          ? "border-emerald-600/20 bg-emerald-600/[0.04]"
+          ? "border-primary/20 bg-primary/[0.04]"
           : variant === "warn"
             ? "border-amber-500/25 bg-amber-500/[0.04]"
             : variant === "bad"

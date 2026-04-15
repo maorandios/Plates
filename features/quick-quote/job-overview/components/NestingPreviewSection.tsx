@@ -113,7 +113,7 @@ function SheetCard({
           className={cn(
             "shrink-0 rounded-md bg-black/20 px-2 py-0.5 text-sm font-mono font-bold tabular-nums",
             layout.utilizationPct >= 68
-              ? "text-green-400"
+              ? "text-primary"
               : layout.utilizationPct >= 48
                 ? "text-yellow-400"
                 : "text-red-400"
@@ -327,7 +327,7 @@ export function NestingPreviewSection({
               className={cn(
                 "overflow-hidden border bg-card/80 shadow-sm transition-colors",
                 "border-white/10",
-                open && "border-emerald-500/25 bg-emerald-500/[0.04]"
+                open && "border-primary/25 bg-primary/[0.04]"
               )}
             >
               <CardHeader className="cursor-pointer select-none space-y-0 p-4 pb-3 sm:p-5">

@@ -110,7 +110,7 @@ function StatusDot({
       <span
         className={cn(
           "h-2.5 w-2.5 rounded-full shrink-0",
-          ok ? "bg-emerald-500" : "bg-red-500"
+          ok ? "bg-primary" : "bg-red-500"
         )}
       />
     </span>
@@ -586,7 +586,7 @@ function GeometryPrepCell({ part }: { part: Part }) {
             variant="outline"
             className={
               st === "ready"
-                ? "text-emerald-800 border-emerald-300 bg-emerald-50 text-[10px] font-semibold px-1.5"
+                ? "text-primary/90 border-primary/40 bg-primary/10 text-[10px] font-semibold px-1.5"
                 : st === "warning"
                   ? "text-amber-900 border-amber-300 bg-amber-50 text-[10px] font-semibold px-1.5"
                   : "text-destructive border-destructive/40 bg-destructive/10 text-[10px] font-semibold px-1.5"
@@ -774,12 +774,12 @@ function ExcelMatchCell({
             className="inline-flex w-full justify-center items-center rounded-md p-1 -m-1 border-0 bg-transparent cursor-default"
             aria-label="Excel data matches DXF plate parameters"
           >
-            <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-emerald-500" />
+            <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-primary" />
           </button>
         </TooltipTrigger>
         <TooltipContent side="left" className="max-w-sm text-xs">
           <p className="font-semibold text-foreground mb-1">Excel match</p>
-          <p className="text-emerald-800 leading-snug">
+          <p className="text-primary/90 leading-snug">
             Excel list matches DXF dimensions, area, and total weight (same rules as before).
           </p>
         </TooltipContent>

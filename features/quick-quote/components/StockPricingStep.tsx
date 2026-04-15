@@ -471,7 +471,7 @@ export function StockPricingStep({
             return (
               <details
                 key={row.thicknessMm}
-                className="group/details rounded-lg border border-white/10 bg-card overflow-hidden open:border-emerald-500/25 open:bg-emerald-500/[0.04]"
+                className="group/details rounded-lg border border-white/10 bg-card overflow-hidden open:border-primary/25 open:bg-primary/[0.04]"
                 open={index === 0}
               >
                 <summary
@@ -484,7 +484,7 @@ export function StockPricingStep({
                   <div className="flex shrink-0 items-stretch gap-3">
                     <div className="flex items-center">
                       <Layers
-                        className="h-5 w-5 text-emerald-600 dark:text-emerald-400"
+                        className="h-5 w-5 text-primary dark:text-primary"
                         aria-hidden
                       />
                     </div>

@@ -60,7 +60,7 @@ function parseDotForFile(file: UploadedFile): { kind: ParseDot; label: string } 
 function ParseDot({ kind, label }: { kind: ParseDot; label: string }) {
   const color =
     kind === "ok"
-      ? "bg-emerald-500"
+      ? "bg-primary"
       : kind === "warn"
         ? "bg-amber-500"
         : "bg-red-500";

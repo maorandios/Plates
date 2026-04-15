@@ -113,7 +113,7 @@ export function ColumnMappingDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
+            <FileSpreadsheet className="h-4 w-4 text-primary shrink-0" />
             Map Excel Columns
           </DialogTitle>
           <p className="text-sm text-muted-foreground mt-0.5 truncate">{fileName}</p>
@@ -187,8 +187,8 @@ export function ColumnMappingDialog({
                       </Select>
 
                       {isAutoDetected && (
-                        <p className="text-xs text-emerald-600 flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+                        <p className="text-xs text-primary flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary inline-block" />
                           Auto-detected
                         </p>
                       )}

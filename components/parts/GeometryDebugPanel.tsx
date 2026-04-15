@@ -117,7 +117,7 @@ export function GeometryDebugPanel({
       )}
 
       <div className="text-[10px] text-muted-foreground border-t border-violet-200/60 pt-2 leading-relaxed">
-        <span className="text-emerald-700 font-medium">Green</span> outer ·{" "}
+        <span className="text-primary/85 font-medium">Green</span> outer ·{" "}
         <span className="text-blue-700 font-medium">Blue</span> holes ·{" "}
         <span className="text-red-700 font-medium">Red dashed</span> removed ·{" "}
         <span className="text-orange-700 font-medium">Orange dashed</span> open/invalid ·{" "}

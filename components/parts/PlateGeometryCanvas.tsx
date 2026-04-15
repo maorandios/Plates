@@ -336,7 +336,7 @@ export function PlateGeometryCanvas({
   }
 
   const holeStroke = previewModal
-    ? "#00FF9F"
+    ? "#6A23F7"
     : debugMode
       ? "#2563eb"
       : "#dc2626";
@@ -346,14 +346,14 @@ export function PlateGeometryCanvas({
       ? "rgba(37,99,235,0.12)"
       : "#ffffff";
   const outerStroke = previewModal
-    ? "#00FF9F"
+    ? "#6A23F7"
     : debugMode
-      ? "#16a34a"
+      ? "#6A23F7"
       : "#1e40af";
   const outerFill = previewModal
-    ? "#00371F"
+    ? "#160822"
     : debugMode
-      ? "rgba(22,163,74,0.15)"
+      ? "rgba(106,35,247,0.15)"
       : "#e0f2fe";
 
   return (

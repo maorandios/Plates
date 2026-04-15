@@ -674,7 +674,7 @@ function BendPlateHub({
             </DialogHeader>
           </div>
 
-          <div dir="ltr" className="w-full shrink-0 overflow-hidden border-t border-solid border-[#00FF9F]/20">
+          <div dir="ltr" className="w-full shrink-0 overflow-hidden border-t border-solid border-[#6A23F7]/20">
             <div
               className={cn(
                 "grid w-full min-h-[21rem] grid-cols-2 sm:min-h-[22.5rem]",
@@ -690,9 +690,9 @@ function BendPlateHub({
                   className={cn(
                     "flex min-h-0 min-w-0 flex-col items-center justify-center gap-3 px-4 py-4 text-center transition-colors",
                     "bg-card hover:bg-white/[0.03]",
-                    "border-b border-solid border-[#00FF9F]/20",
-                    i % 2 === 0 && "border-s border-e border-solid border-[#00FF9F]/20",
-                    i % 2 === 1 && "border-e border-solid border-[#00FF9F]/20",
+                    "border-b border-solid border-[#6A23F7]/20",
+                    i % 2 === 0 && "border-s border-e border-solid border-[#6A23F7]/20",
+                    i % 2 === 1 && "border-e border-solid border-[#6A23F7]/20",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                     "active:bg-white/[0.05]"
                   )}

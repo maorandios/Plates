@@ -232,10 +232,10 @@ export function ExcelColumnMappingModal({
               <>
                 <div className="flex w-full justify-start">
                   <div className="min-w-0 w-full max-w-full sm:max-w-[50%]">
-                    <div className="flex w-full flex-col gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                    <div className="flex w-full flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         <FileSpreadsheet
-                          className="h-5 w-5 shrink-0 text-emerald-600"
+                          className="h-5 w-5 shrink-0 text-primary"
                           aria-hidden
                         />
                         <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
@@ -259,7 +259,7 @@ export function ExcelColumnMappingModal({
                             <p className="text-[10px] font-medium leading-tight text-muted-foreground">
                               {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
                             </p>
-                            <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
+                            <p className="text-sm font-medium tabular-nums text-primary/90 dark:text-primary/80">
                               {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
                                 n: excelStripDataRowCount,
                               })}

@@ -153,7 +153,7 @@ function DxfPreviewStatCell({
       )}
     >
       <Icon
-        className="h-4 w-4 shrink-0 text-[#00FF9F]/70"
+        className="h-4 w-4 shrink-0 text-[#6A23F7]/70"
         strokeWidth={1.75}
         aria-hidden
       />
@@ -1095,7 +1095,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                       <div
                         className={cn(
                           "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors",
-                          isComplete && "border-emerald-600 bg-emerald-600 text-white",
+                          isComplete && "border-primary bg-primary text-white",
                           isCurrent && !isComplete && "border-primary bg-primary text-primary-foreground",
                           !isCurrent && !isComplete && "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
                         )}
@@ -1106,7 +1106,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                         className={cn(
                           "text-sm font-medium whitespace-nowrap",
                           isCurrent && "text-foreground",
-                          !isCurrent && isComplete && "text-emerald-600",
+                          !isCurrent && isComplete && "text-primary",
                           !isCurrent && !isComplete && "text-muted-foreground"
                         )}
                       >
@@ -1117,7 +1117,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                       <div
                         className={cn(
                           "h-0.5 flex-1 mx-3",
-                          step < subStep ? "bg-emerald-600" : "bg-border"
+                          step < subStep ? "bg-primary" : "bg-border"
                         )}
                       />
                     )}
@@ -1172,10 +1172,10 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 )}
               >
                 {dxfQuotePhaseLayout && uploadedFiles.length > 0 ? (
-                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <DxfFileBadgeIcon
-                        className="h-6 w-6 shrink-0 text-emerald-600"
+                        className="h-6 w-6 shrink-0 text-primary"
                         aria-hidden
                       />
                       <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
@@ -1204,7 +1204,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                           <p className="text-[10px] font-medium leading-tight text-muted-foreground">
                             {t("quote.dxfPhase.dxfUploadedFilesCountLabel")}
                           </p>
-                          <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
+                          <p className="text-sm font-medium tabular-nums text-primary/90 dark:text-primary/80">
                             {t("quote.dxfPhase.dxfUploadedFilesCountValue", {
                               n: uploadedFiles.length,
                             })}
@@ -1428,10 +1428,10 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 )}
 
                 {excelMappedComplete && optionalExcelFile && mappedExcelRows && (
-                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <FileSpreadsheet
-                        className="h-5 w-5 shrink-0 text-emerald-600"
+                        className="h-5 w-5 shrink-0 text-primary"
                         aria-hidden
                       />
                       <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
@@ -1464,7 +1464,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                               ? t("quote.dxfPhase.excelUploadedRowCount")
                               : "Rows detected"}
                           </p>
-                          <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
+                          <p className="text-sm font-medium tabular-nums text-primary/90 dark:text-primary/80">
                             {dxfQuotePhaseLayout
                               ? t("quote.dxfPhase.excelUploadedRowsDetectedValue", {
                                   n: mappedExcelRows.length,
@@ -1587,13 +1587,13 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                         "inline-flex w-fit max-w-full items-center gap-3 rounded-lg border p-4 text-start transition-colors focus-visible:outline-none",
                         validationSummary.warnings > 0 || validationSummary.critical > 0
                           ? "excel-dxf-mismatch-banner"
-                          : "border-emerald-500/40 bg-emerald-500/[0.05] text-foreground hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          : "border-primary/40 bg-primary/[0.05] text-foreground hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       )}
                     >
                       {validationSummary.warnings > 0 || validationSummary.critical > 0 ? (
                         <AlertTriangle className="h-5 w-5 shrink-0 text-current" aria-hidden />
                       ) : (
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                       )}
                       <div className="min-w-0 space-y-1">
                         <p className="text-sm font-medium">
@@ -1890,14 +1890,14 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                               disabled={!upload.parsed}
                               className={cn(
                                 "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md p-0",
-                                "text-[#00E5FF] hover:bg-white/5",
+                                "text-[#6A23F7] hover:bg-white/5",
                                 "disabled:pointer-events-none disabled:opacity-50",
                                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                               )}
                             >
                               <Eye
                                 className="h-4 w-4"
-                                stroke="#00E5FF"
+                                stroke="#6A23F7"
                                 strokeWidth={2}
                                 aria-hidden
                               />
@@ -2090,7 +2090,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                           label={cell.label}
                           value={cell.value}
                           className={cn(
-                            "border-b border-solid border-[#00FF9F]/20",
+                            "border-b border-solid border-[#6A23F7]/20",
                             i % 4 === 0 && "border-s",
                             i % 4 !== 3 && "border-e"
                           )}

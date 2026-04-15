@@ -176,7 +176,7 @@ export function ManualPartPreviewDialog({
                         label={cell.label}
                         value={cell.value}
                         className={cn(
-                          "border-b border-solid border-[#00FF9F]/20",
+                          "border-b border-solid border-[#6A23F7]/20",
                           i % 4 === 0 && "border-s",
                           i % 4 !== 3 && "border-e"
                         )}

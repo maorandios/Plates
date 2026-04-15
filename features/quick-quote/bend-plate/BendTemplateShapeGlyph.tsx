@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import type { BendTemplateId } from "./types";
 
 /** Matches plate preview / metric accent in quick quote. */
-const GLYPH_CLASS = "text-[#00FF9F]";
+const GLYPH_CLASS = "text-[#6A23F7]";
 
 /** Thin schematic strokes (side-view icons). */
 const STROKE = 2.2;

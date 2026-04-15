@@ -145,7 +145,7 @@ export function SheetCanvas({
                 <Line
                   points={outerPts}
                   closed
-                  fill={selected ? "rgba(22,163,74,0.22)" : "rgba(22,163,74,0.12)"}
+                  fill={selected ? "rgba(106,35,247,0.22)" : "rgba(106,35,247,0.12)"}
                   stroke={selected ? "#15803d" : "#16a34a"}
                   strokeWidth={selected ? 3 : 2}
                   lineJoin="round"

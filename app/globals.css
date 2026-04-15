@@ -37,7 +37,7 @@
  * #121F25 — main panels & cards
  * #0C1318 — input / field surfaces (rgb(12, 19, 24))
  * #182430 — inner rows, nested surfaces (popover, etc.)
- * #00E19A — primary actions (text on buttons: dark for contrast)
+ * #6A23F7 — primary actions (accent purple)
  */
 :root {
   color-scheme: dark;
@@ -50,9 +50,9 @@
   --popover: 210 33% 14.1%; /* #182430 */
   --popover-foreground: 0 0% 100%;
 
-  /* #00E19A — mint / emerald CTA */
-  --primary: 163 100% 44.1%;
-  --primary-foreground: 180 25% 4.7%; /* #090F0F — dark text on mint button */
+  /* #6A23F7 — brand purple (hsl approx. for hsl(var(--primary))) */
+  --primary: 262 92% 55%;
+  --primary-foreground: 0 0% 100%; /* white on purple buttons */
 
   --secondary: 210 33% 14.1%; /* #182430 */
   --secondary-foreground: 0 0% 100%;
@@ -70,7 +70,7 @@
   --border: 205 22% 22%;
   /* Legacy HSL token; theme field fill uses --color-input #0c1318 */
   --input: 204 35% 14%;
-  --ring: 163 100% 44.1%;
+  --ring: 262 92% 55%;
 
   --radius: 0.75rem;
 
@@ -79,7 +79,7 @@
   --sidebar-accent: 199 34% 10.8%; /* #121F25 */
   --sidebar-border: 205 18% 18%;
 
-  --success: 163 100% 44.1%;
+  --success: 262 92% 55%;
   --warning: 38 92% 50%;
 }
 
@@ -237,7 +237,7 @@ div.job-overview-analysis-card--rose {
   color: #ff006f !important;
 }
 div.job-overview-analysis-card--emerald {
-  background-color: #001910 !important;
-  border-color: #00ff88 !important;
-  color: #00ff99 !important;
+  background-color: #160822 !important;
+  border-color: #6a23f7 !important;
+  color: #d4c4fd !important;
 }

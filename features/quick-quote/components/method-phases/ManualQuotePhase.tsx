@@ -463,14 +463,14 @@ export function ManualQuotePhase({
                                   disabled={!canPreview}
                                   className={cn(
                                     "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md p-0",
-                                    "text-[#00E5FF] hover:bg-white/5",
+                                    "text-[#6A23F7] hover:bg-white/5",
                                     "disabled:pointer-events-none disabled:opacity-50",
                                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                   )}
                                 >
                                   <Eye
                                     className="h-4 w-4"
-                                    stroke="#00E5FF"
+                                    stroke="#6A23F7"
                                     strokeWidth={2}
                                     aria-hidden
                                   />

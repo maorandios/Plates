@@ -442,7 +442,7 @@ export function ClientImportWizardModal({
                         <Loader2 className="h-4 w-4 animate-spin shrink-0" />
                       )}
                       {row.status === "done" && (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                       )}
                       {row.status === "error" && (
                         <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
@@ -453,7 +453,7 @@ export function ClientImportWizardModal({
               )}
 
               {pendingDxf.length > 0 && !dxfParsing && (
-                <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-900">
+                <div className="rounded-lg bg-primary/10 border border-primary/30 px-3 py-2 text-sm text-primary/90">
                   <strong>Parse complete.</strong>{" "}
                   {pendingDxf.filter((p) => p.status === "done").length} DXF file
                   {pendingDxf.filter((p) => p.status === "done").length !== 1
@@ -521,7 +521,7 @@ export function ClientImportWizardModal({
                         <span className="text-xs text-blue-600">Mapping…</span>
                       )}
                       {row.status === "done" && (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                       )}
                       {row.status === "error" && (
                         <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />

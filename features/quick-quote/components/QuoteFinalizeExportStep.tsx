@@ -83,12 +83,12 @@ function equalColumnWidthsPct(n: number): number[] {
   return arr;
 }
 
-const PREVIEW_ICON_CLASS = "text-[#00E5FF]";
-const PREVIEW_STROKE = "#00E5FF";
+const PREVIEW_ICON_CLASS = "text-[#6A23F7]";
+const PREVIEW_STROKE = "#6A23F7";
 
 /** Editable cell inputs — pill outline to match Quick Quote tables. */
 const FINALIZE_CELL_INPUT =
-  "h-8 w-full min-w-0 rounded-full border border-white/10 bg-muted/35 px-3 text-sm shadow-none text-foreground placeholder:text-muted-foreground focus-visible:border-[#00FF9F]/50 focus-visible:ring-1 focus-visible:ring-[#00FF9F]/30";
+  "h-8 w-full min-w-0 rounded-full border border-white/10 bg-muted/35 px-3 text-sm shadow-none text-foreground placeholder:text-muted-foreground focus-visible:border-[#6A23F7]/50 focus-visible:ring-1 focus-visible:ring-[#6A23F7]/30";
 
 function finishLabelFromCode(code: string): string {
   const key = `quote.finishLabels.${code}`;
@@ -98,7 +98,7 @@ function finishLabelFromCode(code: string): string {
 
 /** Matches PartBreakdownTable summary metrics. */
 const METRIC_VALUE_ROW =
-  "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#00FF9F] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
+  "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#6A23F7] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
 const METRIC_UNIT_CLASS =
   "font-semibold tabular-nums text-muted-foreground text-[0.72em] leading-none";
 
@@ -616,7 +616,7 @@ export function QuoteFinalizeExportStep({
                     aria-label={t(`${FP}.copyQuoteNumberAria`)}
                   >
                     {quoteNumberCopied ? (
-                      <Check className="h-4 w-4 text-[#00FF9F]" aria-hidden />
+                      <Check className="h-4 w-4 text-[#6A23F7]" aria-hidden />
                     ) : (
                       <Copy className="h-4 w-4" aria-hidden />
                     )}
@@ -1229,7 +1229,7 @@ export function QuoteFinalizeExportStep({
                               label={cell.label}
                               value={cell.value}
                               className={cn(
-                                "border-b border-solid border-[#00FF9F]/20",
+                                "border-b border-solid border-[#6A23F7]/20",
                                 idx % 4 === 0 && "border-s",
                                 idx % 4 !== 3 && "border-e"
                               )}

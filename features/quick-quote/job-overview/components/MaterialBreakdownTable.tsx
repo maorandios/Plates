@@ -55,9 +55,9 @@ function wasteSharePct(r: StockSheetSizeBreakdownRow): number {
 function utilHeatCellClass(pct: number): string {
   const u = clampPct(pct);
   if (u >= 85)
-    return "bg-emerald-500/25 dark:bg-emerald-500/[0.22] font-semibold text-foreground";
+    return "bg-primary/25 dark:bg-primary/[0.22] font-semibold text-foreground";
   if (u >= 72)
-    return "bg-lime-500/20 dark:bg-lime-500/[0.18] font-semibold text-foreground";
+    return "bg-primary/20 dark:bg-primary/[0.18] font-semibold text-foreground";
   if (u >= 58)
     return "bg-amber-400/22 dark:bg-amber-500/[0.18] font-semibold text-foreground";
   if (u >= 42)
@@ -74,9 +74,9 @@ function wasteShareHeatCellClass(wastePct: number): string {
 function utilHeatRowClass(pct: number): string {
   const u = clampPct(pct);
   if (u >= 85)
-    return "border-s-4 border-s-emerald-500 bg-emerald-500/[0.05] dark:bg-emerald-500/[0.09]";
+    return "border-s-4 border-s-primary bg-primary/[0.05] dark:bg-primary/[0.09]";
   if (u >= 72)
-    return "border-s-4 border-s-lime-500 bg-lime-500/[0.05] dark:bg-lime-500/[0.08]";
+    return "border-s-4 border-s-primary bg-primary/[0.05] dark:bg-primary/[0.08]";
   if (u >= 58)
     return "border-s-4 border-s-amber-500 bg-amber-400/[0.06] dark:bg-amber-500/[0.09]";
   if (u >= 42)
@@ -233,7 +233,7 @@ export function MaterialBreakdownTable({
             {t(`${QA}.tableHeatLabel`)}
           </span>
           <div
-            className="h-2.5 min-w-[140px] flex-1 max-w-xs rounded-sm bg-gradient-to-r from-red-500/40 via-amber-400/35 via-lime-500/35 to-emerald-500/40 dark:from-red-500/30 dark:via-amber-500/25 dark:via-lime-500/25 dark:to-emerald-500/30"
+            className="h-2.5 min-w-[140px] flex-1 max-w-xs rounded-sm bg-gradient-to-r from-red-500/40 via-amber-400/35 via-violet-500/35 to-[#6A23F7]/40 dark:from-red-500/30 dark:via-amber-500/25 dark:via-violet-500/25 dark:to-[#6A23F7]/30"
             title={`${t(`${QA}.tableHeatPoor`)} → ${t(`${QA}.tableHeatStrong`)}`}
           />
           <span className="tabular-nums text-[10px]">{t(`${QA}.tableHeatPoor`)}</span>

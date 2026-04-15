@@ -120,13 +120,13 @@ export function CalculationStep({
                   className={cn(
                     "flex items-start gap-3 rounded-md border px-3 py-2.5 text-sm",
                     s.state === "active" && "border-primary/40 bg-primary/5",
-                    s.state === "complete" && "border-emerald-600/25 bg-emerald-600/[0.04]",
+                    s.state === "complete" && "border-primary/25 bg-primary/[0.04]",
                     s.state === "pending" && "border-white/[0.08] bg-white/[0.03] text-muted-foreground"
                   )}
                 >
                   <span className="mt-0.5 shrink-0">
                     {s.state === "complete" && (
-                      <Check className="h-4 w-4 text-emerald-600" strokeWidth={2.5} />
+                      <Check className="h-4 w-4 text-primary" strokeWidth={2.5} />
                     )}
                     {s.state === "active" && (
                       <Loader2 className="h-4 w-4 text-primary animate-spin" />

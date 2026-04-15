@@ -99,7 +99,7 @@ function statusBadge(status: ValidationRowStatus) {
       return (
         <Badge
           variant="outline"
-          className="border-emerald-600/40 bg-emerald-600/10 font-medium text-emerald-800 dark:text-emerald-200"
+          className="border-primary/40 bg-primary/10 font-medium text-primary/90 dark:text-primary/80"
         >
           {t(`${VT}.exportStatusOk`)}
         </Badge>

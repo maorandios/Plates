@@ -62,7 +62,7 @@ function ParseStatusBadge({ file }: { file: UploadedFile }) {
   const label = parseStatusLabel(file);
   if (file.parseStatus === "parsed") {
     return (
-      <Badge variant="secondary" className="text-[10px] font-medium bg-emerald-50 text-emerald-800 border-emerald-200">
+      <Badge variant="secondary" className="text-[10px] font-medium bg-primary/10 text-primary/90 border-primary/30">
         {label}
       </Badge>
     );
@@ -150,7 +150,7 @@ function FileRow({
             <Icon
               className={cn(
                 "h-4 w-4 shrink-0",
-                file.type === "excel" ? "text-emerald-600" : "text-indigo-600"
+                file.type === "excel" ? "text-primary" : "text-indigo-600"
               )}
             />
             <span className="truncate font-medium text-foreground">{file.name}</span>
@@ -203,7 +203,7 @@ function FileRow({
               <Clock className="h-3.5 w-3.5 text-amber-500 animate-pulse shrink-0" />
             )}
             {file.parseStatus === "parsed" && !noRowsParsed && !hasWarnings && file.type === "excel" && (
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
             )}
             {(noRowsParsed || (file.parseStatus === "parsed" && hasWarnings)) && (
               <Tooltip>
@@ -265,7 +265,7 @@ function FileRow({
               </>
             ) : (
               <>
-                <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />
                 <span>
                   <strong>{file.parsedRowCount}</strong> row
                   {file.parsedRowCount !== 1 ? "s" : ""} extracted

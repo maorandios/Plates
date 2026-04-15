@@ -409,7 +409,7 @@ export function FileUploadZone({
                     </span>
                   )}
                   {item.status === "done" && (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
                   )}
                   {item.status === "error" && (
                     <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />

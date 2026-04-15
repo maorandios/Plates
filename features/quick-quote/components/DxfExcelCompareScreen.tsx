@@ -72,11 +72,11 @@ export function DxfExcelCompareScreen({
               {t("quote.dxfPhase.excelDxfCompare.title")}
             </h2>
             <span
-              className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/[0.14] px-3 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200"
+              className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/[0.14] px-3 py-1 text-xs font-medium text-primary/90 dark:text-primary/80"
               role="status"
             >
               <span
-                className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgb(16_185_129/0.35)]"
+                className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_2px_rgb(106_35_247/0.35)]"
                 aria-hidden
               />
               {t("quote.dxfPhase.excelDxfCompare.rowsCheckedLine", {
@@ -335,7 +335,7 @@ function CompareMetricCard({
           className={cn(
             "cursor-help border-white/[0.1] bg-gradient-to-b from-card to-card/80 shadow-sm transition-colors hover:bg-white/[0.04]",
             result.matches
-              ? "ring-1 ring-emerald-500/20 hover:ring-emerald-500/35"
+              ? "ring-1 ring-primary/20 hover:ring-primary/35"
               : "ring-1 ring-amber-500/30 bg-amber-500/[0.03] hover:ring-amber-500/45"
           )}
         >
@@ -343,7 +343,7 @@ function CompareMetricCard({
             <div
               className={cn(
                 "flex size-[calc(2.75rem/1.5)] shrink-0 items-center justify-center rounded-lg",
-                result.matches ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"
+                result.matches ? "bg-primary/15 text-primary" : "bg-amber-500/15 text-amber-500"
               )}
             >
               <Icon
@@ -356,7 +356,7 @@ function CompareMetricCard({
             <p
               className={cn(
                 "text-base font-bold tabular-nums",
-                result.matches ? "text-emerald-500" : "text-amber-500"
+                result.matches ? "text-primary" : "text-amber-500"
               )}
             >
               {valueLabel}

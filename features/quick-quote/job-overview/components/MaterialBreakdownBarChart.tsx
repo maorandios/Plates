@@ -18,7 +18,7 @@ import type { StockSheetSizeBreakdownRow } from "../jobOverview.types";
 const QA = "quote.quantityAnalysis" as const;
 
 /** Phase 5 material breakdown stacked bars */
-const CHART_UTIL = "#004E53";
+const CHART_UTIL = "#6A23F7";
 const CHART_WASTE = "#530021";
 const CHART_HOVER_BG = "#111C21";
 /** 1.25× former default (~56px auto cap); use explicit `barSize` so width actually changes */

@@ -124,14 +124,14 @@ export default function ClientDetailPage() {
         dir="rtl"
       >
         <aside className="w-full shrink-0 lg:max-w-md xl:max-w-lg">
-          <div className="relative overflow-hidden rounded-2xl border border-teal-500/35 bg-gradient-to-b from-teal-950/50 via-[#0c1419] to-card/90 shadow-[0_0_0_1px_rgba(20,184,166,0.12),inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div className="relative overflow-hidden rounded-2xl border border-violet-500/35 bg-gradient-to-b from-violet-950/50 via-[#0c1419] to-card/90 shadow-[0_0_0_1px_rgba(106,35,247,0.12),inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div
-              className="h-1 w-full bg-gradient-to-l from-teal-500/90 via-teal-400/70 to-teal-600/60"
+              className="h-1 w-full bg-gradient-to-l from-violet-500/90 via-violet-400/70 to-violet-600/60"
               aria-hidden
             />
             <div className="p-5 sm:p-6">
-              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold tracking-tight text-teal-100/95">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500/15 text-teal-400 ring-1 ring-teal-500/20">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold tracking-tight text-violet-100/95">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/20">
                   <Building2 className="h-4 w-4" strokeWidth={1.75} />
                 </span>
                 {t("clientDetail.infoTitle")}
@@ -151,8 +151,8 @@ export default function ClientDetailPage() {
                 />
               </div>
               {client.notes && (
-                <div className="mt-4 border-t border-teal-500/20 pt-4">
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-teal-200/60">
+                <div className="mt-4 border-t border-violet-500/20 pt-4">
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-violet-200/60">
                     {t("clientDetail.notesLabel")}
                   </p>
                   <p className="text-sm leading-relaxed text-foreground/95 whitespace-pre-wrap">
@@ -296,7 +296,7 @@ function QuoteStatusBadge({ status }: { status: QuoteListStatus }) {
     return (
       <Badge
         variant="secondary"
-        className="border font-normal bg-emerald-600/15 text-emerald-800 dark:text-emerald-200 border-emerald-500/30"
+        className="border font-normal bg-primary/15 text-primary/90 dark:text-primary/80 border-primary/30"
       >
         {t("clientDetail.table.statusApproved")}
       </Badge>

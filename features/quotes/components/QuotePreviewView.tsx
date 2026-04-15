@@ -74,7 +74,7 @@ function equalColumnWidthsPct(n: number): number[] {
 }
 
 const METRIC_VALUE_ROW =
-  "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#00FF9F] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
+  "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#6A23F7] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
 const METRIC_UNIT_CLASS =
   "font-semibold tabular-nums text-muted-foreground text-[0.72em] leading-none";
 
@@ -560,12 +560,12 @@ export function QuotePreviewView({
                               onClick={() => openPreviewForRow(row, i)}
                               className={cn(
                                 "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
-                                "text-[#00E5FF]",
+                                "text-[#6A23F7]",
                                 "hover:bg-white/5",
                                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               )}
                             >
-                              <Eye className="h-4 w-4" stroke="#00E5FF" strokeWidth={2} aria-hidden />
+                              <Eye className="h-4 w-4" stroke="#6A23F7" strokeWidth={2} aria-hidden />
                             </button>
                           </TableCell>
                         </TableRow>
@@ -714,7 +714,7 @@ export function QuotePreviewView({
                           label={cell.label}
                           value={cell.value}
                           className={cn(
-                            "border-b border-solid border-[#00FF9F]/20",
+                            "border-b border-solid border-[#6A23F7]/20",
                             idx % 4 === 0 && "border-s",
                             idx % 4 !== 3 && "border-e"
                           )}

@@ -40,13 +40,17 @@ import {
 } from "@/lib/quotes/quoteList";
 import { t } from "@/lib/i18n";
 import { formatDecimal } from "@/lib/formatNumbers";
+import { cn } from "@/lib/utils";
 
+/** DD/MM/YYYY only (no time), local calendar date. */
 function formatCreated(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("he-IL", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = String(d.getFullYear());
+    return `${dd}/${mm}/${yyyy}`;
   } catch {
     return iso;
   }
@@ -196,7 +200,14 @@ export default function QuotesPage() {
                         }
                       >
                         <SelectTrigger
-                          className="h-9 w-[min(100%,9.5rem)] max-w-full"
+                          className={cn(
+                            "h-7 min-h-7 w-[9rem] min-w-[9rem] max-w-[9rem] shrink-0 gap-0.5 rounded-full border px-1.5 text-[11px] font-medium leading-none shadow-none focus-visible:ring-1 focus-visible:ring-offset-0 [&_svg]:h-3 [&_svg]:w-3 [&_svg]:shrink-0 [&_svg]:opacity-70",
+                            /* אושרה — border/text #6A23F7, bg #160822 */
+                            q.status === "complete"
+                              ? "!border-[#6A23F7] !bg-[#160822] !text-[#6A23F7] hover:!bg-[#160822] focus-visible:!ring-[#6A23F7]/45"
+                              : /* לא אושרה — border/text #ff9100, bg #291600 */
+                                "!border-[#ff9100] !bg-[#291600] !text-[#ff9100] hover:!bg-[#291600] focus-visible:!ring-[#ff9100]/45"
+                          )}
                           aria-label={t("quotes.statusSelectAria", {
                             ref: q.referenceNumber,
                           })}
@@ -204,11 +215,11 @@ export default function QuotesPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="complete">
-                            {t("quotes.statusApproved")}
-                          </SelectItem>
                           <SelectItem value="in_progress">
                             {t("quotes.statusNotApproved")}
+                          </SelectItem>
+                          <SelectItem value="complete">
+                            {t("quotes.statusApproved")}
                           </SelectItem>
                         </SelectContent>
                       </Select>

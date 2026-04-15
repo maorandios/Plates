@@ -85,14 +85,14 @@ const MOD = "quote.dxfPhase.partPreviewModal" as const;
 
 /** Matches method-phase metrics / sidebar accent. 1.25× former `text-2xl` / `1.65rem` sizes. */
 const METRIC_VALUE_ROW =
-  "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#00FF9F] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
+  "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#6A23F7] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
 
 const METRIC_UNIT_CLASS =
   "font-semibold tabular-nums text-muted-foreground text-[0.72em] leading-none";
 
 /** Matches manual phase preview control accent. */
-const PREVIEW_ICON_CLASS = "text-[#00E5FF]";
-const PREVIEW_STROKE = "#00E5FF";
+const PREVIEW_ICON_CLASS = "text-[#6A23F7]";
+const PREVIEW_STROKE = "#6A23F7";
 
 /** Horizontal + vertical corner stick; z above other header cells. `top-0` comes from headBase. */
 const STICKY_FIRST_HEAD =
@@ -939,7 +939,7 @@ export function PartBreakdownTable({
                           label={cell.label}
                           value={cell.value}
                           className={cn(
-                            "border-b border-solid border-[#00FF9F]/20",
+                            "border-b border-solid border-[#6A23F7]/20",
                             i % 4 === 0 && "border-s",
                             i % 4 !== 3 && "border-e"
                           )}

@@ -45,7 +45,7 @@ export function PreviewStatCell({
       )}
     >
       <Icon
-        className="h-4 w-4 shrink-0 text-[#00FF9F]/70"
+        className="h-4 w-4 shrink-0 text-[#6A23F7]/70"
         strokeWidth={1.75}
         aria-hidden
       />

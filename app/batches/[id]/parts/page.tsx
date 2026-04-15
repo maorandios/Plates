@@ -307,7 +307,7 @@ export default function PartsReviewPage() {
                       <span
                         className={
                           s.status === "valid"
-                            ? "text-emerald-600"
+                            ? "text-primary"
                             : s.status === "warning"
                             ? "text-amber-600"
                             : s.status === "error"
@@ -360,7 +360,7 @@ export default function PartsReviewPage() {
                           ? "text-red-600"
                           : f.parsedRowCount === 0
                           ? "text-amber-600 font-semibold"
-                          : "text-emerald-600"
+                          : "text-primary"
                       }
                     >
                       status: {f.parseStatus}

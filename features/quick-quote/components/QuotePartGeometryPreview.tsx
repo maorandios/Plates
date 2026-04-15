@@ -44,9 +44,9 @@ function RectangularPlateSvg({
   const vl = l * (1 + 2 * pad);
   const strokeW = Math.max(w, l) * 0.004;
   const fill =
-    rectStyle === "dxfPreviewModal" ? "#00371F" : "hsl(var(--muted) / 0.35)";
+    rectStyle === "dxfPreviewModal" ? "#160822" : "hsl(var(--muted) / 0.35)";
   const stroke =
-    rectStyle === "dxfPreviewModal" ? "#00FF9F" : "hsl(var(--primary))";
+    rectStyle === "dxfPreviewModal" ? "#6A23F7" : "hsl(var(--primary))";
 
   return (
     <div
