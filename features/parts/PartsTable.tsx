@@ -314,11 +314,11 @@ export function PartsTable({ parts, onRemoveParts }: PartsTableProps) {
             )}
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => setPartPendingDelete(null)}>
-              Cancel
-            </Button>
             <Button type="button" variant="destructive" onClick={confirmDeletePart}>
               Delete permanently
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setPartPendingDelete(null)}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

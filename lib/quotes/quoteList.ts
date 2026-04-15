@@ -2,6 +2,8 @@
  * Persisted list of Quick Quote sessions for the Quotes overview (localStorage).
  */
 
+import { removeQuoteSnapshot } from "./quoteSnapshot";
+
 export type QuoteListStatus = "in_progress" | "complete";
 
 export interface QuoteListRecord {
@@ -23,6 +25,8 @@ export interface QuoteListRecord {
   totalWeightKg?: number;
   totalAreaM2?: number;
   totalItemQty?: number;
+  /** Total price including VAT (from finalize draft when present, else computed from BOM). */
+  totalInclVat?: number;
 }
 
 const STORAGE_KEY = "plate_quotes_list_v1";
@@ -85,6 +89,7 @@ function normalizeRecord(r: QuoteListRecord): QuoteListRecord {
     totalWeightKg: numOrUndef(r.totalWeightKg),
     totalAreaM2: numOrUndef(r.totalAreaM2),
     totalItemQty: numOrUndef(r.totalItemQty),
+    totalInclVat: numOrUndef(r.totalInclVat),
     wizardSchema: r.wizardSchema === 2 ? 2 : undefined,
   };
 }
@@ -180,6 +185,7 @@ export function patchQuoteSession(
       | "totalWeightKg"
       | "totalAreaM2"
       | "totalItemQty"
+      | "totalInclVat"
     >
   >
 ): void {
@@ -211,9 +217,25 @@ export function markQuoteComplete(id: string): void {
   save(list);
 }
 
+/** Set approval status from quotes list / preview (אושרה / לא אושרה). */
+export function setQuoteApprovalStatus(id: string, status: QuoteListStatus): void {
+  const list = load();
+  const i = list.findIndex((q) => q.id === id);
+  if (i < 0) return;
+  const now = new Date().toISOString();
+  list[i] = {
+    ...list[i],
+    status,
+    wizardSchema: 2,
+    updatedAt: now,
+  };
+  save(list);
+}
+
 export function deleteQuoteFromList(id: string): void {
   const list = load().filter((q) => q.id !== id);
   save(list);
+  removeQuoteSnapshot(id);
 }
 
 /** Quotes (projects) linked to a global client id. */

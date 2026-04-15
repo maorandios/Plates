@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { AlertCircle, FileSpreadsheet, RefreshCw, ArrowRight } from "lucide-react";
+import { AlertCircle, FileSpreadsheet, RefreshCw, ArrowRight, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -28,37 +27,40 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { readExcelHeaders, parseExcelFileWithMapping } from "@/lib/parsers/excelParser";
+import {
+  readExcelHeaders,
+  parseExcelFileWithMapping,
+  countEligibleExcelDataRows,
+} from "@/lib/parsers/excelParser";
+import { formatDecimal } from "@/lib/formatNumbers";
 import type { ColumnMapping, ExcelRow } from "@/types";
 import type { ExcelHeadersResult } from "@/lib/parsers/excelParser";
 import { t } from "@/lib/i18n";
 
 const NONE = "__none__";
 
+const DXF_EXCEL_UI = "quote.dxfPhase";
+
 interface MappingField {
   key: keyof Omit<ColumnMapping, "headerRowIdx">;
   required: boolean;
 }
 
-/** Same fields as {@link ExcelUploadStep} variant `dxf`. */
+/** Same fields as {@link ExcelUploadStep} variant `dxf`; display order matches product UX (material last). */
 const MAPPING_FIELDS: MappingField[] = [
   { key: "partNameCol", required: true },
   { key: "qtyCol", required: false },
   { key: "thkCol", required: false },
-  { key: "matCol", required: false },
   { key: "lengthCol", required: false },
   { key: "widthCol", required: false },
   { key: "weightCol", required: false },
+  { key: "matCol", required: false },
 ];
 
 const MAPPING_COL_WIDTH_PCT = 100 / MAPPING_FIELDS.length;
 
 function fieldLabelKey(fieldKey: MappingField["key"]): string {
   return `quote.excelColumnMapping.fields.${fieldKey}.label`;
-}
-
-function fieldDescriptionKey(fieldKey: MappingField["key"]): string {
-  return `quote.excelColumnMapping.fields.${fieldKey}.description`;
 }
 
 export interface ExcelColumnMappingModalProps {
@@ -127,6 +129,16 @@ export function ExcelColumnMappingModal({
     if (!mapping) return false;
     return mapping.partNameCol !== null;
   }, [mapping]);
+
+  /** Same row count as Excel list upload strip — eligible data rows for current mapping. */
+  const excelStripDataRowCount = useMemo(() => {
+    if (!arrayBuffer || !mapping) return 0;
+    try {
+      return countEligibleExcelDataRows(arrayBuffer, mapping);
+    } catch {
+      return 0;
+    }
+  }, [arrayBuffer, mapping]);
 
   const previewData = useMemo(() => {
     if (!headersResult || !mapping) return null;
@@ -206,42 +218,71 @@ export function ExcelColumnMappingModal({
         <DialogContent
           dir="rtl"
           showCloseButton={false}
-          className="w-[min(calc(100vw-2rem),112rem)] max-w-[min(calc(100vw-2rem),112rem)] max-h-[min(92vh,960px)] flex flex-col gap-0 p-0"
+          className="w-[min(calc(100vw-2rem),56rem)] max-w-[min(calc(100vw-2rem),56rem)] max-h-[min(92vh,960px)] flex flex-col gap-0 p-0"
         >
-          <DialogHeader className="shrink-0 px-6 pt-6 pb-2 border-b text-start sm:text-start">
+          <DialogHeader className="shrink-0 px-4 pt-4 pb-2 sm:px-5 border-b text-start sm:text-start">
             <DialogTitle>{t("quote.excelColumnMapping.title")}</DialogTitle>
             <DialogDescription>
               {t("quote.excelColumnMapping.description")}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 space-y-3">
             {file && headersResult && mapping && (
               <>
-                <Card>
-                  <CardHeader className="py-3">
-                    <CardTitle className="text-base">{t("quote.excelColumnMapping.file")}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                      <FileSpreadsheet className="h-5 w-5 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{file.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {t("quote.excelColumnMapping.rowsDetected", {
-                            n: headersResult.previewRows.length,
-                          })}
-                        </p>
+                <div className="flex w-full justify-start">
+                  <div className="min-w-0 w-full max-w-full sm:max-w-[50%]">
+                    <div className="flex w-full flex-col gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <FileSpreadsheet
+                          className="h-5 w-5 shrink-0 text-emerald-600"
+                          aria-hidden
+                        />
+                        <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                              {t(`${DXF_EXCEL_UI}.excelUploadedFileName`)}
+                            </p>
+                            <p className="truncate text-sm font-medium text-foreground" title={file.name}>
+                              {file.name}
+                            </p>
+                          </div>
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                              {t(`${DXF_EXCEL_UI}.excelUploadedFileSize`)}
+                            </p>
+                            <p className="text-sm font-medium tabular-nums text-foreground">
+                              {formatDecimal(file.size / 1024, 1)} KB
+                            </p>
+                          </div>
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                              {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
+                            </p>
+                            <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
+                              {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
+                                n: excelStripDataRowCount,
+                              })}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <Badge variant="secondary" className="shrink-0">
-                        {headersResult.sheetName}
-                      </Badge>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={requestDiscard}
+                        className="shrink-0 self-center"
+                        aria-label={t(`${DXF_EXCEL_UI}.excelRemoveFileAria`)}
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                <Card className="min-w-0">
-                  <CardHeader className="py-3">
+                <Card className="min-w-0 w-full">
+                  <CardHeader className="px-3 pb-4 pt-2 sm:px-3">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <CardTitle className="text-base">
@@ -262,10 +303,11 @@ export function ExcelColumnMappingModal({
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent className="min-w-0 space-y-4">
+                  {/* Flush with scroll area edges: override Card default p-6 so bordered table aligns with file strip above */}
+                  <CardContent className="min-w-0 space-y-4 px-0 pb-4 pt-1">
                     {previewData && (
-                      <div className="min-w-0 space-y-2">
-                        <div className="min-w-0 overflow-x-hidden rounded-md border px-2 sm:px-3">
+                      <div className="min-w-0 space-y-3">
+                        <div className="min-w-0 overflow-x-auto rounded-md border">
                           <Table
                             containerClassName="overflow-visible"
                             className="w-full max-w-full table-fixed border-collapse text-sm"
@@ -290,11 +332,11 @@ export function ExcelColumnMappingModal({
                                   return (
                                     <TableHead
                                       key={field.key}
-                                      className="!h-auto min-w-0 !px-2.5 !pt-[1.953125rem] !pb-[2.734375rem] align-top sm:!px-3 sm:!pt-[2.34375rem] sm:!pb-[3.125rem]"
+                                      className="!h-auto min-w-0 align-top !px-2.5 !py-2.5 text-start sm:!px-3"
                                     >
-                                      <div className="min-w-0 space-y-[0.9765625rem]">
-                                        <div className="flex min-w-0 items-baseline gap-1 pt-1">
-                                          <span className="break-words text-sm font-semibold leading-snug">
+                                      <div className="min-w-0 space-y-1.5">
+                                        <div className="flex min-w-0 items-baseline gap-1">
+                                          <span className="break-words text-xs font-semibold leading-snug sm:text-sm">
                                             {t(fieldLabelKey(field.key))}
                                           </span>
                                           {field.required && (
@@ -307,7 +349,7 @@ export function ExcelColumnMappingModal({
                                           value={valueStr}
                                           onValueChange={(v) => updateMapping(field.key, v)}
                                         >
-                                          <SelectTrigger className="h-8 w-full min-w-0 max-w-full px-2 text-sm [&>span]:min-w-0 [&>span]:truncate">
+                                          <SelectTrigger className="h-8 w-full min-w-0 max-w-full px-2 text-xs sm:text-sm [&>span]:min-w-0 [&>span]:truncate">
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -328,9 +370,6 @@ export function ExcelColumnMappingModal({
                                               ))}
                                           </SelectContent>
                                         </Select>
-                                        <p className="text-xs text-muted-foreground leading-relaxed break-words pt-[0.5859375rem] pb-[0.390625rem]">
-                                          {t(fieldDescriptionKey(field.key))}
-                                        </p>
                                       </div>
                                     </TableHead>
                                   );
@@ -343,10 +382,10 @@ export function ExcelColumnMappingModal({
                                   {row.cells.map((cell, cellIndex) => (
                                     <TableCell
                                       key={cellIndex}
-                                      className="overflow-hidden !px-1 !py-2 align-middle text-sm tabular-nums leading-normal"
+                                      className="min-w-0 overflow-hidden !px-2.5 !py-2 align-middle text-start text-sm tabular-nums leading-normal sm:!px-3"
                                     >
                                       <span
-                                        className="block min-w-0 whitespace-nowrap"
+                                        className="block min-w-0 truncate"
                                         title={cell.value}
                                       >
                                         {cell.value}
@@ -358,21 +397,21 @@ export function ExcelColumnMappingModal({
                             </TableBody>
                           </Table>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="px-3 text-xs text-muted-foreground">
                           {t("quote.excelColumnMapping.previewRows")}
                         </p>
                       </div>
                     )}
 
                     {!isMappingValid && (
-                      <div className="flex items-center gap-2 text-amber-600">
+                      <div className="flex items-center gap-2 px-3 text-amber-600">
                         <AlertCircle className="h-4 w-4 shrink-0" />
                         <p className="text-sm">{t("quote.excelColumnMapping.partNameRequired")}</p>
                       </div>
                     )}
 
                     {parseError && (
-                      <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+                      <div className="mx-3 rounded-lg border border-destructive/20 bg-destructive/10 p-3 flex items-start gap-2">
                         <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                         <p className="text-sm text-destructive">{parseError}</p>
                       </div>
@@ -387,10 +426,7 @@ export function ExcelColumnMappingModal({
             ) : null}
           </div>
 
-          <DialogFooter
-            dir="ltr"
-            className="shrink-0 w-full px-6 py-4 border-t border-white/[0.08] bg-card/40 flex flex-row flex-wrap justify-start gap-2 sm:flex-row sm:justify-start sm:space-x-0"
-          >
+          <DialogFooter className="shrink-0 w-full border-t border-white/[0.08] bg-card/40 px-4 py-3 sm:px-5">
             <Button
               type="button"
               onClick={() => void handleComplete()}
@@ -419,15 +455,12 @@ export function ExcelColumnMappingModal({
               {t("quote.excelColumnMapping.discardDescription")}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter
-            dir="ltr"
-            className="w-full gap-2 flex flex-row flex-wrap justify-start sm:justify-start sm:space-x-0"
-          >
-            <Button type="button" variant="outline" onClick={() => setDiscardConfirmOpen(false)}>
-              {t("quote.excelColumnMapping.discardCancel")}
-            </Button>
+          <DialogFooter className="w-full gap-2">
             <Button type="button" variant="destructive" onClick={runDiscard}>
               {t("quote.excelColumnMapping.discardConfirm")}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setDiscardConfirmOpen(false)}>
+              {t("quote.excelColumnMapping.discardCancel")}
             </Button>
           </DialogFooter>
         </DialogContent>

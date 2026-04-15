@@ -5,7 +5,6 @@ import Link from "next/link";
 import { BookUser, Copy, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -182,19 +181,6 @@ export function GeneralSection({
             <SelectItem value="aluminum">{MATERIAL_TYPE_LABELS.aluminum}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-
-      {/* Notes */}
-      <div className="space-y-2">
-        <Label htmlFor="notes">{t("general.notes")}</Label>
-        <Textarea
-          id="notes"
-          value={value.notes}
-          onChange={(e) => patch({ notes: e.target.value })}
-          placeholder={t("general.notesPlaceholder")}
-          rows={4}
-          className="resize-y min-h-[100px]"
-        />
       </div>
 
       {/* Client picker dialog */}

@@ -192,7 +192,10 @@ export function DxfQuotePhase({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
+          <div
+            id="quick-quote-method-scroll"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain"
+          >
             <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
               <DxfUploadStep
                 ref={dxfRef}
@@ -301,12 +304,12 @@ export function DxfQuotePhase({
             <DialogTitle>{t("quote.dxfPhase.confirmResetTitle")}</DialogTitle>
             <DialogDescription>{t("quote.dxfPhase.confirmResetDescription")}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={() => setResetConfirmOpen(false)}>
-              {t("common.cancel")}
-            </Button>
+          <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
             <Button type="button" variant="destructive" onClick={confirmResetSession}>
               {t("quote.dxfPhase.confirmResetAction")}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setResetConfirmOpen(false)}>
+              {t("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,11 +2,12 @@
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
   Copy,
   Eye,
+  FileDown,
   Hash,
   Layers,
   LayoutGrid,
@@ -37,6 +38,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { MaterialType } from "@/types/materials";
+import { finalizePlateTypeLabel } from "../lib/finalizePlateTypeLabel";
 import {
   finalizeDraftLineToQuotePart,
   recalcFinalizeLineMetrics,
@@ -92,14 +94,6 @@ function finishLabelFromCode(code: string): string {
   const key = `quote.finishLabels.${code}`;
   const label = t(key);
   return label === key ? code : label;
-}
-
-/** Hebrew plate / bend template label for finalize table “תיאור” column (from `plate_shape`). */
-function finalizePlateTypeLabel(shape: string | undefined): string {
-  const s = (shape || "flat").toLowerCase();
-  const key = `${FP}.plateShapeLabels.${s}`;
-  const label = t(key);
-  return label === key ? s : label;
 }
 
 /** Matches PartBreakdownTable summary metrics. */
@@ -178,18 +172,9 @@ function parseDdMmYyyyToIso(display: string): string | null {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Wired to the bottom bar “הפקת הצעת מחיר” action on finalize (step 7). */
-export interface FinalizeExportToolbar {
-  exportPdf: () => Promise<void>;
-  exporting: boolean;
-  disabled: boolean;
-}
-
 interface QuoteFinalizeExportStepProps {
   draft: QuotePdfFullPayload;
   setDraft: React.Dispatch<React.SetStateAction<QuotePdfFullPayload>>;
-  /** Reports export handler + state for {@link QuickQuoteBottomBar} on step 7. */
-  onExportControlsChange?: (controls: FinalizeExportToolbar | null) => void;
   /** Material family from General (Carbon / Stainless / Aluminum) — not editable in the table. */
   materialFamilyLabel: string;
   materialType: MaterialType;
@@ -248,7 +233,6 @@ function summarizeJobFromItems(items: FinalizeDraftLineItem[]) {
 export function QuoteFinalizeExportStep({
   draft,
   setDraft,
-  onExportControlsChange,
   materialFamilyLabel,
   materialType,
   materialPricePerKgByRow,
@@ -551,40 +535,12 @@ export function QuoteFinalizeExportStep({
     setDraft,
   ]);
 
-  const onExportControlsChangeRef = useRef(onExportControlsChange);
-  onExportControlsChangeRef.current = onExportControlsChange;
-
-  const handleExportPdfRef = useRef(handleExportPdf);
-  handleExportPdfRef.current = handleExportPdf;
-
-  const stableExportPdf = useCallback(
-    (...args: Parameters<typeof handleExportPdf>) => handleExportPdfRef.current(...args),
-    []
-  );
-
-  useEffect(() => {
-    onExportControlsChangeRef.current?.({
-      exportPdf: stableExportPdf,
-      exporting,
-      disabled:
-        exporting ||
-        draft.items.length === 0 ||
-        !draft.company.name.trim(),
-    });
-  }, [
-    stableExportPdf,
-    exporting,
-    draft.items.length,
-    draft.company.name,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      onExportControlsChangeRef.current?.(null);
-    };
-  }, []);
-
   const notesText = draft.quote.notes.join("\n");
+
+  const exportPdfDisabled =
+    exporting ||
+    draft.items.length === 0 ||
+    !draft.company.name.trim();
 
   const pv = previewPart;
   const previewTotalWeightLine = pv ? pv.weightKg * pv.qty : 0;
@@ -762,7 +718,20 @@ export function QuoteFinalizeExportStep({
             </CardContent>
           </Card>
 
-          <div dir="rtl" className="text-start">
+          {/* Export above metrics; button on visual left (RTL: justify-end). */}
+          <div dir="rtl" className="space-y-3 text-start">
+            <div className="flex w-full justify-end">
+              <Button
+                type="button"
+                size="default"
+                className="min-w-[10rem] gap-1"
+                disabled={exportPdfDisabled}
+                onClick={() => void handleExportPdf()}
+              >
+                {exporting ? t(`${FP}.exporting`) : t(`${FP}.exportQuoteProduce`)}
+                <FileDown className="ms-1.5 h-4 w-4 shrink-0" aria-hidden />
+              </Button>
+            </div>
             <div className="overflow-hidden rounded-md border border-white/[0.08] bg-white/[0.08]">
               <div className="grid grid-cols-2 gap-px sm:grid-cols-3 lg:grid-cols-5">
                 <div className="bg-card">
@@ -838,22 +807,20 @@ export function QuoteFinalizeExportStep({
           </div>
 
           <Card dir="rtl" className="text-start">
-            <CardHeader className="pb-3">
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 px-4 pb-3 pt-0 sm:px-6">
               <CardTitle className="text-base">{t(`${FP}.plateDetailTableTitle`)}</CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={resetPricingToCalculated}
+                aria-label={t(`${FP}.resetLinePricingAria`)}
+              >
+                {t(`${FP}.resetLinePricing`)}
+              </Button>
             </CardHeader>
             <CardContent className="px-0 sm:px-0">
-              <div className="mb-2 flex justify-end px-4 sm:px-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={resetPricingToCalculated}
-                  aria-label={t(`${FP}.resetLinePricingAria`)}
-                >
-                  {t(`${FP}.resetLinePricing`)}
-                </Button>
-              </div>
               {/* No overflow-* on wrappers here — sticky `th` must stick to the page scroll like PartBreakdownTable. */}
               <div className="px-4 pb-4 sm:px-6">
                 <div className="rounded-md border border-white/[0.08] bg-card">

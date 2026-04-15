@@ -68,7 +68,7 @@ export interface UploadedFileMeta {
 }
 
 export interface QuickQuoteJobDetails {
-  /** Auto-generated unique quote id (e.g. QQ-20260327-AB12CD34). */
+  /** Auto-generated unique quote reference (e.g. OM-0001). */
   referenceNumber: string;
   /** Project or job title — required on General (used as PDF project name). */
   projectName: string;

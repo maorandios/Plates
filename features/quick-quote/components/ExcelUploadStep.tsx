@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, type ReactNode } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  type ReactNode,
+} from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Upload,
@@ -197,6 +204,7 @@ function ExcelImportPreviewStatCell({
   );
 }
 
+/** Same column order as {@link ExcelColumnMappingModal} (DXF Excel mapping): part, qty, thickness, length, width, then material + finish for list import. */
 function quoteImportMappingFieldsT(): MappingField[] {
   return [
     {
@@ -206,28 +214,28 @@ function quoteImportMappingFieldsT(): MappingField[] {
       description: t(`${EI}.mapPartNumberDesc`),
     },
     {
-      key: "thkCol",
-      label: t(`${EI}.mapThicknessLabel`),
-      required: false,
-      description: t(`${EI}.mapThicknessDesc`),
-    },
-    {
       key: "qtyCol",
       label: t(`${EI}.mapQtyLabel`),
       required: false,
       description: t(`${EI}.mapQtyDesc`),
     },
     {
-      key: "widthCol",
-      label: t(`${EI}.mapWidthLabel`),
+      key: "thkCol",
+      label: t(`${EI}.mapThicknessLabel`),
       required: false,
-      description: t(`${EI}.mapWidthDesc`),
+      description: t(`${EI}.mapThicknessDesc`),
     },
     {
       key: "lengthCol",
       label: t(`${EI}.mapLengthLabel`),
       required: false,
       description: t(`${EI}.mapLengthDesc`),
+    },
+    {
+      key: "widthCol",
+      label: t(`${EI}.mapWidthLabel`),
+      required: false,
+      description: t(`${EI}.mapWidthDesc`),
     },
     {
       key: "matCol",
@@ -276,6 +284,11 @@ function parseCellNumber(raw: string): number | undefined {
   if (!t) return undefined;
   const n = parseFloat(t.replace(",", "."));
   return Number.isFinite(n) ? n : undefined;
+}
+
+/** Ascending sort for part labels (e.g. p1012 before p1111). */
+function comparePartNameAsc(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
 const QUOTE_IMPORT_PHASE_VIEWPORT =
@@ -328,6 +341,10 @@ export function ExcelUploadStep({
   const [importPreviewRowId, setImportPreviewRowId] = useState<string | null>(null);
   const [phaseCompleteDialogOpen, setPhaseCompleteDialogOpen] = useState(false);
   const [phaseCompleteLines, setPhaseCompleteLines] = useState<string[]>([]);
+
+  useLayoutEffect(() => {
+    document.getElementById("quick-quote-method-scroll")?.scrollTo(0, 0);
+  }, [subStep]);
 
   const activeMappingFields = useMemo(
     () => (variant === "quoteImport" ? quoteImportMappingFieldsT() : MAPPING_FIELDS),
@@ -710,6 +727,14 @@ export function ExcelUploadStep({
   const showDxfReview = variant === "dxf" && parsedRows && metrics;
   const showQuoteReview = variant === "quoteImport" && parsedRows && quoteImportMetrics;
 
+  /** Import review table: rows ordered by part name ascending (natural compare). */
+  const quoteImportReviewRowsSorted = useMemo(() => {
+    if (!parsedRows?.length) return null;
+    return [...parsedRows].sort((a, b) =>
+      comparePartNameAsc(String(a.partName ?? ""), String(b.partName ?? ""))
+    );
+  }, [parsedRows]);
+
   const uploadInputId =
     variant === "quoteImport" ? "excel-upload-quote-import" : "excel-upload";
 
@@ -839,52 +864,54 @@ export function ExcelUploadStep({
       {subStep === 2 && file && headersResult && mapping && (
         <>
           {variant === "quoteImport" ? (
-            <div className="w-full max-w-3xl me-auto">
-              <div className="flex w-full flex-col gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <FileSpreadsheet
-                    className="h-5 w-5 shrink-0 text-emerald-600"
-                    aria-hidden
-                  />
-                  <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                        {t(`${DXF_EXCEL_UI}.excelUploadedFileName`)}
-                      </p>
-                      <p className="truncate text-sm font-medium text-foreground" title={file.name}>
-                        {file.name}
-                      </p>
-                    </div>
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                        {t(`${DXF_EXCEL_UI}.excelUploadedFileSize`)}
-                      </p>
-                      <p className="text-sm font-medium tabular-nums text-foreground">
-                        {formatDecimal(file.size / 1024, 1)} KB
-                      </p>
-                    </div>
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                        {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
-                      </p>
-                      <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
-                        {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
-                          n: excelBadgeDataRowCount,
-                        })}
-                      </p>
+            <div className="flex w-full justify-start">
+              <div className="min-w-0 w-full max-w-full sm:max-w-[50%]">
+                <div className="flex w-full flex-col gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <FileSpreadsheet
+                      className="h-5 w-5 shrink-0 text-emerald-600"
+                      aria-hidden
+                    />
+                    <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                          {t(`${DXF_EXCEL_UI}.excelUploadedFileName`)}
+                        </p>
+                        <p className="truncate text-sm font-medium text-foreground" title={file.name}>
+                          {file.name}
+                        </p>
+                      </div>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                          {t(`${DXF_EXCEL_UI}.excelUploadedFileSize`)}
+                        </p>
+                        <p className="text-sm font-medium tabular-nums text-foreground">
+                          {formatDecimal(file.size / 1024, 1)} KB
+                        </p>
+                      </div>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                          {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
+                        </p>
+                        <p className="text-sm font-medium tabular-nums text-emerald-800 dark:text-emerald-200">
+                          {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
+                            n: excelBadgeDataRowCount,
+                          })}
+                        </p>
+                      </div>
                     </div>
                   </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveFile}
+                    className="shrink-0 self-center"
+                    aria-label={t(`${DXF_EXCEL_UI}.excelRemoveFileAria`)}
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRemoveFile}
-                  className="shrink-0 self-center"
-                  aria-label={t(`${DXF_EXCEL_UI}.excelRemoveFileAria`)}
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </Button>
               </div>
             </div>
           ) : (
@@ -925,134 +952,250 @@ export function ExcelUploadStep({
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>
-                    {variant === "quoteImport" ? t(`${EI}.columnMapTitle`) : "Column Mapping"}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {variant === "quoteImport"
-                      ? t(`${EI}.columnMapHint`)
-                      : "Map your Excel columns to the required fields"}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={resetToAutoDetected}
-                  className="gap-2"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-                  {variant === "quoteImport" ? t(`${EI}.resetAuto`) : "Reset to Auto-detected"}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {previewData && (
-                <div className="space-y-2">
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/30">
-                          {activeMappingFields.map((field) => {
-                            const currentValue = mapping[field.key];
-                            const valueStr =
-                              currentValue !== null && currentValue !== undefined
-                                ? String(currentValue)
-                                : NONE;
-
-                            return (
-                              <TableHead key={field.key} className="p-2 min-w-[140px]">
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-semibold">
-                                      {field.label}
-                                    </span>
-                                    {field.required && (
-                                      <span className="text-destructive text-xs">*</span>
-                                    )}
-                                  </div>
-                                  <Select
-                                    value={valueStr}
-                                    onValueChange={(v) => updateMapping(field.key, v)}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value={NONE}>
-                                        <span className="text-muted-foreground text-xs">
-                                          {variant === "quoteImport" ? t(`${EI}.noneColumn`) : "None"}
-                                        </span>
-                                      </SelectItem>
-                                      {headersResult.rawHeaders
-                                        .filter((h) => h && h.trim())
-                                        .map((header, index) => (
-                                          <SelectItem key={`${header}-${index}`} value={String(index)}>
-                                            <span className="text-xs">{header}</span>
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <p className="text-[10px] text-muted-foreground leading-tight">
-                                    {field.description}
-                                  </p>
-                                </div>
-                              </TableHead>
-                            );
-                          })}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {previewData.map((row) => (
-                          <TableRow key={row.rowIndex}>
-                            {row.cells.map((cell, cellIndex) => (
-                              <TableCell key={cellIndex} className="text-sm py-2">
-                                {cell.value}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+          {variant === "quoteImport" ? (
+            <Card className="min-w-0 w-full">
+              <CardHeader className="px-3 pb-4 pt-2 sm:px-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base">{t(`${EI}.columnMapTitle`)}</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">{t(`${EI}.columnMapHint`)}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {variant === "quoteImport" ? t(`${EI}.previewNote`) : "Preview (first 3 rows)"}
-                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetToAutoDetected}
+                    className="gap-2 shrink-0"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                    {t(`${EI}.resetAuto`)}
+                  </Button>
                 </div>
-              )}
+              </CardHeader>
+              <CardContent className="min-w-0 space-y-4 px-0 pb-4 pt-1">
+                {previewData && (
+                  <div className="min-w-0 space-y-3">
+                    <div className="min-w-0 overflow-x-auto rounded-md border">
+                      <Table
+                        containerClassName="overflow-visible"
+                        className="w-full max-w-full table-fixed border-collapse text-sm"
+                      >
+                        <colgroup>
+                          {activeMappingFields.map((field) => (
+                            <col
+                              key={field.key}
+                              style={{
+                                width: `${100 / activeMappingFields.length}%`,
+                              }}
+                            />
+                          ))}
+                        </colgroup>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30">
+                            {activeMappingFields.map((field) => {
+                              const currentValue = mapping[field.key];
+                              const valueStr =
+                                currentValue !== null && currentValue !== undefined
+                                  ? String(currentValue)
+                                  : NONE;
 
-              <div className="flex items-center justify-between pt-4 border-t">
-                {!isMappingValid && (
-                  <div className="flex items-center gap-2 text-amber-600">
-                    <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
-                    <p className="text-sm">
-                      {variant === "quoteImport"
-                        ? t(`${EI}.partNumberRequired`)
-                        : "Part Name is required"}
-                    </p>
+                              return (
+                                <TableHead
+                                  key={field.key}
+                                  className="!h-auto min-w-0 align-top !px-2.5 !py-2.5 text-start sm:!px-3"
+                                >
+                                  <div className="min-w-0 space-y-1.5">
+                                    <div className="flex min-w-0 items-baseline gap-1">
+                                      <span className="break-words text-xs font-semibold leading-snug sm:text-sm">
+                                        {field.label}
+                                      </span>
+                                      {field.required && (
+                                        <span className="shrink-0 text-destructive text-sm">*</span>
+                                      )}
+                                    </div>
+                                    <Select
+                                      value={valueStr}
+                                      onValueChange={(v) => updateMapping(field.key, v)}
+                                    >
+                                      <SelectTrigger className="h-8 w-full min-w-0 max-w-full px-2 text-xs sm:text-sm [&>span]:min-w-0 [&>span]:truncate">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value={NONE}>
+                                          <span className="text-muted-foreground text-xs">
+                                            {t(`${EI}.noneColumn`)}
+                                          </span>
+                                        </SelectItem>
+                                        {headersResult.rawHeaders
+                                          .filter((h) => h && h.trim())
+                                          .map((header, index) => (
+                                            <SelectItem
+                                              key={`${header}-${index}`}
+                                              value={String(index)}
+                                            >
+                                              <span className="text-xs">{header}</span>
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </TableHead>
+                              );
+                            })}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {previewData.map((row) => (
+                            <TableRow key={row.rowIndex}>
+                              {row.cells.map((cell, cellIndex) => (
+                                <TableCell
+                                  key={cellIndex}
+                                  className="min-w-0 overflow-hidden !px-2.5 !py-2 align-middle text-start text-sm tabular-nums leading-normal sm:!px-3"
+                                >
+                                  <span className="block min-w-0 truncate" title={cell.value}>
+                                    {cell.value}
+                                  </span>
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <p className="px-3 text-xs text-muted-foreground">{t(`${EI}.previewNote`)}</p>
                   </div>
                 )}
-                {variant !== "quoteImport" ? (
+
+                <div className="flex items-center justify-between border-t px-3 pt-4">
+                  {!isMappingValid && (
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                      <p className="text-sm">{t(`${EI}.partNumberRequired`)}</p>
+                    </div>
+                  )}
+                </div>
+
+                {parseError && (
+                  <div className="mx-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    <p className="text-sm text-destructive">{parseError}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Column Mapping</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Map your Excel columns to the required fields
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetToAutoDetected}
+                    className="gap-2"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                    Reset to Auto-detected
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {previewData && (
+                  <div className="space-y-2">
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30">
+                            {activeMappingFields.map((field) => {
+                              const currentValue = mapping[field.key];
+                              const valueStr =
+                                currentValue !== null && currentValue !== undefined
+                                  ? String(currentValue)
+                                  : NONE;
+
+                              return (
+                                <TableHead key={field.key} className="p-2 min-w-[140px]">
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-semibold">{field.label}</span>
+                                      {field.required && (
+                                        <span className="text-destructive text-xs">*</span>
+                                      )}
+                                    </div>
+                                    <Select
+                                      value={valueStr}
+                                      onValueChange={(v) => updateMapping(field.key, v)}
+                                    >
+                                      <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value={NONE}>
+                                          <span className="text-muted-foreground text-xs">None</span>
+                                        </SelectItem>
+                                        {headersResult.rawHeaders
+                                          .filter((h) => h && h.trim())
+                                          .map((header, index) => (
+                                            <SelectItem key={`${header}-${index}`} value={String(index)}>
+                                              <span className="text-xs">{header}</span>
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <p className="text-[10px] text-muted-foreground leading-tight">
+                                      {field.description}
+                                    </p>
+                                  </div>
+                                </TableHead>
+                              );
+                            })}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {previewData.map((row) => (
+                            <TableRow key={row.rowIndex}>
+                              {row.cells.map((cell, cellIndex) => (
+                                <TableCell key={cellIndex} className="text-sm py-2">
+                                  {cell.value}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Preview (first 3 rows)</p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-4 border-t">
+                  {!isMappingValid && (
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                      <p className="text-sm">Part Name is required</p>
+                    </div>
+                  )}
                   <>
                     {isMappingValid && <div className="flex-1" />}
                     <Button onClick={handleParseWithMapping} disabled={!isMappingValid} size="lg">
                       Continue to Review
                     </Button>
                   </>
-                ) : null}
-              </div>
-
-              {parseError && (
-                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                  <p className="text-sm text-destructive">{parseError}</p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {parseError && (
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    <p className="text-sm text-destructive">{parseError}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 
@@ -1070,7 +1213,7 @@ export function ExcelUploadStep({
               </p>
             </CardHeader>
             <CardContent className="min-h-0">
-              <div className="max-h-[min(70vh,800px)] overflow-auto rounded-md border border-white/[0.08] bg-card">
+              <div className="rounded-md border border-white/[0.08] bg-card">
                 <Table
                   className="border-separate border-spacing-0"
                   containerClassName="overflow-visible"
@@ -1117,7 +1260,7 @@ export function ExcelUploadStep({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {parsedRows.map((row) => {
+                    {(quoteImportReviewRowsSorted ?? parsedRows ?? []).map((row) => {
                       const rho =
                         quoteImportDensityKgPerM3 != null &&
                         Number.isFinite(quoteImportDensityKgPerM3)
@@ -1526,7 +1669,10 @@ export function ExcelUploadStep({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
+          <div
+            id="quick-quote-method-scroll"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain"
+          >
             <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
               {mainColumn}
             </div>

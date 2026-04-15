@@ -5,6 +5,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useLayoutEffect,
   forwardRef,
   useImperativeHandle,
   useRef,
@@ -98,6 +99,20 @@ const SUB_STEPS = [
   { step: 2 as DxfSubStep, label: "Parse" },
   { step: 3 as DxfSubStep, label: "Review" },
 ] as const;
+
+/**
+ * Quoted plate area/weight use the DXF axis-aligned bounding box (mm), not the true cut outline.
+ */
+function bboxFootprintAreaM2(
+  geom: { boundingBox?: { width: number; height: number } } | null | undefined
+): number {
+  const bb = geom?.boundingBox;
+  if (!bb) return 0;
+  const w = bb.width;
+  const h = bb.height;
+  if (!(w > 0) || !(h > 0)) return 0;
+  return (w * h) / 1_000_000;
+}
 
 /** Unit label to the left of the number (LTR) so suffix stays visually left of the value in RTL UI */
 function StatValueUnitLeft({
@@ -474,6 +489,11 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     useState(true);
 
   const excelRestoreAppliedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    document.getElementById("quick-quote-method-scroll")?.scrollTo(0, 0);
+  }, [subStep]);
+
   useEffect(() => {
     if (excelRestoreAppliedRef.current) return;
     if (!restoredExcelBundle?.rows?.length) return;
@@ -530,13 +550,11 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     const bbox = geom.boundingBox;
     const densityKgPerM3 = materialConfig.densityKgPerM3;
     const thMm = clampPositiveThicknessMm(upload.thicknessMm);
+    const unitAreaM2 = bboxFootprintAreaM2(geom);
     const unitWeightKg =
-      geom.area > 0
-        ? (geom.area / 1_000_000) * (thMm / 1000) * densityKgPerM3
-        : 0;
+      unitAreaM2 > 0 ? unitAreaM2 * (thMm / 1000) * densityKgPerM3 : 0;
     const qty = Math.max(1, Math.floor(Number(upload.quantity)) || 1);
     const totalWeightKg = unitWeightKg * qty;
-    const unitAreaM2 = geom.area > 0 ? geom.area / 1_000_000 : 0;
     const totalAreaM2 = unitAreaM2 * qty;
     const dim1 = bbox.width;
     const dim2 = bbox.height;
@@ -903,9 +921,9 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       totalQuantity += qty;
       const geom = u.parsed?.processedGeometry;
       if (geom) {
-        totalArea += (geom.area / 1000000) * qty; // m² × pieces
+        const areaM2 = bboxFootprintAreaM2(geom);
+        totalArea += areaM2 * qty;
         totalPerimeter += geom.perimeter * qty;
-        const areaM2 = geom.area / 1000000;
         const thicknessMm = clampPositiveThicknessMm(u.thicknessMm);
         const volumeM3 = areaM2 * (thicknessMm / 1000);
         totalWeight += volumeM3 * densityKgPerM3 * qty;
@@ -1613,27 +1631,27 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 <div
                   role="status"
                   className={cn(
-                    "mb-4 flex gap-3 rounded-lg border border-amber-500/45 bg-amber-500/[0.09] p-3 text-start shadow-sm",
+                    "mb-4 flex gap-3 rounded-lg border-2 !border-[#FF8C00] bg-[#1A120B] p-3 text-start shadow-sm",
                     "animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-300"
                   )}
                 >
                   <Info
-                    className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+                    className="h-5 w-5 shrink-0 text-[#FF8C00]"
                     aria-hidden
                   />
                   <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="text-sm font-semibold text-[#FF8C00]">
                       {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerTitle")}
                     </p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
+                    <p className="text-xs leading-relaxed text-[#FF8C00]/85">
                       {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerBody")}
                     </p>
                   </div>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     size="sm"
-                    className="shrink-0 self-start"
+                    className="shrink-0 self-start border-2 !border-[#FF8C00] bg-transparent text-[#FF8C00] hover:!border-[#FF8C00] hover:bg-[#FF8C00]/15 hover:text-[#FF8C00] focus-visible:!border-[#FF8C00] focus-visible:ring-[#FF8C00]/40"
                     onClick={dismissNoExcelDefaultsBanner}
                   >
                     {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerDismiss")}
@@ -1707,14 +1725,13 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
 
                       const densityKgPerM3 = materialConfig.densityKgPerM3;
                       const thMm = clampPositiveThicknessMm(upload.thicknessMm);
+                      const unitAreaM2 = geom ? bboxFootprintAreaM2(geom) : 0;
                       const unitWeightKg =
-                        geom && geom.area > 0
-                          ? (geom.area / 1_000_000) * (thMm / 1000) * densityKgPerM3
+                        unitAreaM2 > 0
+                          ? unitAreaM2 * (thMm / 1000) * densityKgPerM3
                           : 0;
                       const qty = Math.max(1, Math.floor(Number(upload.quantity)) || 1);
                       const totalWeightKg = unitWeightKg * qty;
-                      const unitAreaM2 =
-                        geom && geom.area > 0 ? geom.area / 1_000_000 : 0;
                       const totalAreaM2 = unitAreaM2 * qty;
 
                       const dim1 = bbox?.width ?? 0;
@@ -1799,7 +1816,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                               : "-"}
                           </TableCell>
                           <TableCell className="tabular-nums">
-                            {geom && geom.area > 0
+                            {unitAreaM2 > 0
                               ? formatDecimal(totalAreaM2, 4)
                               : "-"}
                           </TableCell>

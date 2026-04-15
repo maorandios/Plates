@@ -28,7 +28,10 @@ export default function RootLayout({
       >
         <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
           <AppTopBar />
-          <div className="flex min-h-0 min-w-0 w-full max-w-none flex-1 flex-col overflow-auto">
+          <div
+            id="app-shell-scroll"
+            className="flex min-h-0 min-w-0 w-full max-w-none flex-1 flex-col overflow-auto"
+          >
             {children}
           </div>
         </div>

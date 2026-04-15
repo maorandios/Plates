@@ -67,12 +67,25 @@ export function buildValidationData(
     const dxfLengthMm = dxfDimensions[0];
     const dxfWidthMm = dxfDimensions[1];
 
-    const dxfAreaM2 = geom ? geom.area / 1000000 : 0;
-    const dxfWeightKg = geom
-      ? (geom.area / 1000000) * ((excelRow.thickness || 10) / 1000) * densityKgPerM3
-      : 0;
+    /** Match DXF review / quote: bbox footprint, not true cut area. */
+    const dxfAreaM2 =
+      dxfDim1 > 0 && dxfDim2 > 0 ? (dxfDim1 * dxfDim2) / 1_000_000 : 0;
+    const dxfWeightKg =
+      dxfAreaM2 > 0
+        ? dxfAreaM2 * ((excelRow.thickness || 10) / 1000) * densityKgPerM3
+        : 0;
 
-    const excelAreaM2 = excelRow.area || 0;
+    /**
+     * Same footprint definition as DXF: L×W (mm² → m²). When both Excel dimensions exist,
+     * use that instead of the imported `area` column (often net/cut area or rounded BOM value),
+     * so the area column matches length/width and compares apples-to-apples with DXF.
+     */
+    const excelFootprintM2 =
+      rawExcelL > 0 && rawExcelW > 0
+        ? (rawExcelL * rawExcelW) / 1_000_000
+        : 0;
+    const excelAreaM2 =
+      excelFootprintM2 > 0 ? excelFootprintM2 : excelRow.area || 0;
     const excelWeightKg = excelRow.weight || 0;
 
     const mismatchFields: string[] = [];
@@ -171,6 +184,13 @@ export function buildValidationData(
             : "No action required",
     });
   }
+
+  rows.sort((a, b) =>
+    a.partName.localeCompare(b.partName, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    })
+  );
 
   return {
     rows,

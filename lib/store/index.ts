@@ -128,6 +128,24 @@ function stripDxfGeometryForStorage(g: DxfPartGeometry): DxfPartGeometry {
   };
 }
 
+/**
+ * Quote preview snapshots need drawable `outer` + `holes` for the part preview modal.
+ * Still drop heavy `entities` text and trim `preparation` vertices — those dominate size.
+ */
+export function slimDxfGeometryForQuoteSnapshot(g: DxfPartGeometry): DxfPartGeometry {
+  const pg = g.processedGeometry;
+  return {
+    ...g,
+    entities: [],
+    processedGeometry: pg
+      ? {
+          ...pg,
+          preparation: slimGeometryPreparationForStorage(pg.preparation),
+        }
+      : null,
+  };
+}
+
 // ─── Batches ─────────────────────────────────────────────────────────────────
 
 export function getBatches(): Batch[] {

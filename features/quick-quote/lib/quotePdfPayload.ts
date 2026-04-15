@@ -37,6 +37,25 @@ function sumLineTotalsRounded(
   return Math.round(raw * 100) / 100;
 }
 
+/**
+ * Total price including VAT from current BOM lines and $/kg map — same basis as PDF pricing
+ * (before finalize edits). Used for quotes list when finalize draft is not loaded.
+ */
+export function computeTotalInclVatFromQuoteParts(
+  parts: QuotePartRow[],
+  materialType: MaterialType,
+  materialPricePerKgByRow: Record<string, string>,
+  vatRate = 0.18
+): number {
+  const lineTotals = parts.map((p) =>
+    lineMaterialSellFromPart(p, materialType, materialPricePerKgByRow)
+  );
+  const totalPrice = sumLineTotalsRounded(
+    lineTotals.map((line_total) => ({ line_total }))
+  );
+  return computeQuoteTotalInclVat(totalPrice, null, vatRate);
+}
+
 /** Sender / letterhead block (editable before PDF export). */
 export interface QuotePdfCompanyBlock {
   name: string;

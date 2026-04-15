@@ -144,10 +144,7 @@ export function MergedQuoteLinesStep({
             <DialogTitle>{t(`${PP}.confirmResetTitle`)}</DialogTitle>
             <DialogDescription>{t(`${PP}.confirmResetDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-end sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>
-              {t(`${PP}.cancel`)}
-            </Button>
+          <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
             <Button
               type="button"
               variant="destructive"
@@ -157,6 +154,9 @@ export function MergedQuoteLinesStep({
               }}
             >
               {t(`${PP}.resetSession`)}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>
+              {t(`${PP}.cancel`)}
             </Button>
           </DialogFooter>
         </DialogContent>

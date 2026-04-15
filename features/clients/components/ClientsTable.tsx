@@ -76,10 +76,7 @@ export function ClientsTable({
                 : ""}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter
-            className="flex flex-row flex-wrap gap-2 sm:justify-start"
-            dir="rtl"
-          >
+          <DialogFooter className="flex flex-row flex-wrap gap-2">
             <Button
               type="button"
               variant="destructive"

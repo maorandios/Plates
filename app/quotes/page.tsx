@@ -2,9 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, PlusCircle, Trash2 } from "lucide-react";
+import { Eye, PlusCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -19,31 +33,15 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import {
   deleteQuoteFromList,
   getQuotesList,
+  setQuoteApprovalStatus,
   subscribeQuotesListChanged,
   type QuoteListRecord,
   type QuoteListStatus,
 } from "@/lib/quotes/quoteList";
 import { t } from "@/lib/i18n";
+import { formatDecimal } from "@/lib/formatNumbers";
 
-function listStepLabel(step: number): string {
-  if (step >= 1 && step <= 7) {
-    return t(`quotes.listStepLabels.${step}` as `quotes.listStepLabels.${number}`);
-  }
-  return t("quotes.stepFallback", { n: step });
-}
-
-function statusBadge(status: QuoteListStatus) {
-  if (status === "complete") {
-    return (
-      <Badge variant="secondary" className="bg-emerald-600/15 text-emerald-800 dark:text-emerald-200">
-        {t("quotes.statusComplete")}
-      </Badge>
-    );
-  }
-  return <Badge variant="outline">{t("quotes.statusInProgress")}</Badge>;
-}
-
-function formatUpdated(iso: string): string {
+function formatCreated(iso: string): string {
   try {
     return new Date(iso).toLocaleString("he-IL", {
       dateStyle: "medium",
@@ -54,19 +52,31 @@ function formatUpdated(iso: string): string {
   }
 }
 
+/** Matches {@link ClientsTable}: fixed #; text columns; numeric pairs; VAT; status; icon columns. */
+const GRID_COLS =
+  "2.75rem minmax(140px, 1.15fr) minmax(120px, 1fr) minmax(110px, 1fr) minmax(150px, 1.1fr) minmax(92px, 0.85fr) minmax(92px, 0.85fr) minmax(108px, 1fr) minmax(128px, 1fr) 3.25rem 3.25rem" as const;
+
 export default function QuotesPage() {
   const [tick, setTick] = useState(0);
+  const [quotePendingDelete, setQuotePendingDelete] = useState<QuoteListRecord | null>(
+    null
+  );
 
   useEffect(() => {
-    return subscribeQuotesListChanged(() => setTick((t) => t + 1));
+    return subscribeQuotesListChanged(() => setTick((n) => n + 1));
   }, []);
 
   const rows = useMemo(() => getQuotesList(), [tick]);
 
-  const handleDelete = useCallback((q: QuoteListRecord) => {
-    if (!confirm(t("quotes.removeConfirm", { ref: q.referenceNumber }))) return;
-    deleteQuoteFromList(q.id);
+  const openDeleteDialog = useCallback((q: QuoteListRecord) => {
+    setQuotePendingDelete(q);
   }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (!quotePendingDelete) return;
+    deleteQuoteFromList(quotePendingDelete.id);
+    setQuotePendingDelete(null);
+  }, [quotePendingDelete]);
 
   return (
     <PageContainer>
@@ -74,84 +84,203 @@ export default function QuotesPage() {
         title={t("quotes.title")}
         description={t("quotes.description")}
         actions={
-          <div className="flex items-center gap-2">
-            <Button asChild>
-              <Link href="/quick-quote" className="gap-2">
-                <PlusCircle className="h-4 w-4 me-2" />
-                {t("quotes.newQuote")}
-              </Link>
-            </Button>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted shrink-0">
-              <ClipboardList className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </div>
+          <Button asChild>
+            <Link href="/quick-quote" className="gap-2 inline-flex items-center">
+              <PlusCircle className="h-4 w-4" />
+              {t("quotes.newQuote")}
+            </Link>
+          </Button>
         }
       />
 
       {rows.length === 0 ? (
         <EmptyState
-          icon={ClipboardList}
+          icon={PlusCircle}
           title={t("quotes.emptyTitle")}
           description={t("quotes.emptyDescription")}
           action={
             <Button asChild>
-              <Link href="/quick-quote" className="gap-2">
-                <PlusCircle className="h-4 w-4 me-2" />
+              <Link href="/quick-quote" className="gap-2 inline-flex items-center">
+                <PlusCircle className="h-4 w-4" />
                 {t("quotes.newQuote")}
               </Link>
             </Button>
           }
         />
       ) : (
-        <div className="rounded-xl border-0 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("quotes.colReference")}</TableHead>
-                <TableHead>{t("quotes.colClient")}</TableHead>
-                <TableHead>{t("quotes.colStatus")}</TableHead>
-                <TableHead>{t("quotes.colPhase")}</TableHead>
-                <TableHead>{t("quotes.colUpdated")}</TableHead>
-                <TableHead className="text-end w-[140px]">{t("quotes.colActions")}</TableHead>
+        <div className="rounded-xl border border-white/[0.08] overflow-x-auto" dir="rtl">
+          <div className="min-w-[1140px] px-3 sm:px-5">
+          <Table
+            className="grid w-full border-collapse border-spacing-0 [&_thead]:contents [&_tbody]:contents [&_tr]:contents"
+            style={{ gridTemplateColumns: GRID_COLS }}
+          >
+            <TableHeader className="contents">
+              <TableRow className="contents border-0 hover:bg-transparent">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium text-xs sm:text-sm">
+                  {t("quotes.colIndex")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium text-xs sm:text-sm">
+                  {t("quotes.colClient")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium text-xs sm:text-sm">
+                  {t("quotes.colProject")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium text-xs sm:text-sm">
+                  {t("quotes.colReference")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium text-xs sm:text-sm">
+                  {t("quotes.colCreated")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium text-xs sm:text-sm">
+                  {t("quotes.colTotalWeight")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium text-xs sm:text-sm">
+                  {t("quotes.colTotalArea")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium text-xs sm:text-sm">
+                  {t("quotes.colTotalInclVat")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium text-xs sm:text-sm">
+                  {t("quotes.colStatus")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium text-xs sm:text-sm">
+                  {t("quotes.colView")}
+                </TableHead>
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium text-xs sm:text-sm pe-1 sm:pe-2">
+                  {t("quotes.colDelete")}
+                </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {rows.map((q) => (
-                <TableRow key={q.id}>
-                  <TableCell className="font-mono text-sm">{q.referenceNumber}</TableCell>
-                  <TableCell className="font-medium max-w-[220px] truncate">
-                    {q.customerName || "—"}
-                  </TableCell>
-                  <TableCell>{statusBadge(q.status)}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {listStepLabel(q.currentStep)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                    {formatUpdated(q.updatedAt)}
-                  </TableCell>
-                  <TableCell className="text-end">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href="/quick-quote">{t("quotes.openBuilder")}</Link>
+            <TableBody className="contents">
+              {rows.map((q, index) => {
+                const w = q.totalWeightKg;
+                const a = q.totalAreaM2;
+                const vat = q.totalInclVat;
+                return (
+                  <TableRow key={q.id} className="contents border-0 group/row hover:bg-white/[0.02]">
+                    <TableCell className="text-center tabular-nums text-muted-foreground border-b border-white/[0.06] text-sm">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell className="min-w-0 text-right font-medium border-b border-white/[0.06]">
+                      <span className="block truncate" title={q.customerName || undefined}>
+                        {q.customerName?.trim() || "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="min-w-0 text-right text-sm border-b border-white/[0.06]">
+                      <span className="block truncate" title={q.projectName?.trim() || undefined}>
+                        {q.projectName?.trim() || "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="min-w-0 border-b border-white/[0.06] text-right">
+                      <span className="font-mono text-sm block truncate" title={q.referenceNumber}>
+                        {q.referenceNumber}
+                      </span>
+                    </TableCell>
+                    <TableCell className="min-w-0 text-right text-muted-foreground text-sm tabular-nums whitespace-nowrap border-b border-white/[0.06]">
+                      {formatCreated(q.createdAt)}
+                    </TableCell>
+                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-white/[0.06]">
+                      {w != null && Number.isFinite(w) ? formatDecimal(w, 1) : "—"}
+                    </TableCell>
+                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-white/[0.06]">
+                      {a != null && Number.isFinite(a) ? formatDecimal(a, 2) : "—"}
+                    </TableCell>
+                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-white/[0.06]">
+                      {vat != null && Number.isFinite(vat) ? formatDecimal(vat, 2) : "—"}
+                    </TableCell>
+                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] px-1">
+                      <Select
+                        value={q.status}
+                        onValueChange={(v) =>
+                          setQuoteApprovalStatus(q.id, v as QuoteListStatus)
+                        }
+                      >
+                        <SelectTrigger
+                          className="h-9 w-[min(100%,9.5rem)] max-w-full"
+                          aria-label={t("quotes.statusSelectAria", {
+                            ref: q.referenceNumber,
+                          })}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="complete">
+                            {t("quotes.statusApproved")}
+                          </SelectItem>
+                          <SelectItem value="in_progress">
+                            {t("quotes.statusNotApproved")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] px-2 py-2">
+                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" asChild>
+                        <Link
+                          href={`/quotes/${q.id}/preview`}
+                          title={t("quotes.viewAria", { ref: q.referenceNumber })}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
                       </Button>
+                    </TableCell>
+                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] ps-2 py-2 pe-1 sm:pe-2">
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(q)}
-                        aria-label={t("quotes.removeAria", { ref: q.referenceNumber })}
+                        className="h-9 w-9 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => openDeleteDialog(q)}
+                        title={t("quotes.removeAria", { ref: q.referenceNumber })}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
+          </div>
         </div>
       )}
+
+      <Dialog
+        open={quotePendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setQuotePendingDelete(null);
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          showCloseButton={false}
+          className="max-w-md border-white/10 text-start sm:text-start"
+        >
+          <DialogHeader className="text-start sm:text-start">
+            <DialogTitle>{t("quotes.removeDialogTitle")}</DialogTitle>
+            <DialogDescription className="text-start">
+              {quotePendingDelete
+                ? t("quotes.removeDialogDescription", {
+                    projectName:
+                      quotePendingDelete.projectName?.trim() ||
+                      t("quotes.removeDialogProjectFallback"),
+                  })
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex w-full flex-row flex-wrap items-center gap-2">
+            <Button type="button" variant="destructive" onClick={confirmDelete}>
+              {t("quotes.removeDialogConfirm")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQuotePendingDelete(null)}
+            >
+              {t("common.cancel")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }

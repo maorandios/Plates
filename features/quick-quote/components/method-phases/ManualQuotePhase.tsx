@@ -238,7 +238,10 @@ export function ManualQuotePhase({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain">
+          <div
+            id="quick-quote-method-scroll"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain"
+          >
             <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
               {rows.length === 0 ? (
                 <div className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 py-8">

@@ -3,6 +3,14 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Edit2, Layers, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -111,6 +119,7 @@ function ThicknessSheetsPanel({
   const { formatLengthValue, formatAreaValue, parseLengthInputToMm } = useAppPreferences();
   const [draftRow, setDraftRow] = useState<DraftRowState | null>(null);
   const [editingLine, setEditingLine] = useState<QuoteSheetStockLine | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const tableBusy = !!draftRow || !!editingLine;
 
@@ -171,9 +180,14 @@ function ThicknessSheetsPanel({
     setDraftRow(null);
   }
 
-  function handleDelete(lineId: string) {
-    if (!confirm(t(`${SKM}.deleteSheetConfirm`))) return;
-    onSheetsChange(sheets.filter((s) => s.id !== lineId));
+  function requestDelete(lineId: string) {
+    setDeleteTargetId(lineId);
+  }
+
+  function confirmDeleteSheet() {
+    if (deleteTargetId == null) return;
+    onSheetsChange(sheets.filter((s) => s.id !== deleteTargetId));
+    setDeleteTargetId(null);
   }
 
   function handleEdit(line: QuoteSheetStockLine) {
@@ -262,7 +276,7 @@ function ThicknessSheetsPanel({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(line.id)}
+                        onClick={() => requestDelete(line.id)}
                         disabled={tableBusy}
                         className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                         aria-label={t(`${SKM}.deleteSheetAria`)}
@@ -354,6 +368,30 @@ function ThicknessSheetsPanel({
           </Button>
         </div>
       </div>
+
+      <Dialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null);
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-md" dir="rtl">
+          <DialogHeader className="text-start sm:text-start">
+            <DialogTitle>{t(`${SKM}.deleteSheetDialogTitle`)}</DialogTitle>
+            <DialogDescription className="text-start text-sm leading-relaxed">
+              {t(`${SKM}.deleteSheetConfirm`)}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="destructive" onClick={confirmDeleteSheet}>
+              {t(`${SKM}.deleteSheetDialogDelete`)}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setDeleteTargetId(null)}>
+              {t("common.cancel")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {editingLine && (
         <StockSheetForm

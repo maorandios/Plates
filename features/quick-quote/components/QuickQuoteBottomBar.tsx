@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, FileDown } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { t } from "@/lib/i18n";
 import type { QuickQuoteStep } from "../types/quickQuote";
@@ -34,13 +34,15 @@ export function QuickQuoteBottomBar({
   onBack,
   onContinue,
   exportQuotePdf,
+  saveQuoteToList,
 }: QuickQuoteBottomBarProps) {
   const showBackBtn = showBack && currentStep > 1 && onBack;
   const showContinueBtn =
     showContinue && currentStep < 7 && onContinue;
   const showExportPdfBtn = Boolean(exportQuotePdf);
+  const showSaveToListBtn = Boolean(saveQuoteToList);
 
-  if (!showBackBtn && !showContinueBtn && !showExportPdfBtn) {
+  if (!showBackBtn && !showContinueBtn && !showExportPdfBtn && !showSaveToListBtn) {
     return null;
   }
 
@@ -70,6 +72,25 @@ export function QuickQuoteBottomBar({
             >
               {t("common.continue")}
               <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+          {saveQuoteToList && (
+            <Button
+              type="button"
+              size="default"
+              variant={saveQuoteToList.disabled ? "outline" : "default"}
+              className="min-w-[10rem] gap-1"
+              disabled={saveQuoteToList.disabled}
+              onClick={saveQuoteToList.onClick}
+            >
+              {saveQuoteToList.disabled ? (
+                <>
+                  <Check className="h-4 w-4 shrink-0" aria-hidden />
+                  {saveQuoteToList.savedLabel}
+                </>
+              ) : (
+                saveQuoteToList.label
+              )}
             </Button>
           )}
           {exportQuotePdf && (

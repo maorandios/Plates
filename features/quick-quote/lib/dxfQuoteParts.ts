@@ -36,7 +36,9 @@ export function dxfGeometriesToQuoteParts(
       const dim2 = bbox.height;
       const [lengthMm, widthMm] =
         dim1 >= dim2 ? [dim1, dim2] : [dim2, dim1];
-      const areaM2 = geom.area / 1_000_000;
+      /** Quote line uses bounding-box footprint, not true cut outline area. */
+      const areaM2 =
+        dim1 > 0 && dim2 > 0 ? (dim1 * dim2) / 1_000_000 : 0;
       const tM = th / 1000;
       const weightKg = areaM2 * tM * rho;
       const pierceCount =

@@ -1,7 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GeneralSection } from "./GeneralSection";
@@ -10,10 +27,7 @@ import { MergedQuoteLinesStep } from "./MergedQuoteLinesStep";
 import { QuoteMethodPickerPhase } from "./QuoteMethodPickerPhase";
 import { QuoteStepper } from "./QuoteStepper";
 import { QuickQuoteBottomBar } from "./QuickQuoteBottomBar";
-import {
-  QuoteFinalizeExportStep,
-  type FinalizeExportToolbar,
-} from "./QuoteFinalizeExportStep";
+import { QuoteFinalizeExportStep } from "./QuoteFinalizeExportStep";
 import { PricingStep } from "./PricingStep";
 import { QuoteSummaryStep } from "./QuoteSummaryStep";
 import { StockPricingStep } from "./StockPricingStep";
@@ -42,7 +56,10 @@ import type { BendPlateQuoteItem } from "../bend-plate/types";
 import { generateQuoteReference } from "../lib/generateQuoteReference";
 import { MOCK_MFG_PARAMETERS } from "../mock/quickQuoteMockData";
 import type { QuotePdfFullPayload } from "../lib/quotePdfPayload";
-import { buildQuotePdfFullPayload } from "../lib/quotePdfPayload";
+import {
+  buildQuotePdfFullPayload,
+  computeTotalInclVatFromQuoteParts,
+} from "../lib/quotePdfPayload";
 import type { DxfPartGeometry } from "@/types";
 import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import { getPurchasedSheetSizes } from "@/lib/store";
@@ -51,6 +68,7 @@ import {
   patchQuoteSession,
   upsertQuoteInProgress,
 } from "@/lib/quotes/quoteList";
+import { saveQuoteSnapshot } from "@/lib/quotes/quoteSnapshot";
 import { nanoid } from "@/lib/utils/nanoid";
 import { t } from "@/lib/i18n";
 
@@ -65,12 +83,27 @@ const defaultJobDetails: QuickQuoteJobDetails = {
 type QuoteMethodSubView = "picker" | "methodSetup";
 
 export function QuickQuotePage() {
+  const router = useRouter();
   /** Stable id for this browser session — ties wizard progress to the Quotes list. */
   const quoteListSessionIdRef = useRef<string | null>(null);
+  /** After user clicks "Save to list" on step 7, the quote exists in the quotes list; until then, no list row. */
+  const [quoteSavedToList, setQuoteSavedToList] = useState(false);
+  const [leaveWizardDialogOpen, setLeaveWizardDialogOpen] = useState(false);
+  /** Target path for in-app navigation after user confirms leaving. */
+  const pendingNavigationHrefRef = useRef<string | null>(null);
   const [step, setStep] = useState<QuickQuoteStep>(1);
   const [highestStepReached, setHighestStepReached] = useState<QuickQuoteStep>(1);
   const [quoteMethodSubView, setQuoteMethodSubView] =
     useState<QuoteMethodSubView>("picker");
+
+  /** Scroll both the app shell and the page `<main>` so the step header stays visible after step changes. */
+  const pageMainScrollRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const shell = document.getElementById("app-shell-scroll");
+    if (shell) shell.scrollTop = 0;
+    const main = pageMainScrollRef.current;
+    if (main) main.scrollTop = 0;
+  }, [step, quoteMethodSubView]);
   const [jobDetails, setJobDetails] = useState<QuickQuoteJobDetails>(() => ({
     ...defaultJobDetails,
     referenceNumber: generateQuoteReference(),
@@ -85,8 +118,6 @@ export function QuickQuotePage() {
     Record<string, string>
   >({});
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
-  const [finalizeExportToolbar, setFinalizeExportToolbar] =
-    useState<FinalizeExportToolbar | null>(null);
   const stableSetFinalizeDraft = useCallback(
     (action: React.SetStateAction<QuotePdfFullPayload>) => {
       setPdfExportDraft((prev) => {
@@ -193,14 +224,7 @@ export function QuickQuotePage() {
     if (!quoteListSessionIdRef.current) {
       quoteListSessionIdRef.current = nanoid();
     }
-    upsertQuoteInProgress({
-      id: quoteListSessionIdRef.current,
-      referenceNumber: jobDetails.referenceNumber,
-      customerName: jobDetails.customerName.trim(),
-      projectName: jobDetails.projectName.trim(),
-      customerClientId: jobDetails.customerClientId,
-      currentStep: 2,
-    });
+    /** List row is created only on explicit Save in phase 7 ({@link handleSaveQuoteToList}). */
     advanceTo(2);
   };
 
@@ -310,12 +334,59 @@ export function QuickQuotePage() {
 
   const handleContinueToFinalize = useCallback(() => {
     setPdfExportDraft(buildFinalizeDraft());
-    const qid = quoteListSessionIdRef.current;
-    if (qid) {
-      markQuoteComplete(qid);
-    }
     advanceTo(7);
   }, [advanceTo, buildFinalizeDraft]);
+
+  const handleSaveQuoteToList = useCallback(() => {
+    let qid = quoteListSessionIdRef.current;
+    if (!qid) {
+      qid = nanoid();
+      quoteListSessionIdRef.current = qid;
+    }
+    const js = selection.jobSummary;
+    const draftIncl = pdfExportDraft?.pricing?.total_incl_vat;
+    const totalInclVat =
+      pdfExportDraft != null &&
+      typeof draftIncl === "number" &&
+      Number.isFinite(draftIncl)
+        ? draftIncl
+        : computeTotalInclVatFromQuoteParts(
+            selection.parts,
+            materialType,
+            materialPricePerKgByRow
+          );
+    upsertQuoteInProgress({
+      id: qid,
+      referenceNumber: jobDetails.referenceNumber,
+      customerName: jobDetails.customerName.trim(),
+      projectName: jobDetails.projectName.trim(),
+      customerClientId: jobDetails.customerClientId,
+      currentStep: 7,
+    });
+    patchQuoteSession(qid, {
+      currentStep: 7,
+      customerClientId: jobDetails.customerClientId,
+      projectName: jobDetails.projectName.trim(),
+      customerName: jobDetails.customerName.trim(),
+      referenceNumber: jobDetails.referenceNumber,
+      totalWeightKg: js.totalEstWeightKg,
+      totalAreaM2: js.totalPlateAreaM2,
+      totalItemQty: js.totalQty,
+      totalInclVat,
+    });
+    markQuoteComplete(qid);
+    setQuoteSavedToList(true);
+  }, [
+    jobDetails.referenceNumber,
+    jobDetails.customerName,
+    jobDetails.projectName,
+    jobDetails.customerClientId,
+    selection.jobSummary,
+    selection.parts,
+    materialType,
+    materialPricePerKgByRow,
+    pdfExportDraft,
+  ]);
 
   const handleBackFromFinalize = useCallback(() => {
     advanceTo(6);
@@ -328,13 +399,21 @@ export function QuickQuotePage() {
   }, [step, pdfExportDraft, buildFinalizeDraft]);
 
   useEffect(() => {
-    if (step !== 7) setFinalizeExportToolbar(null);
-  }, [step]);
-
-  useEffect(() => {
+    if (!quoteSavedToList) return;
     const qid = quoteListSessionIdRef.current;
     if (!qid) return;
     const js = selection.jobSummary;
+    const draftIncl = pdfExportDraft?.pricing?.total_incl_vat;
+    const totalInclVat =
+      pdfExportDraft != null &&
+      typeof draftIncl === "number" &&
+      Number.isFinite(draftIncl)
+        ? draftIncl
+        : computeTotalInclVatFromQuoteParts(
+            selection.parts,
+            materialType,
+            materialPricePerKgByRow
+          );
     patchQuoteSession(qid, {
       currentStep: step,
       customerClientId: jobDetails.customerClientId,
@@ -344,8 +423,10 @@ export function QuickQuotePage() {
       totalWeightKg: js.totalEstWeightKg,
       totalAreaM2: js.totalPlateAreaM2,
       totalItemQty: js.totalQty,
+      totalInclVat,
     });
   }, [
+    quoteSavedToList,
     step,
     jobDetails.customerClientId,
     jobDetails.projectName,
@@ -354,6 +435,10 @@ export function QuickQuotePage() {
     selection.jobSummary.totalEstWeightKg,
     selection.jobSummary.totalPlateAreaM2,
     selection.jobSummary.totalQty,
+    selection.parts,
+    materialType,
+    materialPricePerKgByRow,
+    pdfExportDraft,
   ]);
 
   const setSheetsForThickness = useCallback(
@@ -391,6 +476,39 @@ export function QuickQuotePage() {
       bendPlateQuoteItems,
     ]
   );
+
+  /** Persist a read-only snapshot for `/quotes/[id]/preview` (debounced). */
+  useEffect(() => {
+    const qid = quoteListSessionIdRef.current;
+    if (!qid || mergedQuotePartsList.length === 0) return;
+    let draftPayload: QuotePdfFullPayload;
+    try {
+      draftPayload = pdfExportDraft ?? buildFinalizeDraft();
+    } catch {
+      return;
+    }
+    const tmr = window.setTimeout(() => {
+      saveQuoteSnapshot(qid, {
+        draft: draftPayload,
+        materialType,
+        materialPricePerKgByRow,
+        mergedParts: mergedQuotePartsList,
+        dxfMethodGeometries,
+        bendPlateQuoteItems,
+        generalNotes: jobDetails.notes?.trim() ?? "",
+      });
+    }, 500);
+    return () => window.clearTimeout(tmr);
+  }, [
+    mergedQuotePartsList,
+    materialType,
+    materialPricePerKgByRow,
+    dxfMethodGeometries,
+    bendPlateQuoteItems,
+    jobDetails.notes,
+    pdfExportDraft,
+    buildFinalizeDraft,
+  ]);
 
   const hasAnyQuoteMethodData = mergedQuotePartsList.length > 0;
 
@@ -487,6 +605,57 @@ export function QuickQuotePage() {
 
   const stepNav = getStepNavigation();
 
+  const shouldWarnOnLeave = step > 1 && !quoteSavedToList;
+
+  useEffect(() => {
+    if (!shouldWarnOnLeave) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [shouldWarnOnLeave]);
+
+  useEffect(() => {
+    if (!shouldWarnOnLeave) return;
+    const onDocClickCapture = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      const a = el?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a) return;
+      const href = a.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+      if (href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      try {
+        const u = new URL(href, window.location.origin);
+        if (u.origin !== window.location.origin) return;
+        if (u.pathname === "/quick-quote" || u.pathname.startsWith("/quick-quote/")) {
+          return;
+        }
+        const path = `${u.pathname}${u.search}${u.hash}`;
+        e.preventDefault();
+        e.stopPropagation();
+        pendingNavigationHrefRef.current = path;
+        setLeaveWizardDialogOpen(true);
+      } catch {
+        return;
+      }
+    };
+    document.addEventListener("click", onDocClickCapture, true);
+    return () => document.removeEventListener("click", onDocClickCapture, true);
+  }, [shouldWarnOnLeave]);
+
+  const handleLeaveWizardConfirm = useCallback(() => {
+    const path = pendingNavigationHrefRef.current;
+    pendingNavigationHrefRef.current = null;
+    setLeaveWizardDialogOpen(false);
+    if (path) router.push(path);
+  }, [router]);
+
+  const handleLeaveWizardStay = useCallback(() => {
+    pendingNavigationHrefRef.current = null;
+    setLeaveWizardDialogOpen(false);
+  }, []);
+
   const methodSetupScrollFriendly =
     step === 2 && quoteMethodSubView === "methodSetup";
 
@@ -510,6 +679,7 @@ export function QuickQuotePage() {
         )}
       >
         <PageContainer
+          ref={pageMainScrollRef}
           className={cn(
             "bg-background min-h-0 flex-1",
             step === 2 || step === 3
@@ -540,7 +710,7 @@ export function QuickQuotePage() {
           )}
         >
           {step === 1 && (
-            <Card className="mx-auto w-full max-w-4xl border-0 shadow-sm">
+            <Card className="mx-auto w-full max-w-xl border-0 shadow-sm">
               <CardHeader className="space-y-1 pb-2">
                 <CardTitle className="text-xl tracking-tight">
                   {t("quickQuotePage.generalTitle")}
@@ -646,7 +816,6 @@ export function QuickQuotePage() {
             <QuoteFinalizeExportStep
               draft={pdfExportDraft}
               setDraft={stableSetFinalizeDraft}
-              onExportControlsChange={setFinalizeExportToolbar}
               materialFamilyLabel={MATERIAL_TYPE_LABELS[materialType]}
               materialType={materialType}
               materialPricePerKgByRow={materialPricePerKgByRow}
@@ -663,19 +832,42 @@ export function QuickQuotePage() {
           canContinue={stepNav.canContinue ?? false}
           onBack={stepNav.onBack}
           onContinue={stepNav.onContinue}
-          exportQuotePdf={
-            step === 7 && finalizeExportToolbar
+          saveQuoteToList={
+            step === 7
               ? {
-                  label: t("quote.finalizePhase.exportQuoteProduce"),
-                  loadingLabel: t("quote.finalizePhase.exporting"),
-                  disabled: finalizeExportToolbar.disabled,
-                  loading: finalizeExportToolbar.exporting,
-                  onClick: () => void finalizeExportToolbar.exportPdf(),
+                  label: t("quickQuotePage.saveQuoteToList"),
+                  savedLabel: t("quickQuotePage.savedToListShort"),
+                  onClick: handleSaveQuoteToList,
+                  disabled: quoteSavedToList,
                 }
               : undefined
           }
         />
       </div>
+
+      <Dialog
+        open={leaveWizardDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) handleLeaveWizardStay();
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-md" dir="rtl">
+          <DialogHeader className="text-start sm:text-start">
+            <DialogTitle>{t("quickQuotePage.leaveWizardTitle")}</DialogTitle>
+            <DialogDescription className="text-start text-sm leading-relaxed">
+              {t("quickQuotePage.leaveWizardConfirm")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-row flex-wrap gap-2">
+            <Button type="button" variant="destructive" onClick={handleLeaveWizardConfirm}>
+              {t("quickQuotePage.leaveWizardLeave")}
+            </Button>
+            <Button type="button" variant="outline" onClick={handleLeaveWizardStay}>
+              {t("quickQuotePage.leaveWizardStay")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
