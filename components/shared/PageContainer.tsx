@@ -12,13 +12,13 @@ interface PageContainerProps {
 }
 
 export const PageContainer = React.forwardRef<
-  HTMLElement,
+  HTMLDivElement,
   PageContainerProps
 >(function PageContainer({ children, className, embedded }, ref) {
-  const Comp = embedded ? "div" : "main";
   return (
-    <Comp
+    <div
       ref={ref}
+      role={embedded ? undefined : "main"}
       className={cn(
         embedded ? "" : "flex-1 min-h-0 overflow-auto",
         "p-6 lg:p-8",
@@ -26,6 +26,6 @@ export const PageContainer = React.forwardRef<
       )}
     >
       {children}
-    </Comp>
+    </div>
   );
 });

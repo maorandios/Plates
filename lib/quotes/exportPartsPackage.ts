@@ -1,5 +1,5 @@
 /**
- * One-click export: ZIP containing one DXF per part + one Excel plate list.
+ * One-click export: ZIP containing one DXF per part + technical drawings + Excel plate list.
  *
  * Download: `{quoteId}.zip`
  *
@@ -8,6 +8,9 @@
  *   │   ├── BP-001.dxf      ← exact polygon (DXF-sourced parts)
  *   │   ├── SH-PL01.dxf     ← flat blank + bend profile (bend-plate parts)
  *   │   └── MA-PL01.dxf     ← rectangle (manual / excel parts)
+ *   ├── drawings/
+ *   │   ├── BP-001.pdf      ← A4 technical drawing (profile + flat blank + title block)
+ *   │   └── ...
  *   └── {quoteId}-plate-list.xlsx   ← RTL sheet matching טבלת סיכום columns
  */
 
@@ -18,6 +21,7 @@ import type { QuotePartRow } from "@/features/quick-quote/types/quickQuote";
 import { buildUnifiedSummaryBomXlsxBuffer } from "@/features/quick-quote/lib/unifiedSummaryBomXlsx";
 import { getFileById, getFileData } from "@/lib/store";
 import { generatePartDxfString, safeFilenameBase } from "./generatePartDxf";
+import { generatePlateDrawingPdf } from "./generatePlateDrawingPdf";
 
 // ---------------------------------------------------------------------------
 // Browser download helper
@@ -102,6 +106,7 @@ export async function exportPartsPackage(
   const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
   const dxfFolder = zip.folder("dxf")!;
+  const drawingsFolder = zip.folder("drawings")!;
 
   // Build lookup maps: partId → source data
   const geoMap = new Map<string, DxfPartGeometry>(
@@ -140,18 +145,21 @@ export async function exportPartsPackage(
     const baseName = uniqueFilename(safeFilenameBase(part.partName), usedFilenames);
 
     if (geometry) {
-      // DXF-sourced part: use the original uploaded file exactly as-is
       const rawText = getRawDxfText(geometry);
       if (rawText) {
         dxfFolder.file(`${baseName}.dxf`, rawText);
+        // Still generate a drawing PDF for DXF-sourced parts (simple rectangle view)
+        const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType);
+        if (pdfBytes) drawingsFolder.file(`${baseName}.pdf`, pdfBytes);
         continue;
       }
-      // Original file no longer in storage — fall through to generated fallback
     }
 
-    // Bend-plate or manual/excel → generate DXF
     const dxfText = generatePartDxfString(part, geometry, bendItem, materialType);
     dxfFolder.file(`${baseName}.dxf`, dxfText);
+
+    const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType);
+    if (pdfBytes) drawingsFolder.file(`${baseName}.pdf`, pdfBytes);
   }
 
   // Excel BOM (same columns & RTL styling as DXF↔Excel compare export pattern)

@@ -20,6 +20,13 @@ export interface QuickQuoteBottomBarProps {
     loading: boolean;
     onClick: () => void;
   };
+  /** Optional save-to-list action (finalize step). */
+  saveQuoteToList?: {
+    label: string;
+    savedLabel: string;
+    disabled: boolean;
+    onClick: () => void;
+  };
 }
 
 /**

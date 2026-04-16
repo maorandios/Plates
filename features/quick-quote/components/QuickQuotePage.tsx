@@ -97,7 +97,7 @@ export function QuickQuotePage() {
     useState<QuoteMethodSubView>("picker");
 
   /** Scroll both the app shell and the page `<main>` so the step header stays visible after step changes. */
-  const pageMainScrollRef = useRef<HTMLElement | null>(null);
+  const pageMainScrollRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     const shell = document.getElementById("app-shell-scroll");
     if (shell) shell.scrollTop = 0;

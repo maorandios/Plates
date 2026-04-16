@@ -111,7 +111,7 @@ export function QuotePartGeometryPreview({
   rectangleAppearance = "default",
 }: QuotePartGeometryPreviewProps) {
   const dxf = findDxfGeometryForQuotePart(part, dxfGeometries ?? undefined);
-  const pg = dxf?.processedGeometry;
+  const pg = dxf?.processedGeometry ?? null;
 
   if (hasValidGeometry(pg)) {
     const rectFallback = (
