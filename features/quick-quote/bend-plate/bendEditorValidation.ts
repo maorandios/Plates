@@ -10,8 +10,7 @@ export function getBendEditorValidationIssueCodes(form: BendPlateFormState): str
   const g = form.global;
 
   if (!(Number(g.thicknessMm) > 0)) issues.push("thicknessMm");
-  if (!(Number(g.plateWidthMm) > 0)) issues.push("plateWidthMm");
-  if (!(Number(g.insideRadiusMm) > 0)) issues.push("insideRadiusMm");
+  if (form.template !== "plate" && !(Number(g.plateWidthMm) > 0)) issues.push("plateWidthMm");
   if (!(Math.floor(g.quantity) >= 1)) issues.push("quantity");
   if (!(g.material ?? "").trim()) issues.push("material");
 
@@ -65,6 +64,12 @@ export function getBendEditorValidationIssueCodes(form: BendPlateFormState): str
       if (!angleOk(gt.angle2Deg)) issues.push("gutterAngle2");
       if (!angleOk(gt.angle3Deg)) issues.push("gutterAngle3");
       if (!angleOk(gt.angle4Deg)) issues.push("gutterAngle4");
+      break;
+    }
+    case "plate": {
+      const pl = form.plate;
+      if (!(pl.lengthMm > 0)) issues.push("plateOutlineLengthMm");
+      if (!(pl.widthMm > 0)) issues.push("plateOutlineWidthMm");
       break;
     }
     case "custom": {

@@ -1,5 +1,12 @@
 /**
- * Side-profile centerline, developed length, bend allowances (neutral axis k=0.33).
+ * Side-profile centerline, developed length, bend deductions.
+ *
+ * User-entered segment lengths are **finished leg dimensions** (measured on the
+ * bent part).  The developed (flat-blank) length is computed by subtracting bend
+ * deductions — *not* by adding bend allowances to raw segments.
+ *
+ * Inside bend radius is derived automatically: r = plate thickness.
+ * K-factor varies by material family.
  */
 
 import type { MaterialType } from "@/types/materials";
@@ -12,11 +19,20 @@ import type {
   GutterTemplateParams,
   LTemplateParams,
   OmegaTemplateParams,
+  PlateTemplateParams,
   UTemplateParams,
   ZTemplateParams,
 } from "./types";
 
-const K_FACTOR = 0.33;
+const K_FACTORS: Record<MaterialType, number> = {
+  carbonSteel: 0.33,
+  aluminum: 0.33,
+  stainlessSteel: 0.45,
+};
+
+export function kFactorForMaterial(materialType: MaterialType): number {
+  return K_FACTORS[materialType] ?? 0.33;
+}
 
 export type Point2 = { x: number; y: number };
 
@@ -53,11 +69,34 @@ export function internalAnglesFromPolyline(pts: Point2[]): number[] {
 export function bendAllowanceMm(
   bendAngleDeg: number,
   insideRadiusMm: number,
-  thicknessMm: number
+  thicknessMm: number,
+  kFactor: number = 0.33
 ): number {
   const theta = (Math.abs(bendAngleDeg) * Math.PI) / 180;
-  const rn = insideRadiusMm + K_FACTOR * thicknessMm;
+  const rn = insideRadiusMm + kFactor * thicknessMm;
   return theta * rn;
+}
+
+/** Outside setback: distance from bend tangent point to the theoretical sharp corner. */
+export function outsideSetbackMm(
+  bendAngleDeg: number,
+  insideRadiusMm: number,
+  thicknessMm: number
+): number {
+  const halfTheta = ((Math.abs(bendAngleDeg) * Math.PI) / 180) / 2;
+  return (insideRadiusMm + thicknessMm) * Math.tan(halfTheta);
+}
+
+/** Bend deduction: amount to subtract from the sum of finished leg dimensions per bend. */
+export function bendDeductionMm(
+  bendAngleDeg: number,
+  insideRadiusMm: number,
+  thicknessMm: number,
+  kFactor: number = 0.33
+): number {
+  const ossb = outsideSetbackMm(bendAngleDeg, insideRadiusMm, thicknessMm);
+  const ba = bendAllowanceMm(bendAngleDeg, insideRadiusMm, thicknessMm, kFactor);
+  return 2 * ossb - ba;
 }
 
 export function polylineFromSegments(
@@ -81,17 +120,23 @@ export function polylineFromSegments(
   return pts;
 }
 
+/**
+ * Developed (flat-blank) length from finished leg dimensions.
+ *
+ * developed = Σ finished legs − Σ bend deductions
+ */
 function computeDeveloped(
-  straights: number[],
+  finishedLegs: number[],
   bends: number[],
   insideRadiusMm: number,
-  thicknessMm: number
+  thicknessMm: number,
+  kFactor: number
 ): { developedMm: number; bendCount: number } {
-  let developed = straights.reduce((a, b) => a + b, 0);
+  let developed = finishedLegs.reduce((a, b) => a + b, 0);
   for (const ang of bends) {
-    developed += bendAllowanceMm(ang, insideRadiusMm, thicknessMm);
+    developed -= bendDeductionMm(ang, insideRadiusMm, thicknessMm, kFactor);
   }
-  return { developedMm: developed, bendCount: bends.length };
+  return { developedMm: Math.max(0, developed), bendCount: bends.length };
 }
 
 export function buildL(p: LTemplateParams): {
@@ -176,6 +221,34 @@ export function buildOmega(p: OmegaTemplateParams): {
  * Gutter / tray: left lip outward → down → floor → up → right lip outward (5 straights, 4 bends).
  * Start at inner corner of left lip; segment A points west (symmetric outward flanges).
  */
+
+/**
+ * Flat plate: axis-aligned rectangle (90° corners). Bottom on +X; `straights` = [L, W, L, W].
+ */
+export function buildPlate(p: PlateTemplateParams): {
+  pts: Point2[];
+  straights: number[];
+  bends: number[];
+} {
+  const L = Math.max(0, p.lengthMm);
+  const W = Math.max(0, p.widthMm);
+  const pts: Point2[] =
+    L > 0 && W > 0
+      ? [
+          { x: 0, y: 0 },
+          { x: L, y: 0 },
+          { x: L, y: W },
+          { x: 0, y: W },
+          { x: 0, y: 0 },
+        ]
+      : [{ x: 0, y: 0 }];
+  return {
+    pts,
+    straights: [L, W, L, W],
+    bends: [],
+  };
+}
+
 export function buildGutter(p: GutterTemplateParams): {
   pts: Point2[];
   straights: number[];
@@ -234,6 +307,7 @@ function segmentLabelsForTemplate(state: BendPlateFormState): string[] {
   if (t === "u" || t === "z") return ["A", "B", "C"];
   if (t === "omega") return ["A", "B", "C", "D", "E"];
   if (t === "gutter") return ["A", "B", "C", "D", "E"];
+  if (t === "plate") return ["1", "2", "3", "4"];
   if (t === "custom") {
     const n = Math.min(7, Math.max(2, Math.floor(state.custom.segmentCount) || 2));
     return Array.from({ length: n }, (_, i) => `${i + 1}`);
@@ -275,6 +349,9 @@ export function bendProfileBendAngles(state: BendPlateFormState): number[] {
       state.gutter.angle4Deg,
     ];
   }
+  if (t === "plate") {
+    return [];
+  }
   if (t === "custom") {
     const built = buildCustom(state.custom);
     return internalAnglesFromPolyline(built.pts);
@@ -297,6 +374,8 @@ export function buildForTemplate(
       return buildOmega(s.omega);
     case "gutter":
       return buildGutter(s.gutter);
+    case "plate":
+      return buildPlate(s.plate);
     case "custom":
       return buildCustom(s.custom);
     default: {
@@ -324,6 +403,8 @@ export function horizontalAnchorSegmentIndex(
       return 2;
     case "gutter":
       return 2;
+    case "plate":
+      return 0;
     case "custom":
       return null;
     default: {
@@ -367,19 +448,67 @@ export function normalizePolylineToHorizontalAnchor(
   });
 }
 
+/** Shoelace area of a closed polygon in mm²; duplicate closing vertex (p0 === pN) is ignored once. */
+export function closedPolygonAreaMm2(pts: Point2[]): number {
+  const n = pts.length;
+  if (n < 3) return 0;
+  let m = n;
+  if (
+    Math.hypot(pts[0].x - pts[n - 1].x, pts[0].y - pts[n - 1].y) < 1e-9
+  ) {
+    m = n - 1;
+  }
+  if (m < 3) return 0;
+  let sum = 0;
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m;
+    sum += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+  }
+  return Math.abs(sum) / 2;
+}
+
 export function computeBendGeometry(
   state: BendPlateFormState,
   materialType: MaterialType
 ): { pts: Point2[]; calc: BendPlateCalculation } {
+  if (state.template === "plate") {
+    const p = state.plate;
+    const L = Math.max(0, p.lengthMm);
+    const W = Math.max(0, p.widthMm);
+    const ptsRaw = buildPlate(p).pts;
+    const anchorIdx = horizontalAnchorSegmentIndex("plate");
+    const pts = normalizePolylineToHorizontalAnchor(ptsRaw, anchorIdx);
+    const { thicknessMm, quantity } = state.global;
+    const density = getMaterialConfig(materialType).densityKgPerM3;
+    const areaM2 = (L * W) / 1_000_000;
+    const q = Math.max(0, Math.floor(quantity));
+    const weightKg =
+      q > 0 ? areaM2 * (thicknessMm / 1000) * density * q : 0;
+    return {
+      pts,
+      calc: {
+        developedLengthMm: L,
+        blankLengthMm: L,
+        blankWidthMm: W,
+        areaM2,
+        weightKg,
+        bendCount: 0,
+      },
+    };
+  }
+
   const { pts: ptsRaw, straights, bends } = buildForTemplate(state.template, state);
   const anchorIdx = horizontalAnchorSegmentIndex(state.template);
   const pts = normalizePolylineToHorizontalAnchor(ptsRaw, anchorIdx);
-  const { insideRadiusMm, thicknessMm, plateWidthMm, quantity } = state.global;
+  const { thicknessMm, plateWidthMm, quantity } = state.global;
+  const insideRadiusMm = thicknessMm; // r = t rule-of-thumb for air bending
+  const kFactor = kFactorForMaterial(materialType);
   const { developedMm, bendCount } = computeDeveloped(
     straights,
     bends,
     insideRadiusMm,
-    thicknessMm
+    thicknessMm,
+    kFactor
   );
   const density = getMaterialConfig(materialType).densityKgPerM3;
   const areaM2 = (developedMm * plateWidthMm) / 1_000_000;

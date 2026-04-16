@@ -84,7 +84,7 @@ import { ProfilePreview3D } from "./ProfilePreview3D";
 const BP = "quote.bendPlatePhase";
 const ED = `${BP}.editor`;
 
-const TEMPLATE_IDS: BendTemplateId[] = ["l", "u", "z", "omega", "gutter", "custom"];
+const TEMPLATE_IDS: BendTemplateId[] = ["l", "u", "z", "omega", "gutter", "plate", "custom"];
 
 /** Shape-picker grid: columns swapped vs `TEMPLATE_IDS` row-major order (right column first). */
 const TEMPLATE_IDS_SHAPE_PICKER: BendTemplateId[] = [
@@ -94,6 +94,7 @@ const TEMPLATE_IDS_SHAPE_PICKER: BendTemplateId[] = [
   "z",
   "custom",
   "gutter",
+  "plate",
 ];
 
 function templateLabel(id: BendTemplateId): string {
@@ -219,6 +220,7 @@ function snapshotItem(
     z: { ...state.z },
     omega: { ...state.omega },
     gutter: { ...state.gutter },
+    plate: { ...state.plate },
     custom: {
       segmentCount: state.custom.segmentCount,
       segmentsMm: [...state.custom.segmentsMm],
@@ -678,7 +680,7 @@ function BendPlateHub({
             <div
               className={cn(
                 "grid w-full min-h-[21rem] grid-cols-2 sm:min-h-[22.5rem]",
-                "[grid-template-rows:repeat(3,minmax(0,1fr))]"
+                "[grid-template-rows:repeat(4,minmax(0,1fr))]"
               )}
             >
               {TEMPLATE_IDS_SHAPE_PICKER.map((tid, i) => (
@@ -689,6 +691,7 @@ function BendPlateHub({
                   onClick={() => pickShape(tid)}
                   className={cn(
                     "flex min-h-0 min-w-0 flex-col items-center justify-center gap-3 px-4 py-4 text-center transition-colors",
+                    i === TEMPLATE_IDS_SHAPE_PICKER.length - 1 && "col-span-2",
                     "bg-card hover:bg-white/[0.03]",
                     "border-b border-solid border-[#6A23F7]/20",
                     i % 2 === 0 && "border-s border-e border-solid border-[#6A23F7]/20",
@@ -785,6 +788,8 @@ function BendPlateShapeEditor({
           return { ...s, omega: { ...d.omega } };
         case "gutter":
           return { ...s, gutter: { ...d.gutter } };
+        case "plate":
+          return { ...s, plate: { ...d.plate } };
         case "custom":
           return { ...s, custom: { ...d.custom } };
         default:
@@ -851,19 +856,14 @@ function BendPlateShapeEditor({
                     min={0}
                     step={0.01}
                   />
-                  <NumField
-                    label={t(`${ED}.plateWidthMm`)}
-                    value={form.global.plateWidthMm}
-                    onChange={(n) => patchGlobal({ plateWidthMm: Math.max(0, n) })}
-                    min={0}
-                  />
-                  <NumField
-                    label={t(`${ED}.insideRadiusMm`)}
-                    value={form.global.insideRadiusMm}
-                    onChange={(n) => patchGlobal({ insideRadiusMm: Math.max(0, n) })}
-                    min={0}
-                    step={0.01}
-                  />
+                  {form.template !== "plate" ? (
+                    <NumField
+                      label={t(`${ED}.plateWidthMm`)}
+                      value={form.global.plateWidthMm}
+                      onChange={(n) => patchGlobal({ plateWidthMm: Math.max(0, n) })}
+                      min={0}
+                    />
+                  ) : null}
                   <NumField
                     label={t(`${ED}.quantity`)}
                     value={form.global.quantity}
@@ -1010,6 +1010,8 @@ function BendPlateShapeEditor({
               pts={pts}
               plateWidthMm={form.global.plateWidthMm}
               thicknessMm={form.global.thicknessMm}
+              insideRadiusMm={form.global.insideRadiusMm ?? form.global.thicknessMm}
+              flatPlate={form.template === "plate"}
               fill
               className="h-full min-h-[min(64vh,500px)] w-full rounded-md border-0 bg-transparent"
             />
@@ -1381,6 +1383,44 @@ function TemplateFields({
             }
             min={0}
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (tmpl === "plate") {
+    const pl = form.plate;
+    return (
+      <div className="space-y-3">
+        <div className={SEGMENT_DIM_BOX}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t(`${ED}.plate.rectTitle`)}
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{t(`${ED}.plate.rectHint`)}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label={t(`${ED}.plate.lengthMm`)}
+              value={pl.lengthMm}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  plate: { ...s.plate, lengthMm: Math.max(0, n) },
+                }))
+              }
+              min={0}
+            />
+            <NumField
+              label={t(`${ED}.plate.widthMm`)}
+              value={pl.widthMm}
+              onChange={(n) =>
+                setForm((s) => ({
+                  ...s,
+                  plate: { ...s.plate, widthMm: Math.max(0, n) },
+                }))
+              }
+              min={0}
+            />
+          </div>
         </div>
       </div>
     );

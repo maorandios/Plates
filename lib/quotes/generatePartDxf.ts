@@ -20,10 +20,16 @@ import {
   point3d,
 } from "@tarikjabiri/dxf";
 import type { DxfPartGeometry } from "@/types";
-import type { BendPlateQuoteItem } from "@/features/quick-quote/bend-plate/types";
+import type {
+  BendPlateFormState,
+  BendPlateQuoteItem,
+} from "@/features/quick-quote/bend-plate/types";
 import type { QuotePartRow } from "@/features/quick-quote/types/quickQuote";
+import type { MaterialType } from "@/types/materials";
 import {
   bendAllowanceMm,
+  outsideSetbackMm,
+  kFactorForMaterial,
   buildForTemplate,
 } from "@/features/quick-quote/bend-plate/geometry";
 import { splitMaterialGradeAndFinish } from "@/features/quick-quote/lib/plateFields";
@@ -174,12 +180,27 @@ function dxfFromGeometry(
 function dxfFromBendPlate(
   dxf: DxfWriter,
   part: QuotePartRow,
-  item: BendPlateQuoteItem
+  item: BendPlateQuoteItem,
+  materialType: MaterialType
 ): void {
   const L = item.calc.blankLengthMm;  // developed (unfolded) length — X axis
   const W = item.calc.blankWidthMm;   // plate width — Y axis
 
-  // ── CUT layer: flat blank rectangle ──────────────────────────────────────
+  const formState: BendPlateFormState = {
+    template: item.template,
+    global: item.global,
+    l: item.l,
+    u: item.u,
+    z: item.z,
+    omega: item.omega,
+    gutter: item.gutter,
+    plate: item.plate,
+    custom: item.custom,
+  };
+
+  // ── CUT layer: flat blank rectangle (L × W from calc; plate = length × width, 90°) ──
+  const markingL = L;
+  const markingW = W;
   dxf.addLWPolyline(
     [
       { point: point2d(0, 0) },
@@ -191,52 +212,48 @@ function dxfFromBendPlate(
   );
 
   // ── BEND_LINE layer: one vertical line per bend ───────────────────────────
-  // Reconstruct segment + bend-allowance sequence from stored params
+  // Walk the flat-blank layout: each segment's flat run is the finished leg
+  // minus outside-setbacks from adjacent bends, separated by BA zones.
   try {
-    const formState = {
-      template: item.template,
-      global: item.global,
-      l: item.l,
-      u: item.u,
-      z: item.z,
-      omega: item.omega,
-      gutter: item.gutter,
-      custom: item.custom,
-    };
 
-    const { straights, bends } = buildForTemplate(item.template, formState);
+    const { straights, bends } = buildForTemplate(formState.template, formState);
 
     if (bends.length > 0 && straights.length > 1) {
       dxf.addLayer(LAYER_BEND_LINE, COLOR_BEND);
 
-      const { insideRadiusMm, thicknessMm } = item.global;
+      const { thicknessMm } = item.global;
+      const insideRadiusMm = thicknessMm;
+      const kFactor = kFactorForMaterial(materialType);
 
-      // Text height for angle labels: ~5% of plate width, 3–8 mm
-      const textH = Math.min(8, Math.max(3, W * 0.05));
-      // Estimated rendered width of the label when rotated vertical
-      // (DXF text width ≈ charCount × 0.6 × height)
-      const labelCharCount = 4; // e.g. "90°"
+      const textH = Math.min(8, Math.max(3, markingW * 0.05));
+      const labelCharCount = 4;
       const labelWidth = labelCharCount * 0.6 * textH;
-      // Vertical centre of the plate
-      const textStartY = W / 2 - labelWidth / 2;
+      const textStartY = markingW / 2 - labelWidth / 2;
+
+      // Pre-compute OSSB for each bend
+      const ossbs = bends.map((ang) =>
+        outsideSetbackMm(ang, insideRadiusMm, thicknessMm)
+      );
 
       let curX = 0;
 
       for (let i = 0; i < bends.length; i++) {
-        curX += straights[i] ?? 0;
+        // Flat run for leg i: finished length minus adjacent setbacks
+        let flatRun = straights[i] ?? 0;
+        if (i > 0) flatRun -= ossbs[i - 1];
+        flatRun -= ossbs[i];
+        curX += Math.max(0, flatRun);
 
-        const ba = bendAllowanceMm(bends[i], insideRadiusMm, thicknessMm);
+        const ba = bendAllowanceMm(bends[i], insideRadiusMm, thicknessMm, kFactor);
         const bendCentreX = curX + ba / 2;
 
-        // Full-height bend line
         dxf.addLine(
           point3d(bendCentreX, 0, 0),
-          point3d(bendCentreX, W, 0),
+          point3d(bendCentreX, markingW, 0),
           { layerName: LAYER_BEND_LINE }
         );
 
-        // Angle label: rotated 90° (parallel to the bend line), centred on the line
-        const angleLabel = `${Math.round(bends[i])}\xb0`; // e.g. "90°"
+        const angleLabel = `${Math.round(bends[i])}\xb0`;
         dxf.addText(
           point3d(bendCentreX - textH * 0.3, textStartY, 0),
           textH,
@@ -252,10 +269,10 @@ function dxfFromBendPlate(
   }
 
   // ── MARKING text: one line at the bottom-left corner of the blank ─────────
-  const textH = Math.min(6, Math.max(2, Math.min(L, W) * 0.05));
-  const padX = Math.max(L * 0.02, 1);
-  const padY = Math.max(W * 0.04, textH * 1.5);
-  const usableW = L * 0.92;
+  const textH = Math.min(6, Math.max(2, Math.min(markingL, markingW) * 0.05));
+  const padX = Math.max(markingL * 0.02, 1);
+  const padY = Math.max(markingW * 0.04, textH * 1.5);
+  const usableW = markingL * 0.92;
 
   addMarkingLine(dxf, bendPlateMarkingLineText(part, item), padX, padY, usableW, textH);
 }
@@ -295,14 +312,15 @@ function dxfFromRect(dxf: DxfWriter, part: QuotePartRow): void {
 export function generatePartDxfString(
   part: QuotePartRow,
   geometry: DxfPartGeometry | null,
-  bendItem: BendPlateQuoteItem | null
+  bendItem: BendPlateQuoteItem | null,
+  materialType: MaterialType = "carbonSteel"
 ): string {
   const dxf = initDxf();
 
   if (geometry) {
     dxfFromGeometry(dxf, part, geometry);
   } else if (bendItem) {
-    dxfFromBendPlate(dxf, part, bendItem);
+    dxfFromBendPlate(dxf, part, bendItem, materialType);
   } else {
     dxfFromRect(dxf, part);
   }

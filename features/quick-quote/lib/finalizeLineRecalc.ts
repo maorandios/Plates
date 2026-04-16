@@ -33,7 +33,7 @@ export type FinalizeDraftLineItem = {
   description?: string;
 };
 
-const BEND_SHAPE_IDS = new Set<string>(["l", "u", "z", "omega", "gutter", "custom"]);
+const BEND_SHAPE_IDS = new Set<string>(["l", "u", "z", "omega", "gutter", "plate", "custom"]);
 
 function roundN(n: number, decimals: number): number {
   const p = 10 ** decimals;

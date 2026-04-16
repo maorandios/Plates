@@ -119,6 +119,21 @@ export function CustomProfileGlyph({ className }: { className?: string }) {
   );
 }
 
+/** Flat square outline — ריבוע (axis-aligned plate; length × width in editor). */
+export function PlateProfileGlyph({ className }: { className?: string }) {
+  return (
+    <GlyphSvg viewBox="0 0 72 52" className={className}>
+      <path
+        d="M 20 10 L 52 10 L 52 42 L 20 42 Z"
+        stroke="currentColor"
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </GlyphSvg>
+  );
+}
+
 const GLYPH_BY_TEMPLATE: Record<
   BendTemplateId,
   React.ComponentType<{ className?: string }>
@@ -128,6 +143,7 @@ const GLYPH_BY_TEMPLATE: Record<
   z: ZProfileGlyph,
   omega: OmegaProfileGlyph,
   gutter: GutterProfileGlyph,
+  plate: PlateProfileGlyph,
   custom: CustomProfileGlyph,
 };
 

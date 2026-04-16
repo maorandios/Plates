@@ -1,4 +1,4 @@
-export type BendTemplateId = "l" | "u" | "z" | "omega" | "gutter" | "custom";
+export type BendTemplateId = "l" | "u" | "z" | "omega" | "gutter" | "plate" | "custom";
 
 export interface BendPlateGlobalParams {
   /** Steel grade / designation (e.g. S235). */
@@ -7,7 +7,11 @@ export interface BendPlateGlobalParams {
   finish: string;
   thicknessMm: number;
   plateWidthMm: number;
-  insideRadiusMm: number;
+  /**
+   * @deprecated Inside radius is now derived from thickness (r = t).
+   * Kept optional for backward-compat with saved quotes that still carry the field.
+   */
+  insideRadiusMm?: number;
   quantity: number;
 }
 
@@ -68,6 +72,15 @@ export interface GutterTemplateParams {
   angle4Deg: number;
 }
 
+/**
+ * Flat plate (no bends): axis-aligned rectangle, 90° corners.
+ * `lengthMm` = bottom/top edge, `widthMm` = left/right edge (first span on +X is length).
+ */
+export interface PlateTemplateParams {
+  lengthMm: number;
+  widthMm: number;
+}
+
 /** Up to 7 straight segments; `anglesDeg` has length `segmentCount − 1` (max 6). */
 export interface CustomTemplateParams {
   segmentCount: number;
@@ -97,6 +110,7 @@ export interface BendPlateFormState {
   z: ZTemplateParams;
   omega: OmegaTemplateParams;
   gutter: GutterTemplateParams;
+  plate: PlateTemplateParams;
   custom: CustomTemplateParams;
 }
 
@@ -116,6 +130,7 @@ export interface BendPlateQuoteItem {
   z: ZTemplateParams;
   omega: OmegaTemplateParams;
   gutter: GutterTemplateParams;
+  plate: PlateTemplateParams;
   custom: CustomTemplateParams;
   calc: BendPlateCalculation;
 }

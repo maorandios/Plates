@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Package, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,10 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import type { DxfPartGeometry } from "@/types";
-import type { BendPlateQuoteItem } from "../bend-plate/types";
 import type { QuotePartRow } from "../types/quickQuote";
 import { PartBreakdownTable } from "./PartBreakdownTable";
-import { exportPartsPackage } from "@/lib/quotes/exportPartsPackage";
 
 const VIEWPORT = "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
 const PP = "quote.partsPhase" as const;
@@ -25,9 +23,7 @@ const PP = "quote.partsPhase" as const;
 interface MergedQuoteLinesStepProps {
   parts: QuotePartRow[];
   currency: string;
-  referenceNumber: string;
   dxfMethodGeometries: DxfPartGeometry[];
-  bendPlateQuoteItems: BendPlateQuoteItem[];
   onDeletePart: (row: QuotePartRow) => void;
   onReset: () => void;
   canReset: boolean;
@@ -36,35 +32,12 @@ interface MergedQuoteLinesStepProps {
 export function MergedQuoteLinesStep({
   parts,
   currency,
-  referenceNumber,
   dxfMethodGeometries,
-  bendPlateQuoteItems,
   onDeletePart,
   onReset,
   canReset,
 }: MergedQuoteLinesStepProps) {
   const [resetOpen, setResetOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-
-  const handleExportPackage = useCallback(async () => {
-    if (parts.length === 0 || exporting) return;
-    setExportError(null);
-    setExporting(true);
-    try {
-      await exportPartsPackage(
-        parts,
-        dxfMethodGeometries,
-        bendPlateQuoteItems,
-        referenceNumber
-      );
-    } catch (err) {
-      console.error(err);
-      setExportError(t(`${PP}.exportError`));
-    } finally {
-      setExporting(false);
-    }
-  }, [parts, dxfMethodGeometries, bendPlateQuoteItems, referenceNumber, exporting]);
 
   return (
     <div
@@ -93,20 +66,7 @@ export function MergedQuoteLinesStep({
                   <RotateCcw className="h-4 w-4" aria-hidden />
                   {t(`${PP}.resetSession`)}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="gap-2"
-                  disabled={parts.length === 0 || exporting}
-                  onClick={handleExportPackage}
-                >
-                  <Package className="h-4 w-4" aria-hidden />
-                  {exporting ? t(`${PP}.exportBuilding`) : t(`${PP}.exportPackage`)}
-                </Button>
               </div>
-              {exportError ? (
-                <p className="max-w-sm text-end text-xs text-destructive">{exportError}</p>
-              ) : null}
             </div>
           </div>
         </div>

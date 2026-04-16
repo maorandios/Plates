@@ -1,7 +1,12 @@
 import type { MaterialType } from "@/types/materials";
 import { internalAngleToTurnDeg } from "./geometry";
 import { normalizeStoredReviewFinish } from "../lib/materialSettingsOptions";
-import type { BendPlateFormState, BendPlateQuoteItem, BendTemplateId } from "./types";
+import type {
+  BendPlateFormState,
+  BendPlateQuoteItem,
+  BendTemplateId,
+  PlateTemplateParams,
+} from "./types";
 
 function roundAngleDeg(n: number): number {
   return Math.round(n * 10) / 10;
@@ -131,6 +136,53 @@ function migrateCustomIncludedAnglesToPathTurns(
   return { ...custom, anglesDeg };
 }
 
+/** Legacy `plate` rows: four sides / old fields → rectangle length × width. */
+function migratePlateParams(
+  raw: unknown,
+  fallback: PlateTemplateParams
+): PlateTemplateParams {
+  const r = raw as
+    | (Partial<PlateTemplateParams> & {
+        side1Mm?: number;
+        side2Mm?: number;
+        side3Mm?: number;
+        side4Mm?: number;
+        innerLengthMm?: number;
+        innerWidthMm?: number;
+      })
+    | null
+    | undefined;
+  if (r && typeof r.lengthMm === "number" && typeof r.widthMm === "number") {
+    return {
+      lengthMm: Math.max(0, r.lengthMm),
+      widthMm: Math.max(0, r.widthMm),
+    };
+  }
+  if (
+    r &&
+    typeof r.side1Mm === "number" &&
+    typeof r.side2Mm === "number" &&
+    typeof r.side3Mm === "number" &&
+    typeof r.side4Mm === "number"
+  ) {
+    const s1 = Math.max(0, r.side1Mm);
+    const s2 = Math.max(0, r.side2Mm);
+    const s3 = Math.max(0, r.side3Mm);
+    const s4 = Math.max(0, r.side4Mm);
+    return {
+      lengthMm: (s1 + s3) / 2,
+      widthMm: (s2 + s4) / 2,
+    };
+  }
+  if (r && typeof r.innerLengthMm === "number") {
+    const il = Math.max(0, r.innerLengthMm);
+    const iw = Math.max(0, Number(r.innerWidthMm) || 0);
+    const S = il > 0 && iw > 0 ? (il + iw) / 2 : fallback.lengthMm;
+    return { lengthMm: S, widthMm: S };
+  }
+  return { ...fallback };
+}
+
 export function createDefaultBendPlateFormState(): BendPlateFormState {
   return {
     template: "l",
@@ -139,7 +191,6 @@ export function createDefaultBendPlateFormState(): BendPlateFormState {
       finish: "",
       thicknessMm: 0,
       plateWidthMm: 0,
-      insideRadiusMm: 0,
       quantity: 0,
     },
     l: { aMm: 100, bMm: 80, angleDeg: 90 },
@@ -166,6 +217,10 @@ export function createDefaultBendPlateFormState(): BendPlateFormState {
       angle2Deg: 90,
       angle3Deg: 90,
       angle4Deg: 90,
+    },
+    plate: {
+      lengthMm: 100,
+      widthMm: 100,
     },
     custom: {
       segmentCount: 2,
@@ -216,6 +271,7 @@ export function formStateFromQuoteItem(
   const ext = item as BendPlateQuoteItem & {
     omega?: BendPlateFormState["omega"];
     gutter?: BendPlateFormState["gutter"];
+    plate?: BendPlateFormState["plate"];
   };
   let customBlock = padCustomParams({ ...item.custom });
   if (item.template === "custom" && item.bendAngleSemantic !== "path_turn") {
@@ -233,6 +289,7 @@ export function formStateFromQuoteItem(
     z: { ...item.z },
     omega: { ...def.omega, ...ext.omega },
     gutter: { ...def.gutter, ...ext.gutter },
+    plate: migratePlateParams(ext.plate, def.plate),
     custom: customBlock,
   };
   if (item.bendAngleSemantic === "internal" || item.template === "custom") {

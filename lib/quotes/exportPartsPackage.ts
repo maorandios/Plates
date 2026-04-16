@@ -12,6 +12,7 @@
  */
 
 import type { DxfPartGeometry } from "@/types";
+import type { MaterialType } from "@/types/materials";
 import type { BendPlateQuoteItem } from "@/features/quick-quote/bend-plate/types";
 import type { QuotePartRow } from "@/features/quick-quote/types/quickQuote";
 import { buildUnifiedSummaryBomXlsxBuffer } from "@/features/quick-quote/lib/unifiedSummaryBomXlsx";
@@ -92,7 +93,8 @@ export async function exportPartsPackage(
   parts: QuotePartRow[],
   dxfMethodGeometries: DxfPartGeometry[],
   bendPlateQuoteItems: BendPlateQuoteItem[],
-  referenceNumber: string
+  referenceNumber: string,
+  materialType: MaterialType = "carbonSteel"
 ): Promise<void> {
   if (parts.length === 0) return;
 
@@ -148,7 +150,7 @@ export async function exportPartsPackage(
     }
 
     // Bend-plate or manual/excel → generate DXF
-    const dxfText = generatePartDxfString(part, geometry, bendItem);
+    const dxfText = generatePartDxfString(part, geometry, bendItem, materialType);
     dxfFolder.file(`${baseName}.dxf`, dxfText);
   }
 

@@ -771,9 +771,7 @@ export function QuickQuotePage() {
             <MergedQuoteLinesStep
               parts={mergedQuotePartsList}
               currency={jobDetails.currency}
-              referenceNumber={jobDetails.referenceNumber}
               dxfMethodGeometries={dxfMethodGeometries}
-              bendPlateQuoteItems={bendPlateQuoteItems}
               onDeletePart={handleRemoveMergedPart}
               onReset={handleResetMergedLines}
               canReset={hasAnyQuoteMethodData}

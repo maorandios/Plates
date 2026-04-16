@@ -263,7 +263,8 @@ export function QuotePreviewView({
         mergedParts,
         dxfMethodGeometries,
         snapshot.bendPlateQuoteItems,
-        draft.quote.quote_number || draft.quote.reference_number || "quote"
+        draft.quote.quote_number || draft.quote.reference_number || "quote",
+        materialType
       );
     } catch (err) {
       console.error(err);
