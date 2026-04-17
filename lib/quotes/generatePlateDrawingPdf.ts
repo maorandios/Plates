@@ -1290,6 +1290,7 @@ export async function generatePlateDrawingPdf(
         gutter: bendItem.gutter,
         plate: bendItem.plate,
         custom: bendItem.custom,
+        segmentFaceHoles: bendItem.segmentFaceHoles ?? [],
       };
       const { pts, straights, bends } = buildForTemplate(
         formState.template,

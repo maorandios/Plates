@@ -196,6 +196,7 @@ function dxfFromBendPlate(
     gutter: item.gutter,
     plate: item.plate,
     custom: item.custom,
+    segmentFaceHoles: item.segmentFaceHoles ?? [],
   };
 
   // ── CUT layer: flat blank rectangle (L × W from calc; plate = length × width, 90°) ──

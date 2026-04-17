@@ -227,6 +227,7 @@ export function createDefaultBendPlateFormState(): BendPlateFormState {
       segmentsMm: [100, 100, 0, 0, 0, 0, 0],
       anglesDeg: [90, 0, 0, 0, 0, 0],
     },
+    segmentFaceHoles: [],
   };
 }
 
@@ -291,6 +292,21 @@ export function formStateFromQuoteItem(
     gutter: { ...def.gutter, ...ext.gutter },
     plate: migratePlateParams(ext.plate, def.plate),
     custom: customBlock,
+    segmentFaceHoles: Array.isArray(item.segmentFaceHoles)
+      ? item.segmentFaceHoles.map((row) =>
+          (row ?? []).map((h) => {
+            const copy = { ...h };
+            if (
+              copy.kind === "oval" &&
+              copy.ovalLengthMm == null &&
+              copy.ovalOverallMm != null
+            ) {
+              copy.ovalLengthMm = copy.ovalOverallMm;
+            }
+            return copy;
+          })
+        )
+      : [],
   };
   if (item.bendAngleSemantic === "internal" || item.template === "custom") {
     return base;

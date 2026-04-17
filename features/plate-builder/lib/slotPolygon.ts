@@ -31,7 +31,7 @@ function circlePolyLocal(r: number, n: number): [number, number][] {
  * Stadium / slotted hole: constant width = diameter (semicircular ends), variable overall length.
  * Local +X = slot axis before rotation. CCW, Y-up.
  */
-function localCapsulePoints(overallLength: number, diameter: number): [number, number][] {
+export function localCapsulePoints(overallLength: number, diameter: number): [number, number][] {
   const d = diameter;
   const r = d / 2;
   const L = overallLength;

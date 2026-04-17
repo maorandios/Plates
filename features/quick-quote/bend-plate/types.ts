@@ -101,6 +101,36 @@ export interface BendPlateCalculation {
   bendCount: number;
 }
 
+/** Hole on a straight segment’s flat face. `uMm` = along plate width, `vMm` = along segment length (0 at top edge in preview). */
+export type BendSegmentHoleKind = "round" | "oval" | "rect";
+
+export interface BendSegmentHole {
+  id: string;
+  kind: BendSegmentHoleKind;
+  /** Center along plate strip width (mm). */
+  uMm: number;
+  /** Center along segment run (mm). */
+  vMm: number;
+  /** Round & oval: width across the slot = diameter of semicircular ends (mm). */
+  diameterMm: number;
+  /**
+   * Oval: overall length along the slot axis (mm), ≥ diameterMm.
+   * Straights extend; end curvature radius stays diameter/2 (stadium / pill shape).
+   */
+  ovalLengthMm?: number;
+  /** @deprecated Prefer `ovalLengthMm` — kept for older saved quotes. */
+  ovalOverallMm?: number;
+  /**
+   * Oval & rect: rotation (°), clockwise from +plate width (+u).
+   * Rect: width along local +u, length along local +v at 0°. Default 0.
+   */
+  rotationDeg?: number;
+  /** Rect: extent along segment (mm). */
+  rectLengthMm?: number;
+  /** Rect: extent along plate width (mm). */
+  rectWidthMm?: number;
+}
+
 /** Full editor state: one block per template (only active template is used). */
 export interface BendPlateFormState {
   template: BendTemplateId;
@@ -112,6 +142,11 @@ export interface BendPlateFormState {
   gutter: GutterTemplateParams;
   plate: PlateTemplateParams;
   custom: CustomTemplateParams;
+  /**
+   * Holes per straight segment index (same order as bend profile dimension segments).
+   * Sparse trailing omission is OK; missing indices = no holes.
+   */
+  segmentFaceHoles: BendSegmentHole[][];
 }
 
 export interface BendPlateQuoteItem {
@@ -133,4 +168,5 @@ export interface BendPlateQuoteItem {
   plate: PlateTemplateParams;
   custom: CustomTemplateParams;
   calc: BendPlateCalculation;
+  segmentFaceHoles?: BendSegmentHole[][];
 }
