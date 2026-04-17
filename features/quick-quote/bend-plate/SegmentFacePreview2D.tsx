@@ -8,7 +8,11 @@ import {
   computeSegmentFaceSvgModel,
   segmentFaceAnnotationStylesForView,
 } from "./segmentFaceLayout";
-import { SegmentFaceKonvaHolesOverlay } from "./SegmentFaceKonvaHolesOverlay";
+import {
+  SegmentFaceKonvaHolesOverlay,
+  segmentFaceHoleCenterToStagePx,
+  type SegmentFaceDimEdge,
+} from "./SegmentFaceKonvaHolesOverlay";
 
 /** Match ProfilePreview2D. */
 const PROFILE_STROKE = "hsl(142 70% 45%)";
@@ -26,6 +30,21 @@ export interface SegmentFacePreview2DProps {
   fill?: boolean;
   holes?: BendSegmentHole[];
   onHolePositionChange?: (holeId: string, uMm: number, vMm: number) => void;
+  selectedHoleId?: string | null;
+  onHoleSelect?: (holeId: string) => void;
+  /** Click a dashed guide from hole center to an edge to type an exact distance (mm). */
+  onDimensionGuideLineClick?: (
+    holeId: string,
+    edge: SegmentFaceDimEdge,
+    clientX: number,
+    clientY: number
+  ) => void;
+  /** Show dashed dimension guides only after the user tapped this hole id on the canvas. */
+  dimensionGuidesActiveHoleId?: string | null;
+  /** After adding a hole, show a hint above it until dismissed. */
+  placementTooltipHoleId?: string | null;
+  /** Clear placement hint (e.g. any pointer down in this preview). */
+  onClearPlacementTooltip?: () => void;
 }
 
 /**
@@ -41,8 +60,15 @@ export function SegmentFacePreview2D({
   fill,
   holes = [],
   onHolePositionChange,
+  selectedHoleId = null,
+  onHoleSelect,
+  onDimensionGuideLineClick,
+  dimensionGuidesActiveHoleId = null,
+  placementTooltipHoleId = null,
+  onClearPlacementTooltip,
 }: SegmentFacePreview2DProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const [viewPx, setViewPx] = useState({ w: 320, h: 240 });
 
   useLayoutEffect(() => {
@@ -75,15 +101,50 @@ export function SegmentFacePreview2D({
     <div
       ref={wrapRef}
       className={cn(
-        /* Same flex centering as ProfilePreview2D — not flex-col + flex-1 (that skews hole view). */
         "relative flex items-center justify-center overflow-hidden",
         fill
           ? "h-full min-h-0 w-full"
           : "aspect-[4/3] rounded-lg bg-[#0f1419]",
         className
       )}
+      onPointerDownCapture={
+        placementTooltipHoleId && onClearPlacementTooltip
+          ? () => {
+              /** Defer so Konva can handle the same gesture (hole click / guides) first. */
+              window.setTimeout(() => onClearPlacementTooltip(), 0);
+            }
+          : undefined
+      }
     >
+      {holesInteractive &&
+      placementTooltipHoleId &&
+      svg.kind === "ok" ? (() => {
+        const th = holes.find((h) => h.id === placementTooltipHoleId);
+        if (!th) return null;
+        const p = segmentFaceHoleCenterToStagePx(
+          svg,
+          viewPx.w,
+          viewPx.h,
+          th.uMm,
+          th.vMm
+        );
+        return (
+          <div
+            className="pointer-events-none absolute z-[45] max-w-[min(92%,240px)] rounded-md border border-white/15 bg-card/95 px-2.5 py-2 text-center text-[11px] leading-snug text-foreground shadow-lg backdrop-blur-sm"
+            style={{
+              left: p.x,
+              top: p.y,
+              transform: "translate(-50%, calc(-100% - 14px))",
+            }}
+            dir="rtl"
+            role="tooltip"
+          >
+            {t(`${ED}.holesPlacementTooltip`)}
+          </div>
+        );
+      })() : null}
       <svg
+        ref={svgRef}
         viewBox={svg.kind === "ok" ? svg.vb : svg.vb}
         className={cn(
           fill
@@ -200,6 +261,10 @@ export function SegmentFacePreview2D({
           viewH={viewPx.h}
           holes={holes}
           onHolePositionChange={onHolePositionChange}
+          selectedHoleId={selectedHoleId}
+          onHoleSelect={onHoleSelect}
+          onDimensionGuideLineClick={onDimensionGuideLineClick}
+          dimensionGuidesActiveHoleId={dimensionGuidesActiveHoleId}
         />
       ) : null}
       {svg.kind === "ok" && svg.widthPlaceholder ? (

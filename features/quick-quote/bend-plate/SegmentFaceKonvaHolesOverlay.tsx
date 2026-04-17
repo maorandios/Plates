@@ -1,32 +1,54 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Circle, Group, Layer, Line, Rect, Stage, Text } from "react-konva";
-import { formatInteger } from "@/lib/formatNumbers";
+import { useMemo, useRef } from "react";
+import { Circle, Group, Layer, Line, Rect, Stage } from "react-konva";
 import type { BendSegmentHole } from "./types";
 import {
   capsuleOutlineUvMm,
   clampAndSnapHoleCenterTo1Mm,
+  holeHalfExtentsMm,
   segmentFaceEffectiveWidthMm,
 } from "./segmentFaceHolesBounds";
 import type { SegmentFaceSvgModel } from "./segmentFaceLayout";
 
 const HOLE_STROKE = "#f97316";
+const HOLE_STROKE_SELECTED = "#a78bfa";
 const HOLE_FILL = "rgba(249,115,22,0.12)";
+const HOLE_FILL_SELECTED = "rgba(167,139,250,0.18)";
 const HIT_PAD_PX = 14;
-const DIM_STROKE = "#94a3b8";
-const DIM_FONT = 11;
-const DIM_GAP = 12;
+/**
+ * Must match Konva `dragDistance`: pointer must move this far before a drag starts.
+ * Keeps taps/select from nudging UV; keeps preview size stable vs. spurious drags.
+ */
+const DRAG_DISTANCE_PX = 6;
 
-function fmtDimMm(n: number): string {
-  return `${formatInteger(Math.round(n))} mm`;
+const GUIDE_STROKE = "#a78bfa";
+/** Solid stroke width for invisible hit targets — dashed lines have gaps that don’t receive clicks. */
+const GUIDE_HIT_LINE_STROKE_W = 22;
+
+export type SegmentFaceDimEdge = "top" | "bottom" | "left" | "right";
+
+function clientXYFromPointerEvent(evt: Event): { x: number; y: number } {
+  if ("clientX" in evt && typeof (evt as MouseEvent).clientX === "number") {
+    const m = evt as MouseEvent;
+    return { x: m.clientX, y: m.clientY };
+  }
+  const t = (evt as TouchEvent).changedTouches?.[0];
+  return { x: t?.clientX ?? 0, y: t?.clientY ?? 0 };
 }
 
-function estTextHalfSize(text: string, fontSize: number): { w: number; h: number } {
-  return {
-    w: (text.length * fontSize * 0.52) / 2,
-    h: (fontSize * 1.1) / 2,
-  };
+/** Shorten segment [from→to] from the `to` end so it stops before the hole (clear hit targets). */
+function trimTowardStart(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  trimFromToPx: number
+): { x: number; y: number } {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy);
+  if (len < trimFromToPx + 2) return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  const t = (len - trimFromToPx) / len;
+  return { x: from.x + dx * t, y: from.y + dy * t };
 }
 
 function overlayTransform(
@@ -67,115 +89,16 @@ function overlayTransform(
   return { scale, ox, oy, uvToStage, stageToUv, Wmm, Lmm, su, sv };
 }
 
-type OverlayTf = ReturnType<typeof overlayTransform>;
-
-function HoleCenterToEdgeDimensions({
-  uMm,
-  vMm,
-  Wmm,
-  Lmm,
-  tf,
-}: {
-  uMm: number;
-  vMm: number;
-  Wmm: number;
-  Lmm: number;
-  tf: OverlayTf;
-}) {
-  const px = tf.uvToStage(uMm, vMm).x;
-  const py = tf.uvToStage(uMm, vMm).y;
-  const leftX = tf.uvToStage(0, vMm).x;
-  const rightX = tf.uvToStage(Wmm, vMm).x;
-  const topY = tf.uvToStage(uMm, 0).y;
-  const bottomY = tf.uvToStage(uMm, Lmm).y;
-
-  const leftMm = uMm;
-  const rightMm = Wmm - uMm;
-  const topMm = vMm;
-  const bottomMm = Lmm - vMm;
-
-  const leftText = fmtDimMm(leftMm);
-  const rightText = fmtDimMm(rightMm);
-  const topText = fmtDimMm(topMm);
-  const bottomText = fmtDimMm(bottomMm);
-
-  const midLeftX = (leftX + px) / 2;
-  const midRightX = (px + rightX) / 2;
-  const midTopY = (topY + py) / 2;
-  const midBottomY = (py + bottomY) / 2;
-
-  const lw = estTextHalfSize(leftText, DIM_FONT);
-  const rw = estTextHalfSize(rightText, DIM_FONT);
-  const tw = estTextHalfSize(topText, DIM_FONT);
-  const bw = estTextHalfSize(bottomText, DIM_FONT);
-
-  const dash = [5, 4];
-  const strokeW = 1;
-
-  return (
-    <>
-      <Line
-        points={[leftX, py, rightX, py]}
-        stroke={DIM_STROKE}
-        strokeWidth={strokeW}
-        dash={dash}
-        opacity={0.95}
-        lineCap="round"
-        listening={false}
-      />
-      <Line
-        points={[px, topY, px, bottomY]}
-        stroke={DIM_STROKE}
-        strokeWidth={strokeW}
-        dash={dash}
-        opacity={0.95}
-        lineCap="round"
-        listening={false}
-      />
-      <Text
-        text={leftText}
-        x={midLeftX}
-        y={py + DIM_GAP + lw.h}
-        fontSize={DIM_FONT}
-        fill={DIM_STROKE}
-        offsetX={lw.w}
-        offsetY={lw.h}
-        listening={false}
-      />
-      <Text
-        text={rightText}
-        x={midRightX}
-        y={py - DIM_GAP - rw.h}
-        fontSize={DIM_FONT}
-        fill={DIM_STROKE}
-        offsetX={rw.w}
-        offsetY={rw.h}
-        listening={false}
-      />
-      <Text
-        text={topText}
-        x={px - DIM_GAP - tw.w}
-        y={midTopY}
-        fontSize={DIM_FONT}
-        fill={DIM_STROKE}
-        offsetX={tw.w}
-        offsetY={tw.h}
-        rotation={-90}
-        listening={false}
-      />
-      <Text
-        text={bottomText}
-        x={px + DIM_GAP + bw.w}
-        y={midBottomY}
-        fontSize={DIM_FONT}
-        fill={DIM_STROKE}
-        offsetX={bw.w}
-        offsetY={bw.h}
-        rotation={-90}
-        listening={false}
-      />
-    </>
-  );
+/** Screen pixel position of a face UV point (same mapping as the holes overlay). */
+export function segmentFaceHoleCenterToStagePx(
+  layout: Extract<SegmentFaceSvgModel, { kind: "ok" }>,
+  viewW: number,
+  viewH: number,
+  uMm: number,
+  vMm: number
+): { x: number; y: number } {
+  const tf = overlayTransform(layout, viewW, viewH);
+  return tf.uvToStage(uMm, vMm);
 }
 
 export interface SegmentFaceKonvaHolesOverlayProps {
@@ -184,6 +107,24 @@ export interface SegmentFaceKonvaHolesOverlayProps {
   viewH: number;
   holes: BendSegmentHole[];
   onHolePositionChange: (holeId: string, uMm: number, vMm: number) => void;
+  /** Highlight and allow tap-to-select for panel editing. */
+  selectedHoleId?: string | null;
+  onHoleSelect?: (holeId: string) => void;
+  /**
+   * When a hole is selected, draw dashed guides to the four segment edges; clicking a segment
+   * opens precise dimension entry in the parent (popover).
+   */
+  onDimensionGuideLineClick?: (
+    holeId: string,
+    edge: SegmentFaceDimEdge,
+    clientX: number,
+    clientY: number
+  ) => void;
+  /**
+   * Dimension guides only after the user selects this hole on the canvas (tap on the hole).
+   * When unset or different from `selectedHoleId`, dashed guides are hidden.
+   */
+  dimensionGuidesActiveHoleId?: string | null;
 }
 
 export function SegmentFaceKonvaHolesOverlay({
@@ -192,13 +133,20 @@ export function SegmentFaceKonvaHolesOverlay({
   viewH,
   holes,
   onHolePositionChange,
+  selectedHoleId = null,
+  onHoleSelect,
+  onDimensionGuideLineClick,
+  dimensionGuidesActiveHoleId = null,
 }: SegmentFaceKonvaHolesOverlayProps) {
   const tf = useMemo(
     () => overlayTransform(layout, viewW, viewH),
     [layout, viewW, viewH]
   );
 
-  const [dragLive, setDragLive] = useState<{ u: number; v: number } | null>(null);
+  /** Konva may fire both tap and click for one mouse action — avoid double-opening the popover. */
+  const lastDimGuideUiRef = useRef<{ key: string; t: number } | null>(null);
+  /** Draggable holes: tap + click can both fire for one physical click. */
+  const lastHoleSelectUiRef = useRef<{ id: string; t: number } | null>(null);
 
   if (holes.length === 0 || viewW < 8 || viewH < 8) return null;
 
@@ -206,23 +154,15 @@ export function SegmentFaceKonvaHolesOverlay({
     <Stage
       width={viewW}
       height={viewH}
-      className="absolute inset-0 z-[1]"
+      className="absolute inset-0 z-20"
       style={{ touchAction: "none" }}
     >
-      <Layer listening={false}>
-        {dragLive ? (
-          <HoleCenterToEdgeDimensions
-            uMm={dragLive.u}
-            vMm={dragLive.v}
-            Wmm={tf.Wmm}
-            Lmm={tf.Lmm}
-            tf={tf}
-          />
-        ) : null}
-      </Layer>
       <Layer>
         {holes.map((h) => {
           const p = tf.uvToStage(h.uMm, h.vMm);
+          const selected = selectedHoleId === h.id;
+          const stroke = selected ? HOLE_STROKE_SELECTED : HOLE_STROKE;
+          const fill = selected ? HOLE_FILL_SELECTED : HOLE_FILL;
           const applyDrag = (sx: number, sy: number) => {
             const { u, v } = tf.stageToUv(sx, sy);
             const [uc, vc] = clampAndSnapHoleCenterTo1Mm(
@@ -242,20 +182,23 @@ export function SegmentFaceKonvaHolesOverlay({
             return r;
           };
 
-          const onDragStart = () => {
-            setDragLive({ u: h.uMm, v: h.vMm });
-          };
-
-          const onDragMove = (sx: number, sy: number) => {
-            const r = finalizeDrag(sx, sy);
-            setDragLive({ u: r.uc, v: r.vc });
+          const handleDragEnd = (sx: number, sy: number) => {
+            const r = applyDrag(sx, sy);
+            onHolePositionChange(h.id, r.uc, r.vc);
             return r;
           };
 
-          const onDragEnd = (sx: number, sy: number) => {
-            const r = finalizeDrag(sx, sy);
-            setDragLive(null);
-            return r;
+          const emitHoleSelect = () => {
+            if (!onHoleSelect) return;
+            const now = Date.now();
+            const prev = lastHoleSelectUiRef.current;
+            if (prev && prev.id === h.id && now - prev.t < 420) return;
+            lastHoleSelectUiRef.current = { id: h.id, t: now };
+            onHoleSelect(h.id);
+          };
+          const onHoleSelectEv = (e: { cancelBubble?: boolean }) => {
+            e.cancelBubble = true;
+            emitHoleSelect();
           };
 
           if (h.kind === "round") {
@@ -269,19 +212,21 @@ export function SegmentFaceKonvaHolesOverlay({
                 x={p.x}
                 y={p.y}
                 radius={rPx}
-                stroke={HOLE_STROKE}
-                strokeWidth={1.25}
-                fill={HOLE_FILL}
+                stroke={stroke}
+                strokeWidth={selected ? 2 : 1.25}
+                fill={fill}
                 draggable
-                onDragStart={onDragStart}
+                dragDistance={DRAG_DISTANCE_PX}
                 onDragMove={(e) => {
-                  const r = onDragMove(e.target.x(), e.target.y());
+                  const r = finalizeDrag(e.target.x(), e.target.y());
                   e.target.position({ x: r.x, y: r.y });
                 }}
                 onDragEnd={(e) => {
-                  const r = onDragEnd(e.target.x(), e.target.y());
+                  const r = handleDragEnd(e.target.x(), e.target.y());
                   e.target.position({ x: r.x, y: r.y });
                 }}
+                onTap={onHoleSelectEv}
+                onClick={onHoleSelectEv}
                 hitStrokeWidth={HIT_PAD_PX}
                 cursor="grab"
               />
@@ -300,23 +245,25 @@ export function SegmentFaceKonvaHolesOverlay({
                 x={p.x}
                 y={p.y}
                 draggable
-                onDragStart={onDragStart}
+                dragDistance={DRAG_DISTANCE_PX}
                 onDragMove={(e) => {
-                  const r = onDragMove(e.target.x(), e.target.y());
+                  const r = finalizeDrag(e.target.x(), e.target.y());
                   e.target.position({ x: r.x, y: r.y });
                 }}
                 onDragEnd={(e) => {
-                  const r = onDragEnd(e.target.x(), e.target.y());
+                  const r = handleDragEnd(e.target.x(), e.target.y());
                   e.target.position({ x: r.x, y: r.y });
                 }}
+                onTap={onHoleSelectEv}
+                onClick={onHoleSelectEv}
                 cursor="grab"
               >
                 <Line
                   points={flat}
                   closed
-                  fill={HOLE_FILL}
-                  stroke={HOLE_STROKE}
-                  strokeWidth={1.25}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={selected ? 2 : 1.25}
                   lineJoin="round"
                   hitStrokeWidth={HIT_PAD_PX}
                 />
@@ -335,15 +282,17 @@ export function SegmentFaceKonvaHolesOverlay({
               x={p.x}
               y={p.y}
               draggable
-              onDragStart={onDragStart}
+              dragDistance={DRAG_DISTANCE_PX}
               onDragMove={(e) => {
-                const r = onDragMove(e.target.x(), e.target.y());
+                const r = finalizeDrag(e.target.x(), e.target.y());
                 e.target.position({ x: r.x, y: r.y });
               }}
               onDragEnd={(e) => {
-                const r = onDragEnd(e.target.x(), e.target.y());
+                const r = handleDragEnd(e.target.x(), e.target.y());
                 e.target.position({ x: r.x, y: r.y });
               }}
+              onTap={onHoleSelectEv}
+              onClick={onHoleSelectEv}
               cursor="grab"
             >
               <Rect
@@ -352,15 +301,95 @@ export function SegmentFaceKonvaHolesOverlay({
                 offsetX={wPx / 2}
                 offsetY={hPx / 2}
                 rotation={rot}
-                stroke={HOLE_STROKE}
-                strokeWidth={1.25}
-                fill={HOLE_FILL}
+                stroke={stroke}
+                strokeWidth={selected ? 2 : 1.25}
+                fill={fill}
                 hitStrokeWidth={HIT_PAD_PX}
               />
             </Group>
           );
         })}
       </Layer>
+
+      {selectedHoleId &&
+      dimensionGuidesActiveHoleId === selectedHoleId &&
+      onDimensionGuideLineClick ? (
+        <Layer>
+          {(() => {
+            const h = holes.find((x) => x.id === selectedHoleId);
+            if (!h) return null;
+            const pc = tf.uvToStage(h.uMm, h.vMm);
+            const pLeft = tf.uvToStage(0, h.vMm);
+            const pRight = tf.uvToStage(tf.Wmm, h.vMm);
+            const pTop = tf.uvToStage(h.uMm, 0);
+            const pBot = tf.uvToStage(h.uMm, tf.Lmm);
+            const { hu, hv } = holeHalfExtentsMm(h);
+            const trimPx =
+              Math.max(10, Math.hypot(hu * tf.su, hv * tf.sv) + 8);
+            const qLeft = trimTowardStart(pLeft, pc, trimPx);
+            const qRight = trimTowardStart(pRight, pc, trimPx);
+            const qTop = trimTowardStart(pTop, pc, trimPx);
+            const qBot = trimTowardStart(pBot, pc, trimPx);
+            const dash = [6, 5];
+            const emit =
+              (edge: SegmentFaceDimEdge) =>
+              (e: { evt: Event; cancelBubble?: boolean }) => {
+                e.cancelBubble = true;
+                e.evt.stopPropagation?.();
+                const dedupeKey = `${h.id}:${edge}`;
+                const now = Date.now();
+                const prev = lastDimGuideUiRef.current;
+                if (
+                  prev &&
+                  prev.key === dedupeKey &&
+                  now - prev.t < 280
+                ) {
+                  return;
+                }
+                lastDimGuideUiRef.current = { key: dedupeKey, t: now };
+                const { x, y } = clientXYFromPointerEvent(e.evt);
+                onDimensionGuideLineClick(h.id, edge, x, y);
+              };
+            /** Visible dash drawn first; wide hit line on top so clicks hit a listening shape directly. */
+            const guidePair = (
+              pts: number[],
+              edge: SegmentFaceDimEdge
+            ) => (
+              <>
+                <Line
+                  points={pts}
+                  stroke={GUIDE_STROKE}
+                  strokeWidth={1.25}
+                  dash={dash}
+                  opacity={0.95}
+                  lineCap="round"
+                  listening={false}
+                  perfectDrawEnabled={false}
+                />
+                <Line
+                  points={pts}
+                  stroke="rgba(0,0,0,0.004)"
+                  strokeWidth={GUIDE_HIT_LINE_STROKE_W}
+                  lineCap="round"
+                  listening
+                  perfectDrawEnabled={false}
+                  onTap={emit(edge)}
+                  onClick={emit(edge)}
+                  cursor="pointer"
+                />
+              </>
+            );
+            return (
+              <>
+                {guidePair([pLeft.x, pLeft.y, qLeft.x, qLeft.y], "left")}
+                {guidePair([qRight.x, qRight.y, pRight.x, pRight.y], "right")}
+                {guidePair([pTop.x, pTop.y, qTop.x, qTop.y], "top")}
+                {guidePair([pBot.x, pBot.y, qBot.x, qBot.y], "bottom")}
+              </>
+            );
+          })()}
+        </Layer>
+      ) : null}
     </Stage>
   );
 }

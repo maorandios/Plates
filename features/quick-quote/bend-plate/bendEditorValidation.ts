@@ -94,6 +94,17 @@ export function getBendEditorValidationIssueCodes(form: BendPlateFormState): str
   return issues;
 }
 
+/** Global fields shown in the «basic data» sidebar section (thickness, plate length, quantity, steel grade). */
+export function getBendEditorBasicDataIssueCodes(form: BendPlateFormState): string[] {
+  const issues: string[] = [];
+  const g = form.global;
+  if (!(Number(g.thicknessMm) > 0)) issues.push("thicknessMm");
+  if (form.template !== "plate" && !(Number(g.plateWidthMm) > 0)) issues.push("plateWidthMm");
+  if (!(Math.floor(g.quantity) >= 1)) issues.push("quantity");
+  if (!(g.material ?? "").trim()) issues.push("material");
+  return issues;
+}
+
 /** @deprecated Use getBendEditorValidationIssueCodes + locale mapping in UI */
 export function getBendEditorValidationLines(form: BendPlateFormState): string[] | null {
   const codes = getBendEditorValidationIssueCodes(form);
