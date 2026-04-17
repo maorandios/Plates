@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Users, ArrowLeft, TrendingUp, Calculator } from "lucide-react";
+import {
+  FileText,
+  Users,
+  ArrowLeft,
+  TrendingUp,
+  Calculator,
+  FolderKanban,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -90,12 +97,20 @@ export default function DashboardPage() {
         title={t("dashboard.title")}
         description={t("dashboard.subtitle")}
         actions={
-          <Button asChild>
-            <Link href="/quick-quote" className="inline-flex items-center gap-2">
-              <Calculator className="h-4 w-4" />
-              {t("dashboard.newQuote")}
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild>
+              <Link href="/plate-project" className="inline-flex items-center gap-2">
+                <FolderKanban className="h-4 w-4" />
+                {t("dashboard.newPlateProject")}
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/quick-quote" className="inline-flex items-center gap-2">
+                <Calculator className="h-4 w-4" />
+                {t("dashboard.newQuote")}
+              </Link>
+            </Button>
+          </div>
         }
       />
 

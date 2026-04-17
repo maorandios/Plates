@@ -5,7 +5,8 @@
  *   Top stripe: חתך (left) | פריסה (right)
  *   Below divider: left = profile (חתך) + bend plan strip below it; right = flat (פריסה) + title block
  *
- * Uses jsPDF + Rubik TTF from /fonts/.
+ * Uses jsPDF + two Noto TTFs: Noto Sans Regular (Latin/digits) + Noto Sans Hebrew (Hebrew).
+ * The hinted `NotoSans-Regular` build has no Hebrew; `NotoSansHebrew` has no ASCII digits.
  */
 
 // Use browser ESM bundle — default "jspdf" resolves to node build under Turbopack and breaks (fflate Worker).
@@ -186,8 +187,13 @@ function drawSheetVerticalDivider(doc: jsPDF): void {
 // Font loading + caching (TTF — jsPDF requires TTF, not woff)
 // ---------------------------------------------------------------------------
 
-let fontCacheRegular: string | null = null;
-let fontCacheBold: string | null = null;
+/** Base64 TTF — Latin, digits, symbols (no Hebrew in this hinted build). */
+let fontCacheLatin: string | null = null;
+/** Base64 TTF — Hebrew script (use with {@link setHebFont}). */
+let fontCacheHebrew: string | null = null;
+
+const SHEET_FONT_LATIN = "NotoSans";
+const SHEET_FONT_HEBREW = "NotoSansHebrew";
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -207,22 +213,21 @@ async function loadFont(url: string): Promise<string | null> {
 }
 
 async function ensureFonts(): Promise<void> {
-  if (!fontCacheRegular) fontCacheRegular = await loadFont("/fonts/Rubik-Regular.ttf");
-  if (!fontCacheBold) fontCacheBold = await loadFont("/fonts/Rubik-Bold.ttf");
+  if (!fontCacheLatin) {
+    fontCacheLatin = await loadFont("/fonts/NotoSans-Regular.ttf");
+  }
+  if (!fontCacheHebrew) {
+    fontCacheHebrew = await loadFont("/fonts/NotoSansHebrew-Regular.ttf");
+  }
 }
 
 function registerFonts(doc: jsPDF): boolean {
-  let ok = false;
-  if (fontCacheRegular) {
-    doc.addFileToVFS("Rubik-Regular.ttf", fontCacheRegular);
-    doc.addFont("Rubik-Regular.ttf", "Rubik", "normal");
-    ok = true;
-  }
-  if (fontCacheBold) {
-    doc.addFileToVFS("Rubik-Bold.ttf", fontCacheBold);
-    doc.addFont("Rubik-Bold.ttf", "Rubik", "bold");
-  }
-  return ok;
+  if (!fontCacheLatin || !fontCacheHebrew) return false;
+  doc.addFileToVFS("NotoSans-Regular.ttf", fontCacheLatin);
+  doc.addFont("NotoSans-Regular.ttf", SHEET_FONT_LATIN, "normal");
+  doc.addFileToVFS("NotoSansHebrew-Regular.ttf", fontCacheHebrew);
+  doc.addFont("NotoSansHebrew-Regular.ttf", SHEET_FONT_HEBREW, "normal");
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,20 +238,20 @@ function heb(s: string): string {
   return s.split("").reverse().join("");
 }
 
-function setHebFont(doc: jsPDF, size: number, bold = false): void {
+function setHebFont(doc: jsPDF, size: number, _bold = false): void {
   try {
-    doc.setFont("Rubik", bold ? "bold" : "normal");
+    doc.setFont(SHEET_FONT_HEBREW, "normal");
   } catch {
-    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFont("helvetica", "normal");
   }
   doc.setFontSize(size);
 }
 
-function setLatFont(doc: jsPDF, size: number, bold = false): void {
+function setLatFont(doc: jsPDF, size: number, _bold = false): void {
   try {
-    doc.setFont("Rubik", bold ? "bold" : "normal");
+    doc.setFont(SHEET_FONT_LATIN, "normal");
   } catch {
-    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFont("helvetica", "normal");
   }
   doc.setFontSize(size);
 }
@@ -274,7 +279,7 @@ const DIM_VISUAL_GAP_MM = 3.0;
 
 /**
  * Approximate half-ascent of the font in mm, given fontSize in pt.
- * Rubik Latin glyphs: ascent ≈ 70 % of em → half-ascent ≈ 35 % × pt→mm.
+ * Noto Sans: approximate Latin/hebrew ascent for label offset (~70 % of em).
  */
 const HALF_ASCENT_FACTOR = 0.352778 * 0.35;
 
@@ -1012,6 +1017,8 @@ function drawBendPlanFlatView(
   // the real ends down to the dashed dimension line (offsetMag below the feature), label outside.
   const blankDimFont = Math.min(10, Math.max(8, areaW * 0.03));
   const stripCentroid = { x: rx + stripW / 2, y: lineY };
+  /** Vertical gap from plate line to total dim line (was 3 mm; ×1.25 for clearer separation). */
+  const bendPlanTotalDimOffsetMm = 3 * 1.25;
   drawDimension(
     doc,
     rx,
@@ -1019,7 +1026,7 @@ function drawBendPlanFlatView(
     rx + stripW,
     lineY,
     { mmHebrew: blankL },
-    3,
+    bendPlanTotalDimOffsetMm,
     blankDimFont,
     stripCentroid
   );
@@ -1113,7 +1120,7 @@ function drawTitleBlock(
     doc.text(heb(s), left, y, { baseline: "middle" });
   }
   const GAP_UNIT_NUM = 1.25;
-  /** `מ״מ` to the left, then Latin number (avoids unit↔digit bidi swaps). */
+  /** Hebrew unit then Latin digits — separate `doc.text` + fonts; no LRM (U+200E) — it can draw as a stray mark in PDF. */
   function valMm(left: number, y: number, mm: number): void {
     const num =
       Math.abs(mm - Math.round(mm)) < 1e-6
@@ -1123,7 +1130,7 @@ function drawTitleBlock(
     const twU = doc.getTextWidth(HEB_MM);
     doc.text(HEB_MM, left, y, { baseline: "middle" });
     setLatFont(doc, fsVal);
-    doc.text("\u200E" + num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
+    doc.text(num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
   }
   /** `ק״ג` left, then Latin number. */
   function valKg(left: number, y: number, kg: number): void {
@@ -1136,7 +1143,7 @@ function drawTitleBlock(
     const twU = doc.getTextWidth(HEB_KG);
     doc.text(HEB_KG, left, y, { baseline: "middle" });
     setLatFont(doc, fsVal);
-    doc.text("\u200E" + num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
+    doc.text(num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
   }
   /** `מ״ר` left, then Latin number. */
   function valM2(left: number, y: number, m2: number): void {
@@ -1149,7 +1156,7 @@ function drawTitleBlock(
     const twU = doc.getTextWidth(HEB_M2);
     doc.text(HEB_M2, left, y, { baseline: "middle" });
     setLatFont(doc, fsVal);
-    doc.text("\u200E" + num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
+    doc.text(num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
   }
 
   function rowY(top: number): { yL: number; yV: number } {
@@ -1348,13 +1355,19 @@ export async function generatePlateDrawingPdf(
       const geometryLabel = titleGeometryLabel(part, bendItem);
       const quoteRef =
         exportMeta?.quoteReference?.trim() || part.partName;
+      // `bendItem.calc.weightKg` is line total (× qty); title block shows one plate (match `part.weightKg` / calc÷qty).
+      const unitWeightKg =
+        part.weightKg > 0
+          ? part.weightKg
+          : bendItem.calc.weightKg /
+            Math.max(1, Math.floor(bendItem.global.quantity) || 1);
       drawTitleBlock(
         doc,
         part.partName,
         grade,
         bendItem.global.thicknessMm,
         bendItem.global.plateWidthMm,
-        bendItem.calc.weightKg,
+        unitWeightKg,
         bendItem.global.quantity,
         finish || bendItem.global.finish || "",
         materialType,

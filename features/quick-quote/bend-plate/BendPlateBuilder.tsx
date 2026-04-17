@@ -3,7 +3,9 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -75,27 +77,24 @@ import {
   createFormStateForTemplate,
   formStateFromQuoteItem,
 } from "./defaults";
+import { BEND_TEMPLATE_CARD_ORDER } from "./bendTemplateCardOrder";
 import { getBendEditorValidationIssueCodes } from "./bendEditorValidation";
 import { MethodPhaseMetricStrip } from "../components/method-phases/MethodPhaseMetricStrip";
 import { BendTemplatePickerGlyph } from "./BendTemplateShapeGlyph";
 import { ProfilePreview2D } from "./ProfilePreview2D";
 import { ProfilePreview3D } from "./ProfilePreview3D";
+import { SegmentFacePreview2D } from "./SegmentFacePreview2D";
 
 const BP = "quote.bendPlatePhase";
 const ED = `${BP}.editor`;
 
-const TEMPLATE_IDS: BendTemplateId[] = ["l", "u", "z", "omega", "gutter", "plate", "custom"];
+/** Segment face hole shape (UI draft; placement on canvas comes later). */
+type SegmentHoleKind = "round" | "oval" | "rect";
 
-/** Shape-picker grid: columns swapped vs `TEMPLATE_IDS` row-major order (right column first). */
-const TEMPLATE_IDS_SHAPE_PICKER: BendTemplateId[] = [
-  "u",
-  "l",
-  "omega",
-  "z",
-  "custom",
-  "gutter",
-  "plate",
-];
+const SEGMENT_DIM_BOX =
+  "rounded-xl border-0 bg-white/[0.03] p-3 space-y-3";
+
+const TEMPLATE_IDS: BendTemplateId[] = ["l", "u", "z", "omega", "gutter", "plate", "custom"];
 
 function templateLabel(id: BendTemplateId): string {
   return t(`${BP}.template.${id}.name`);
@@ -264,6 +263,11 @@ interface BendPlateBuilderProps {
   onBack: () => void;
   /** Finish this phase and return to the quote method step (e.g. after validation). */
   onComplete: () => void;
+  /**
+   * When set on mount, opens the shape editor immediately for this template
+   * (e.g. plate-project template cards).
+   */
+  initialEditorTemplate?: BendTemplateId | null;
 }
 
 export function BendPlateBuilder({
@@ -275,6 +279,7 @@ export function BendPlateBuilder({
   onResetAll,
   onBack,
   onComplete,
+  initialEditorTemplate = null,
 }: BendPlateBuilderProps) {
   const [screen, setScreen] = useState<"hub" | "editor">("hub");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -311,6 +316,13 @@ export function BendPlateBuilder({
     });
     setScreen("editor");
   }, [materialType]);
+
+  const initialEditorOpenedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!initialEditorTemplate || initialEditorOpenedRef.current) return;
+    initialEditorOpenedRef.current = true;
+    openNewEditor(initialEditorTemplate);
+  }, [initialEditorTemplate, openNewEditor]);
 
   const openEditEditor = useCallback(
     (item: BendPlateQuoteItem) => {
@@ -683,7 +695,7 @@ function BendPlateHub({
                 "[grid-template-rows:repeat(4,minmax(0,1fr))]"
               )}
             >
-              {TEMPLATE_IDS_SHAPE_PICKER.map((tid, i) => (
+              {BEND_TEMPLATE_CARD_ORDER.map((tid, i) => (
                 <button
                   key={tid}
                   type="button"
@@ -691,7 +703,7 @@ function BendPlateHub({
                   onClick={() => pickShape(tid)}
                   className={cn(
                     "flex min-h-0 min-w-0 flex-col items-center justify-center gap-3 px-4 py-4 text-center transition-colors",
-                    i === TEMPLATE_IDS_SHAPE_PICKER.length - 1 && "col-span-2",
+                    i === BEND_TEMPLATE_CARD_ORDER.length - 1 && "col-span-2",
                     "bg-card hover:bg-white/[0.03]",
                     "border-b border-solid border-[#6A23F7]/20",
                     i % 2 === 0 && "border-s border-e border-solid border-[#6A23F7]/20",
@@ -802,8 +814,33 @@ function BendPlateShapeEditor({
   const [saveValidationOpen, setSaveValidationOpen] = useState(false);
   const [saveValidationLines, setSaveValidationLines] = useState<string[]>([]);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
+  /** `null` = side profile; index = flat face of that straight segment (hole placement). */
+  const [holeViewSegmentIndex, setHoleViewSegmentIndex] = useState<number | null>(null);
+  const [segmentHolePanelOpen, setSegmentHolePanelOpen] = useState(false);
+  const [segmentHoleKind, setSegmentHoleKind] = useState<SegmentHoleKind>("round");
+  const [holeDraftDiameterMm, setHoleDraftDiameterMm] = useState(10);
+  const [holeDraftOvalOverallWidthMm, setHoleDraftOvalOverallWidthMm] = useState(24);
+  const [holeDraftRectLengthMm, setHoleDraftRectLengthMm] = useState(20);
+  const [holeDraftRectWidthMm, setHoleDraftRectWidthMm] = useState(15);
 
   const materialConfig = useMemo(() => getMaterialConfig(materialType), [materialType]);
+
+  useEffect(() => {
+    if (form.template === "plate") {
+      setHoleViewSegmentIndex(null);
+      return;
+    }
+    if (
+      holeViewSegmentIndex !== null &&
+      holeViewSegmentIndex >= profileSegmentDims.length
+    ) {
+      setHoleViewSegmentIndex(null);
+    }
+  }, [form.template, profileSegmentDims.length, holeViewSegmentIndex]);
+
+  useEffect(() => {
+    if (holeViewSegmentIndex === null) setSegmentHolePanelOpen(false);
+  }, [holeViewSegmentIndex]);
 
   const gradeSelectValue =
     (form.global.material || "").trim() || defaultMaterialGradeForFamily(materialType);
@@ -948,6 +985,163 @@ function BendPlateShapeEditor({
                 </div>
                 <TemplateFields form={form} setForm={setForm} />
               </div>
+
+              {form.template !== "plate" && profileSegmentDims.length > 0 ? (
+                <div className="space-y-3 border-t border-white/[0.08] pt-5">
+                  <div className="space-y-1">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t(`${ED}.holesTitle`)}
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      {t(`${ED}.holesHint`)}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground font-normal">
+                      {t(`${ED}.holesPickSegment`)}
+                    </Label>
+                    <Select
+                      value={
+                        holeViewSegmentIndex === null
+                          ? "__profile__"
+                          : String(holeViewSegmentIndex)
+                      }
+                      onValueChange={(v) => {
+                        if (v === "__profile__") setHoleViewSegmentIndex(null);
+                        else {
+                          const i = Number.parseInt(v, 10);
+                          setHoleViewSegmentIndex(Number.isFinite(i) ? i : null);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9 max-w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent dir="rtl">
+                        <SelectItem value="__profile__">
+                          {t(`${ED}.holesFullProfile`)}
+                        </SelectItem>
+                        {profileSegmentDims.map((seg, i) => (
+                          <SelectItem key={`${seg.label}-${i}`} value={String(i)}>
+                            {t(`${ED}.holesSegmentOption`, {
+                              label: seg.label,
+                              length: formatDecimal(seg.lengthMm, 1),
+                            })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {holeViewSegmentIndex !== null ? (
+                    <div className="space-y-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-1.5"
+                        aria-expanded={segmentHolePanelOpen}
+                        onClick={() => setSegmentHolePanelOpen((o) => !o)}
+                      >
+                        <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        {t(`${ED}.holesAddNew`)}
+                      </Button>
+
+                      {segmentHolePanelOpen ? (
+                        <div className={SEGMENT_DIM_BOX}>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {t(`${ED}.holesNewHoleTitle`)}
+                          </p>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground font-normal">
+                              {t(`${ED}.holesKind`)}
+                            </Label>
+                            <Select
+                              value={segmentHoleKind}
+                              onValueChange={(v) =>
+                                setSegmentHoleKind(v as SegmentHoleKind)
+                              }
+                            >
+                              <SelectTrigger className="h-9 max-w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent dir="rtl">
+                                <SelectItem value="round">
+                                  {t(`${ED}.holesKindRound`)}
+                                </SelectItem>
+                                <SelectItem value="oval">
+                                  {t(`${ED}.holesKindOval`)}
+                                </SelectItem>
+                                <SelectItem value="rect">
+                                  {t(`${ED}.holesKindRect`)}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pt-1">
+                            {t(`${ED}.holesDims`)}
+                          </p>
+
+                          {segmentHoleKind === "round" ? (
+                            <NumField
+                              label={t(`${ED}.holesDiameter`)}
+                              value={holeDraftDiameterMm}
+                              onChange={(n) => setHoleDraftDiameterMm(Math.max(0, n))}
+                              min={0}
+                              step={0.1}
+                            />
+                          ) : null}
+
+                          {segmentHoleKind === "oval" ? (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <NumField
+                                label={t(`${ED}.holesDiameter`)}
+                                value={holeDraftDiameterMm}
+                                onChange={(n) => setHoleDraftDiameterMm(Math.max(0, n))}
+                                min={0}
+                                step={0.1}
+                              />
+                              <NumField
+                                label={t(`${ED}.holesOverallWidth`)}
+                                value={holeDraftOvalOverallWidthMm}
+                                onChange={(n) =>
+                                  setHoleDraftOvalOverallWidthMm(Math.max(0, n))
+                                }
+                                min={0}
+                                step={0.1}
+                              />
+                            </div>
+                          ) : null}
+
+                          {segmentHoleKind === "rect" ? (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <NumField
+                                label={t(`${ED}.holesLength`)}
+                                value={holeDraftRectLengthMm}
+                                onChange={(n) =>
+                                  setHoleDraftRectLengthMm(Math.max(0, n))
+                                }
+                                min={0}
+                                step={0.1}
+                              />
+                              <NumField
+                                label={t(`${ED}.holesWidth`)}
+                                value={holeDraftRectWidthMm}
+                                onChange={(n) =>
+                                  setHoleDraftRectWidthMm(Math.max(0, n))
+                                }
+                                min={0}
+                                step={0.1}
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             </div>
           </aside>
@@ -967,13 +1161,25 @@ function BendPlateShapeEditor({
                 >
                   {t(`${ED}.preview3d`)}
                 </Button>
-                <ProfilePreview2D
-                  pts={pts}
-                  segments={profileSegmentDims}
-                  bendAnglesDeg={profileBendAnglesDeg}
-                  fill
-                  className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
-                />
+                {form.template !== "plate" &&
+                holeViewSegmentIndex !== null &&
+                profileSegmentDims[holeViewSegmentIndex] ? (
+                  <SegmentFacePreview2D
+                    lengthMm={profileSegmentDims[holeViewSegmentIndex].lengthMm}
+                    widthMm={form.global.plateWidthMm}
+                    segmentLabel={profileSegmentDims[holeViewSegmentIndex].label}
+                    fill
+                    className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
+                  />
+                ) : (
+                  <ProfilePreview2D
+                    pts={pts}
+                    segments={profileSegmentDims}
+                    bendAnglesDeg={profileBendAnglesDeg}
+                    fill
+                    className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -1062,9 +1268,6 @@ function BendPlateShapeEditor({
     </div>
   );
 }
-
-const SEGMENT_DIM_BOX =
-  "rounded-xl border-0 bg-white/[0.03] p-3 space-y-3";
 
 function TemplateFields({
   form,
