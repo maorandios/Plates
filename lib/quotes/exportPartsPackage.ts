@@ -21,7 +21,10 @@ import type { QuotePartRow } from "@/features/quick-quote/types/quickQuote";
 import { buildUnifiedSummaryBomXlsxBuffer } from "@/features/quick-quote/lib/unifiedSummaryBomXlsx";
 import { getFileById, getFileData } from "@/lib/store";
 import { generatePartDxfString, safeFilenameBase } from "./generatePartDxf";
-import { generatePlateDrawingPdf } from "./generatePlateDrawingPdf";
+import {
+  generatePlateDrawingPdf,
+  type PlateDrawingExportMeta,
+} from "./generatePlateDrawingPdf";
 
 // ---------------------------------------------------------------------------
 // Browser download helper
@@ -91,14 +94,16 @@ function getRawDxfText(geo: DxfPartGeometry): string | null {
  * @param parts               Unified merged parts list (Parts step)
  * @param dxfMethodGeometries DxfPartGeometry[] from QuickQuotePage state
  * @param bendPlateQuoteItems BendPlateQuoteItem[] from QuickQuotePage state
- * @param referenceNumber     Quote reference (used in filenames)
+ * @param referenceNumber     Quote reference (filenames + PDF סימוכין)
+ * @param options             Optional `customerName` for PDF שם הלקוח
  */
 export async function exportPartsPackage(
   parts: QuotePartRow[],
   dxfMethodGeometries: DxfPartGeometry[],
   bendPlateQuoteItems: BendPlateQuoteItem[],
   referenceNumber: string,
-  materialType: MaterialType = "carbonSteel"
+  materialType: MaterialType = "carbonSteel",
+  options?: Pick<PlateDrawingExportMeta, "customerName">
 ): Promise<void> {
   if (parts.length === 0) return;
 
@@ -149,7 +154,10 @@ export async function exportPartsPackage(
       if (rawText) {
         dxfFolder.file(`${baseName}.dxf`, rawText);
         // Still generate a drawing PDF for DXF-sourced parts (simple rectangle view)
-        const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType);
+        const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType, {
+          customerName: options?.customerName,
+          quoteReference: referenceNumber,
+        });
         if (pdfBytes) drawingsFolder.file(`${baseName}.pdf`, pdfBytes);
         continue;
       }
@@ -158,7 +166,10 @@ export async function exportPartsPackage(
     const dxfText = generatePartDxfString(part, geometry, bendItem, materialType);
     dxfFolder.file(`${baseName}.dxf`, dxfText);
 
-    const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType);
+    const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType, {
+      customerName: options?.customerName,
+      quoteReference: referenceNumber,
+    });
     if (pdfBytes) drawingsFolder.file(`${baseName}.pdf`, pdfBytes);
   }
 

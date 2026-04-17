@@ -264,7 +264,8 @@ export function QuotePreviewView({
         dxfMethodGeometries,
         snapshot.bendPlateQuoteItems,
         draft.quote.quote_number || draft.quote.reference_number || "quote",
-        materialType
+        materialType,
+        { customerName: listMeta.customerName }
       );
     } catch (err) {
       console.error(err);

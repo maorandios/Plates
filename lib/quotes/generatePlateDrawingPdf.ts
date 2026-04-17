@@ -2,18 +2,20 @@
  * Client-side technical-drawing PDF for each plate (bend or flat).
  *
  * A4 landscape, Hebrew RTL:
- *   Top stripe: section titles (חתך פריסה - מבט על | חתך צד)
- *   Below: vertical divider at title-block left edge; left = flat pattern (full height);
- *   right = profile above title block + title block (2 cols × 6 rows)
+ *   Top stripe: חתך (left) | פריסה (right)
+ *   Below divider: left = profile (חתך) + bend plan strip below it; right = flat (פריסה) + title block
  *
  * Uses jsPDF + Rubik TTF from /fonts/.
  */
 
 // Use browser ESM bundle — default "jspdf" resolves to node build under Turbopack and breaks (fflate Worker).
 import jsPDF from "jspdf/dist/jspdf.es.min.js";
-import type { BendPlateQuoteItem } from "@/features/quick-quote/bend-plate/types";
+import type {
+  BendPlateQuoteItem,
+  BendTemplateId,
+} from "@/features/quick-quote/bend-plate/types";
 import type { QuotePartRow } from "@/features/quick-quote/types/quickQuote";
-import type { MaterialType } from "@/types/materials";
+import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import type { BendPlateFormState } from "@/features/quick-quote/bend-plate/types";
 import {
   buildForTemplate,
@@ -40,16 +42,17 @@ const FB = PH - M;  // frame bottom
 const FW = FR - FL;  // 277
 const FH = FB - FT;  // 190
 
-/** Title block width (was 3 cols; −1 col width → more room for תוכנית ביצוע on the left). */
+/** Title block width (2 cols); flat פריסה stays on the right of the divider. */
 const TB_W = 114;
 const TB_H = 56;    // title block height
 const TB_L = FR - TB_W;
 const TB_T = FB - TB_H;
-/** Single vertical inside title block: 2 equal columns (RTL: col1 right, col2 left of it). */
-const TB_C1 = TB_L + TB_W * 0.5;
+/** Vertical split: right column slightly wider (labels top-right, values bottom-left). */
+const TB_SPLIT_L = 0.44;
+const TB_C1 = TB_L + TB_W * TB_SPLIT_L;
 /** Row height in title block — also used for view header stripes so heights match. */
 const TB_ROW_H = TB_H / 6;
-/** Vertical divider = left edge of title block — splits פריסה (left) from חתך צד + info (right). */
+/** Vertical divider = left edge of title block — left = חתך + תוכנית כיפוף; right = פריסה + info. */
 const SHEET_DIVIDER_X = TB_L;
 
 /** Gap between title block and drawing row */
@@ -59,7 +62,7 @@ const TOP_T = FT + 2;
 /** Section title stripe height — matches title-block row height (not taller than data rows). */
 const VIEW_HEADER_H = TB_ROW_H;
 const HEADER_B = TOP_T + VIEW_HEADER_H;
-/** Right-hand drawing (חתך צד) ends above title block; left column uses full height to FB */
+/** Profile column ends above title block; flat column can extend to bottom when no bend plan */
 const TOP_B = TB_T - GAP_ABOVE_TB;
 
 /** Section titles in header — must fit within `VIEW_HEADER_H` (one title-block row). */
@@ -68,40 +71,51 @@ const VIEW_TITLE_FONT_SIZE = Math.min(14, Math.max(9, TB_ROW_H * 1.15));
 /** Gap straddling vertical divider line */
 const SPLIT_GAP = 0.8;
 
-/** Hebrew millimetres glyph — pair with Latin digits in a separate `doc.text` to avoid bidi reversal. */
-const HEB_MM = "\u05DE\"\u05DE";
+/** Hebrew millimetres — `מ״מ` using gershayim (U+05F4). */
+const HEB_MM = "\u05DE\u05F4\u05DE";
+/**
+ * Hebrew kg — intended visual `ק״ג`. jsPDF mirrors some two-letter abbrevs; logical `ג״ק`
+ * renders as ק״ג (swap relative to Unicode spelling).
+ */
+const HEB_KG = "\u05D2\u05F4\u05E7";
+/**
+ * Hebrew m² — intended visual `מ״ר`. Logical `ר״מ` renders as מ״ר under the same quirk.
+ */
+const HEB_M2 = "\u05E8\u05F4\u05DE";
 
 /**
- * Lower stripe on the LEFT column only — holds the `תוכנית ביצוע` view title.
- * Aligned with the top row of the title block so the left and right halves mirror each other.
+ * Lower stripe on the LEFT column only — `תוכנית כיפוף` sits below חתך (profile), above the bend plan view.
  */
 const BOTTOM_HEADER_T = TB_T;
 const BOTTOM_HEADER_B = TB_T + VIEW_HEADER_H;
 
+/** Left half: profile (חתך) — shortens when a bend plan strip is reserved below it. */
 function leftPanelBounds(hasBendPlan = false): { l: number; t: number; r: number; b: number } {
   return {
     l: FL + 2,
     t: HEADER_B + 1,
     r: SHEET_DIVIDER_X - SPLIT_GAP / 2 - 1,
-    b: hasBendPlan ? BOTTOM_HEADER_T - 2 : FB - 2,
+    b: hasBendPlan ? BOTTOM_HEADER_T - 2 : TOP_B - 2,
   };
 }
 
-function leftBottomPanelBounds(): { l: number; t: number; r: number; b: number } {
-  return {
-    l: FL + 2,
-    t: BOTTOM_HEADER_B + 1,
-    r: SHEET_DIVIDER_X - SPLIT_GAP / 2 - 1,
-    b: FB - 2,
-  };
-}
-
+/** Right half: flat pattern (פריסה) — full height above the title block row. */
 function rightPanelBounds(): { l: number; t: number; r: number; b: number } {
   return {
     l: SHEET_DIVIDER_X + SPLIT_GAP / 2 + 1,
     t: HEADER_B + 1,
     r: FR - 2,
     b: TOP_B - 2,
+  };
+}
+
+/** Bottom strip of the left column: bend plan below חתך. */
+function leftBottomPanelBounds(): { l: number; t: number; r: number; b: number } {
+  return {
+    l: FL + 2,
+    t: BOTTOM_HEADER_B + 1,
+    r: SHEET_DIVIDER_X - SPLIT_GAP / 2 - 1,
+    b: FB - 2,
   };
 }
 
@@ -130,24 +144,23 @@ function drawViewHeaderStripe(doc: jsPDF, hasBendPlan = false): void {
   const rightCx = (rightL + rightR) / 2;
   const headerMidY = TOP_T + VIEW_HEADER_H / 2;
 
-  doc.setLineWidth(0.35);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.setDrawColor(0);
   doc.line(FL, HEADER_B, FR, HEADER_B);
 
   setHebFont(doc, VIEW_TITLE_FONT_SIZE);
   doc.setTextColor(0);
-  doc.text(heb("חתך פריסה - מבט על"), leftCx, headerMidY, {
+  doc.text(heb("חתך"), leftCx, headerMidY, {
     align: "center",
     baseline: "middle",
   });
-  doc.text(heb("חתך צד"), rightCx, headerMidY, {
+  doc.text(heb("פריסה"), rightCx, headerMidY, {
     align: "center",
     baseline: "middle",
   });
 
   if (hasBendPlan) {
-    // Lower stripe on the left half only — sits above the title block row on the right.
-    doc.setLineWidth(0.35);
+    doc.setLineWidth(GEO_LINE_MM);
     doc.setDrawColor(0);
     doc.line(FL, BOTTOM_HEADER_T, SHEET_DIVIDER_X, BOTTOM_HEADER_T);
     doc.line(FL, BOTTOM_HEADER_B, SHEET_DIVIDER_X, BOTTOM_HEADER_B);
@@ -155,7 +168,7 @@ function drawViewHeaderStripe(doc: jsPDF, hasBendPlan = false): void {
     const midY = (BOTTOM_HEADER_T + BOTTOM_HEADER_B) / 2;
     setHebFont(doc, VIEW_TITLE_FONT_SIZE);
     doc.setTextColor(0);
-    doc.text(heb("תוכנית ביצוע"), leftCx, midY, {
+    doc.text(heb("תוכנית כיפוף"), leftCx, midY, {
       align: "center",
       baseline: "middle",
     });
@@ -165,7 +178,7 @@ function drawViewHeaderStripe(doc: jsPDF, hasBendPlan = false): void {
 /** Vertical separator at title-block left edge: frame top → bottom. */
 function drawSheetVerticalDivider(doc: jsPDF): void {
   doc.setDrawColor(0);
-  doc.setLineWidth(0.45);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.line(SHEET_DIVIDER_X, FT, SHEET_DIVIDER_X, FB);
 }
 
@@ -242,10 +255,11 @@ function setLatFont(doc: jsPDF, size: number, bold = false): void {
 // Drawing primitives
 // ---------------------------------------------------------------------------
 
-/** Profile / blank outline — dark gray (not green). */
-const STROKE_RGB: [number, number, number] = [48, 48, 48];
-/** Dimension lines, arrows, and numeric labels. */
-const DIM_RGB: [number, number, number] = [82, 82, 82];
+/** All geometry and dimensions render in black. */
+const STROKE_RGB: [number, number, number] = [0, 0, 0];
+const DIM_RGB: [number, number, number] = [0, 0, 0];
+/** Unified stroke width (mm): geometry, dimensions, frames, headers, title block, sheet border. */
+const GEO_LINE_MM = 0.45;
 
 /** Filled arrow: tip at witness/dimension intersection, base inside along the dim line. */
 const DIM_ARROW_DEPTH_MM = 2.05;
@@ -352,7 +366,7 @@ function drawDimension(
   const dimMidX = (ax + bx) / 2;
   const dimMidY = (ay + by) / 2;
 
-  doc.setLineWidth(0.15);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.setDrawColor(DIM_RGB[0], DIM_RGB[1], DIM_RGB[2]);
 
   doc.setLineDashPattern([0.7, 1.1], 0);
@@ -449,7 +463,7 @@ function drawAngleArc(
     ea = tmp + 2 * Math.PI;
   }
   const steps = Math.max(16, Math.ceil(((ea - sa) * 180) / Math.PI));
-  doc.setLineWidth(0.15);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.setDrawColor(DIM_RGB[0], DIM_RGB[1], DIM_RGB[2]);
   for (let i = 0; i < steps; i++) {
     const a1 = sa + ((ea - sa) * i) / steps;
@@ -528,7 +542,7 @@ function drawProfileView(
   tcy /= pts.length;
   const centroid = { x: tcx, y: tcy };
 
-  doc.setLineWidth(0.65);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
   for (let i = 0; i < pts.length - 1; i++) {
     doc.line(tx(pts[i]), ty(pts[i]), tx(pts[i + 1]), ty(pts[i + 1]));
@@ -618,7 +632,7 @@ function drawFlatBlankView(
   const rx = cxInner - rectW / 2;
   const ry = topFree + (availH - rectH) / 2;
 
-  doc.setLineWidth(0.45);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
   doc.rect(rx, ry, rectW, rectH);
   doc.setDrawColor(0);
@@ -659,11 +673,9 @@ function drawFlatBlankView(
       outsideSetbackMm(a, insideRadiusMm, thicknessMm)
     );
 
-    doc.setLineWidth(0.22);
-    doc.setDrawColor(210, 40, 40);
-    const dashLen = 1.5;
+    doc.setLineWidth(GEO_LINE_MM);
+    doc.setDrawColor(0, 0, 0);
     let curX = 0;
-    const bendLabelFont = Math.min(dimFont, 9);
 
     for (let i = 0; i < bends.length; i++) {
       let flatRun = straights[i] ?? 0;
@@ -678,20 +690,6 @@ function drawFlatBlankView(
       doc.setLineDashPattern([1.2, 1.0], 0);
       doc.line(px, ry, px, ry + rectH);
       doc.setLineDashPattern([], 0);
-
-      const bendDeg = Math.round(bends[i]);
-      const bendLabel = heb(`כיפוף ${bendDeg} מעלות`);
-      setHebFont(doc, bendLabelFont);
-      doc.setTextColor(210, 40, 40);
-      // Manual centering (avoid align:"center" which shifts page-x, wrong for rotated text).
-      // angle = -90: run direction = (cos −90, −sin −90) = (0, 1) = downward.
-      const hBend = bendLabelFont * HALF_ASCENT_FACTOR;
-      const btw = doc.getTextWidth(bendLabel);
-      // Center along run (downward): shift y by −btw/2·(−sin(−90°)) = −btw/2
-      doc.text(bendLabel, px + hBend, ry + rectH / 2 - btw / 2, {
-        angle: -90,
-      });
-      doc.setTextColor(0);
 
       curX += ba;
     }
@@ -722,7 +720,7 @@ function drawFlatSideStripView(
   const rx = inner.l + areaW / 2 - rw / 2;
   const ry = inner.t + areaH / 2 - rh / 2;
 
-  doc.setLineWidth(0.5);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
   doc.rect(rx, ry, rw, rh);
   doc.setDrawColor(0);
@@ -755,7 +753,7 @@ function drawFlatSideStripView(
 }
 
 // ---------------------------------------------------------------------------
-// Bend plan (flat) — תוכנית ביצוע — left-bottom panel
+// Bend plan (flat) — תוכנית כיפוף — left-bottom panel (below חתך)
 // ---------------------------------------------------------------------------
 
 /**
@@ -831,6 +829,62 @@ function drawMmLabelCentered(
   doc.text(num, x0 + twU + gap, y, { baseline: "middle" });
 }
 
+/** mm label with the block’s right edge at `rightX` (e.g. start “0” left of the strip). */
+function drawMmLabelRightAligned(
+  doc: jsPDF,
+  rightX: number,
+  y: number,
+  valueMm: number,
+  fontSize: number
+): void {
+  const num = valueMm.toFixed(1);
+  const gap = 1.15;
+  setLatFont(doc, fontSize);
+  const twN = doc.getTextWidth(num);
+  setHebFont(doc, fontSize);
+  const twU = doc.getTextWidth(HEB_MM);
+  const total = twN + gap + twU;
+  const x0 = rightX - total;
+  setHebFont(doc, fontSize);
+  doc.text(HEB_MM, x0, y, { baseline: "middle" });
+  setLatFont(doc, fontSize);
+  doc.text(num, x0 + twU + gap, y, { baseline: "middle" });
+}
+
+/** mm label with the block’s left edge at `leftX` (e.g. total length right of the strip). */
+function drawMmLabelLeftAligned(
+  doc: jsPDF,
+  leftX: number,
+  y: number,
+  valueMm: number,
+  fontSize: number
+): void {
+  const num = valueMm.toFixed(1);
+  const gap = 1.15;
+  setHebFont(doc, fontSize);
+  const twU = doc.getTextWidth(HEB_MM);
+  const x0 = leftX;
+  setHebFont(doc, fontSize);
+  doc.text(HEB_MM, x0, y, { baseline: "middle" });
+  setLatFont(doc, fontSize);
+  doc.text(num, x0 + twU + gap, y, { baseline: "middle" });
+}
+
+/** Width (mm) of the `מ"מ` + number block — used to reserve horizontal space at strip ends. */
+function mmLabelBlockWidth(
+  doc: jsPDF,
+  valueMm: number,
+  fontSize: number
+): number {
+  const num = valueMm.toFixed(1);
+  const gap = 1.15;
+  setLatFont(doc, fontSize);
+  const twN = doc.getTextWidth(num);
+  setHebFont(doc, fontSize);
+  const twU = doc.getTextWidth(HEB_MM);
+  return twN + gap + twU;
+}
+
 /**
  * Bend execution plan rendered as the DEVELOPED (flat) blank: horizontal strip with a
  * perpendicular bend line at each bend's centerline, and a 3-line callout stacked above it:
@@ -857,21 +911,27 @@ function drawBendPlanFlatView(
   const areaH = inner.b - inner.t;
   if (areaW < 20 || areaH < 15) return;
 
-  // Horizontal fit — reserve a little padding on each side for end dimension extensions.
-  const sidePad = 6;
+  // Label size first — endpoint mm labels sit to the left/right of the strip; reserve
+  // enough horizontal margin so they stay inside the panel (same font as bend callouts).
+  const labelFont = Math.min(11.25, Math.max(8.75, areaW * 0.035));
+  const epGap = 1.8;
+  const borderMargin = 2;
+  const wStart = mmLabelBlockWidth(doc, 0, labelFont);
+  const wEnd = mmLabelBlockWidth(doc, blankL, labelFont);
+  const sidePad = Math.max(wStart, wEnd) + epGap + borderMargin;
   const availW = Math.max(4, areaW - sidePad * 2);
   const scale = availW / blankL;
   const stripW = blankL * scale;
 
   // Plate is rendered as a single horizontal line (no plate rectangle) — the operator reads
   // numbers from the callouts, the line is just a reference axis for position.
-  // blankDimSpace must fit: endpoint tick (2) + label row (~5) + dim line gap (~8) = 15 mm.
+  // blankDimSpace: room below the line for the overall length dimension.
   const blankDimSpace = 15;
   const cxInner = (inner.l + inner.r) / 2;
   const rx = cxInner - stripW / 2;
   const lineY = inner.b - blankDimSpace;
 
-  doc.setLineWidth(0.5);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
   doc.line(rx, lineY, rx + stripW, lineY);
   doc.setDrawColor(0);
@@ -897,8 +957,6 @@ function drawBendPlanFlatView(
     curX += ba;
   }
 
-  // Label sizing — 1.25× the previous scale so the numbers are easier to read on paper.
-  const labelFont = Math.min(11.25, Math.max(8.75, areaW * 0.035));
   const lineH = labelFont * 0.352778 * 1.25;
 
   // Visual geometry around the reference line.
@@ -915,10 +973,9 @@ function drawBendPlanFlatView(
   for (let i = 0; i < bends.length; i++) {
     const px = rx + bendCenters[i] * scale;
 
-    // Bend tick + leader — solid gray (no red, no dashes), one continuous segment from
-    // just below the reference line up to the base of the direction triangle.
-    doc.setLineWidth(0.22);
-    doc.setDrawColor(DIM_RGB[0], DIM_RGB[1], DIM_RGB[2]);
+    // Bend tick + leader — one continuous segment from reference line to callout stack.
+    doc.setLineWidth(GEO_LINE_MM);
+    doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
     doc.line(px, lineY + tickHalf, px, dirY + arrowSize / 2 + 0.4);
 
     // Direction triangle — user convention: up = CW turn sign (−1), down = CCW (+1).
@@ -941,37 +998,26 @@ function drawBendPlanFlatView(
     doc.setDrawColor(0);
   }
 
-  // Start / end reference labels — placed AT the line endpoints, ticking downward.
-  // The "0" and total labels sit just below the reference line at each endpoint so the
-  // operator can instantly see the blank's measuring datum and overall length.
-  const epTickLen = 2;
-  const epLabelGap = 1.5; // gap between tick end and text centre
-  const epLabelY = lineY + epTickLen + epLabelGap + lineH * 0.5;
-
-  doc.setDrawColor(DIM_RGB[0], DIM_RGB[1], DIM_RGB[2]);
-  doc.setLineWidth(0.22);
-  doc.line(rx, lineY, rx, lineY + epTickLen);
-  doc.line(rx + stripW, lineY, rx + stripW, lineY + epTickLen);
+  // Start / end reference labels — same vertical band as the plate line, to the left of
+  // the start and to the right of the end (not below the line).
 
   setLatFont(doc, labelFont);
   doc.setTextColor(DIM_RGB[0], DIM_RGB[1], DIM_RGB[2]);
-  drawMmLabelCentered(doc, rx, epLabelY, 0, labelFont);
-  drawMmLabelCentered(doc, rx + stripW, epLabelY, blankL, labelFont);
+  drawMmLabelRightAligned(doc, rx - epGap, lineY, 0, labelFont);
+  drawMmLabelLeftAligned(doc, rx + stripW + epGap, lineY, blankL, labelFont);
   doc.setTextColor(0);
   doc.setDrawColor(0);
 
-  // Overall developed-length dimension line — rendered below the endpoint labels so the
-  // reader gets both the individual position markers and the sanity-check total span.
+  // Overall developed length: witness points on the plate line so extension lines run from
+  // the real ends down to the dashed dimension line (offsetMag below the feature), label outside.
   const blankDimFont = Math.min(10, Math.max(8, areaW * 0.03));
-  const dimRefY = epLabelY + lineH * 0.5 + 1;
-  // Centroid above the ref line → normal points downward → dim line appears below dimRefY.
   const stripCentroid = { x: rx + stripW / 2, y: lineY };
   drawDimension(
     doc,
     rx,
-    dimRefY,
+    lineY,
     rx + stripW,
-    dimRefY,
+    lineY,
     { mmHebrew: blankL },
     3,
     blankDimFont,
@@ -980,8 +1026,33 @@ function drawBendPlanFlatView(
 }
 
 // ---------------------------------------------------------------------------
-// Title block (ISO 7200 style, Hebrew RTL)
+// Title block — 2×6 grid, Hebrew RTL (one label + one value per half-row)
 // ---------------------------------------------------------------------------
+
+const TB_GRID_LINE_MM = Math.max(GEO_LINE_MM * 1.2, 0.52);
+
+/** Hebrew shape names — aligned with `messages/he.json` bendPlatePhase.template.*.name */
+const BEND_TEMPLATE_LABEL_HE: Record<BendTemplateId, string> = {
+  l: "זוית",
+  u: "תעלה",
+  z: "מדרגה",
+  omega: "אומגה",
+  gutter: "מרזב",
+  plate: "ריבוע",
+  custom: "מותאם אישית",
+};
+
+function titleGeometryLabel(
+  part: QuotePartRow,
+  bendItem: BendPlateQuoteItem | null
+): string {
+  if (bendItem) return BEND_TEMPLATE_LABEL_HE[bendItem.template];
+  const tid = part.bendTemplateId;
+  if (tid && tid in BEND_TEMPLATE_LABEL_HE) {
+    return BEND_TEMPLATE_LABEL_HE[tid as BendTemplateId];
+  }
+  return "ריבוע";
+}
 
 function drawTitleBlock(
   doc: jsPDF,
@@ -991,118 +1062,163 @@ function drawTitleBlock(
   plateWidthMm: number,
   weightKg: number,
   quantity: number,
-  bendCount: number,
-  finish: string
+  finish: string,
+  materialType: MaterialType,
+  areaM2: number,
+  geometryLabel: string,
+  quoteReference: string,
+  customerName?: string
 ): void {
-  doc.setLineWidth(0.5);
-  doc.rect(TB_L, TB_T, TB_W, TB_H);
-  doc.setLineWidth(0.2);
-
   const rh = TB_ROW_H;
+  const pad = 1.85;
+  const fsLbl = 6.15;
+  /** Value size: previous 2× step, then ÷1.25 per layout request. */
+  const fsVal = 10.8;
+  const TB_R = TB_L + TB_W;
 
-  // Six horizontal bands
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const today = (() => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(todayIso);
+    if (!m) return todayIso;
+    const [, y, mo, d] = m;
+    return `${d}/${mo}/${y}`;
+  })();
+  const finishDisplay =
+    finish && finish !== "ללא" ? finish : "-";
+  const matTypeHe = MATERIAL_TYPE_LABELS[materialType];
+  const clientDisplay = customerName?.trim() || "—";
+  const referenceDisplay = quoteReference.trim() || partName;
+
+  doc.setLineWidth(TB_GRID_LINE_MM);
+  doc.setDrawColor(0);
+  doc.rect(TB_L, TB_T, TB_W, TB_H);
   for (let r = 1; r < 6; r++) {
-    doc.line(TB_L, TB_T + rh * r, TB_L + TB_W, TB_T + rh * r);
+    doc.line(TB_L, TB_T + rh * r, TB_R, TB_T + rh * r);
   }
-  // Vertical divider between the two columns (rows with split cells only)
-  doc.line(TB_C1, TB_T, TB_C1, TB_T + rh);
-  doc.line(TB_C1, TB_T + rh * 2, TB_C1, TB_T + rh * 3);
-  doc.line(TB_C1, TB_T + rh * 3, TB_C1, FB);
+  doc.line(TB_C1, TB_T, TB_C1, TB_T + TB_H);
 
-  const pad = 2;
-  const labelSize = 5;
-  const valueSize = 7;
-  const lab2 = 4;
-  const val2 = 6;
-
-  function cell(
-    left: number,
-    top: number,
-    right: number,
-    labelHe: string,
-    value: string,
-    valueIsHeb = false
-  ) {
-    const cy = top + rh / 2;
-    setHebFont(doc, labelSize);
-    doc.setTextColor(100);
-    doc.text(heb(labelHe), right - pad, top + 3.5, { align: "right" });
+  function lblTR(right: number, y: number, s: string): void {
+    setHebFont(doc, fsLbl);
     doc.setTextColor(0);
-    if (valueIsHeb) {
-      setHebFont(doc, valueSize);
-      doc.text(heb(value), right - pad, cy + 2.5, { align: "right" });
-    } else {
-      setLatFont(doc, valueSize);
-      doc.text(value, left + pad, cy + 2.5);
+    doc.text(heb(s), right, y, { align: "right", baseline: "middle" });
+  }
+  function valBL(left: number, y: number, s: string, bold = false): void {
+    setLatFont(doc, fsVal, bold);
+    doc.setTextColor(0);
+    doc.text(s, left, y, { baseline: "middle" });
+  }
+  function valBLheb(left: number, y: number, s: string): void {
+    setHebFont(doc, fsVal);
+    doc.setTextColor(0);
+    doc.text(heb(s), left, y, { baseline: "middle" });
+  }
+  const GAP_UNIT_NUM = 1.25;
+  /** `מ״מ` to the left, then Latin number (avoids unit↔digit bidi swaps). */
+  function valMm(left: number, y: number, mm: number): void {
+    const num =
+      Math.abs(mm - Math.round(mm)) < 1e-6
+        ? `${Math.round(mm)}`
+        : (Math.round(mm * 10) / 10).toFixed(1);
+    setHebFont(doc, fsVal);
+    const twU = doc.getTextWidth(HEB_MM);
+    doc.text(HEB_MM, left, y, { baseline: "middle" });
+    setLatFont(doc, fsVal);
+    doc.text("\u200E" + num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
+  }
+  /** `ק״ג` left, then Latin number. */
+  function valKg(left: number, y: number, kg: number): void {
+    if (kg <= 0) {
+      valBL(left, y, "-");
+      return;
     }
+    const num = `${Math.round(kg * 1000) / 1000}`;
+    setHebFont(doc, fsVal);
+    const twU = doc.getTextWidth(HEB_KG);
+    doc.text(HEB_KG, left, y, { baseline: "middle" });
+    setLatFont(doc, fsVal);
+    doc.text("\u200E" + num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
+  }
+  /** `מ״ר` left, then Latin number. */
+  function valM2(left: number, y: number, m2: number): void {
+    if (m2 <= 0) {
+      valBL(left, y, "-");
+      return;
+    }
+    const num = `${Math.round(m2 * 1000) / 1000}`;
+    setHebFont(doc, fsVal);
+    const twU = doc.getTextWidth(HEB_M2);
+    doc.text(HEB_M2, left, y, { baseline: "middle" });
+    setLatFont(doc, fsVal);
+    doc.text("\u200E" + num, left + twU + GAP_UNIT_NUM, y, { baseline: "middle" });
   }
 
-  // Row 0
-  cell(TB_L, TB_T, TB_C1, "חברה", "");
-  cell(TB_C1, TB_T, TB_L + TB_W, "גיליון", "1 / 1");
+  function rowY(top: number): { yL: number; yV: number } {
+    return { yL: top + 2.5, yV: top + rh - 3.35 };
+  }
 
-  // Row 1
-  cell(TB_L, TB_T + rh, TB_C1, "פורמט", "A4");
+  // Row 0 — left: סוג חומר; right: שם הלקוח
   {
-    const today = new Date().toISOString().slice(0, 10);
-    cell(TB_C1, TB_T + rh, TB_L + TB_W, "תאריך", today);
+    const top = TB_T;
+    const { yL, yV } = rowY(top);
+    lblTR(TB_C1 - pad, yL, "סוג חומר");
+    valBLheb(TB_L + pad, yV, matTypeHe);
+    lblTR(TB_R - pad, yL, "שם הלקוח");
+    valBL(TB_C1 + pad, yV, clientDisplay);
   }
 
-  // Row 2: part name — full width
+  // Row 1 — left: סיווג חומר; right: מספר חלק
+  {
+    const top = TB_T + rh;
+    const { yL, yV } = rowY(top);
+    lblTR(TB_C1 - pad, yL, "סיווג חומר");
+    valBL(TB_L + pad, yV, material);
+    lblTR(TB_R - pad, yL, "מספר חלק");
+    valBL(TB_C1 + pad, yV, partName);
+  }
+
+  // Row 2 — left: גימור; right: עובי
   {
     const top = TB_T + rh * 2;
-    setHebFont(doc, labelSize);
-    doc.setTextColor(100);
-    doc.text(heb("שם חלק"), TB_L + TB_W - pad, top + 3.5, { align: "right" });
-    doc.setTextColor(0);
-    setLatFont(doc, 9, true);
-    doc.text(partName, TB_L + pad, top + rh / 2 + 2.5);
+    const { yL, yV } = rowY(top);
+    lblTR(TB_C1 - pad, yL, "גימור");
+    if (finishDisplay === "-") valBL(TB_L + pad, yV, "-");
+    else valBLheb(TB_L + pad, yV, finishDisplay);
+    lblTR(TB_R - pad, yL, "עובי");
+    valMm(TB_C1 + pad, yV, thicknessMm);
   }
 
-  // Row 3
+  // Row 3 — left: תאריך; right: כמות
   {
     const top = TB_T + rh * 3;
-    cell(TB_L, top, TB_C1, "מספר שרטוט", partName);
-    cell(TB_C1, top, TB_L + TB_W, "חומר", material);
+    const { yL, yV } = rowY(top);
+    lblTR(TB_C1 - pad, yL, "תאריך");
+    valBL(TB_L + pad, yV, today);
+    lblTR(TB_R - pad, yL, "כמות");
+    valBL(TB_C1 + pad, yV, `${quantity}`);
   }
 
-  // Row 4
+  // Row 4 — left: גאומטריה (זוית / תעלה / …); right: משקל
   {
     const top = TB_T + rh * 4;
-    const bendLabel = bendCount > 0 ? `${bendCount}` : "-";
-    cell(TB_L, top, TB_C1, "כיפופים", bendLabel);
-    cell(TB_C1, top, TB_L + TB_W, "עובי", `${thicknessMm} mm`);
+    const { yL, yV } = rowY(top);
+    lblTR(TB_C1 - pad, yL, "גאומטריה");
+    valBLheb(TB_L + pad, yV, geometryLabel);
+    lblTR(TB_R - pad, yL, "משקל");
+    valKg(TB_C1 + pad, yV, weightKg);
   }
 
-  // Row 5: two stacked field pairs per column (fits 6 rows total)
+  // Row 5 — left: סימוכין (quote ref); right: שטח
   {
     const top = TB_T + rh * 5;
-    const y0 = top + 2.2;
-    const y1 = top + 6.0;
-    const wStr = weightKg > 0 ? `${Math.round(weightKg * 1000) / 1000} kg` : "-";
-    const finishDisplay = finish && finish !== "ללא" ? finish : "-";
-
-    setHebFont(doc, lab2);
-    doc.setTextColor(100);
-    doc.text(heb("רוחב פלטה"), TB_C1 - pad, y0, { align: "right" });
-    doc.text(heb("משקל"), TB_C1 - pad, y1, { align: "right" });
-    setLatFont(doc, val2);
-    doc.setTextColor(0);
-    doc.text(`${plateWidthMm} mm`, TB_L + pad, y0 + 1.8);
-    doc.text(wStr, TB_L + pad, y1 + 1.8);
-
-    setHebFont(doc, lab2);
-    doc.setTextColor(100);
-    doc.text(heb("כמות"), TB_L + TB_W - pad, y0, { align: "right" });
-    doc.text(heb("גימור"), TB_L + TB_W - pad, y1, { align: "right" });
-    doc.setTextColor(0);
-    setLatFont(doc, val2);
-    doc.text(`${quantity}`, TB_C1 + pad, y0 + 1.8);
-    setHebFont(doc, val2);
-    doc.text(heb(finishDisplay), TB_L + TB_W - pad, y1 + 1.8, { align: "right" });
+    const { yL, yV } = rowY(top);
+    lblTR(TB_C1 - pad, yL, "סימוכין");
+    valBL(TB_L + pad, yV, referenceDisplay);
+    lblTR(TB_R - pad, yL, "שטח");
+    valM2(TB_C1 + pad, yV, areaM2);
   }
 
   doc.setTextColor(0);
+  doc.setDrawColor(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -1110,20 +1226,27 @@ function drawTitleBlock(
 // ---------------------------------------------------------------------------
 
 function drawBorder(doc: jsPDF): void {
-  doc.setLineWidth(0.7);
+  doc.setLineWidth(GEO_LINE_MM);
   doc.setDrawColor(0);
   doc.rect(FL, FT, FW, FH);
-  doc.setLineWidth(0.15);
 }
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
+export type PlateDrawingExportMeta = {
+  /** Shown under שם הלקוח when exporting from a quote. */
+  customerName?: string;
+  /** Quote reference (e.g. OM-0001) — shown under סימוכין. */
+  quoteReference?: string;
+};
+
 export async function generatePlateDrawingPdf(
   part: QuotePartRow,
   bendItem: BendPlateQuoteItem | null,
-  materialType: MaterialType
+  materialType: MaterialType,
+  exportMeta?: PlateDrawingExportMeta
 ): Promise<Uint8Array | null> {
   try {
     await ensureFonts();
@@ -1179,19 +1302,8 @@ export async function generatePlateDrawingPdf(
     if (bendItem && bendGeometry) {
       const { pts, straights, bends, angles, isFlat } = bendGeometry;
 
-      drawFlatBlankView(
-        doc,
-        bendItem.calc.blankLengthMm,
-        bendItem.calc.blankWidthMm,
-        straights,
-        bends,
-        bendItem.global.thicknessMm,
-        materialType,
-        pl
-      );
-
       if (!isFlat && pts.length >= 3) {
-        drawProfileView(doc, pts, straights, angles, pr);
+        drawProfileView(doc, pts, straights, angles, pl);
       } else {
         drawFlatSideStripView(
           doc,
@@ -1200,9 +1312,20 @@ export async function generatePlateDrawingPdf(
             bendItem.calc.blankWidthMm
           ),
           bendItem.global.thicknessMm,
-          pr
+          pl
         );
       }
+
+      drawFlatBlankView(
+        doc,
+        bendItem.calc.blankLengthMm,
+        bendItem.calc.blankWidthMm,
+        straights,
+        bends,
+        bendItem.global.thicknessMm,
+        materialType,
+        pr
+      );
 
       if (hasBendPlan) {
         drawBendPlanFlatView(
@@ -1222,6 +1345,9 @@ export async function generatePlateDrawingPdf(
         bendItem.global.material
       );
 
+      const geometryLabel = titleGeometryLabel(part, bendItem);
+      const quoteRef =
+        exportMeta?.quoteReference?.trim() || part.partName;
       drawTitleBlock(
         doc,
         part.partName,
@@ -1230,12 +1356,17 @@ export async function generatePlateDrawingPdf(
         bendItem.global.plateWidthMm,
         bendItem.calc.weightKg,
         bendItem.global.quantity,
-        bendItem.calc.bendCount,
-        finish || bendItem.global.finish || ""
+        finish || bendItem.global.finish || "",
+        materialType,
+        part.areaM2,
+        geometryLabel,
+        quoteRef,
+        exportMeta?.customerName
       );
     } else {
       const L = Math.max(1, part.lengthMm);
       const W = Math.max(1, part.widthMm);
+      drawFlatSideStripView(doc, Math.max(L, W), part.thicknessMm, pl);
       drawFlatBlankView(
         doc,
         L,
@@ -1244,11 +1375,13 @@ export async function generatePlateDrawingPdf(
         [],
         part.thicknessMm,
         materialType,
-        pl
+        pr
       );
-      drawFlatSideStripView(doc, Math.max(L, W), part.thicknessMm, pr);
 
       const { grade, finish } = splitMaterialGradeAndFinish(part.material);
+      const geometryLabel = titleGeometryLabel(part, null);
+      const quoteRef =
+        exportMeta?.quoteReference?.trim() || part.partName;
       drawTitleBlock(
         doc,
         part.partName,
@@ -1257,8 +1390,12 @@ export async function generatePlateDrawingPdf(
         part.widthMm,
         part.weightKg,
         part.qty,
-        0,
-        finish
+        finish,
+        materialType,
+        part.areaM2,
+        geometryLabel,
+        quoteRef,
+        exportMeta?.customerName
       );
     }
 
