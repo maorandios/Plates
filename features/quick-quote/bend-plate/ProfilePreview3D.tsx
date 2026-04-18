@@ -6,8 +6,15 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { cn } from "@/lib/utils";
+import type { BendSegmentHole } from "./types";
 import type { Point2 } from "./geometry";
 import { boundsOfPolyline } from "./geometry";
+import { plateSegmentHoleCenterOnRectangleBlank } from "./bendPlateHoleFlatBlank";
+import { computeSegmentFaceSvgModel } from "./segmentFaceLayout";
+import {
+  resolvedOvalLengthMm,
+  segmentFaceEffectiveWidthMm,
+} from "./segmentFaceHolesBounds";
 
 interface ProfilePreview3DProps {
   pts: Point2[];
@@ -27,6 +34,10 @@ interface ProfilePreview3DProps {
   className?: string;
   /** Stretch to parent height (e.g. split-pane editor). */
   fill?: boolean;
+  /** Per straight segment index: holes on that face (same order as profile edges). */
+  segmentFaceHoles?: BendSegmentHole[][];
+  /** When `flatPlate`, rectangle dimensions (mm) for mapping perimeter holes onto the slab top. */
+  flatPlateBlankMm?: { lengthMm: number; widthMm: number } | null;
 }
 
 const SCALE = 0.001;
@@ -84,6 +95,178 @@ function disposeLights(lights: THREE.Light[]): void {
  * Edge overlay: `thresholdDeg` — higher on rounded slab hides tessellation;
  * lower on sharp extruded strips draws bend / thickness edges clearly.
  */
+const HOLE_MAT = new THREE.MeshStandardMaterial({
+  color: 0x141a18,
+  metalness: 0.35,
+  roughness: 0.55,
+  polygonOffset: true,
+  polygonOffsetFactor: 2,
+  polygonOffsetUnits: 2,
+});
+
+function addHoleMeshesBent(
+  scene: THREE.Scene,
+  /** Logical profile vertices (same as 2D editor) — NOT the filleted high-res polyline. */
+  profilePts: Point2[],
+  segmentFaceHoles: BendSegmentHole[][],
+  plateWidthMm: number,
+  thicknessMm: number
+): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  const hpw = Math.max((plateWidthMm * SCALE) / 2, 0.00005);
+
+  const nSeg = Math.min(profilePts.length - 1, segmentFaceHoles.length);
+  for (let s = 0; s < nSeg; s++) {
+    const row = segmentFaceHoles[s];
+    if (!row?.length) continue;
+    const Pa = new THREE.Vector3(
+      profilePts[s]!.x * SCALE,
+      profilePts[s]!.y * SCALE,
+      0
+    );
+    const Pb = new THREE.Vector3(
+      profilePts[s + 1]!.x * SCALE,
+      profilePts[s + 1]!.y * SCALE,
+      0
+    );
+    const dir = new THREE.Vector3().subVectors(Pb, Pa);
+    const Llen = dir.length();
+    if (Llen < 1e-12) continue;
+    const T = dir.clone().divideScalar(Llen);
+    const N = new THREE.Vector3(-T.y, T.x, 0);
+    if (N.lengthSq() < 1e-18) continue;
+    N.normalize();
+    const B = new THREE.Vector3(0, 0, 1);
+    const Lmm = Llen / SCALE;
+    const layout = computeSegmentFaceSvgModel(Lmm, plateWidthMm, `${s}`);
+    if (layout.kind !== "ok") continue;
+    const Wmm = segmentFaceEffectiveWidthMm(
+      layout.plateWidthMm,
+      layout.segmentLenMm,
+      layout.plateWidthDrawMm
+    );
+
+    for (const h of row) {
+      const vAlong = (h.vMm / Lmm) * Llen;
+      const uAcross = (h.uMm / Wmm - 0.5) * (2 * hpw);
+      const pos = Pa.clone()
+        .add(T.clone().multiplyScalar(vAlong))
+        .add(B.clone().multiplyScalar(uAcross));
+
+      const depth = Math.max(thicknessMm * SCALE * 1.15, 1e-5);
+      let mesh: THREE.Mesh;
+
+      if (h.kind === "round") {
+        const r = Math.max((h.diameterMm * SCALE) / 2, 1e-5);
+        const geom = new THREE.CylinderGeometry(r, r, depth, 32);
+        mesh = new THREE.Mesh(geom, HOLE_MAT);
+        mesh.position.copy(pos);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), N);
+      } else if (h.kind === "oval") {
+        const d = Math.max(h.diameterMm * SCALE, 1e-5);
+        const slotL = Math.max(resolvedOvalLengthMm(h) * SCALE, d);
+        const geom = new THREE.CylinderGeometry(d / 2, d / 2, slotL, 24);
+        mesh = new THREE.Mesh(geom, HOLE_MAT);
+        mesh.position.copy(pos);
+        const θ = ((h.rotationDeg ?? 0) * Math.PI) / 180;
+        const slotDir = T.clone()
+          .multiplyScalar(Math.cos(θ))
+          .add(B.clone().multiplyScalar(Math.sin(θ)));
+        mesh.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          slotDir.lengthSq() > 1e-18 ? slotDir.normalize() : T
+        );
+      } else {
+        const rw = Math.max((h.rectWidthMm ?? 0) * SCALE, 1e-5);
+        const rl = Math.max((h.rectLengthMm ?? 0) * SCALE, 1e-5);
+        const geom = new THREE.BoxGeometry(rw, depth, rl);
+        mesh = new THREE.Mesh(geom, HOLE_MAT);
+        mesh.position.copy(pos);
+        const θ = ((h.rotationDeg ?? 0) * Math.PI) / 180;
+        const ex = T.clone()
+          .multiplyScalar(Math.cos(θ))
+          .add(B.clone().multiplyScalar(Math.sin(θ)));
+        const ez = T.clone()
+          .multiplyScalar(-Math.sin(θ))
+          .add(B.clone().multiplyScalar(Math.cos(θ)));
+        const ey = N.clone();
+        mesh.quaternion.setFromRotationMatrix(
+          new THREE.Matrix4().makeBasis(ex, ey, ez)
+        );
+      }
+
+      scene.add(mesh);
+      meshes.push(mesh);
+    }
+  }
+  return meshes;
+}
+
+function addHoleMeshesFlatPlate(
+  scene: THREE.Scene,
+  segmentFaceHoles: BendSegmentHole[][],
+  lengthMm: number,
+  widthMm: number,
+  bw: number,
+  bh: number,
+  cx: number,
+  cy: number,
+  td: number
+): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  const L = Math.max(lengthMm, 1e-6);
+  const W = Math.max(widthMm, 1e-6);
+  const depth = Math.max(td * 1.1, 1e-5);
+
+  for (let segIdx = 0; segIdx < segmentFaceHoles.length; segIdx++) {
+    const row = segmentFaceHoles[segIdx];
+    if (!row?.length) continue;
+    for (const h of row) {
+      const p = plateSegmentHoleCenterOnRectangleBlank(
+        segIdx,
+        h.uMm,
+        h.vMm,
+        L,
+        W
+      );
+      const lx = (p.x / L - 0.5) * bw;
+      const ly = (p.y / W - 0.5) * bh;
+      const wx = cx + lx;
+      const wy = cy + ly;
+      const wz = td / 2;
+
+      let mesh: THREE.Mesh;
+      if (h.kind === "round") {
+        const r = Math.max((h.diameterMm * SCALE) / 2, 1e-5);
+        const geom = new THREE.CylinderGeometry(r, r, depth, 32);
+        mesh = new THREE.Mesh(geom, HOLE_MAT);
+        mesh.position.set(wx, wy, wz);
+        mesh.rotation.x = -Math.PI / 2;
+      } else if (h.kind === "oval") {
+        const d = Math.max(h.diameterMm * SCALE, 1e-5);
+        const slotL = Math.max(resolvedOvalLengthMm(h) * SCALE, d);
+        const geom = new THREE.CylinderGeometry(d / 2, d / 2, slotL, 24);
+        mesh = new THREE.Mesh(geom, HOLE_MAT);
+        mesh.position.set(wx, wy, wz);
+        const θ = ((h.rotationDeg ?? 0) * Math.PI) / 180;
+        mesh.rotation.order = "ZXY";
+        mesh.rotation.z = θ;
+        mesh.rotation.x = -Math.PI / 2;
+      } else {
+        const rw = Math.max((h.rectWidthMm ?? 0) * SCALE, 1e-5);
+        const rl = Math.max((h.rectLengthMm ?? 0) * SCALE, 1e-5);
+        const geom = new THREE.BoxGeometry(rw, rl, depth);
+        mesh = new THREE.Mesh(geom, HOLE_MAT);
+        mesh.position.set(wx, wy, wz);
+        mesh.rotation.z = ((h.rotationDeg ?? 0) * Math.PI) / 180;
+      }
+      scene.add(mesh);
+      meshes.push(mesh);
+    }
+  }
+  return meshes;
+}
+
 function addPreviewEdgeOverlay(
   scene: THREE.Scene,
   geom: THREE.BufferGeometry,
@@ -276,6 +459,8 @@ export function ProfilePreview3D({
   flatPlate = false,
   className,
   fill,
+  segmentFaceHoles,
+  flatPlateBlankMm = null,
 }: ProfilePreview3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -308,6 +493,7 @@ export function ProfilePreview3D({
 
     const lights = addPreviewLighting(scene);
 
+    let pathPtsForHoles: Point2[] = pts;
     let geom: THREE.BufferGeometry;
     if (flatPlate) {
       const bw = Math.max((b.maxX - b.minX) * SCALE, 0.001);
@@ -326,8 +512,8 @@ export function ProfilePreview3D({
       const ht = Math.max((thicknessMm * SCALE) / 2, 0.00005);
       const hpw = Math.max((plateWidthMm * SCALE) / 2, 0.00005);
       const ri = insideRadiusMmProp ?? thicknessMm;
-      const pathPts = filletCenterlinePolyline(pts, ri, thicknessMm);
-      geom = buildBentProfilePrismGeometry(pathPts, ht, hpw);
+      pathPtsForHoles = filletCenterlinePolyline(pts, ri, thicknessMm);
+      geom = buildBentProfilePrismGeometry(pathPtsForHoles, ht, hpw);
     }
 
     geom.computeBoundingBox();
@@ -351,6 +537,38 @@ export function ProfilePreview3D({
     const mat = flatPlate ? createPreviewSlabMaterial() : createPreviewStripMaterial();
     const mesh = new THREE.Mesh(geom, mat);
     scene.add(mesh);
+
+    const holeMeshes: THREE.Mesh[] = [];
+    if (segmentFaceHoles?.some((row) => row && row.length > 0)) {
+      if (flatPlate && flatPlateBlankMm) {
+        const bw = Math.max((b.maxX - b.minX) * SCALE, 0.001);
+        const bh = Math.max((b.maxY - b.minY) * SCALE, 0.001);
+        const td = Math.max(thicknessMm * SCALE, 0.001);
+        holeMeshes.push(
+          ...addHoleMeshesFlatPlate(
+            scene,
+            segmentFaceHoles,
+            flatPlateBlankMm.lengthMm,
+            flatPlateBlankMm.widthMm,
+            bw,
+            bh,
+            cx,
+            cy,
+            td
+          )
+        );
+      } else if (!flatPlate) {
+        holeMeshes.push(
+          ...addHoleMeshesBent(
+            scene,
+            pts,
+            segmentFaceHoles,
+            plateWidthMm,
+            thicknessMm
+          )
+        );
+      }
+    }
 
     const edge = addPreviewEdgeOverlay(scene, geom, flatPlate ? 30 : 22);
 
@@ -379,13 +597,25 @@ export function ProfilePreview3D({
       controls.dispose();
       geom.dispose();
       mat.dispose();
+      for (const hm of holeMeshes) {
+        hm.geometry.dispose();
+        scene.remove(hm);
+      }
       edge.geometry.dispose();
       (edge.material as THREE.Material).dispose();
       disposeLights(lights);
       renderer.dispose();
       el.removeChild(renderer.domElement);
     };
-  }, [pts, plateWidthMm, thicknessMm, insideRadiusMmProp, flatPlate]);
+  }, [
+    pts,
+    plateWidthMm,
+    thicknessMm,
+    insideRadiusMmProp,
+    flatPlate,
+    segmentFaceHoles,
+    flatPlateBlankMm,
+  ]);
 
   return (
     <div

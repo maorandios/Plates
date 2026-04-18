@@ -6,7 +6,6 @@ import type { BendSegmentHole } from "./types";
 import {
   capsuleOutlineUvMm,
   clampAndSnapHoleCenterTo1Mm,
-  holeHalfExtentsMm,
   segmentFaceEffectiveWidthMm,
 } from "./segmentFaceHolesBounds";
 import type { SegmentFaceSvgModel } from "./segmentFaceLayout";
@@ -21,35 +20,6 @@ const HIT_PAD_PX = 14;
  * Keeps taps/select from nudging UV; keeps preview size stable vs. spurious drags.
  */
 const DRAG_DISTANCE_PX = 6;
-
-const GUIDE_STROKE = "#a78bfa";
-/** Solid stroke width for invisible hit targets — dashed lines have gaps that don’t receive clicks. */
-const GUIDE_HIT_LINE_STROKE_W = 22;
-
-export type SegmentFaceDimEdge = "top" | "bottom" | "left" | "right";
-
-function clientXYFromPointerEvent(evt: Event): { x: number; y: number } {
-  if ("clientX" in evt && typeof (evt as MouseEvent).clientX === "number") {
-    const m = evt as MouseEvent;
-    return { x: m.clientX, y: m.clientY };
-  }
-  const t = (evt as TouchEvent).changedTouches?.[0];
-  return { x: t?.clientX ?? 0, y: t?.clientY ?? 0 };
-}
-
-/** Shorten segment [from→to] from the `to` end so it stops before the hole (clear hit targets). */
-function trimTowardStart(
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-  trimFromToPx: number
-): { x: number; y: number } {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy);
-  if (len < trimFromToPx + 2) return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
-  const t = (len - trimFromToPx) / len;
-  return { x: from.x + dx * t, y: from.y + dy * t };
-}
 
 function overlayTransform(
   layout: Extract<SegmentFaceSvgModel, { kind: "ok" }>,
@@ -110,21 +80,6 @@ export interface SegmentFaceKonvaHolesOverlayProps {
   /** Highlight and allow tap-to-select for panel editing. */
   selectedHoleId?: string | null;
   onHoleSelect?: (holeId: string) => void;
-  /**
-   * When a hole is selected, draw dashed guides to the four segment edges; clicking a segment
-   * opens precise dimension entry in the parent (popover).
-   */
-  onDimensionGuideLineClick?: (
-    holeId: string,
-    edge: SegmentFaceDimEdge,
-    clientX: number,
-    clientY: number
-  ) => void;
-  /**
-   * Dimension guides only after the user selects this hole on the canvas (tap on the hole).
-   * When unset or different from `selectedHoleId`, dashed guides are hidden.
-   */
-  dimensionGuidesActiveHoleId?: string | null;
 }
 
 export function SegmentFaceKonvaHolesOverlay({
@@ -135,16 +90,12 @@ export function SegmentFaceKonvaHolesOverlay({
   onHolePositionChange,
   selectedHoleId = null,
   onHoleSelect,
-  onDimensionGuideLineClick,
-  dimensionGuidesActiveHoleId = null,
 }: SegmentFaceKonvaHolesOverlayProps) {
   const tf = useMemo(
     () => overlayTransform(layout, viewW, viewH),
     [layout, viewW, viewH]
   );
 
-  /** Konva may fire both tap and click for one mouse action — avoid double-opening the popover. */
-  const lastDimGuideUiRef = useRef<{ key: string; t: number } | null>(null);
   /** Draggable holes: tap + click can both fire for one physical click. */
   const lastHoleSelectUiRef = useRef<{ id: string; t: number } | null>(null);
 
@@ -310,86 +261,6 @@ export function SegmentFaceKonvaHolesOverlay({
           );
         })}
       </Layer>
-
-      {selectedHoleId &&
-      dimensionGuidesActiveHoleId === selectedHoleId &&
-      onDimensionGuideLineClick ? (
-        <Layer>
-          {(() => {
-            const h = holes.find((x) => x.id === selectedHoleId);
-            if (!h) return null;
-            const pc = tf.uvToStage(h.uMm, h.vMm);
-            const pLeft = tf.uvToStage(0, h.vMm);
-            const pRight = tf.uvToStage(tf.Wmm, h.vMm);
-            const pTop = tf.uvToStage(h.uMm, 0);
-            const pBot = tf.uvToStage(h.uMm, tf.Lmm);
-            const { hu, hv } = holeHalfExtentsMm(h);
-            const trimPx =
-              Math.max(10, Math.hypot(hu * tf.su, hv * tf.sv) + 8);
-            const qLeft = trimTowardStart(pLeft, pc, trimPx);
-            const qRight = trimTowardStart(pRight, pc, trimPx);
-            const qTop = trimTowardStart(pTop, pc, trimPx);
-            const qBot = trimTowardStart(pBot, pc, trimPx);
-            const dash = [6, 5];
-            const emit =
-              (edge: SegmentFaceDimEdge) =>
-              (e: { evt: Event; cancelBubble?: boolean }) => {
-                e.cancelBubble = true;
-                e.evt.stopPropagation?.();
-                const dedupeKey = `${h.id}:${edge}`;
-                const now = Date.now();
-                const prev = lastDimGuideUiRef.current;
-                if (
-                  prev &&
-                  prev.key === dedupeKey &&
-                  now - prev.t < 280
-                ) {
-                  return;
-                }
-                lastDimGuideUiRef.current = { key: dedupeKey, t: now };
-                const { x, y } = clientXYFromPointerEvent(e.evt);
-                onDimensionGuideLineClick(h.id, edge, x, y);
-              };
-            /** Visible dash drawn first; wide hit line on top so clicks hit a listening shape directly. */
-            const guidePair = (
-              pts: number[],
-              edge: SegmentFaceDimEdge
-            ) => (
-              <>
-                <Line
-                  points={pts}
-                  stroke={GUIDE_STROKE}
-                  strokeWidth={1.25}
-                  dash={dash}
-                  opacity={0.95}
-                  lineCap="round"
-                  listening={false}
-                  perfectDrawEnabled={false}
-                />
-                <Line
-                  points={pts}
-                  stroke="rgba(0,0,0,0.004)"
-                  strokeWidth={GUIDE_HIT_LINE_STROKE_W}
-                  lineCap="round"
-                  listening
-                  perfectDrawEnabled={false}
-                  onTap={emit(edge)}
-                  onClick={emit(edge)}
-                  cursor="pointer"
-                />
-              </>
-            );
-            return (
-              <>
-                {guidePair([pLeft.x, pLeft.y, qLeft.x, qLeft.y], "left")}
-                {guidePair([qRight.x, qRight.y, pRight.x, pRight.y], "right")}
-                {guidePair([pTop.x, pTop.y, qTop.x, qTop.y], "top")}
-                {guidePair([pBot.x, pBot.y, qBot.x, qBot.y], "bottom")}
-              </>
-            );
-          })()}
-        </Layer>
-      ) : null}
     </Stage>
   );
 }

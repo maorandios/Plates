@@ -12,7 +12,6 @@ import {
 } from "react";
 import {
   Check,
-  ChevronDown,
   ChevronRight,
   CircleDot,
   LayoutGrid,
@@ -99,12 +98,11 @@ import { BendTemplatePickerGlyph } from "./BendTemplateShapeGlyph";
 import { ProfilePreview2D } from "./ProfilePreview2D";
 import { ProfilePreview3D } from "./ProfilePreview3D";
 import { SegmentFacePreview2D } from "./SegmentFacePreview2D";
-import { SegmentHoleDimGuidePopover } from "./SegmentHoleDimGuidePopover";
-import type { SegmentFaceDimEdge } from "./SegmentFaceKonvaHolesOverlay";
+import { SegmentHolePlacementPanel } from "./SegmentHolePlacementPanel";
 import { computeSegmentFaceSvgModel } from "./segmentFaceLayout";
 import {
   clampAndSnapHoleCenterTo1Mm,
-  resolvedOvalLengthMm,
+  holeFitsOnSegmentFace,
   segmentFaceEffectiveWidthMm,
 } from "./segmentFaceHolesBounds";
 import { reclampSegmentHolesToFace } from "./SegmentFaceKonvaHolesOverlay";
@@ -136,53 +134,6 @@ function bendPlateFinishDisplay(finish: string): string {
 
 function bendEditorBasicDataValidationMessages(form: BendPlateFormState): string[] {
   return getBendEditorBasicDataIssueCodes(form).map((code) => t(`${BP}.issues.${code}`));
-}
-
-function segmentHoleSummaryLine(h: BendSegmentHole): string {
-  if (h.kind === "round") {
-    return `${formatDecimal(h.diameterMm, 1)} מ״מ`;
-  }
-  if (h.kind === "oval") {
-    return `${formatDecimal(h.diameterMm, 1)} · ${formatDecimal(resolvedOvalLengthMm(h), 1)} מ״מ`;
-  }
-  return `${formatDecimal(h.rectLengthMm ?? 0, 1)}×${formatDecimal(h.rectWidthMm ?? 0, 1)} מ״מ`;
-}
-
-function bendHoleWithNewKind(
-  h: BendSegmentHole,
-  kind: BendSegmentHoleKind
-): BendSegmentHole {
-  const { id, uMm, vMm } = h;
-  if (kind === "round") {
-    const d = Math.max(0, h.diameterMm > 0 ? h.diameterMm : 10);
-    return { id, kind: "round", uMm, vMm, diameterMm: d };
-  }
-  if (kind === "oval") {
-    const d = Math.max(0, h.diameterMm > 0 ? h.diameterMm : 10);
-    const ovalLen = Math.max(
-      resolvedOvalLengthMm({ ...h, kind: "oval", diameterMm: d }),
-      d
-    );
-    return {
-      id,
-      kind: "oval",
-      uMm,
-      vMm,
-      diameterMm: d,
-      ovalLengthMm: ovalLen,
-      rotationDeg: h.rotationDeg ?? 0,
-    };
-  }
-  return {
-    id,
-    kind: "rect",
-    uMm,
-    vMm,
-    diameterMm: 0,
-    rectLengthMm: Math.max(0, h.rectLengthMm ?? 20),
-    rectWidthMm: Math.max(0, h.rectWidthMm ?? 15),
-    rotationDeg: h.rotationDeg ?? 0,
-  };
 }
 
 function bendEditorValidationMessages(form: BendPlateFormState): string[] {
@@ -902,19 +853,10 @@ function BendPlateShapeEditor({
   const [holeViewSegmentIndex, setHoleViewSegmentIndex] = useState<number | null>(null);
   /** Perforations panel: which row is expanded — existing hole id, or "new" draft at list end. */
   const [holePanelExpand, setHolePanelExpand] = useState<
-    null | { type: "new" } | { type: "hole"; id: string }
+    null | { type: "hole"; id: string }
   >(null);
-  /** Canvas: click a guide line to type exact distance (mm) from hole center to that edge. */
-  const [holeDimPopover, setHoleDimPopover] = useState<null | {
-    holeId: string;
-    edge: SegmentFaceDimEdge;
-    anchor: { left: number; top: number };
-  }>(null);
-  /** Dashed edge guides only after the user taps this hole on the face canvas (not sidebar-only). */
-  const [segmentFaceCanvasGuidesHoleId, setSegmentFaceCanvasGuidesHoleId] =
-    useState<string | null>(null);
-  /** Shown above a hole after adding it until the user taps a hole on the canvas or changes focus. */
-  const [holePlacementTooltipHoleId, setHolePlacementTooltipHoleId] = useState<
+  /** Face canvas: placement dialog for exact distances (mm) from hole center to each plate edge. */
+  const [holePlacementPanelHoleId, setHolePlacementPanelHoleId] = useState<
     string | null
   >(null);
   const canvasFaceWrapRef = useRef<HTMLDivElement>(null);
@@ -929,6 +871,10 @@ function BendPlateShapeEditor({
   const [editorSidebarScreen, setEditorSidebarScreen] =
     useState<EditorSidebarScreen>("hub");
   const [basicDataSaved, setBasicDataSaved] = useState(basicDataInitiallySaved);
+  /** Inline message when “add punching” would exceed segment face (replaces alert). */
+  const [addHoleFaceError, setAddHoleFaceError] = useState<string | null>(null);
+
+  const prevEditorSidebarScreenRef = useRef<EditorSidebarScreen>(editorSidebarScreen);
 
   const perforationsAvailable =
     form.template !== "plate" && profileSegmentDims.length > 0;
@@ -964,6 +910,21 @@ function BendPlateShapeEditor({
       setEditorSidebarScreen("hub");
     }
   }, [basicDataGateOk, editorSidebarScreen]);
+
+  /** Leaving ניקובים → hub: show side profile 2D, not the last segment face. */
+  useEffect(() => {
+    const prev = prevEditorSidebarScreenRef.current;
+    if (prev === "perforations" && editorSidebarScreen === "hub") {
+      setHoleViewSegmentIndex(null);
+      setHolePlacementPanelHoleId(null);
+      setHolePanelExpand(null);
+    }
+    prevEditorSidebarScreenRef.current = editorSidebarScreen;
+  }, [editorSidebarScreen]);
+
+  useEffect(() => {
+    setAddHoleFaceError(null);
+  }, [holeViewSegmentIndex]);
 
   const materialConfig = useMemo(() => getMaterialConfig(materialType), [materialType]);
 
@@ -1071,6 +1032,12 @@ function BendPlateShapeEditor({
     const [u, v] = clampAndSnapHoleCenterTo1Mm(hole.uMm, hole.vMm, hole, W, L);
     hole = { ...hole, uMm: u, vMm: v };
 
+    setAddHoleFaceError(null);
+    if (!holeFitsOnSegmentFace(hole, W, L)) {
+      setAddHoleFaceError(t(`${ED}.holesOversizeFace`));
+      return;
+    }
+
     const idx = holeViewSegmentIndex;
     setForm((s) => {
       const rows = [...(s.segmentFaceHoles ?? [])];
@@ -1079,7 +1046,7 @@ function BendPlateShapeEditor({
       return { ...s, segmentFaceHoles: rows };
     });
     setHolePanelExpand({ type: "hole", id });
-    setHolePlacementTooltipHoleId(id);
+    setHolePlacementPanelHoleId(id);
   }, [
     holeViewSegmentIndex,
     profileSegmentDims,
@@ -1092,6 +1059,7 @@ function BendPlateShapeEditor({
     holeDraftRectWidthMm,
     holeDraftRectRotationDeg,
     setForm,
+    t,
   ]);
 
   const patchSegmentHole = useCallback(
@@ -1114,14 +1082,14 @@ function BendPlateShapeEditor({
         );
         const L = layout.segmentLenMm;
         const rows = [...(s.segmentFaceHoles ?? [])];
-        const row = [...(rows[segIdx] ?? [])];
-        const j = row.findIndex((h) => h.id === holeId);
+        const r = [...(rows[segIdx] ?? [])];
+        const j = r.findIndex((h) => h.id === holeId);
         if (j < 0) return s;
-        let next: BendSegmentHole = { ...row[j], ...patch };
+        let next: BendSegmentHole = { ...r[j], ...patch };
         const [u, v] = clampAndSnapHoleCenterTo1Mm(next.uMm, next.vMm, next, W, L);
         next = { ...next, uMm: u, vMm: v };
-        row[j] = next;
-        rows[segIdx] = row;
+        r[j] = next;
+        rows[segIdx] = r;
         return { ...s, segmentFaceHoles: rows };
       });
     },
@@ -1175,8 +1143,7 @@ function BendPlateShapeEditor({
       setHolePanelExpand((exp) =>
         exp?.type === "hole" && exp.id === holeId ? null : exp
       );
-      setSegmentFaceCanvasGuidesHoleId((g) => (g === holeId ? null : g));
-      setHolePlacementTooltipHoleId((t) => (t === holeId ? null : t));
+      setHolePlacementPanelHoleId((p) => (p === holeId ? null : p));
     },
     [holeViewSegmentIndex, setForm]
   );
@@ -1201,99 +1168,34 @@ function BendPlateShapeEditor({
 
   const handleCanvasHoleSelect = useCallback((holeId: string) => {
     setHolePanelExpand({ type: "hole", id: holeId });
-    setSegmentFaceCanvasGuidesHoleId(holeId);
-    setHolePlacementTooltipHoleId(null);
+    setHolePlacementPanelHoleId(holeId);
   }, []);
 
-  const handleDimensionGuideLineClick = useCallback(
-    (holeId: string, edge: SegmentFaceDimEdge, clientX: number, clientY: number) => {
-      const el = canvasFaceWrapRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      setHoleDimPopover({
-        holeId,
-        edge,
-        anchor: { left: clientX - r.left, top: clientY - r.top },
-      });
-    },
-    []
-  );
-
-  const handleHoleDimGuideApply = useCallback(
-    (mm: number) => {
-      const pop = holeDimPopover;
-      if (!pop || holeViewSegmentIndex === null) return;
-      const idx = holeViewSegmentIndex;
-      const seg = profileSegmentDims[idx];
-      if (!seg) return;
-      const hole = form.segmentFaceHoles?.[idx]?.find((h) => h.id === pop.holeId);
-      if (!hole) return;
-      const layout = computeSegmentFaceSvgModel(
-        seg.lengthMm,
-        form.global.plateWidthMm,
-        seg.label
-      );
-      if (layout.kind !== "ok") return;
-      const W = segmentFaceEffectiveWidthMm(
-        layout.plateWidthMm,
-        layout.segmentLenMm,
-        layout.plateWidthDrawMm
-      );
-      const L = layout.segmentLenMm;
-      let u = hole.uMm;
-      let v = hole.vMm;
-      switch (pop.edge) {
-        case "left":
-          u = mm;
-          break;
-        case "right":
-          u = W - mm;
-          break;
-        case "top":
-          v = mm;
-          break;
-        case "bottom":
-          v = L - mm;
-          break;
-      }
-      const [uc, vc] = clampAndSnapHoleCenterTo1Mm(u, v, hole, W, L);
-      handleSegmentHolePositionChange(pop.holeId, uc, vc);
-      setHoleDimPopover(null);
+  const handleHolePlacementComplete = useCallback(
+    (uMm: number, vMm: number) => {
+      const hid = holePlacementPanelHoleId;
+      if (!hid || holeViewSegmentIndex === null) return;
+      handleSegmentHolePositionChange(hid, uMm, vMm);
+      setHolePlacementPanelHoleId(null);
     },
     [
-      holeDimPopover,
+      holePlacementPanelHoleId,
       holeViewSegmentIndex,
-      profileSegmentDims,
-      form.segmentFaceHoles,
-      form.global.plateWidthMm,
       handleSegmentHolePositionChange,
     ]
   );
 
+  const handleHolePlacementCancel = useCallback(() => {
+    setHolePlacementPanelHoleId(null);
+  }, []);
+
   useEffect(() => {
-    if (holePanelExpand?.type !== "hole") setHoleDimPopover(null);
+    if (holePanelExpand?.type !== "hole") setHolePlacementPanelHoleId(null);
   }, [holePanelExpand]);
 
   useEffect(() => {
-    setSegmentFaceCanvasGuidesHoleId(null);
-    setHolePlacementTooltipHoleId(null);
+    setHolePlacementPanelHoleId(null);
   }, [holeViewSegmentIndex]);
-
-  useEffect(() => {
-    if (holePlacementTooltipHoleId === null) return;
-    const match =
-      holePanelExpand?.type === "hole" &&
-      holePanelExpand.id === holePlacementTooltipHoleId;
-    if (!match) setHolePlacementTooltipHoleId(null);
-  }, [holePanelExpand, holePlacementTooltipHoleId]);
-
-  useEffect(() => {
-    if (holePlacementTooltipHoleId === null) return;
-    const id = window.setTimeout(() => {
-      setHolePlacementTooltipHoleId(null);
-    }, 5000);
-    return () => window.clearTimeout(id);
-  }, [holePlacementTooltipHoleId]);
 
   useEffect(() => {
     if (holeViewSegmentIndex === null) {
@@ -1321,6 +1223,14 @@ function BendPlateShapeEditor({
       setHoleViewSegmentIndex(null);
     }
   }, [form.template, profileSegmentDims.length, holeViewSegmentIndex]);
+
+  const preview3dFlatBlankMm = useMemo(
+    () =>
+      form.template === "plate"
+        ? { lengthMm: form.plate.lengthMm, widthMm: form.plate.widthMm }
+        : null,
+    [form.template, form.plate.lengthMm, form.plate.widthMm]
+  );
 
   const gradeSelectValue =
     (form.global.material || "").trim() || defaultMaterialGradeForFamily(materialType);
@@ -1361,45 +1271,29 @@ function BendPlateShapeEditor({
   const canvasSelectedHoleId =
     holePanelExpand?.type === "hole" ? holePanelExpand.id : null;
 
-  const holeDimGuideInitialMm = useMemo(() => {
-    if (!holeDimPopover || holeViewSegmentIndex === null) return 0;
-    const seg = profileSegmentDims[holeViewSegmentIndex];
-    if (!seg) return 0;
-    const h = form.segmentFaceHoles?.[holeViewSegmentIndex]?.find(
-      (x) => x.id === holeDimPopover.holeId
-    );
-    if (!h) return 0;
-    const layout = computeSegmentFaceSvgModel(
-      seg.lengthMm,
-      form.global.plateWidthMm,
-      seg.label
-    );
-    if (layout.kind !== "ok") return 0;
-    const W = segmentFaceEffectiveWidthMm(
-      layout.plateWidthMm,
-      layout.segmentLenMm,
-      layout.plateWidthDrawMm
-    );
-    const L = layout.segmentLenMm;
-    switch (holeDimPopover.edge) {
-      case "left":
-        return h.uMm;
-      case "right":
-        return W - h.uMm;
-      case "top":
-        return h.vMm;
-      case "bottom":
-        return L - h.vMm;
-      default:
-        return 0;
-    }
-  }, [
-    holeDimPopover,
-    holeViewSegmentIndex,
-    profileSegmentDims,
-    form.segmentFaceHoles,
-    form.global.plateWidthMm,
-  ]);
+  const holePlacementPanelHole =
+    holePlacementPanelHoleId && holeViewSegmentIndex !== null
+      ? (segmentFaceHoleRow.find((h) => h.id === holePlacementPanelHoleId) ??
+        null)
+      : null;
+  const holePlacementLayout =
+    holeViewSegmentIndex !== null && profileSegmentDims[holeViewSegmentIndex]
+      ? computeSegmentFaceSvgModel(
+          profileSegmentDims[holeViewSegmentIndex].lengthMm,
+          form.global.plateWidthMm,
+          profileSegmentDims[holeViewSegmentIndex].label
+        )
+      : null;
+  const holePlacementWidthMm =
+    holePlacementLayout?.kind === "ok"
+      ? segmentFaceEffectiveWidthMm(
+          holePlacementLayout.plateWidthMm,
+          holePlacementLayout.segmentLenMm,
+          holePlacementLayout.plateWidthDrawMm
+        )
+      : 0;
+  const holePlacementLengthMm =
+    holePlacementLayout?.kind === "ok" ? holePlacementLayout.segmentLenMm : 0;
 
   return (
     <div className={cn(BEND_PLATE_FILL)} dir="rtl">
@@ -1651,431 +1545,85 @@ function BendPlateShapeEditor({
                           {t(`${ED}.holesHint`)}
                         </p>
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground font-normal">
+                          <Label className="text-xs font-normal text-muted-foreground">
                             {t(`${ED}.holesPickSegment`)}
                           </Label>
-                          <Select
-                            value={
-                              holeViewSegmentIndex === null
-                                ? "__profile__"
-                                : String(holeViewSegmentIndex)
-                            }
-                            onValueChange={(v) => {
-                              if (v === "__profile__") setHoleViewSegmentIndex(null);
-                              else {
-                                const i = Number.parseInt(v, 10);
-                                setHoleViewSegmentIndex(Number.isFinite(i) ? i : null);
-                              }
-                            }}
+                          <div
+                            className="flex max-h-[min(42vh,20rem)] flex-col gap-2 overflow-y-auto pr-0.5"
+                            role="listbox"
+                            aria-label={t(`${ED}.holesPickSegment`)}
                           >
-                            <SelectTrigger className="h-9 max-w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent dir="rtl">
-                              <SelectItem value="__profile__">
-                                {t(`${ED}.holesFullProfile`)}
-                              </SelectItem>
-                              {profileSegmentDims.map((seg, i) => (
-                                <SelectItem key={`${seg.label}-${i}`} value={String(i)}>
-                                  {t(`${ED}.holesSegmentOption`, {
-                                    label: seg.label,
-                                    length: formatDecimal(seg.lengthMm, 1),
-                                  })}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={holeViewSegmentIndex === null}
+                              onClick={() => setHoleViewSegmentIndex(null)}
+                              className={cn(
+                                "w-full rounded-lg border px-3 py-2.5 text-right transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                holeViewSegmentIndex === null
+                                  ? "border-primary bg-primary/12 shadow-sm ring-1 ring-primary/35"
+                                  : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                              )}
+                            >
+                              <span className="block text-sm font-semibold tabular-nums leading-snug">
+                                {t(`${ED}.holesProfileCardTitle`)}
+                              </span>
+                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                {t(`${ED}.holesProfileCardSubtitle`)}
+                              </span>
+                            </button>
+                            {profileSegmentDims.map((seg, i) => {
+                              const hasHoles =
+                                (form.segmentFaceHoles?.[i]?.length ?? 0) > 0;
+                              const selected = holeViewSegmentIndex === i;
+                              return (
+                                <button
+                                  key={`${seg.label}-${i}`}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={selected}
+                                  onClick={() => setHoleViewSegmentIndex(i)}
+                                  className={cn(
+                                    "w-full rounded-lg border px-3 py-2.5 text-right transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                    selected
+                                      ? "border-primary bg-primary/12 shadow-sm ring-1 ring-primary/35"
+                                      : hasHoles
+                                        ? "border-primary/70 bg-primary/[0.07] ring-1 ring-primary/25"
+                                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                                  )}
+                                >
+                                  <span className="block text-sm font-semibold tabular-nums leading-snug">
+                                    {seg.label}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground tabular-nums">
+                                    {t(`${ED}.holesSegmentCardLength`, {
+                                      length: formatDecimal(seg.lengthMm, 1),
+                                    })}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
 
                         {holeViewSegmentIndex !== null ? (
-                          <div className="flex flex-col gap-2">
-                            <div className="flex flex-col gap-2">
-                              <p className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                {t(`${ED}.holesSavedListTitle`)}
+                          <div className="space-y-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="flex w-full items-center justify-center rounded-lg border border-dashed border-white/15 bg-transparent px-3 py-3 text-sm font-medium transition-colors hover:bg-white/[0.04]"
+                              onClick={addSegmentHole}
+                            >
+                              {t(`${ED}.holesAddPunchingNew`)}
+                            </Button>
+                            {addHoleFaceError ? (
+                              <p
+                                className="text-center text-[11px] leading-snug text-destructive"
+                                role="alert"
+                              >
+                                {addHoleFaceError}
                               </p>
-                              <ul className="space-y-1.5 pe-0.5">
-                                {segmentFaceHoleRow.map((h, i) => {
-                                  const kindLabel =
-                                    h.kind === "round"
-                                      ? t(`${ED}.holesKindRound`)
-                                      : h.kind === "oval"
-                                        ? t(`${ED}.holesKindOval`)
-                                        : t(`${ED}.holesKindRect`);
-                                  const expanded =
-                                    holePanelExpand?.type === "hole" &&
-                                    holePanelExpand.id === h.id;
-                                  const idx1 = i + 1;
-                                  return (
-                                    <li
-                                      key={h.id}
-                                      className="overflow-hidden rounded-lg border border-white/[0.1] bg-white/[0.02]"
-                                    >
-                                      <button
-                                        type="button"
-                                        className={cn(
-                                          "flex w-full items-center gap-2 px-2.5 py-2 text-start transition-colors",
-                                          expanded
-                                            ? "bg-white/[0.06]"
-                                            : "hover:bg-white/[0.04]"
-                                        )}
-                                        aria-expanded={expanded}
-                                        onClick={() =>
-                                          setHolePanelExpand((ex) =>
-                                            ex?.type === "hole" && ex.id === h.id
-                                              ? null
-                                              : { type: "hole", id: h.id }
-                                          )
-                                        }
-                                      >
-                                        <ChevronDown
-                                          className={cn(
-                                            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                                            expanded && "rotate-180"
-                                          )}
-                                          aria-hidden
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center justify-between gap-2">
-                                            <span className="text-xs font-semibold tabular-nums">
-                                              {idx1}
-                                            </span>
-                                            <span className="truncate text-[11px] text-muted-foreground">
-                                              {kindLabel}
-                                            </span>
-                                          </div>
-                                          <span className="mt-0.5 block truncate text-[10px] tabular-nums text-muted-foreground/90">
-                                            {segmentHoleSummaryLine(h)}
-                                          </span>
-                                        </div>
-                                      </button>
-                                      {expanded ? (
-                                        <div className="space-y-3 border-t border-white/10 bg-white/[0.02] p-3">
-                                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                            {t(`${ED}.holesEditHoleTitle`, { n: idx1 })}
-                                          </p>
-                                          <div className="space-y-1.5">
-                                            <Label className="text-xs text-muted-foreground font-normal">
-                                              {t(`${ED}.holesKind`)}
-                                            </Label>
-                                            <Select
-                                              value={h.kind}
-                                              onValueChange={(v) =>
-                                                replaceSegmentHole(
-                                                  h.id,
-                                                  bendHoleWithNewKind(
-                                                    h,
-                                                    v as BendSegmentHoleKind
-                                                  )
-                                                )
-                                              }
-                                            >
-                                              <SelectTrigger className="h-9 max-w-full">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent dir="rtl">
-                                                <SelectItem value="round">
-                                                  {t(`${ED}.holesKindRound`)}
-                                                </SelectItem>
-                                                <SelectItem value="oval">
-                                                  {t(`${ED}.holesKindOval`)}
-                                                </SelectItem>
-                                                <SelectItem value="rect">
-                                                  {t(`${ED}.holesKindRect`)}
-                                                </SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-
-                                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pt-1">
-                                            {t(`${ED}.holesDims`)}
-                                          </p>
-
-                                          {h.kind === "round" ? (
-                                            <NumField
-                                              label={t(`${ED}.holesDiameter`)}
-                                              value={h.diameterMm}
-                                              onChange={(n) =>
-                                                patchSegmentHole(h.id, {
-                                                  diameterMm: Math.max(0, n),
-                                                })
-                                              }
-                                              min={0}
-                                              step={0.1}
-                                            />
-                                          ) : null}
-
-                                          {h.kind === "oval" ? (
-                                            <div className="space-y-3">
-                                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                <NumField
-                                                  label={t(`${ED}.holesDiameter`)}
-                                                  value={h.diameterMm}
-                                                  onChange={(n) => {
-                                                    const d = Math.max(0, n);
-                                                    const prevLen =
-                                                      resolvedOvalLengthMm(h);
-                                                    patchSegmentHole(h.id, {
-                                                      diameterMm: d,
-                                                      ovalLengthMm: Math.max(
-                                                        prevLen,
-                                                        d
-                                                      ),
-                                                    });
-                                                  }}
-                                                  min={0}
-                                                  step={0.1}
-                                                />
-                                                <NumField
-                                                  label={t(`${ED}.holesOvalLength`)}
-                                                  value={resolvedOvalLengthMm(h)}
-                                                  onChange={(n) => {
-                                                    const d = h.diameterMm;
-                                                    patchSegmentHole(h.id, {
-                                                      ovalLengthMm: Math.max(d, n),
-                                                    });
-                                                  }}
-                                                  min={0}
-                                                  step={0.1}
-                                                />
-                                              </div>
-                                              <NumField
-                                                label={t(`${ED}.holesRotation`)}
-                                                value={h.rotationDeg ?? 0}
-                                                onChange={(n) =>
-                                                  patchSegmentHole(h.id, {
-                                                    rotationDeg: Math.min(
-                                                      180,
-                                                      Math.max(-180, n)
-                                                    ),
-                                                  })
-                                                }
-                                                min={-180}
-                                                step={1}
-                                              />
-                                            </div>
-                                          ) : null}
-
-                                          {h.kind === "rect" ? (
-                                            <div className="space-y-3">
-                                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                <NumField
-                                                  label={t(`${ED}.holesLength`)}
-                                                  value={h.rectLengthMm ?? 0}
-                                                  onChange={(n) =>
-                                                    patchSegmentHole(h.id, {
-                                                      rectLengthMm: Math.max(0, n),
-                                                    })
-                                                  }
-                                                  min={0}
-                                                  step={0.1}
-                                                />
-                                                <NumField
-                                                  label={t(`${ED}.holesWidth`)}
-                                                  value={h.rectWidthMm ?? 0}
-                                                  onChange={(n) =>
-                                                    patchSegmentHole(h.id, {
-                                                      rectWidthMm: Math.max(0, n),
-                                                    })
-                                                  }
-                                                  min={0}
-                                                  step={0.1}
-                                                />
-                                              </div>
-                                              <NumField
-                                                label={t(`${ED}.holesRotation`)}
-                                                value={h.rotationDeg ?? 0}
-                                                onChange={(n) =>
-                                                  patchSegmentHole(h.id, {
-                                                    rotationDeg: Math.min(
-                                                      180,
-                                                      Math.max(-180, n)
-                                                    ),
-                                                  })
-                                                }
-                                                min={-180}
-                                                step={1}
-                                              />
-                                            </div>
-                                          ) : null}
-
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            className="w-full gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                            onClick={() => deleteSegmentHole(h.id)}
-                                          >
-                                            <Trash2 className="h-4 w-4" aria-hidden />
-                                            {t(`${ED}.holesDeleteHoleButton`)}
-                                          </Button>
-                                        </div>
-                                      ) : null}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </div>
-
-                            <div className="shrink-0 border-t border-white/10 pt-2">
-                              <div className="overflow-hidden rounded-lg border border-dashed border-white/15 bg-transparent">
-                                <button
-                                  type="button"
-                                  className={cn(
-                                    "flex w-full items-center gap-2 px-2.5 py-2.5 text-start transition-colors",
-                                    holePanelExpand?.type === "new"
-                                      ? "bg-white/[0.06]"
-                                      : "hover:bg-white/[0.04]"
-                                  )}
-                                  aria-expanded={holePanelExpand?.type === "new"}
-                                  onClick={() =>
-                                    setHolePanelExpand((ex) =>
-                                      ex?.type === "new" ? null : { type: "new" }
-                                    )
-                                  }
-                                >
-                                  <ChevronDown
-                                    className={cn(
-                                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                                      holePanelExpand?.type === "new" && "rotate-180"
-                                    )}
-                                    aria-hidden
-                                  />
-                                  <span className="flex flex-1 items-center gap-2 text-sm font-medium">
-                                    <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                                    {t(`${ED}.holesAddNew`)}
-                                  </span>
-                                </button>
-                                {holePanelExpand?.type === "new" ? (
-                                  <div className="space-y-3 border-t border-white/10 p-3">
-                                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                        {t(`${ED}.holesNewHoleTitle`)}
-                                      </p>
-                                      <div className="space-y-1.5">
-                                        <Label className="text-xs text-muted-foreground font-normal">
-                                          {t(`${ED}.holesKind`)}
-                                        </Label>
-                                        <Select
-                                          value={segmentHoleKind}
-                                          onValueChange={(v) =>
-                                            setSegmentHoleKind(v as BendSegmentHoleKind)
-                                          }
-                                        >
-                                          <SelectTrigger className="h-9 max-w-full">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent dir="rtl">
-                                            <SelectItem value="round">
-                                              {t(`${ED}.holesKindRound`)}
-                                            </SelectItem>
-                                            <SelectItem value="oval">
-                                              {t(`${ED}.holesKindOval`)}
-                                            </SelectItem>
-                                            <SelectItem value="rect">
-                                              {t(`${ED}.holesKindRect`)}
-                                            </SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-
-                                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pt-1">
-                                        {t(`${ED}.holesDims`)}
-                                      </p>
-
-                                      {segmentHoleKind === "round" ? (
-                                        <NumField
-                                          label={t(`${ED}.holesDiameter`)}
-                                          value={holeDraftDiameterMm}
-                                          onChange={(n) =>
-                                            setHoleDraftDiameterMm(Math.max(0, n))
-                                          }
-                                          min={0}
-                                          step={0.1}
-                                        />
-                                      ) : null}
-
-                                      {segmentHoleKind === "oval" ? (
-                                        <div className="space-y-3">
-                                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <NumField
-                                              label={t(`${ED}.holesDiameter`)}
-                                              value={holeDraftDiameterMm}
-                                              onChange={(n) =>
-                                                setHoleDraftDiameterMm(Math.max(0, n))
-                                              }
-                                              min={0}
-                                              step={0.1}
-                                            />
-                                            <NumField
-                                              label={t(`${ED}.holesOvalLength`)}
-                                              value={holeDraftOvalLengthMm}
-                                              onChange={(n) =>
-                                                setHoleDraftOvalLengthMm(Math.max(0, n))
-                                              }
-                                              min={0}
-                                              step={0.1}
-                                            />
-                                          </div>
-                                          <NumField
-                                            label={t(`${ED}.holesRotation`)}
-                                            value={holeDraftOvalRotationDeg}
-                                            onChange={(n) =>
-                                              setHoleDraftOvalRotationDeg(
-                                                Math.min(180, Math.max(-180, n))
-                                              )
-                                            }
-                                            min={-180}
-                                            step={1}
-                                          />
-                                        </div>
-                                      ) : null}
-
-                                      {segmentHoleKind === "rect" ? (
-                                        <div className="space-y-3">
-                                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <NumField
-                                              label={t(`${ED}.holesLength`)}
-                                              value={holeDraftRectLengthMm}
-                                              onChange={(n) =>
-                                                setHoleDraftRectLengthMm(Math.max(0, n))
-                                              }
-                                              min={0}
-                                              step={0.1}
-                                            />
-                                            <NumField
-                                              label={t(`${ED}.holesWidth`)}
-                                              value={holeDraftRectWidthMm}
-                                              onChange={(n) =>
-                                                setHoleDraftRectWidthMm(Math.max(0, n))
-                                              }
-                                              min={0}
-                                              step={0.1}
-                                            />
-                                          </div>
-                                          <NumField
-                                            label={t(`${ED}.holesRotation`)}
-                                            value={holeDraftRectRotationDeg}
-                                            onChange={(n) =>
-                                              setHoleDraftRectRotationDeg(
-                                                Math.min(180, Math.max(-180, n))
-                                              )
-                                            }
-                                            min={-180}
-                                            step={1}
-                                          />
-                                        </div>
-                                      ) : null}
-
-                                    <Button
-                                      type="button"
-                                      className="w-full"
-                                      onClick={addSegmentHole}
-                                    >
-                                      {t(`${ED}.holesAddConfirm`)}
-                                    </Button>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-
+                            ) : null}
                           </div>
                         ) : null}
                       </div>
@@ -2140,22 +1688,32 @@ function BendPlateShapeEditor({
                       onHolePositionChange={handleSegmentHolePositionChange}
                       selectedHoleId={canvasSelectedHoleId}
                       onHoleSelect={handleCanvasHoleSelect}
-                      onDimensionGuideLineClick={handleDimensionGuideLineClick}
-                      dimensionGuidesActiveHoleId={segmentFaceCanvasGuidesHoleId}
-                      placementTooltipHoleId={holePlacementTooltipHoleId}
-                      onClearPlacementTooltip={() =>
-                        setHolePlacementTooltipHoleId(null)
-                      }
                       fill
                       className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
                     />
-                    <SegmentHoleDimGuidePopover
-                      open={holeDimPopover !== null}
-                      edge={holeDimPopover?.edge ?? "top"}
-                      initialMm={holeDimGuideInitialMm}
-                      anchor={holeDimPopover?.anchor ?? { left: 0, top: 0 }}
-                      onApply={handleHoleDimGuideApply}
-                      onClose={() => setHoleDimPopover(null)}
+                    <SegmentHolePlacementPanel
+                      key={holePlacementPanelHoleId ?? "closed"}
+                      open={holePlacementPanelHoleId !== null}
+                      hole={holePlacementPanelHole}
+                      widthMm={holePlacementWidthMm}
+                      lengthMm={holePlacementLengthMm}
+                      onComplete={handleHolePlacementComplete}
+                      onCancel={handleHolePlacementCancel}
+                      onPatchHole={(patch) => {
+                        const id = holePlacementPanelHoleId;
+                        if (!id) return;
+                        patchSegmentHole(id, patch);
+                      }}
+                      onReplaceHole={(next) => {
+                        const id = holePlacementPanelHoleId;
+                        if (!id) return;
+                        replaceSegmentHole(id, next);
+                      }}
+                      onDeleteHole={() => {
+                        const id = holePlacementPanelHoleId;
+                        if (!id) return;
+                        deleteSegmentHole(id);
+                      }}
                     />
                   </>
                 ) : (
@@ -2205,6 +1763,8 @@ function BendPlateShapeEditor({
               thicknessMm={form.global.thicknessMm}
               insideRadiusMm={form.global.insideRadiusMm ?? form.global.thicknessMm}
               flatPlate={form.template === "plate"}
+              segmentFaceHoles={form.segmentFaceHoles}
+              flatPlateBlankMm={preview3dFlatBlankMm}
               fill
               className="h-full min-h-[min(64vh,500px)] w-full rounded-md border-0 bg-transparent"
             />

@@ -32,6 +32,7 @@ import {
   kFactorForMaterial,
   buildForTemplate,
 } from "@/features/quick-quote/bend-plate/geometry";
+import { bendPlateHolePolygonsOnFlatBlankMm } from "@/features/quick-quote/bend-plate/bendPlateHoleFlatBlank";
 import { splitMaterialGradeAndFinish } from "@/features/quick-quote/lib/plateFields";
 
 export type { DxfPartGeometry, BendPlateQuoteItem, QuotePartRow };
@@ -211,6 +212,15 @@ function dxfFromBendPlate(
     ],
     { flags: LWPolylineFlags.Closed }
   );
+
+  const holePolys = bendPlateHolePolygonsOnFlatBlankMm(formState, materialType);
+  for (const loop of holePolys) {
+    if (loop.length < 3) continue;
+    dxf.addLWPolyline(
+      loop.map((p) => ({ point: point2d(p.x, p.y) })),
+      { flags: LWPolylineFlags.Closed }
+    );
+  }
 
   // ── BEND_LINE layer: one vertical line per bend ───────────────────────────
   // Walk the flat-blank layout: each segment's flat run is the finished leg

@@ -1,5 +1,5 @@
 import { localCapsulePoints } from "@/features/plate-builder/lib/slotPolygon";
-import type { BendSegmentHole } from "./types";
+import type { BendSegmentHole, BendSegmentHoleKind } from "./types";
 
 /** Oval: overall length along slot (mm), ≥ diameter. */
 export function resolvedOvalLengthMm(h: BendSegmentHole): number {
@@ -42,6 +42,18 @@ export function segmentFaceEffectiveWidthMm(
   const rawW = Math.max(0, plateWidthMm);
   if (rawW > 1e-6) return rawW;
   return Math.max(plateWidthDrawMm, 1e-6);
+}
+
+/** True if the hole’s axis-aligned footprint fits inside the segment face (width × length). */
+export function holeFitsOnSegmentFace(
+  h: BendSegmentHole,
+  widthMm: number,
+  segmentLenMm: number
+): boolean {
+  const W = Math.max(widthMm, 1e-6);
+  const L = Math.max(segmentLenMm, 1e-6);
+  const { hu, hv } = holeHalfExtentsMm(h);
+  return 2 * hu <= W + 1e-4 && 2 * hv <= L + 1e-4;
 }
 
 export function holeHalfExtentsMm(h: BendSegmentHole): { hu: number; hv: number } {
@@ -107,4 +119,42 @@ export function clampAndSnapHoleCenterTo1Mm(
   vc = Math.round(vc);
   [uc, vc] = clampHoleCenterUv(uc, vc, h, widthMm, segmentLenMm);
   return [Math.round(uc), Math.round(vc)];
+}
+
+/** When switching hole kind in the editor, preserve center and pick sensible defaults. */
+export function bendHoleWithNewKind(
+  h: BendSegmentHole,
+  kind: BendSegmentHoleKind
+): BendSegmentHole {
+  const { id, uMm, vMm } = h;
+  if (kind === "round") {
+    const d = Math.max(0, h.diameterMm > 0 ? h.diameterMm : 10);
+    return { id, kind: "round", uMm, vMm, diameterMm: d };
+  }
+  if (kind === "oval") {
+    const d = Math.max(0, h.diameterMm > 0 ? h.diameterMm : 10);
+    const ovalLen = Math.max(
+      resolvedOvalLengthMm({ ...h, kind: "oval", diameterMm: d }),
+      d
+    );
+    return {
+      id,
+      kind: "oval",
+      uMm,
+      vMm,
+      diameterMm: d,
+      ovalLengthMm: ovalLen,
+      rotationDeg: h.rotationDeg ?? 0,
+    };
+  }
+  return {
+    id,
+    kind: "rect",
+    uMm,
+    vMm,
+    diameterMm: 0,
+    rectLengthMm: Math.max(0, h.rectLengthMm ?? 20),
+    rectWidthMm: Math.max(0, h.rectWidthMm ?? 15),
+    rotationDeg: h.rotationDeg ?? 0,
+  };
 }

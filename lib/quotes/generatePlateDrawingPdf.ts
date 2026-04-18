@@ -26,6 +26,7 @@ import {
   internalAnglesFromPolyline,
   type Point2,
 } from "@/features/quick-quote/bend-plate/geometry";
+import { bendPlateHolePolygonsOnFlatBlankMm } from "@/features/quick-quote/bend-plate/bendPlateHoleFlatBlank";
 import { splitMaterialGradeAndFinish } from "@/features/quick-quote/lib/plateFields";
 
 // ---------------------------------------------------------------------------
@@ -615,7 +616,8 @@ function drawFlatBlankView(
   bends: number[],
   thicknessMm: number,
   materialType: MaterialType,
-  panel: { l: number; t: number; r: number; b: number }
+  panel: { l: number; t: number; r: number; b: number },
+  holePolysMm: Point2[][] | null
 ): void {
   if (blankL <= 0 || blankW <= 0) return;
 
@@ -699,6 +701,24 @@ function drawFlatBlankView(
       curX += ba;
     }
     doc.setDrawColor(0);
+  }
+
+  if (holePolysMm && holePolysMm.length > 0) {
+    doc.setLineWidth(GEO_LINE_MM);
+    doc.setDrawColor(0, 0, 0);
+    for (const loop of holePolysMm) {
+      if (loop.length < 3) continue;
+      const n = loop.length;
+      for (let i = 0; i < n; i++) {
+        const a = loop[i]!;
+        const b = loop[(i + 1) % n]!;
+        const x0 = rx + a.x * scale;
+        const y0 = ry + rectH - a.y * scale;
+        const x1 = rx + b.x * scale;
+        const y1 = ry + rectH - b.y * scale;
+        doc.line(x0, y0, x1, y1);
+      }
+    }
   }
 }
 
@@ -1308,7 +1328,7 @@ export async function generatePlateDrawingPdf(
     const pr = rightPanelBounds();
 
     if (bendItem && bendGeometry) {
-      const { pts, straights, bends, angles, isFlat } = bendGeometry;
+      const { pts, straights, bends, angles, isFlat, formState } = bendGeometry;
 
       if (!isFlat && pts.length >= 3) {
         drawProfileView(doc, pts, straights, angles, pl);
@@ -1324,6 +1344,10 @@ export async function generatePlateDrawingPdf(
         );
       }
 
+      const holePolysMm = bendPlateHolePolygonsOnFlatBlankMm(
+        formState,
+        materialType
+      );
       drawFlatBlankView(
         doc,
         bendItem.calc.blankLengthMm,
@@ -1332,7 +1356,8 @@ export async function generatePlateDrawingPdf(
         bends,
         bendItem.global.thicknessMm,
         materialType,
-        pr
+        pr,
+        holePolysMm
       );
 
       if (hasBendPlan) {
@@ -1389,7 +1414,8 @@ export async function generatePlateDrawingPdf(
         [],
         part.thicknessMm,
         materialType,
-        pr
+        pr,
+        null
       );
 
       const { grade, finish } = splitMaterialGradeAndFinish(part.material);
