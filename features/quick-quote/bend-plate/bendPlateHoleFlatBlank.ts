@@ -72,11 +72,15 @@ export function holeOutlinePolygonUvMm(h: BendSegmentHole): [number, number][] {
   const θ = ((h.rotationDeg ?? 0) * Math.PI) / 180;
   const cos = Math.cos(θ);
   const sin = Math.sin(θ);
+  /**
+   * At θ=0: rectLength runs along +u (plate width), rectWidth along +v (segment length) — same
+   * convention as the oval slot (long axis on +u) and the Konva overlay.
+   */
   const corners: [number, number][] = [
-    [-rw / 2, -rl / 2],
-    [rw / 2, -rl / 2],
-    [rw / 2, rl / 2],
-    [-rw / 2, rl / 2],
+    [-rl / 2, -rw / 2],
+    [rl / 2, -rw / 2],
+    [rl / 2, rw / 2],
+    [-rl / 2, rw / 2],
   ];
   return corners.map(([lx, ly]) => {
     const du = lx * cos - ly * sin;
@@ -107,16 +111,31 @@ export function plateSegmentHoleCenterOnRectangleBlank(
   }
 }
 
+/**
+ * Map a hole polygon from segment UV to flat-blank XY for a bent profile segment.
+ *
+ * The straight dimension the user sees (`straightLen`) gets compressed into the shorter
+ * `flatRun` on the developed blank because each adjacent bend consumes an outside-setback
+ * slice of the straight. So the hole's **center** must scale by `flatRun/straightLen` along
+ * the segment. The hole's own geometry is a physical cut on the flat sheet though, so it
+ * must stay 1:1 mm around that center — otherwise circles export as ellipses and slots
+ * come out squashed. We therefore split the transform: scale the center only, then apply
+ * each polygon vertex's (Δu, Δv) around the mapped center at unit scale.
+ */
 function mapUvPolygonToBlankBent(
   poly: [number, number][],
+  centerU: number,
+  centerV: number,
   x0: number,
   flatRun: number,
   straightLen: number
 ): Point2[] {
   const scaleAlong = straightLen > 1e-9 ? flatRun / straightLen : 1;
+  const cx = x0 + centerV * scaleAlong;
+  const cy = centerU;
   return poly.map(([u, v]) => ({
-    x: x0 + v * scaleAlong,
-    y: u,
+    x: cx + (v - centerV),
+    y: cy + (u - centerU),
   }));
 }
 
@@ -159,6 +178,8 @@ export function bendPlateHolePolygonsOnFlatBlankMm(
       const uv = holeOutlinePolygonUvMm(h);
       const blank = mapUvPolygonToBlankBent(
         uv,
+        h.uMm,
+        h.vMm,
         span.x0,
         span.flatRun,
         straightLen

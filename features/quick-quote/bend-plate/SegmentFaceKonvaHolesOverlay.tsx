@@ -222,10 +222,15 @@ export function SegmentFaceKonvaHolesOverlay({
             );
           }
 
-          const wMm = Math.max(0, h.rectWidthMm ?? 0);
-          const lenMm = Math.max(0, h.rectLengthMm ?? 0);
-          const wPx = Math.max(4, wMm * tf.su);
-          const hPx = Math.max(4, lenMm * tf.sv);
+          /**
+           * At rotation=0, rectLength runs horizontally (+u / plate width) and rectWidth
+           * runs vertically (+v / segment). Matches `capsuleOutlineUvMm` (long axis on +u)
+           * and `holeOutlinePolygonUvMm` for rect, so 2D, DXF and 3D all agree.
+           */
+          const rlMm = Math.max(0, h.rectLengthMm ?? 0);
+          const rwMm = Math.max(0, h.rectWidthMm ?? 0);
+          const wPx = Math.max(4, rlMm * tf.su);
+          const hPx = Math.max(4, rwMm * tf.sv);
           const rot = h.rotationDeg ?? 0;
           return (
             <Group

@@ -121,13 +121,17 @@ export interface BendSegmentHole {
   /** @deprecated Prefer `ovalLengthMm` — kept for older saved quotes. */
   ovalOverallMm?: number;
   /**
-   * Oval & rect: rotation (°), clockwise from +plate width (+u).
-   * Rect: width along local +u, length along local +v at 0°. Default 0.
+   * Rotation (°), clockwise in the Konva 2D editor (same sign convention as Konva `Rect`’s
+   * `rotation` prop). Default 0.
+   * - Oval: 0° = slot long axis along +u (plate width). 90° = along +v (segment run).
+   * - Rect: 0° = `rectLengthMm` along +u, `rectWidthMm` along +v.
+   * The +u default lets users create slots/rects longer than the segment run without
+   * needing to rotate 90° first.
    */
   rotationDeg?: number;
-  /** Rect: extent along segment (mm). */
+  /** Rect: extent along the slot’s long axis — runs along +u (plate width) at rotationDeg=0. */
   rectLengthMm?: number;
-  /** Rect: extent along plate width (mm). */
+  /** Rect: extent across the slot’s short axis — runs along +v (segment) at rotationDeg=0. */
   rectWidthMm?: number;
 }
 

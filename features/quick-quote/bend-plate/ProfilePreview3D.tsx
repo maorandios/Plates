@@ -92,17 +92,177 @@ function disposeLights(lights: THREE.Light[]): void {
 }
 
 /**
- * Edge overlay: `thresholdDeg` — higher on rounded slab hides tessellation;
- * lower on sharp extruded strips draws bend / thickness edges clearly.
+ * Dark, slightly-emissive, double-sided material so holes read from any view angle
+ * (including grazing angles on thin stock). polygonOffset is intentionally OFF — pushing
+ * hole fragments backward behind the plate caused the earlier "disappearing" popping.
  */
 const HOLE_MAT = new THREE.MeshStandardMaterial({
-  color: 0x141a18,
-  metalness: 0.35,
-  roughness: 0.55,
-  polygonOffset: true,
-  polygonOffsetFactor: 2,
-  polygonOffsetUnits: 2,
+  color: 0x1a2420,
+  emissive: 0x0c1210,
+  emissiveIntensity: 0.22,
+  metalness: 0.32,
+  roughness: 0.52,
+  side: THREE.DoubleSide,
 });
+
+/** Align hole rows with polyline edges `pts[i]→pts[i+1]` (pad / trim so index `s` is always segment `s`). */
+function padSegmentFaceHolesToSegmentCount(
+  rows: BendSegmentHole[][] | undefined,
+  segCount: number
+): BendSegmentHole[][] {
+  const out = [...(rows ?? [])];
+  while (out.length < segCount) out.push([]);
+  return out.slice(0, segCount);
+}
+
+/**
+ * Face-local (u, v, n) basis with a *canonical* outward normal `n = uHat × vHat`.
+ * This guarantees a right-handed basis even when a segment's (u → world x, v → world y)
+ * Jacobian has negative determinant (all flat-plate perimeter segments do). `setFromRotationMatrix`
+ * requires a pure rotation — using `uHat × vHat` avoids the reflection that mangles quaternions.
+ */
+interface FaceBasis {
+  uHat: THREE.Vector3;
+  vHat: THREE.Vector3;
+  nHat: THREE.Vector3;
+}
+function makeFaceBasis(uHat: THREE.Vector3, vHat: THREE.Vector3): FaceBasis {
+  const nHat = new THREE.Vector3().crossVectors(uHat, vHat).normalize();
+  return { uHat: uHat.clone().normalize(), vHat: vHat.clone().normalize(), nHat };
+}
+
+/**
+ * Stadium outline (long axis = +X local, short axis = +Y local, centered on origin) for
+ * extrusion along +Z. Long axis on +X matches `capsuleOutlineUvMm`: at rotationDeg=0 the slot
+ * runs along +u (plate width). CCW winding gives positive area so `ExtrudeGeometry` normals
+ * face outward.
+ */
+function buildOvalSlotShape(slotLenWorld: number, diameterWorld: number): THREE.Shape {
+  const d = Math.max(diameterWorld, 1e-6);
+  const L = Math.max(slotLenWorld, d);
+  const r = d / 2;
+  const halfMinusR = Math.max(L / 2 - r, 0);
+  const shape = new THREE.Shape();
+  if (halfMinusR < 1e-9) {
+    /** Degenerate slot ≈ circle: one full CCW sweep avoids zero-length edges breaking ExtrudeGeometry. */
+    shape.moveTo(r, 0);
+    shape.absarc(0, 0, r, 0, 2 * Math.PI, false);
+    return shape;
+  }
+  /** Bottom edge right→left? No: CCW traversal starts bottom-left and goes right. */
+  shape.moveTo(-halfMinusR, -r);
+  shape.lineTo(halfMinusR, -r);
+  shape.absarc(halfMinusR, 0, r, -Math.PI / 2, Math.PI / 2, false);
+  shape.lineTo(-halfMinusR, r);
+  shape.absarc(-halfMinusR, 0, r, Math.PI / 2, (3 * Math.PI) / 2, false);
+  return shape;
+}
+
+/**
+ * Small *absolute* overshoot (per side, mm) so the hole pokes through the plate by the same
+ * visible amount whether the stock is 2 mm or 20 mm. Relative multipliers look fine on thin
+ * stock but make the hole stick out like a post on thick stock — this stays flush on thick
+ * plates while still preventing z-fighting on thin ones.
+ */
+const HOLE_OVERSHOOT_PER_SIDE_MM = 0.2;
+
+/**
+ * Build the hole as a solid in a canonical local frame:
+ *   +X = along +u (plate width), +Y = along +v (segment length), +Z = outward plate normal.
+ * Extrusion is centered on Z=0 and spans `thickness + 2 · HOLE_OVERSHOOT_PER_SIDE_MM`, so the
+ * hole always just barely punches through both plate surfaces — visible on thin stock, barely
+ * protruding on thick stock.
+ *
+ * Rotation sign: matches Konva `Rect`’s rotation matrix (du, dv) = (lx·cos − ly·sin,
+ * lx·sin + ly·cos). In the right-handed local frame that matrix is a standard CCW rotation
+ * about +Z by `+θ`, so we use `rotateZ(+θ)` for both oval and rect.
+ */
+function buildHoleLocalGeometry(
+  h: BendSegmentHole,
+  thicknessMm: number
+): THREE.BufferGeometry {
+  const depthMm = Math.max(thicknessMm, 0.1) + 2 * HOLE_OVERSHOOT_PER_SIDE_MM;
+  const depth = Math.max(depthMm * SCALE, 1e-4);
+  const θ = ((h.rotationDeg ?? 0) * Math.PI) / 180;
+
+  let geom: THREE.BufferGeometry;
+  if (h.kind === "round") {
+    const r = Math.max((h.diameterMm * SCALE) / 2, 1e-5);
+    geom = new THREE.CylinderGeometry(r, r, depth, 32);
+    /** Cylinder axis is +Y by default; rotate so axis = +Z (plate normal). */
+    geom.rotateX(Math.PI / 2);
+    return geom;
+  }
+
+  if (h.kind === "oval") {
+    const d = Math.max(h.diameterMm * SCALE, 1e-5);
+    const slotL = Math.max(resolvedOvalLengthMm(h) * SCALE, d);
+    const shape = buildOvalSlotShape(slotL, d);
+    geom = new THREE.ExtrudeGeometry(shape, {
+      depth,
+      bevelEnabled: false,
+      curveSegments: 16,
+      steps: 1,
+    });
+    /** ExtrudeGeometry extrudes from z=0 to z=+depth. Center on Z=0. */
+    geom.translate(0, 0, -depth / 2);
+    if (θ !== 0) geom.rotateZ(θ);
+    return geom;
+  }
+
+  const rw = Math.max((h.rectWidthMm ?? 0) * SCALE, 1e-5);
+  const rl = Math.max((h.rectLengthMm ?? 0) * SCALE, 1e-5);
+  /** BoxGeometry local axes: X=rectLength (+u at 0°), Y=rectWidth (+v at 0°), Z=depth (normal). */
+  geom = new THREE.BoxGeometry(rl, rw, depth);
+  if (θ !== 0) geom.rotateZ(θ);
+  return geom;
+}
+
+/** Face basis along a straight profile edge Pa→Pb (bent profiles). */
+function bentFaceBasis(Pa: THREE.Vector3, Pb: THREE.Vector3): FaceBasis | null {
+  const dir = new THREE.Vector3().subVectors(Pb, Pa);
+  const Llen = dir.length();
+  if (Llen < 1e-12) return null;
+  const T = dir.clone().divideScalar(Llen);
+  /** Plate width (vertical, +Z world) is +u; segment direction T is +v; outward normal is N. */
+  const B = new THREE.Vector3(0, 0, 1);
+  return makeFaceBasis(B, T);
+}
+
+/** Flat-plate top-face (u, v) directions in world per perimeter segment, matching the blank map. */
+function flatPlateFaceBasis(segIdx: number): FaceBasis {
+  switch (segIdx) {
+    case 0:
+      return makeFaceBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
+    case 1:
+      return makeFaceBasis(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 1, 0));
+    case 2:
+      return makeFaceBasis(new THREE.Vector3(0, -1, 0), new THREE.Vector3(-1, 0, 0));
+    case 3:
+      return makeFaceBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0));
+    default:
+      return makeFaceBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
+  }
+}
+
+/** Place a single hole: canonical local geometry → (uHat, vHat, nHat) basis → world position. */
+function spawnHoleMesh(
+  scene: THREE.Scene,
+  h: BendSegmentHole,
+  thicknessMm: number,
+  basis: FaceBasis,
+  centerWorld: THREE.Vector3,
+  meshes: THREE.Mesh[]
+): void {
+  const geom = buildHoleLocalGeometry(h, thicknessMm);
+  const mesh = new THREE.Mesh(geom, HOLE_MAT);
+  mesh.quaternion.setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(basis.uHat, basis.vHat, basis.nHat)
+  );
+  mesh.position.copy(centerWorld);
+  scene.add(mesh);
+  meshes.push(mesh);
+}
 
 function addHoleMeshesBent(
   scene: THREE.Scene,
@@ -114,11 +274,11 @@ function addHoleMeshesBent(
 ): THREE.Mesh[] {
   const meshes: THREE.Mesh[] = [];
   const hpw = Math.max((plateWidthMm * SCALE) / 2, 0.00005);
+  const nSeg = Math.max(0, profilePts.length - 1);
 
-  const nSeg = Math.min(profilePts.length - 1, segmentFaceHoles.length);
   for (let s = 0; s < nSeg; s++) {
-    const row = segmentFaceHoles[s];
-    if (!row?.length) continue;
+    const row = segmentFaceHoles[s] ?? [];
+    if (!row.length) continue;
     const Pa = new THREE.Vector3(
       profilePts[s]!.x * SCALE,
       profilePts[s]!.y * SCALE,
@@ -129,14 +289,10 @@ function addHoleMeshesBent(
       profilePts[s + 1]!.y * SCALE,
       0
     );
-    const dir = new THREE.Vector3().subVectors(Pb, Pa);
-    const Llen = dir.length();
-    if (Llen < 1e-12) continue;
-    const T = dir.clone().divideScalar(Llen);
-    const N = new THREE.Vector3(-T.y, T.x, 0);
-    if (N.lengthSq() < 1e-18) continue;
-    N.normalize();
-    const B = new THREE.Vector3(0, 0, 1);
+    const basis = bentFaceBasis(Pa, Pb);
+    if (!basis) continue;
+    /** Segment length in world (meters) and mm — for hole placement along T. */
+    const Llen = Pa.distanceTo(Pb);
     const Lmm = Llen / SCALE;
     const layout = computeSegmentFaceSvgModel(Lmm, plateWidthMm, `${s}`);
     if (layout.kind !== "ok") continue;
@@ -149,54 +305,10 @@ function addHoleMeshesBent(
     for (const h of row) {
       const vAlong = (h.vMm / Lmm) * Llen;
       const uAcross = (h.uMm / Wmm - 0.5) * (2 * hpw);
-      const pos = Pa.clone()
-        .add(T.clone().multiplyScalar(vAlong))
-        .add(B.clone().multiplyScalar(uAcross));
-
-      const depth = Math.max(thicknessMm * SCALE * 1.15, 1e-5);
-      let mesh: THREE.Mesh;
-
-      if (h.kind === "round") {
-        const r = Math.max((h.diameterMm * SCALE) / 2, 1e-5);
-        const geom = new THREE.CylinderGeometry(r, r, depth, 32);
-        mesh = new THREE.Mesh(geom, HOLE_MAT);
-        mesh.position.copy(pos);
-        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), N);
-      } else if (h.kind === "oval") {
-        const d = Math.max(h.diameterMm * SCALE, 1e-5);
-        const slotL = Math.max(resolvedOvalLengthMm(h) * SCALE, d);
-        const geom = new THREE.CylinderGeometry(d / 2, d / 2, slotL, 24);
-        mesh = new THREE.Mesh(geom, HOLE_MAT);
-        mesh.position.copy(pos);
-        const θ = ((h.rotationDeg ?? 0) * Math.PI) / 180;
-        const slotDir = T.clone()
-          .multiplyScalar(Math.cos(θ))
-          .add(B.clone().multiplyScalar(Math.sin(θ)));
-        mesh.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          slotDir.lengthSq() > 1e-18 ? slotDir.normalize() : T
-        );
-      } else {
-        const rw = Math.max((h.rectWidthMm ?? 0) * SCALE, 1e-5);
-        const rl = Math.max((h.rectLengthMm ?? 0) * SCALE, 1e-5);
-        const geom = new THREE.BoxGeometry(rw, depth, rl);
-        mesh = new THREE.Mesh(geom, HOLE_MAT);
-        mesh.position.copy(pos);
-        const θ = ((h.rotationDeg ?? 0) * Math.PI) / 180;
-        const ex = T.clone()
-          .multiplyScalar(Math.cos(θ))
-          .add(B.clone().multiplyScalar(Math.sin(θ)));
-        const ez = T.clone()
-          .multiplyScalar(-Math.sin(θ))
-          .add(B.clone().multiplyScalar(Math.cos(θ)));
-        const ey = N.clone();
-        mesh.quaternion.setFromRotationMatrix(
-          new THREE.Matrix4().makeBasis(ex, ey, ez)
-        );
-      }
-
-      scene.add(mesh);
-      meshes.push(mesh);
+      const center = Pa.clone()
+        .add(basis.vHat.clone().multiplyScalar(vAlong))
+        .add(basis.uHat.clone().multiplyScalar(uAcross));
+      spawnHoleMesh(scene, h, thicknessMm, basis, center, meshes);
     }
   }
   return meshes;
@@ -216,11 +328,12 @@ function addHoleMeshesFlatPlate(
   const meshes: THREE.Mesh[] = [];
   const L = Math.max(lengthMm, 1e-6);
   const W = Math.max(widthMm, 1e-6);
-  const depth = Math.max(td * 1.1, 1e-5);
+  const thicknessMm = td / SCALE;
 
   for (let segIdx = 0; segIdx < segmentFaceHoles.length; segIdx++) {
     const row = segmentFaceHoles[segIdx];
     if (!row?.length) continue;
+    const basis = flatPlateFaceBasis(segIdx);
     for (const h of row) {
       const p = plateSegmentHoleCenterOnRectangleBlank(
         segIdx,
@@ -229,39 +342,11 @@ function addHoleMeshesFlatPlate(
         L,
         W
       );
-      const lx = (p.x / L - 0.5) * bw;
-      const ly = (p.y / W - 0.5) * bh;
-      const wx = cx + lx;
-      const wy = cy + ly;
+      const wx = cx + (p.x / L - 0.5) * bw;
+      const wy = cy + (p.y / W - 0.5) * bh;
+      /** Mid-plane of the slab in world Z so the centered extrusion punches through both faces. */
       const wz = td / 2;
-
-      let mesh: THREE.Mesh;
-      if (h.kind === "round") {
-        const r = Math.max((h.diameterMm * SCALE) / 2, 1e-5);
-        const geom = new THREE.CylinderGeometry(r, r, depth, 32);
-        mesh = new THREE.Mesh(geom, HOLE_MAT);
-        mesh.position.set(wx, wy, wz);
-        mesh.rotation.x = -Math.PI / 2;
-      } else if (h.kind === "oval") {
-        const d = Math.max(h.diameterMm * SCALE, 1e-5);
-        const slotL = Math.max(resolvedOvalLengthMm(h) * SCALE, d);
-        const geom = new THREE.CylinderGeometry(d / 2, d / 2, slotL, 24);
-        mesh = new THREE.Mesh(geom, HOLE_MAT);
-        mesh.position.set(wx, wy, wz);
-        const θ = ((h.rotationDeg ?? 0) * Math.PI) / 180;
-        mesh.rotation.order = "ZXY";
-        mesh.rotation.z = θ;
-        mesh.rotation.x = -Math.PI / 2;
-      } else {
-        const rw = Math.max((h.rectWidthMm ?? 0) * SCALE, 1e-5);
-        const rl = Math.max((h.rectLengthMm ?? 0) * SCALE, 1e-5);
-        const geom = new THREE.BoxGeometry(rw, rl, depth);
-        mesh = new THREE.Mesh(geom, HOLE_MAT);
-        mesh.position.set(wx, wy, wz);
-        mesh.rotation.z = ((h.rotationDeg ?? 0) * Math.PI) / 180;
-      }
-      scene.add(mesh);
-      meshes.push(mesh);
+      spawnHoleMesh(scene, h, thicknessMm, basis, new THREE.Vector3(wx, wy, wz), meshes);
     }
   }
   return meshes;
@@ -463,6 +548,8 @@ export function ProfilePreview3D({
   flatPlateBlankMm = null,
 }: ProfilePreview3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  /** Deep signature so the WebGL effect re-runs even if callers mutate nested hole arrays in place. */
+  const segmentFaceHolesKey = JSON.stringify(segmentFaceHoles ?? []);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -474,12 +561,16 @@ export function ProfilePreview3D({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0f1419);
 
-    const camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 100);
+    const camera = new THREE.PerspectiveCamera(45, w / h, 0.001, 500);
     const b = boundsOfPolyline(pts);
     const cx = ((b.minX + b.maxX) / 2) * SCALE;
     const cy = ((b.minY + b.maxY) / 2) * SCALE;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      logarithmicDepthBuffer: true,
+    });
     configurePreviewRenderer(renderer);
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -528,6 +619,10 @@ export function ProfilePreview3D({
         bb.max.z - bb.min.z,
         0.001
       );
+      /** Tight near/far around the part improves depth resolution for very thin thickness. */
+      camera.near = Math.max(ext * 1e-4, 1e-6);
+      camera.far = Math.max(ext * 80, 1);
+      camera.updateProjectionMatrix();
       camera.position.set(mtx + ext * 0.55, mty + ext * 0.42, mtz + ext * 0.92);
       controls.target.set(mtx, mty, mtz);
       camera.lookAt(mtx, mty, mtz);
@@ -539,7 +634,9 @@ export function ProfilePreview3D({
     scene.add(mesh);
 
     const holeMeshes: THREE.Mesh[] = [];
-    if (segmentFaceHoles?.some((row) => row && row.length > 0)) {
+    const rowsRaw = segmentFaceHoles ?? [];
+    const hasAnyHole = rowsRaw.some((row) => row && row.length > 0);
+    if (hasAnyHole) {
       if (flatPlate && flatPlateBlankMm) {
         const bw = Math.max((b.maxX - b.minX) * SCALE, 0.001);
         const bh = Math.max((b.maxY - b.minY) * SCALE, 0.001);
@@ -547,7 +644,7 @@ export function ProfilePreview3D({
         holeMeshes.push(
           ...addHoleMeshesFlatPlate(
             scene,
-            segmentFaceHoles,
+            rowsRaw,
             flatPlateBlankMm.lengthMm,
             flatPlateBlankMm.widthMm,
             bw,
@@ -558,11 +655,13 @@ export function ProfilePreview3D({
           )
         );
       } else if (!flatPlate) {
+        const segBent = Math.max(0, pts.length - 1);
+        const paddedBent = padSegmentFaceHolesToSegmentCount(rowsRaw, segBent);
         holeMeshes.push(
           ...addHoleMeshesBent(
             scene,
             pts,
-            segmentFaceHoles,
+            paddedBent,
             plateWidthMm,
             thicknessMm
           )
@@ -613,7 +712,7 @@ export function ProfilePreview3D({
     thicknessMm,
     insideRadiusMmProp,
     flatPlate,
-    segmentFaceHoles,
+    segmentFaceHolesKey,
     flatPlateBlankMm,
   ]);
 
