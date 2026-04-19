@@ -8,7 +8,7 @@ import type { PlateProjectStep } from "../types/plateProject";
 const STEP_KEYS = [
   "plateProject.steps.general",
   "plateProject.steps.createPlans",
-  "plateProject.steps.finish",
+  "plateProject.steps.summary",
 ] as const;
 
 interface PlateProjectStepperProps {

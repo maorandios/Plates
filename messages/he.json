@@ -29,6 +29,19 @@
     "logoutAria": "התנתקות מהמערכת",
     "createNewQuote": "הצעת מחיר חדשה"
   },
+  "listScreen": {
+    "searchLabel": "חיפוש",
+    "searchPlaceholder": "חפש טקסט חופשי",
+    "dateLabel": "תאריך יצירה",
+    "datePlaceholder": "בחר תאריך",
+    "clearDate": "נקה תאריך",
+    "statusLabel": "סטטוס",
+    "statusAll": "הכל",
+    "statusNotApproved": "לא אושרה",
+    "statusApproved": "אושרה",
+    "reset": "איפוס",
+    "noMatch": "אין רשומות התואמות לסינון."
+  },
   "status": {
     "batchDraft": "טיוטה",
     "batchActive": "פעיל",
@@ -317,7 +330,7 @@
         "title": "ייבוא מרשימת Excel"
       },
       "bendPlate": {
-        "title": "שרטט פח מכופף"
+        "title": "שרטוט פלטה לפי תבנית"
       }
     },
     "stockMaterialPhase": {
@@ -686,13 +699,15 @@
       }
     },
     "bendPlatePhase": {
-      "sidebarTitle": "יצירת פח מכופף",
+      "sidebarTitle": "שרטוט לפי תבנית",
       "sidebarIntro": "בחירת צורה גאומטרית, הזנת מידות ומעלות להתאמה מלאה",
       "listTitle": "פחים בהצעה",
       "listEmptyHint": "אין פחים עדיין — לחצו ״הוספת פריט״ לבחירת זוית, תעלה, מדרגה או מותאם אישית ולהזנת שורה ראשונה.",
       "listCount": "{{n}} שורות בהצעה",
       "emptyState": "אין פחים מכופפים עדיין. לחצו להוספת פריט, לבחירת פרופיל ולפתיחת העריכה.",
       "addPart": "הוספת פריט",
+      "addNewPart": "הוסף פריט חדש",
+      "backToPartsList": "חזרה לרשימת פלטות",
       "complete": "סיום",
       "back": "חזרה",
       "reset": "איפוס",
@@ -940,10 +955,14 @@
       "colArea": "שטח (מ״ר)",
       "colWeight": "משקל (ק״ג)",
       "colMaterialPrice": "מחיר לחיוב ({{symbol}})",
+      "colExportFile": "ייצא קובץ",
       "colPreview": "צפייה",
       "colDelete": "מחיקה",
       "emptyNoParts": "אין חלקים בהצעה זו.",
       "emptyNoFilterMatch": "אין שורות התואמות לחיפוש והמסננים.",
+      "exportExecutionPackage": "ייצוא חבילת ביצוע",
+      "ariaExportExecutionPackage": "ייצוא חבילת ביצוע — כל השורות בטבלה (DXF, שרטוטים ו-Excel)",
+      "ariaExportRow": "ייצוא DXF, שרטוט ו-Excel עבור {{name}}",
       "ariaPreviewRow": "צפייה ב{{name}}",
       "ariaDeleteRow": "הסרת {{name}} מההצעה",
       "previewTitleSimple": "פרטי שורת לוח",
@@ -1167,8 +1186,8 @@
   },
   "quoteMethodScreen": {
     "title": "הזנת פריטים להצעה",
-    "intro": "הזינו פריטים בצורה אוטומטאית או ידנית",
-    "methodsStripe": "הזינו נתונים למערכת באמצעות ארבעת השיטות הנפוצות ביותר: העלאת קבצי DXF, ייבוא מרשימת EXCEL, הזנה ידנית של מידות, שירטוט מהיר של פח מכופף",
+    "intro": "הזינו פריטים באמצעות אחת משיטות ההזנה המהירות",
+    "methodsStripe": "הזינו נתונים למערכת באמצעות שלוש השיטות הנפוצות: העלאת קבצי DXF, ייבוא מרשימת Excel, שרטוט פלטה לפי תבנית",
     "complete": "סיום"
   },
   "validation": {
@@ -1192,7 +1211,11 @@
     "steps": {
       "general": "כללי",
       "createPlans": "יצירת תוכניות",
-      "finish": "סיום"
+      "summary": "טבלת סיכום"
+    },
+    "summaryPhase": {
+      "title": "טבלת סיכום",
+      "subtitle": "הצגת כל הפלטות שיצרתם לביצוע"
     },
     "generalTitle": "פרטים בסיסיים",
     "generalSubtitle": "הזנת מידע כללי על הפרויקט",
@@ -1200,6 +1223,7 @@
     "createPlansSubtitle": "הגדרת חלקים, DXF ותוכניות כיפוף",
     "createPlansPlaceholder": "שלב זה יחובר בקרוב לאותם כלים כמו בהצעת מחיר (ייבוא DXF, אקסל, כיפוף וכו׳).",
     "drawingPhase": {
+      "templateCountAria": "נוספו {{n}} פלטות",
       "title": "הזנת שרטוטים לפרויקט",
       "subtitle": "צרו שרטוטים עבור הפרויקט",
       "stripe": "בחרו תבנית מוגדרת או צרו באמצעות תבנית מותאמת אישית",
@@ -1208,13 +1232,12 @@
       "confirmResetDescription": "כל השרטוטים, הפריטים והנתונים שנאספו בשלב זה יימחקו. לא ניתן לשחזר אותם לאחר האישור.",
       "confirmResetAction": "איפוס"
     },
-    "finishTitle": "סיום",
-    "finishSubtitle": "הורדת רשימת אקסל, DXF ושרטוט",
-    "finishPlaceholder": "שלב זה יאפשר ייצוא חבילת קבצים מיד לאחר השלמת התוכניות.",
     "leaveWizardTitle": "יציאה מהפרויקט",
     "leaveWizardConfirm": "הנתונים בפרויקט זה לא נשמרים כהצעה; ייתכן שתאבד עבודה שלא יוצאה.",
     "leaveWizardLeave": "צא ללא שמירה",
-    "leaveWizardStay": "המשך בעריכה"
+    "leaveWizardStay": "המשך בעריכה",
+    "saveNewProject": "שמור פרויקט חדש",
+    "savedToProjectsList": "נשמר ברשימה"
   },
   "quickQuotePage": {
     "generalTitle": "פרטים בסיסיים",
@@ -1224,7 +1247,8 @@
     "leaveWizardLeave": "צא ללא שמירה",
     "leaveWizardStay": "המשך בעריכה",
     "saveQuoteToList": "שמור לרשימת הצעות",
-    "savedToListShort": "נשמר ברשימה"
+    "savedToListShort": "נשמר ברשימה",
+    "manualMethodDeprecated": "שיטת ההזנה הידנית הוסרה. השתמשו בשרטוט פח מכופף כדי להוסיף לוח שטוח מריבוע, או בשיטות האחרות."
   },
   "clientNew": {
     "title": "הקמת לקוח חדש",

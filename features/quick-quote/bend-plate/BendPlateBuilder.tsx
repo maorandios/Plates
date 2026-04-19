@@ -88,13 +88,12 @@ import {
   createFormStateForTemplate,
   formStateFromQuoteItem,
 } from "./defaults";
-import { BEND_TEMPLATE_CARD_ORDER } from "./bendTemplateCardOrder";
+import { BendTemplatePickerGrid } from "./BendTemplatePickerGrid";
 import {
   getBendEditorBasicDataIssueCodes,
   getBendEditorValidationIssueCodes,
 } from "./bendEditorValidation";
 import { MethodPhaseMetricStrip } from "../components/method-phases/MethodPhaseMetricStrip";
-import { BendTemplatePickerGlyph } from "./BendTemplateShapeGlyph";
 import { ProfilePreview2D } from "./ProfilePreview2D";
 import { ProfilePreview3D } from "./ProfilePreview3D";
 import { SegmentFacePreview2D } from "./SegmentFacePreview2D";
@@ -310,6 +309,11 @@ interface BendPlateBuilderProps {
    * (e.g. plate-project template cards).
    */
   initialEditorTemplate?: BendTemplateId | null;
+  /**
+   * Plate-project flow: after save or cancel in the editor, call this instead of showing the
+   * internal hub (line-items table). Parent typically returns to the template card grid.
+   */
+  onLeaveEditorToParent?: () => void;
 }
 
 export function BendPlateBuilder({
@@ -322,6 +326,7 @@ export function BendPlateBuilder({
   onBack,
   onComplete,
   initialEditorTemplate = null,
+  onLeaveEditorToParent,
 }: BendPlateBuilderProps) {
   const [screen, setScreen] = useState<"hub" | "editor">("hub");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -391,16 +396,24 @@ export function BendPlateBuilder({
     } else {
       onAddItem(item);
     }
+    if (onLeaveEditorToParent) {
+      onLeaveEditorToParent();
+      return;
+    }
     setScreen("hub");
     setEditingId(null);
     setForm(createDefaultBendPlateFormState());
-  }, [form, calc, editingId, onAddItem, onUpdateItem]);
+  }, [form, calc, editingId, onAddItem, onUpdateItem, onLeaveEditorToParent]);
 
   const handleCancelEditor = useCallback(() => {
+    if (onLeaveEditorToParent) {
+      onLeaveEditorToParent();
+      return;
+    }
     setScreen("hub");
     setEditingId(null);
     setForm(createDefaultBendPlateFormState());
-  }, []);
+  }, [onLeaveEditorToParent]);
 
   const hubMetrics = useMemo(() => aggregateMetrics(quoteItems), [quoteItems]);
 
@@ -454,17 +467,17 @@ function BendPlateHub({
   onBack: () => void;
   onComplete: () => void;
 }) {
-  const [shapePickerOpen, setShapePickerOpen] = useState(false);
   const [hubValidationOpen, setHubValidationOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  /** When user has lines, full-screen template grid (no table) — opened via "הוסף פריט חדש". */
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  useEffect(() => {
+    if (quoteItems.length === 0) setShowTemplatePicker(false);
+  }, [quoteItems.length]);
 
   const primaryDisabled = quoteItems.length === 0;
   const canReset = quoteItems.length > 0;
-
-  const pickShape = (id: BendTemplateId) => {
-    setShapePickerOpen(false);
-    onSelectTemplate(id);
-  };
 
   function handleHubCompleteClick() {
     if (quoteItems.length === 0) {
@@ -522,20 +535,36 @@ function BendPlateHub({
           >
             <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
               {quoteItems.length === 0 ? (
-                <div className="flex min-h-[min(320px,50vh)] flex-col items-center justify-center gap-4 py-8">
-                  <p className="text-sm text-muted-foreground text-center max-w-sm leading-relaxed">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+                  <p className="mx-auto max-w-lg shrink-0 text-center text-sm leading-relaxed text-muted-foreground">
                     {t(`${BP}.emptyState`)}
                   </p>
-                  <div className="flex justify-center">
+                  <div className="flex min-h-[min(20rem,50vh)] min-w-0 flex-1 overflow-x-auto overflow-y-auto">
+                    <BendTemplatePickerGrid
+                      quoteItems={quoteItems}
+                      onSelectTemplate={onSelectTemplate}
+                    />
+                  </div>
+                </div>
+              ) : showTemplatePicker ? (
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+                  <div className="flex w-full shrink-0 justify-end" dir="rtl">
                     <Button
                       type="button"
-                      size="default"
-                      className="gap-2"
-                      onClick={() => setShapePickerOpen(true)}
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => setShowTemplatePicker(false)}
                     >
-                      <Plus className="h-4 w-4" aria-hidden />
-                      {t(`${BP}.addPart`)}
+                      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+                      {t(`${BP}.backToPartsList`)}
                     </Button>
+                  </div>
+                  <div className="flex min-h-[min(22rem,55vh)] min-w-0 flex-1 overflow-x-auto overflow-y-auto">
+                    <BendTemplatePickerGrid
+                      quoteItems={quoteItems}
+                      onSelectTemplate={onSelectTemplate}
+                    />
                   </div>
                 </div>
               ) : (
@@ -667,13 +696,13 @@ function BendPlateHub({
                   <div className="mt-4 flex justify-start" dir="rtl">
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      className="inline-flex shrink-0 gap-1.5"
-                      onClick={() => setShapePickerOpen(true)}
+                      variant="default"
+                      size="default"
+                      className="gap-2"
+                      onClick={() => setShowTemplatePicker(true)}
                     >
-                      <Plus className="h-4 w-4" aria-hidden />
-                      {t(`${BP}.addPart`)}
+                      <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                      {t(`${BP}.addNewPart`)}
                     </Button>
                   </div>
                 </>
@@ -713,66 +742,6 @@ function BendPlateHub({
           </Button>
         </div>
       </div>
-
-      <Dialog open={shapePickerOpen} onOpenChange={setShapePickerOpen}>
-        <DialogContent
-          className={cn(
-            "flex w-[calc(100vw-1.5rem)] max-w-xl flex-col gap-0 overflow-hidden border-white/10 bg-card p-0 sm:rounded-xl"
-          )}
-          dir="rtl"
-          showCloseButton={false}
-        >
-          <div className="shrink-0 border-b border-white/10 px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
-            <DialogHeader className="sm:text-start gap-2 space-y-0">
-              <DialogTitle className="text-base sm:text-lg">{t(`${BP}.shapePickerTitle`)}</DialogTitle>
-              <DialogDescription className="text-sm leading-relaxed">
-                {t(`${BP}.shapePickerDescription`)}
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-
-          <div dir="ltr" className="w-full shrink-0 overflow-hidden border-t border-solid border-[#6A23F7]/20">
-            <div
-              className={cn(
-                "grid w-full min-h-[21rem] grid-cols-2 sm:min-h-[22.5rem]",
-                "[grid-template-rows:repeat(4,minmax(0,1fr))]"
-              )}
-            >
-              {BEND_TEMPLATE_CARD_ORDER.map((tid, i) => (
-                <button
-                  key={tid}
-                  type="button"
-                  dir="rtl"
-                  onClick={() => pickShape(tid)}
-                  className={cn(
-                    "flex min-h-0 min-w-0 flex-col items-center justify-center gap-3 px-4 py-4 text-center transition-colors",
-                    i === BEND_TEMPLATE_CARD_ORDER.length - 1 && "col-span-2",
-                    "bg-card hover:bg-white/[0.03]",
-                    "border-b border-solid border-[#6A23F7]/20",
-                    i % 2 === 0 && "border-s border-e border-solid border-[#6A23F7]/20",
-                    i % 2 === 1 && "border-e border-solid border-[#6A23F7]/20",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                    "active:bg-white/[0.05]"
-                  )}
-                >
-                  <div
-                    className="flex min-h-[3.75rem] w-full shrink-0 items-center justify-center"
-                    aria-hidden
-                  >
-                    <BendTemplatePickerGlyph
-                      id={tid}
-                      className="h-9 w-[4.25rem] shrink-0"
-                    />
-                  </div>
-                  <span className="block w-full text-center text-base font-bold leading-tight tracking-tight text-foreground sm:text-lg">
-                    {templateLabel(tid)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={hubValidationOpen} onOpenChange={setHubValidationOpen}>
         <DialogContent className="sm:max-w-md" dir="rtl" showCloseButton={false}>

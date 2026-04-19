@@ -14,8 +14,10 @@ import {
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import type { DxfPartGeometry } from "@/types";
+import type { MaterialType } from "@/types/materials";
+import type { BendPlateQuoteItem } from "../bend-plate/types";
 import type { QuotePartRow } from "../types/quickQuote";
-import { PartBreakdownTable } from "./PartBreakdownTable";
+import { PartBreakdownTable, type PartPackageExportContext } from "./PartBreakdownTable";
 
 const VIEWPORT = "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
 const PP = "quote.partsPhase" as const;
@@ -27,6 +29,15 @@ interface MergedQuoteLinesStepProps {
   onDeletePart: (row: QuotePartRow) => void;
   onReset: () => void;
   canReset: boolean;
+  /** Optional header copy (default: quote.partsPhase title/subtitle). */
+  headerTitle?: string;
+  headerSubtitle?: string;
+  materialType: MaterialType;
+  bendPlateQuoteItems: BendPlateQuoteItem[];
+  referenceNumber: string;
+  customerName?: string;
+  /** Quick quote step 3 hides this; plate-project summary keeps it. */
+  showFullExecutionPackageButton?: boolean;
 }
 
 export function MergedQuoteLinesStep({
@@ -36,8 +47,22 @@ export function MergedQuoteLinesStep({
   onDeletePart,
   onReset,
   canReset,
+  headerTitle,
+  headerSubtitle,
+  materialType,
+  bendPlateQuoteItems,
+  referenceNumber,
+  customerName,
+  showFullExecutionPackageButton = true,
 }: MergedQuoteLinesStepProps) {
   const [resetOpen, setResetOpen] = useState(false);
+
+  const partPackageExport: PartPackageExportContext = {
+    materialType,
+    bendPlateQuoteItems,
+    referenceNumber,
+    customerName,
+  };
 
   return (
     <div
@@ -51,8 +76,12 @@ export function MergedQuoteLinesStep({
         <div className="shrink-0 ds-surface-header">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1 text-right">
-              <h2 className="text-base font-semibold text-foreground">{t(`${PP}.title`)}</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">{t(`${PP}.subtitle`)}</p>
+              <h2 className="text-base font-semibold text-foreground">
+                {headerTitle ?? t(`${PP}.title`)}
+              </h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {headerSubtitle ?? t(`${PP}.subtitle`)}
+              </p>
             </div>
             <div className="flex flex-col items-end gap-2 shrink-0">
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -89,6 +118,8 @@ export function MergedQuoteLinesStep({
               currency={currency}
               onDeletePart={onDeletePart}
               dxfPartGeometries={dxfMethodGeometries}
+              partPackageExport={partPackageExport}
+              showFullExecutionPackageButton={showFullExecutionPackageButton}
             />
           )}
         </div>

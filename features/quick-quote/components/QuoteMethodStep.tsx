@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, FileCode2, FileSpreadsheet, FoldHorizontal } from "lucide-react";
+import { FileCode2, FileSpreadsheet, FoldHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { QuoteCreationMethod } from "../types/quickQuote";
 
@@ -17,13 +17,6 @@ const OPTIONS: {
     description: "Upload DXF files for quoting",
     hint: "Best for ready CAD files",
     Icon: FileCode2,
-  },
-  {
-    id: "manualAdd",
-    title: "Manually add",
-    description: "Add part data manually",
-    hint: "Width, length, thickness, qty, material (coming soon)",
-    Icon: ClipboardList,
   },
   {
     id: "excelImport",
@@ -56,7 +49,7 @@ export function QuoteMethodStep({ selected, onSelect }: QuoteMethodStepProps) {
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {OPTIONS.map(({ id, title, description, hint, Icon }) => {
           const isSelected = selected === id;
           return (

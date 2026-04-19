@@ -21,7 +21,11 @@ import type { BendPlateQuoteItem, BendTemplateId } from "@/features/quick-quote/
 import type {
   ManualQuotePartRow,
   QuickQuoteJobDetails,
+  QuotePartRow,
 } from "@/features/quick-quote/types/quickQuote";
+import { MergedQuoteLinesStep } from "@/features/quick-quote/components/MergedQuoteLinesStep";
+import { mergeAllQuoteMethodParts } from "@/features/quick-quote/lib/mergeAllQuoteMethods";
+import { jobSummaryFromParts } from "@/features/quick-quote/lib/deriveQuoteSelection";
 import type { DxfPartGeometry } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import { t } from "@/lib/i18n";
@@ -32,10 +36,10 @@ import {
   type PlateProjectPhase2Mode,
 } from "@/lib/projects/plateProjectSnapshot";
 import {
+  getPlateProjectsList,
   patchPlateProjectListRecord,
   upsertPlateProjectInProgress,
 } from "@/lib/projects/plateProjectList";
-import { aggregatePlateProjectBendMetrics } from "@/lib/projects/plateProjectMetrics";
 import { PlateProjectBottomBar } from "./PlateProjectBottomBar";
 import { PlateProjectDrawingPickerPhase } from "./PlateProjectDrawingPickerPhase";
 import { PlateProjectStepper } from "./PlateProjectStepper";
@@ -91,12 +95,21 @@ export function PlateProjectPage() {
   const [dxfMethodGeometries, setDxfMethodGeometries] = useState<DxfPartGeometry[]>([]);
   const [bendPlateQuoteItems, setBendPlateQuoteItems] = useState<BendPlateQuoteItem[]>([]);
   const [phase2ResetDialogOpen, setPhase2ResetDialogOpen] = useState(false);
+  /** Projects list row is created/updated only after explicit save on step 3 (like quotes). */
+  const [projectSavedToList, setProjectSavedToList] = useState(false);
 
   useLayoutEffect(() => {
     if (!urlId) {
       router.replace(`/plate-project?id=${projectId}`, { scroll: false });
     }
   }, [urlId, projectId, router]);
+
+  useLayoutEffect(() => {
+    if (!urlId) return;
+    if (getPlateProjectsList().some((p) => p.id === urlId)) {
+      setProjectSavedToList(true);
+    }
+  }, [urlId]);
 
   useLayoutEffect(() => {
     if (!urlId) return;
@@ -147,28 +160,6 @@ export function PlateProjectPage() {
     phase2Mode,
   ]);
 
-  useEffect(() => {
-    if (step < 2) return;
-    const m = aggregatePlateProjectBendMetrics(bendPlateQuoteItems);
-    patchPlateProjectListRecord(projectId, {
-      customerName: jobDetails.customerName,
-      referenceNumber: jobDetails.referenceNumber,
-      projectName: jobDetails.projectName,
-      materialType,
-      currentStep: step,
-      totalWeightKg: m.totalWeightKg,
-      totalAreaM2: m.totalAreaM2,
-    });
-  }, [
-    projectId,
-    step,
-    jobDetails.customerName,
-    jobDetails.referenceNumber,
-    jobDetails.projectName,
-    materialType,
-    bendPlateQuoteItems,
-  ]);
-
   const handleBendPlateAddItem = useCallback((item: BendPlateQuoteItem) => {
     setBendPlateQuoteItems((prev) => [...prev, item]);
   }, []);
@@ -199,16 +190,47 @@ export function PlateProjectPage() {
     ]
   );
 
-  const confirmPhase2Reset = useCallback(() => {
-    setBendPlateQuoteItems([]);
-    setManualQuoteRows([]);
-    setExcelImportQuoteRows([]);
-    setDxfMethodGeometries([]);
-    setPhase2Mode("drawingPicker");
-    setBendInitialTemplate(null);
-    setBendBuilderKey((k) => k + 1);
-    setPhase2ResetDialogOpen(false);
-  }, []);
+  const mergedQuotePartsList = useMemo(
+    () =>
+      mergeAllQuoteMethodParts(
+        materialType,
+        manualQuoteRows,
+        excelImportQuoteRows,
+        dxfMethodGeometries,
+        bendPlateQuoteItems
+      ),
+    [
+      materialType,
+      manualQuoteRows,
+      excelImportQuoteRows,
+      dxfMethodGeometries,
+      bendPlateQuoteItems,
+    ]
+  );
+
+  useEffect(() => {
+    if (!projectSavedToList) return;
+    if (step < 2) return;
+    const js = jobSummaryFromParts(mergedQuotePartsList);
+    patchPlateProjectListRecord(projectId, {
+      customerName: jobDetails.customerName.trim(),
+      referenceNumber: jobDetails.referenceNumber.trim(),
+      projectName: jobDetails.projectName.trim(),
+      materialType,
+      currentStep: step,
+      totalWeightKg: js.totalEstWeightKg,
+      totalAreaM2: js.totalPlateAreaM2,
+    });
+  }, [
+    projectSavedToList,
+    projectId,
+    step,
+    mergedQuotePartsList,
+    jobDetails.customerName,
+    jobDetails.referenceNumber,
+    jobDetails.projectName,
+    materialType,
+  ]);
 
   const advanceTo = useCallback((s: PlateProjectStep) => {
     setStep(s);
@@ -223,27 +245,77 @@ export function PlateProjectPage() {
           setPhase2Mode("drawingPicker");
           setBendInitialTemplate(null);
         }
+        if (s === 2) {
+          setPhase2Mode("drawingPicker");
+          setBendInitialTemplate(null);
+        }
       }
     },
     [highestStepReached]
   );
 
+  const confirmPhase2Reset = useCallback(() => {
+    setBendPlateQuoteItems([]);
+    setManualQuoteRows([]);
+    setExcelImportQuoteRows([]);
+    setDxfMethodGeometries([]);
+    setPhase2Mode("drawingPicker");
+    setBendInitialTemplate(null);
+    setBendBuilderKey((k) => k + 1);
+    setPhase2ResetDialogOpen(false);
+  }, []);
+
+  const handleRemoveMergedPart = useCallback((row: QuotePartRow) => {
+    const ids = new Set(row.lineSourceIds?.length ? row.lineSourceIds : [row.id]);
+    setDxfMethodGeometries((prev) => prev.filter((g) => !ids.has(g.id)));
+    setExcelImportQuoteRows((prev) => prev.filter((r) => !ids.has(r.id)));
+    setManualQuoteRows((prev) => prev.filter((r) => !ids.has(r.id)));
+    setBendPlateQuoteItems((prev) => prev.filter((item) => !ids.has(item.id)));
+  }, []);
+
+  const handleResetMergedLines = useCallback(() => {
+    setBendPlateQuoteItems([]);
+    setManualQuoteRows([]);
+    setExcelImportQuoteRows([]);
+    setDxfMethodGeometries([]);
+    setPhase2Mode("drawingPicker");
+    setBendInitialTemplate(null);
+    setBendBuilderKey((k) => k + 1);
+    advanceTo(2);
+  }, [advanceTo]);
+
+  const handleContinueFromDrawingPickerToSummary = useCallback(() => {
+    if (mergedQuotePartsList.length === 0) return;
+    advanceTo(3);
+  }, [advanceTo, mergedQuotePartsList.length]);
+
   const handleContinueFromGeneral = useCallback(() => {
     setPhase2Mode("drawingPicker");
     setBendInitialTemplate(null);
     advanceTo(2);
-    const m = aggregatePlateProjectBendMetrics(bendPlateQuoteItems);
+  }, [advanceTo]);
+
+  const handleSaveProjectToList = useCallback(() => {
+    const js = jobSummaryFromParts(mergedQuotePartsList);
     upsertPlateProjectInProgress({
       id: projectId,
-      referenceNumber: jobDetails.referenceNumber,
-      customerName: jobDetails.customerName,
-      projectName: jobDetails.projectName,
+      referenceNumber: jobDetails.referenceNumber.trim(),
+      customerName: jobDetails.customerName.trim(),
+      projectName: jobDetails.projectName.trim(),
       materialType,
-      currentStep: 2,
-      totalWeightKg: m.totalWeightKg,
-      totalAreaM2: m.totalAreaM2,
+      currentStep: 3,
+      totalWeightKg: js.totalEstWeightKg,
+      totalAreaM2: js.totalPlateAreaM2,
     });
-  }, [advanceTo, bendPlateQuoteItems, jobDetails, materialType, projectId]);
+    setProjectSavedToList(true);
+  }, [
+    mergedQuotePartsList,
+    projectId,
+    jobDetails.referenceNumber,
+    jobDetails.customerName,
+    jobDetails.projectName,
+    materialType,
+  ]);
 
   const handleBackFromCreatePlansPicker = useCallback(() => {
     setPhase2Mode("drawingPicker");
@@ -288,9 +360,10 @@ export function PlateProjectPage() {
         }
         return {
           showBack: true,
-          showContinue: false,
-          canContinue: false,
+          showContinue: true,
+          canContinue: mergedQuotePartsList.length > 0,
           onBack: handleBackFromCreatePlansPicker,
+          onContinue: handleContinueFromDrawingPickerToSummary,
         };
       case 3:
         return {
@@ -313,9 +386,11 @@ export function PlateProjectPage() {
     handleContinueFromGeneral,
     handleBackFromCreatePlansPicker,
     advanceTo,
+    mergedQuotePartsList.length,
+    handleContinueFromDrawingPickerToSummary,
   ]);
 
-  const shouldWarnOnLeave = step > 1;
+  const shouldWarnOnLeave = step > 1 && !projectSavedToList;
 
   useEffect(() => {
     if (!shouldWarnOnLeave) return;
@@ -335,6 +410,8 @@ export function PlateProjectPage() {
       const href = a.getAttribute("href");
       if (!href || href.startsWith("#")) return;
       if (href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      /* File downloads use <a download href="blob:…"> — same-origin as app; must not open leave dialog. */
+      if (href.startsWith("blob:") || a.hasAttribute("download")) return;
       try {
         const u = new URL(href, window.location.origin);
         if (u.origin !== window.location.origin) return;
@@ -366,7 +443,7 @@ export function PlateProjectPage() {
     setLeaveWizardDialogOpen(false);
   }, []);
 
-  const step2FullBleed = step === 2;
+  const wizardFullBleed = step === 2 || step === 3;
 
   return (
     <div dir="rtl" className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -380,8 +457,11 @@ export function PlateProjectPage() {
           ref={pageMainScrollRef}
           className={cn(
             "bg-background min-h-0 flex-1",
-            step2FullBleed
-              ? "flex flex-col overflow-hidden p-0 lg:p-0"
+            wizardFullBleed
+              ? cn(
+                  "flex flex-col p-0 lg:p-0",
+                  (step === 3 || step === 2) && "overflow-hidden"
+                )
               : "overflow-y-auto space-y-8"
           )}
         >
@@ -439,26 +519,28 @@ export function PlateProjectPage() {
                 onBack={closeBendWorkspaceToPicker}
                 onComplete={closeBendWorkspaceToPicker}
                 initialEditorTemplate={bendInitialTemplate}
+                onLeaveEditorToParent={closeBendWorkspaceToPicker}
               />
             </div>
           )}
 
           {step === 3 && (
-            <Card className="mx-auto w-full max-w-xl border-0 shadow-sm">
-              <CardHeader className="space-y-1 pb-2">
-                <CardTitle className="text-xl tracking-tight">
-                  {t("plateProject.finishTitle")}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {t("plateProject.finishSubtitle")}
-                </p>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {t("plateProject.finishPlaceholder")}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
+              <MergedQuoteLinesStep
+                parts={mergedQuotePartsList}
+                currency={jobDetails.currency}
+                dxfMethodGeometries={dxfMethodGeometries}
+                onDeletePart={handleRemoveMergedPart}
+                onReset={handleResetMergedLines}
+                canReset={hasPhase2Data}
+                headerTitle={t("plateProject.summaryPhase.title")}
+                headerSubtitle={t("plateProject.summaryPhase.subtitle")}
+                materialType={materialType}
+                bendPlateQuoteItems={bendPlateQuoteItems}
+                referenceNumber={jobDetails.referenceNumber}
+                customerName={jobDetails.customerName}
+              />
+            </div>
           )}
         </PageContainer>
         <PlateProjectBottomBar
@@ -468,6 +550,17 @@ export function PlateProjectPage() {
           canContinue={stepNav.canContinue ?? false}
           onBack={stepNav.onBack}
           onContinue={stepNav.onContinue}
+          saveProjectToList={
+            step === 3
+              ? {
+                  label: t("plateProject.saveNewProject"),
+                  savedLabel: t("plateProject.savedToProjectsList"),
+                  saved: projectSavedToList,
+                  canSave: mergedQuotePartsList.length > 0,
+                  onClick: handleSaveProjectToList,
+                }
+              : undefined
+          }
         />
       </div>
 

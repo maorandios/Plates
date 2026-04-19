@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ChevronDown,
+  Download,
   Eye,
   Hash,
   Layers,
@@ -16,6 +17,7 @@ import {
   RotateCcw,
   Search,
   Square,
+  Loader2,
   Tag,
   Trash2,
   Weight,
@@ -51,6 +53,11 @@ import {
   quickQuoteCurrencySymbol,
 } from "../lib/quickQuoteCurrencies";
 import type { MaterialType } from "@/types/materials";
+import type { BendPlateQuoteItem } from "../bend-plate/types";
+import {
+  exportPartsPackage,
+  exportSinglePartRowPackage,
+} from "@/lib/quotes/exportPartsPackage";
 import {
   materialPricingRowKey,
   parseMaterialPricePerKg,
@@ -234,10 +241,18 @@ function deriveFilterOptions(parts: QuotePartRow[]) {
 function columnCount(
   showRef: boolean,
   showDelete: boolean,
-  showMaterialPricing: boolean
+  showMaterialPricing: boolean,
+  showExportRow: boolean
 ): number {
   const dim = showMaterialPricing ? 5 : 4;
-  return (showRef ? 1 : 0) + 5 + dim + 1 + (showDelete ? 1 : 0);
+  return (
+    (showRef ? 1 : 0) +
+    5 +
+    dim +
+    (showExportRow ? 1 : 0) +
+    1 +
+    (showDelete ? 1 : 0)
+  );
 }
 
 function equalColumnWidthsPct(n: number): number[] {
@@ -342,6 +357,13 @@ function MultiSelectFilter({
   );
 }
 
+export interface PartPackageExportContext {
+  materialType: MaterialType;
+  bendPlateQuoteItems: BendPlateQuoteItem[];
+  referenceNumber: string;
+  customerName?: string;
+}
+
 interface PartBreakdownTableProps {
   parts: QuotePartRow[];
   currency: string;
@@ -349,6 +371,13 @@ interface PartBreakdownTableProps {
   materialType?: MaterialType;
   materialPricePerKgByRow?: Record<string, string>;
   dxfPartGeometries?: DxfPartGeometry[] | null;
+  /** When set, adds per-row "ייצא קובץ" (DXF + PDF + Excel ZIP). */
+  partPackageExport?: PartPackageExportContext | null;
+  /**
+   * Full-table ZIP ("ייצוא חבילת ביצוע"). Off for quick-quote step 3; on for plate-project summary.
+   * When `partPackageExport` is null, this has no effect.
+   */
+  showFullExecutionPackageButton?: boolean;
 }
 
 export function PartBreakdownTable({
@@ -358,8 +387,14 @@ export function PartBreakdownTable({
   materialType,
   materialPricePerKgByRow,
   dxfPartGeometries,
+  partPackageExport = null,
+  showFullExecutionPackageButton = true,
 }: PartBreakdownTableProps) {
   const [previewPart, setPreviewPart] = useState<QuotePartRow | null>(null);
+  const [exportingPartId, setExportingPartId] = useState<string | null>(null);
+  const [exportingFullPackage, setExportingFullPackage] = useState(false);
+  const exportLockRef = useRef(false);
+  const fullExportLockRef = useRef(false);
 
   const [partNameSearch, setPartNameSearch] = useState("");
   const [filterRef, setFilterRef] = useState<string[]>([]);
@@ -383,11 +418,60 @@ export function PartBreakdownTable({
   );
   const showDelete = Boolean(onDeletePart);
   const showMaterialPricing = Boolean(materialType && materialPricePerKgByRow);
+  const showExportRow = Boolean(partPackageExport);
 
   const columnWidthsPct = useMemo(
-    () => equalColumnWidthsPct(columnCount(showRefColumn, showDelete, showMaterialPricing)),
-    [showRefColumn, showDelete, showMaterialPricing]
+    () =>
+      equalColumnWidthsPct(
+        columnCount(showRefColumn, showDelete, showMaterialPricing, showExportRow)
+      ),
+    [showRefColumn, showDelete, showMaterialPricing, showExportRow]
   );
+
+  const handleExportRow = useCallback(
+    async (row: QuotePartRow) => {
+      if (!partPackageExport || exportLockRef.current) return;
+      exportLockRef.current = true;
+      setExportingPartId(row.id);
+      try {
+        await exportSinglePartRowPackage(
+          row,
+          dxfPartGeometries ?? [],
+          partPackageExport.bendPlateQuoteItems,
+          partPackageExport.referenceNumber,
+          partPackageExport.materialType,
+          { customerName: partPackageExport.customerName }
+        );
+      } catch (e) {
+        console.warn("[PLATE] Row package export failed", e);
+      } finally {
+        exportLockRef.current = false;
+        setExportingPartId(null);
+      }
+    },
+    [partPackageExport, dxfPartGeometries]
+  );
+
+  const handleExportFullPackage = useCallback(async () => {
+    if (!partPackageExport || parts.length === 0 || fullExportLockRef.current) return;
+    fullExportLockRef.current = true;
+    setExportingFullPackage(true);
+    try {
+      await exportPartsPackage(
+        parts,
+        dxfPartGeometries ?? [],
+        partPackageExport.bendPlateQuoteItems,
+        partPackageExport.referenceNumber,
+        partPackageExport.materialType,
+        { customerName: partPackageExport.customerName }
+      );
+    } catch (e) {
+      console.warn("[PLATE] Full execution package export failed", e);
+    } finally {
+      fullExportLockRef.current = false;
+      setExportingFullPackage(false);
+    }
+  }, [partPackageExport, parts, dxfPartGeometries]);
 
   const fmtAmount = (n: number) => formatQuickQuoteCurrencyAmount(n, currency);
   const priceHeaderSymbol = quickQuoteCurrencySymbol(currency);
@@ -465,7 +549,12 @@ export function PartBreakdownTable({
   }
 
   const showRefFilter = filterOptions.refs.length > 0;
-  const colSpanEmpty = columnCount(showRefColumn, showDelete, showMaterialPricing);
+  const colSpanEmpty = columnCount(
+    showRefColumn,
+    showDelete,
+    showMaterialPricing,
+    showExportRow
+  );
 
   const p = previewPart;
   const totalWeightLine = p ? p.weightKg * p.qty : 0;
@@ -527,6 +616,32 @@ export function PartBreakdownTable({
           />
         </div>
       </div>
+
+      {showExportRow &&
+      showFullExecutionPackageButton &&
+      parts.length > 0 ? (
+        <div
+          className="flex w-full justify-end pe-1.5 ps-4 pb-1 pt-0 sm:pe-2 sm:ps-5 sm:pb-1.5"
+          dir="rtl"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 gap-2"
+            disabled={exportingFullPackage}
+            aria-label={t(`${PP}.ariaExportExecutionPackage`)}
+            onClick={handleExportFullPackage}
+          >
+            {exportingFullPackage ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+            ) : (
+              <Package className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            {t(`${PP}.exportExecutionPackage`)}
+          </Button>
+        </div>
+      ) : null}
 
       <div className="rounded-md border border-white/[0.08] bg-card px-4 py-3 sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
@@ -615,10 +730,35 @@ export function PartBreakdownTable({
           dir="rtl"
           className={cn(
             "border-separate border-spacing-0",
-            showRefColumn && showDelete && (showMaterialPricing ? "min-w-[1300px]" : "min-w-[1180px]"),
-            showRefColumn && !showDelete && (showMaterialPricing ? "min-w-[1220px]" : "min-w-[1100px]"),
-            !showRefColumn && showDelete && (showMaterialPricing ? "min-w-[1200px]" : "min-w-[1080px]"),
-            !showRefColumn && !showDelete && (showMaterialPricing ? "min-w-[1100px]" : "min-w-[980px]")
+            showExportRow
+              ? cn(
+                  showRefColumn &&
+                    showDelete &&
+                    (showMaterialPricing ? "min-w-[1420px]" : "min-w-[1300px]"),
+                  showRefColumn &&
+                    !showDelete &&
+                    (showMaterialPricing ? "min-w-[1340px]" : "min-w-[1220px]"),
+                  !showRefColumn &&
+                    showDelete &&
+                    (showMaterialPricing ? "min-w-[1320px]" : "min-w-[1200px]"),
+                  !showRefColumn &&
+                    !showDelete &&
+                    (showMaterialPricing ? "min-w-[1220px]" : "min-w-[1100px]")
+                )
+              : cn(
+                  showRefColumn &&
+                    showDelete &&
+                    (showMaterialPricing ? "min-w-[1300px]" : "min-w-[1180px]"),
+                  showRefColumn &&
+                    !showDelete &&
+                    (showMaterialPricing ? "min-w-[1220px]" : "min-w-[1100px]"),
+                  !showRefColumn &&
+                    showDelete &&
+                    (showMaterialPricing ? "min-w-[1200px]" : "min-w-[1080px]"),
+                  !showRefColumn &&
+                    !showDelete &&
+                    (showMaterialPricing ? "min-w-[1100px]" : "min-w-[980px]")
+                )
           )}
           containerClassName="overflow-visible"
         >
@@ -676,9 +816,21 @@ export function PartBreakdownTable({
                   {t(`${PP}.colMaterialPrice`, { symbol: priceHeaderSymbol })}
                 </TableHead>
               ) : null}
+              {showExportRow ? (
+                <TableHead
+                  scope="col"
+                  className={cn(headBase, "min-w-[5.5rem] text-center")}
+                >
+                  {t(`${PP}.colExportFile`)}
+                </TableHead>
+              ) : null}
               <TableHead
                 scope="col"
-                className={cn(headBase, "min-w-[4.5rem] text-center", !showDelete && "border-e-0")}
+                className={cn(
+                  headBase,
+                  "min-w-[4.5rem] text-center",
+                  !showDelete && "border-e-0"
+                )}
               >
                 {t(`${PP}.colPreview`)}
               </TableHead>
@@ -775,6 +927,27 @@ export function PartBreakdownTable({
                             materialPricePerKgByRow[materialPricingRowKey(row, materialType)] ?? ""
                           )
                       )}
+                    </TableCell>
+                  ) : null}
+                  {showExportRow ? (
+                    <TableCell
+                      className={cn(cellBase, "text-center border-e border-white/10")}
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                        disabled={exportingPartId === row.id}
+                        aria-label={t(`${PP}.ariaExportRow`, { name: row.partName })}
+                        onClick={() => handleExportRow(row)}
+                      >
+                        {exportingPartId === row.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        ) : (
+                          <Download className="h-4 w-4" strokeWidth={2} aria-hidden />
+                        )}
+                      </Button>
                     </TableCell>
                   ) : null}
                   <TableCell

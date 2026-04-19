@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { t } from "@/lib/i18n";
 import type { PlateProjectStep } from "../types/plateProject";
@@ -14,6 +14,16 @@ export interface PlateProjectBottomBarProps {
   canContinue: boolean;
   onBack?: () => void;
   onContinue?: () => void;
+  /** Summary step (3): explicit save to projects list (same idea as quick-quote save to list). */
+  saveProjectToList?: {
+    label: string;
+    savedLabel: string;
+    /** User already saved this session to the list. */
+    saved: boolean;
+    /** False e.g. when there are no parts — button disabled but not in “saved” state. */
+    canSave: boolean;
+    onClick: () => void;
+  };
 }
 
 export function PlateProjectBottomBar({
@@ -23,11 +33,13 @@ export function PlateProjectBottomBar({
   canContinue,
   onBack,
   onContinue,
+  saveProjectToList,
 }: PlateProjectBottomBarProps) {
   const showBackBtn = showBack && currentStep > 1 && onBack;
   const showContinueBtn = showContinue && currentStep < MAX_STEP && onContinue;
+  const showSaveToListBtn = Boolean(saveProjectToList);
 
-  if (!showBackBtn && !showContinueBtn) {
+  if (!showBackBtn && !showContinueBtn && !showSaveToListBtn) {
     return null;
   }
 
@@ -57,6 +69,25 @@ export function PlateProjectBottomBar({
             >
               {t("common.continue")}
               <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+          {saveProjectToList && (
+            <Button
+              type="button"
+              size="default"
+              variant={saveProjectToList.saved ? "outline" : "default"}
+              className="min-w-[10rem] gap-1"
+              disabled={saveProjectToList.saved || !saveProjectToList.canSave}
+              onClick={saveProjectToList.onClick}
+            >
+              {saveProjectToList.saved ? (
+                <>
+                  <Check className="h-4 w-4 shrink-0" aria-hidden />
+                  {saveProjectToList.savedLabel}
+                </>
+              ) : (
+                saveProjectToList.label
+              )}
             </Button>
           )}
         </div>

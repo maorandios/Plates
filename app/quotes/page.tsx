@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eye, PlusCircle, Trash2 } from "lucide-react";
+import { ListScreenFilterBar } from "@/components/shared/ListScreenFilterBar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,6 +40,12 @@ import {
   type QuoteListStatus,
 } from "@/lib/quotes/quoteList";
 import { t } from "@/lib/i18n";
+import {
+  sameLocalDateAsYmd,
+  statusMatches,
+  textMatchesListQuery,
+  type ListStatusFilter,
+} from "@/lib/listScreenFilters";
 import { formatDecimal } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 
@@ -65,12 +72,42 @@ export default function QuotesPage() {
   const [quotePendingDelete, setQuotePendingDelete] = useState<QuoteListRecord | null>(
     null
   );
+  const [search, setSearch] = useState("");
+  const [dateYmd, setDateYmd] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ListStatusFilter>("all");
 
   useEffect(() => {
     return subscribeQuotesListChanged(() => setTick((n) => n + 1));
   }, []);
 
   const rows = useMemo(() => getQuotesList(), [tick]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((q) => {
+      if (
+        !textMatchesListQuery(
+          [q.customerName, q.projectName, q.referenceNumber],
+          search
+        )
+      ) {
+        return false;
+      }
+      if (!statusMatches(q.status, statusFilter)) return false;
+      if (!sameLocalDateAsYmd(q.createdAt, dateYmd)) return false;
+      return true;
+    });
+  }, [rows, search, dateYmd, statusFilter]);
+
+  const hasActiveFilters = useMemo(
+    () => Boolean(search.trim()) || Boolean(dateYmd) || statusFilter !== "all",
+    [search, dateYmd, statusFilter]
+  );
+
+  const resetFilters = useCallback(() => {
+    setSearch("");
+    setDateYmd("");
+    setStatusFilter("all");
+  }, []);
 
   const openDeleteDialog = useCallback((q: QuoteListRecord) => {
     setQuotePendingDelete(q);
@@ -112,6 +149,25 @@ export default function QuotesPage() {
           }
         />
       ) : (
+        <>
+          <ListScreenFilterBar
+            search={search}
+            onSearchChange={setSearch}
+            dateYmd={dateYmd}
+            onDateYmdChange={setDateYmd}
+            status={statusFilter}
+            onStatusChange={setStatusFilter}
+            onReset={resetFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
+          {filteredRows.length === 0 ? (
+            <div
+              className="rounded-xl border border-white/[0.08] px-4 py-12 text-center text-sm text-muted-foreground"
+              dir="rtl"
+            >
+              {t("listScreen.noMatch")}
+            </div>
+          ) : (
         <div className="rounded-xl border border-white/[0.08] overflow-x-auto" dir="rtl">
           <div className="min-w-[1140px] px-3 sm:px-5">
           <Table
@@ -156,7 +212,7 @@ export default function QuotesPage() {
               </TableRow>
             </TableHeader>
             <TableBody className="contents">
-              {rows.map((q, index) => {
+              {filteredRows.map((q, index) => {
                 const w = q.totalWeightKg;
                 const a = q.totalAreaM2;
                 const vat = q.totalInclVat;
@@ -253,6 +309,8 @@ export default function QuotesPage() {
           </Table>
           </div>
         </div>
+          )}
+        </>
       )}
 
       <Dialog

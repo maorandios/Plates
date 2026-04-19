@@ -14,6 +14,8 @@ interface BendPlateQuotePhaseProps {
   onBack: () => void;
   onComplete: () => void;
   initialEditorTemplate?: BendTemplateId | null;
+  /** When set, editor save/cancel exits to parent instead of the bend-plate line-items hub. */
+  onLeaveEditorToParent?: () => void;
 }
 
 export function BendPlateQuotePhase({
@@ -26,6 +28,7 @@ export function BendPlateQuotePhase({
   onBack,
   onComplete,
   initialEditorTemplate = null,
+  onLeaveEditorToParent,
 }: BendPlateQuotePhaseProps) {
   return (
     <BendPlateBuilder
@@ -38,6 +41,7 @@ export function BendPlateQuotePhase({
       onBack={onBack}
       onComplete={onComplete}
       initialEditorTemplate={initialEditorTemplate}
+      onLeaveEditorToParent={onLeaveEditorToParent}
     />
   );
 }

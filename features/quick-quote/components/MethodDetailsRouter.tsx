@@ -20,7 +20,7 @@ import type {
 import { BendPlateQuotePhase } from "./method-phases/BendPlateQuotePhase";
 import { DxfQuotePhase } from "./method-phases/DxfQuotePhase";
 import { ExcelImportQuotePhase } from "./method-phases/ExcelImportQuotePhase";
-import { ManualQuotePhase } from "./method-phases/ManualQuotePhase";
+import { t } from "@/lib/i18n";
 
 interface MethodDetailsRouterProps {
   method: QuoteCreationMethod | null;
@@ -100,14 +100,16 @@ export function MethodDetailsRouter({
       );
     case "manualAdd":
       return (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <ManualQuotePhase
-            materialType={materialType}
-            rows={manualQuoteRows}
-            onRowsChange={onManualQuoteRowsChange}
-            onBack={onBackToMethodPicker}
-            onComplete={onBackToMethodPicker}
-          />
+        <div
+          className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-4 p-8"
+          dir="rtl"
+        >
+          <p className="max-w-md text-center text-sm text-muted-foreground">
+            {t("quickQuotePage.manualMethodDeprecated")}
+          </p>
+          <Button type="button" variant="outline" onClick={onBackToMethodPicker}>
+            {t("common.back")}
+          </Button>
         </div>
       );
     case "excelImport":

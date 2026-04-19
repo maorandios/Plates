@@ -157,6 +157,13 @@ export function QuickQuotePage() {
     setBendPlateQuoteItems([]);
   }, []);
 
+  /** Legacy sessions may still have `manualAdd` — method picker no longer offers it. */
+  useLayoutEffect(() => {
+    if (jobDetails.quoteCreationMethod !== "manualAdd") return;
+    setJobDetails((j) => ({ ...j, quoteCreationMethod: undefined }));
+    setQuoteMethodSubView("picker");
+  }, [jobDetails.quoteCreationMethod]);
+
   const advanceTo = useCallback((s: QuickQuoteStep) => {
     setStep(s);
     setHighestStepReached((h) => (s > h ? s : h));
@@ -625,6 +632,7 @@ export function QuickQuotePage() {
       const href = a.getAttribute("href");
       if (!href || href.startsWith("#")) return;
       if (href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      if (href.startsWith("blob:") || a.hasAttribute("download")) return;
       try {
         const u = new URL(href, window.location.origin);
         if (u.origin !== window.location.origin) return;
@@ -730,22 +738,27 @@ export function QuickQuotePage() {
             </Card>
           )}
 
-          {step === 2 && quoteMethodSubView === "picker" && (
-            <QuoteMethodPickerPhase
-              materialType={materialType}
-              manualQuoteRows={manualQuoteRows}
-              excelImportQuoteRows={excelImportQuoteRows}
-              dxfMethodGeometries={dxfMethodGeometries}
-              bendPlateQuoteItems={bendPlateQuoteItems}
-              selected={jobDetails.quoteCreationMethod ?? null}
-              onSelect={(method) => {
-                setJobDetails((j) => ({ ...j, quoteCreationMethod: method }));
-              }}
-              onConfigureMethod={handleConfigureMethodFromPicker}
-            />
-          )}
+          {step === 2 &&
+            (quoteMethodSubView === "picker" ||
+              jobDetails.quoteCreationMethod === "manualAdd") && (
+              <QuoteMethodPickerPhase
+                materialType={materialType}
+                manualQuoteRows={manualQuoteRows}
+                excelImportQuoteRows={excelImportQuoteRows}
+                dxfMethodGeometries={dxfMethodGeometries}
+                bendPlateQuoteItems={bendPlateQuoteItems}
+                selected={jobDetails.quoteCreationMethod ?? null}
+                onSelect={(method) => {
+                  setJobDetails((j) => ({ ...j, quoteCreationMethod: method }));
+                }}
+                onConfigureMethod={handleConfigureMethodFromPicker}
+              />
+            )}
 
-          {step === 2 && quoteMethodSubView === "methodSetup" && (
+          {step === 2 &&
+            quoteMethodSubView === "methodSetup" &&
+            jobDetails.quoteCreationMethod != null &&
+            jobDetails.quoteCreationMethod !== "manualAdd" && (
             <MethodDetailsRouter
               method={jobDetails.quoteCreationMethod ?? null}
               onBackToMethodPicker={handleReturnToQuoteMethodFromMethodSetup}
@@ -775,6 +788,11 @@ export function QuickQuotePage() {
               onDeletePart={handleRemoveMergedPart}
               onReset={handleResetMergedLines}
               canReset={hasAnyQuoteMethodData}
+              materialType={materialType}
+              bendPlateQuoteItems={bendPlateQuoteItems}
+              referenceNumber={jobDetails.referenceNumber}
+              customerName={jobDetails.customerName}
+              showFullExecutionPackageButton={false}
             />
           )}
 

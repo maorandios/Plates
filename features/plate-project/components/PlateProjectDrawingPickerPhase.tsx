@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { DxfPartGeometry } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import type { BendPlateQuoteItem, BendTemplateId } from "@/features/quick-quote/bend-plate/types";
-import { BendTemplatePickerGlyph } from "@/features/quick-quote/bend-plate/BendTemplateShapeGlyph";
+import { BendTemplatePickerGrid } from "@/features/quick-quote/bend-plate/BendTemplatePickerGrid";
 import { MethodPhaseMetricStrip } from "@/features/quick-quote/components/method-phases/MethodPhaseMetricStrip";
 import { jobSummaryFromParts } from "@/features/quick-quote/lib/deriveQuoteSelection";
 import { mergeAllQuoteMethodParts } from "@/features/quick-quote/lib/mergeAllQuoteMethods";
@@ -16,32 +16,6 @@ import type { ManualQuotePartRow } from "@/features/quick-quote/types/quickQuote
 import { t } from "@/lib/i18n";
 
 const VIEWPORT = "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
-const BP_TEMPLATE = "quote.bendPlatePhase.template";
-
-function templateTitle(id: BendTemplateId): string {
-  return t(`${BP_TEMPLATE}.${id}.name`);
-}
-
-function templateHasRows(id: BendTemplateId, items: BendPlateQuoteItem[]): boolean {
-  return items.some((x) => x.template === id);
-}
-
-/**
- * Fixed 4×2 layout (LTR columns so col 1 = visual left, col 4 = visual right).
- * Col 1: מדרגה / מותאם אישית · Col 2: תעלה / מרזב · Col 3: זוית / אומגה · Col 4: ריבוע rowspan 2.
- */
-const PLATE_PROJECT_TEMPLATE_GRID: {
-  id: BendTemplateId;
-  gridClass: string;
-}[] = [
-  { id: "z", gridClass: "col-start-1 row-start-1" },
-  { id: "custom", gridClass: "col-start-1 row-start-2" },
-  { id: "u", gridClass: "col-start-2 row-start-1" },
-  { id: "gutter", gridClass: "col-start-2 row-start-2" },
-  { id: "l", gridClass: "col-start-3 row-start-1" },
-  { id: "omega", gridClass: "col-start-3 row-start-2" },
-  { id: "plate", gridClass: "col-start-4 row-start-1 row-span-2" },
-];
 
 export interface PlateProjectDrawingPickerPhaseProps {
   materialType: MaterialType;
@@ -152,83 +126,10 @@ export function PlateProjectDrawingPickerPhase({
             </div>
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-auto p-4 sm:p-5">
-            {/* dir=ltr: column 1 is the visual left edge, matching the reference layout */}
-            <div
-              dir="ltr"
-              className={cn(
-                "mx-auto grid min-h-[min(100%,28rem)] w-full min-w-[44rem] flex-1 gap-4",
-                "grid-cols-4 grid-rows-2 [grid-template-rows:minmax(12rem,1fr)_minmax(12rem,1fr)]"
-              )}
-            >
-              {PLATE_PROJECT_TEMPLATE_GRID.map(({ id, gridClass }) => {
-                const title = templateTitle(id);
-                const hasData = templateHasRows(id, bendPlateQuoteItems);
-                const isTall = id === "plate";
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => onSelectTemplate(id)}
-                    aria-label={title}
-                    className={cn(
-                      gridClass,
-                      "group flex min-h-0 min-w-0 flex-col items-center justify-center rounded-xl border-2 bg-card p-5 text-center transition-all duration-150",
-                      isTall ? "h-full min-h-[14rem]" : "min-h-[12rem]",
-                      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                      hasData &&
-                        "border-primary shadow-[0_0_28px_-10px_hsl(var(--primary)/0.55)] ring-2 ring-primary/50 hover:border-primary hover:ring-primary/60",
-                      !hasData &&
-                        "border-white/[0.08] hover:border-primary/50 hover:bg-card/90"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "mb-4 flex shrink-0 items-center justify-center rounded-xl transition-colors",
-                        isTall ? "h-14 w-14" : "h-11 w-11",
-                        hasData
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground group-hover:bg-muted/90"
-                      )}
-                    >
-                      <BendTemplatePickerGlyph
-                        id={id}
-                        className={cn(
-                          "shrink-0",
-                          isTall ? "h-8 w-[3.25rem]" : "h-6 w-[2.75rem]"
-                        )}
-                      />
-                    </div>
-                    <div
-                      className={cn(
-                        "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5",
-                        hasData
-                          ? "border-primary/30 bg-primary/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                          : "border-white/[0.12] bg-muted/35"
-                      )}
-                      dir="rtl"
-                    >
-                      <span
-                        className={cn(
-                          "h-2 w-2 shrink-0 rounded-full",
-                          hasData
-                            ? "bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.65)]"
-                            : "bg-muted-foreground/50"
-                        )}
-                        aria-hidden
-                      />
-                      <span
-                        className={cn(
-                          "text-sm font-semibold leading-snug",
-                          hasData ? "text-foreground" : "text-muted-foreground"
-                        )}
-                      >
-                        {title}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <BendTemplatePickerGrid
+              quoteItems={bendPlateQuoteItems}
+              onSelectTemplate={onSelectTemplate}
+            />
           </div>
         </div>
       </div>

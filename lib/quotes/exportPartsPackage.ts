@@ -187,3 +187,95 @@ export async function exportPartsPackage(
 
   triggerDownload(blob, `${safeRef}.zip`);
 }
+
+/**
+ * ZIP for one summary row: DXF + technical drawing PDF + single-row Excel (same BOM shape as full export).
+ */
+export async function exportSinglePartRowPackage(
+  part: QuotePartRow,
+  dxfMethodGeometries: DxfPartGeometry[],
+  bendPlateQuoteItems: BendPlateQuoteItem[],
+  referenceNumber: string,
+  materialType: MaterialType = "carbonSteel",
+  options?: Pick<PlateDrawingExportMeta, "customerName">
+): Promise<void> {
+  const geoMap = new Map<string, DxfPartGeometry>(
+    dxfMethodGeometries.map((g) => [g.id, g])
+  );
+  const bendById = new Map(bendPlateQuoteItems.map((b) => [b.id, b]));
+  const usedFilenames = new Set<string>();
+
+  function bendForPartRow(p: QuotePartRow): BendPlateQuoteItem | null {
+    let b = bendById.get(p.id) ?? null;
+    if (b) return b;
+    if (p.lineSourceIds?.length) {
+      for (const id of p.lineSourceIds) {
+        b = bendById.get(id) ?? null;
+        if (b) return b;
+      }
+    }
+    return null;
+  }
+
+  function geometryForPart(p: QuotePartRow): DxfPartGeometry | null {
+    let g = geoMap.get(p.id) ?? null;
+    if (g) return g;
+    if (p.lineSourceIds?.length) {
+      for (const id of p.lineSourceIds) {
+        g = geoMap.get(id) ?? null;
+        if (g) return g;
+      }
+    }
+    return null;
+  }
+
+  const geometry = geometryForPart(part);
+  const bendItem = bendForPartRow(part);
+  const baseName = uniqueFilename(safeFilenameBase(part.partName), usedFilenames);
+
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+  const dxfFolder = zip.folder("dxf")!;
+  const drawingsFolder = zip.folder("drawings")!;
+
+  if (geometry) {
+    const rawText = getRawDxfText(geometry);
+    if (rawText) {
+      dxfFolder.file(`${baseName}.dxf`, rawText);
+      const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType, {
+        customerName: options?.customerName,
+        quoteReference: referenceNumber,
+      });
+      if (pdfBytes) drawingsFolder.file(`${baseName}.pdf`, pdfBytes);
+    } else {
+      const dxfText = generatePartDxfString(part, geometry, bendItem, materialType);
+      dxfFolder.file(`${baseName}.dxf`, dxfText);
+      const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType, {
+        customerName: options?.customerName,
+        quoteReference: referenceNumber,
+      });
+      if (pdfBytes) drawingsFolder.file(`${baseName}.pdf`, pdfBytes);
+    }
+  } else {
+    const dxfText = generatePartDxfString(part, geometry, bendItem, materialType);
+    dxfFolder.file(`${baseName}.dxf`, dxfText);
+    const pdfBytes = await generatePlateDrawingPdf(part, bendItem, materialType, {
+      customerName: options?.customerName,
+      quoteReference: referenceNumber,
+    });
+    if (pdfBytes) drawingsFolder.file(`${baseName}.pdf`, pdfBytes);
+  }
+
+  const excelBuffer = await buildUnifiedSummaryBomXlsxBuffer([part]);
+  const safeRef = safeFilenameBase(referenceNumber) || "quote";
+  zip.file(`${safeRef}-plate-list.xlsx`, excelBuffer);
+
+  const blob = await zip.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+
+  const zipBase = safeFilenameBase(part.partName) || "part";
+  triggerDownload(blob, `${zipBase}-export.zip`);
+}

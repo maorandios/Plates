@@ -1,14 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  ClipboardList,
-  FileSpreadsheet,
-  FoldHorizontal,
-  LayoutGrid,
-  Package,
-  Weight,
-} from "lucide-react";
+import { FileSpreadsheet, FoldHorizontal, LayoutGrid, Package, Weight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
@@ -24,12 +17,11 @@ import { DxfFileBadgeIcon } from "./icons/DxfFileBadgeIcon";
 import { t } from "@/lib/i18n";
 
 const OPTIONS: {
-  id: QuoteCreationMethod;
-  i18nPrefix: "dxf" | "manualAdd" | "excelImport" | "bendPlate";
+  id: Exclude<QuoteCreationMethod, "manualAdd">;
+  i18nPrefix: "dxf" | "excelImport" | "bendPlate";
   Icon: LucideIcon | typeof DxfFileBadgeIcon;
 }[] = [
   { id: "dxf", i18nPrefix: "dxf", Icon: DxfFileBadgeIcon },
-  { id: "manualAdd", i18nPrefix: "manualAdd", Icon: ClipboardList },
   { id: "excelImport", i18nPrefix: "excelImport", Icon: FileSpreadsheet },
   { id: "bendPlate", i18nPrefix: "bendPlate", Icon: FoldHorizontal },
 ];
@@ -37,8 +29,7 @@ const OPTIONS: {
 const VIEWPORT = "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
 
 function methodHasData(
-  method: QuoteCreationMethod,
-  manualQuoteRows: ManualQuotePartRow[],
+  method: Exclude<QuoteCreationMethod, "manualAdd">,
   excelImportQuoteRows: ManualQuotePartRow[],
   dxfMethodGeometries: DxfPartGeometry[],
   bendPlateQuoteItems: BendPlateQuoteItem[]
@@ -46,8 +37,6 @@ function methodHasData(
   switch (method) {
     case "dxf":
       return dxfMethodHasQuotableParts(dxfMethodGeometries);
-    case "manualAdd":
-      return manualQuoteRows.length > 0;
     case "excelImport":
       return excelImportQuoteRows.length > 0;
     case "bendPlate":
@@ -149,7 +138,7 @@ export function QuoteMethodPickerPhase({
           <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 sm:p-5">
             <div
               className={cn(
-                "grid min-h-0 flex-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4",
+                "grid min-h-0 flex-1 gap-4 sm:grid-cols-2 xl:grid-cols-3",
                 "[grid-auto-rows:minmax(0,1fr)]"
               )}
             >
@@ -157,7 +146,6 @@ export function QuoteMethodPickerPhase({
                 const title = t(`quote.methods.${i18nPrefix}.title`);
                 const hasData = methodHasData(
                   id,
-                  manualQuoteRows,
                   excelImportQuoteRows,
                   dxfMethodGeometries,
                   bendPlateQuoteItems
