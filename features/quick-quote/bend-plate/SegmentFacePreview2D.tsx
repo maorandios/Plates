@@ -184,17 +184,6 @@ export function SegmentFacePreview2D({
               strokeDasharray={svg.widthPlaceholder ? "6 4" : undefined}
               opacity={svg.widthPlaceholder ? 0.88 : 1}
             />
-            {ann
-              ? svg.corners.map((p, i) => (
-                  <circle
-                    key={`n-${i}`}
-                    cx={p.x}
-                    cy={p.y}
-                    r={ann.nodeRadiusUser}
-                    fill={PROFILE_STROKE}
-                  />
-                ))
-              : null}
           </>
         )}
       </svg>

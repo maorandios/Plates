@@ -229,22 +229,6 @@ function bentFaceBasis(Pa: THREE.Vector3, Pb: THREE.Vector3): FaceBasis | null {
   return makeFaceBasis(B, T);
 }
 
-/** Flat-plate top-face (u, v) directions in world per perimeter segment, matching the blank map. */
-function flatPlateFaceBasis(segIdx: number): FaceBasis {
-  switch (segIdx) {
-    case 0:
-      return makeFaceBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
-    case 1:
-      return makeFaceBasis(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 1, 0));
-    case 2:
-      return makeFaceBasis(new THREE.Vector3(0, -1, 0), new THREE.Vector3(-1, 0, 0));
-    case 3:
-      return makeFaceBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0));
-    default:
-      return makeFaceBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
-  }
-}
-
 /** Place a single hole: canonical local geometry → (uHat, vHat, nHat) basis → world position. */
 function spawnHoleMesh(
   scene: THREE.Scene,
@@ -314,6 +298,17 @@ function addHoleMeshesBent(
   return meshes;
 }
 
+/**
+ * Flat plate: holes are stored on the top surface only (row 0), same UV as 2D editor / DXF
+ * (`plateSegmentHoleCenterOnRectangleBlank` with segIdx 0). Basis: +X × +Y = +Z (outward top face).
+ */
+function flatPlateTopSurfaceBasis(): FaceBasis {
+  return makeFaceBasis(
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 1, 0)
+  );
+}
+
 function addHoleMeshesFlatPlate(
   scene: THREE.Scene,
   segmentFaceHoles: BendSegmentHole[][],
@@ -330,24 +325,17 @@ function addHoleMeshesFlatPlate(
   const W = Math.max(widthMm, 1e-6);
   const thicknessMm = td / SCALE;
 
-  for (let segIdx = 0; segIdx < segmentFaceHoles.length; segIdx++) {
-    const row = segmentFaceHoles[segIdx];
-    if (!row?.length) continue;
-    const basis = flatPlateFaceBasis(segIdx);
-    for (const h of row) {
-      const p = plateSegmentHoleCenterOnRectangleBlank(
-        segIdx,
-        h.uMm,
-        h.vMm,
-        L,
-        W
-      );
-      const wx = cx + (p.x / L - 0.5) * bw;
-      const wy = cy + (p.y / W - 0.5) * bh;
-      /** Mid-plane of the slab in world Z so the centered extrusion punches through both faces. */
-      const wz = td / 2;
-      spawnHoleMesh(scene, h, thicknessMm, basis, new THREE.Vector3(wx, wy, wz), meshes);
-    }
+  const row = segmentFaceHoles[0];
+  if (!row?.length) return meshes;
+
+  const basis = flatPlateTopSurfaceBasis();
+  for (const h of row) {
+    const p = plateSegmentHoleCenterOnRectangleBlank(0, h.uMm, h.vMm, L, W);
+    const wx = cx + (p.x / L - 0.5) * bw;
+    const wy = cy + (p.y / W - 0.5) * bh;
+    /** Mid-plane of the slab in world Z so the centered extrusion punches through both faces. */
+    const wz = td / 2;
+    spawnHoleMesh(scene, h, thicknessMm, basis, new THREE.Vector3(wx, wy, wz), meshes);
   }
   return meshes;
 }

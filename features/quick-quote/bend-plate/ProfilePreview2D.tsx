@@ -102,8 +102,6 @@ function annotationStylesForView(
   const dashLenPx = clamp(geomLongPx * 0.011, 3.2, 5.8);
   const dashGapPx = clamp(geomLongPx * 0.0085, 2.4, 4.5);
   const arcStrokePx = clamp(dimStrokePx * 1.05, 0.78, 1.18);
-  const nodePx = clamp(geomLongPx * 0.0068, 2.1, 3.6);
-  const nodeRadiusUser = nodePx / scale;
 
   return {
     meetScale: scale,
@@ -112,7 +110,6 @@ function annotationStylesForView(
     extStrokePx,
     dashArray: `${dashLenPx}px ${dashGapPx}px`,
     arcStrokePx,
-    nodeRadiusUser,
   };
 }
 
@@ -548,15 +545,6 @@ export function ProfilePreview2D({
             ))}
           </g>
         ) : null}
-        {svg.ptsLocal.map((p, i) => (
-          <circle
-            key={i}
-            cx={p.x}
-            cy={p.y}
-            r={ann.nodeRadiusUser}
-            fill={PROFILE_STROKE}
-          />
-        ))}
         {svg.angleMarkup ? (
           <g aria-hidden>
             {svg.angleMarkup.labels.map((lb, i) => (

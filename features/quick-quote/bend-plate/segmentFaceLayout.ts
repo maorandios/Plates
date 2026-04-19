@@ -254,8 +254,6 @@ export function segmentFaceAnnotationStylesForView(
   const extStrokePx = dimStrokePx * 0.92;
   const dashLenPx = clamp(geomLongPx * 0.011, 3.2, 5.8);
   const dashGapPx = clamp(geomLongPx * 0.0085, 2.4, 4.5);
-  const nodePx = clamp(geomLongPx * 0.0068, 2.1, 3.6);
-  const nodeRadiusUser = nodePx / scale;
 
   return {
     meetScale: scale,
@@ -263,6 +261,5 @@ export function segmentFaceAnnotationStylesForView(
     dimStrokePx,
     extStrokePx,
     dashArray: `${dashLenPx}px ${dashGapPx}px`,
-    nodeRadiusUser,
   };
 }

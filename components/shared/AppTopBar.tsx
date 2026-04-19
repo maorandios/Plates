@@ -17,11 +17,12 @@ import { t } from "@/lib/i18n";
 const dividerClass = "w-px shrink-0 self-stretch bg-white/[0.08]";
 
 const MAIN_NAV: {
-  labelKey: "nav.dashboard" | "nav.quotes" | "nav.clients";
+  labelKey: "nav.dashboard" | "nav.quotes" | "nav.projects" | "nav.clients";
   href: string;
 }[] = [
   { labelKey: "nav.dashboard", href: "/" },
   { labelKey: "nav.quotes", href: "/quotes" },
+  { labelKey: "nav.projects", href: "/projects" },
   { labelKey: "nav.clients", href: "/clients" },
 ];
 
@@ -70,7 +71,7 @@ export function AppTopBar() {
           <div className={dividerClass} aria-hidden />
 
           <nav
-            className="grid h-14 min-h-14 min-w-0 flex-1 grid-cols-4 divide-x divide-white/[0.08] overflow-hidden"
+            className="grid h-14 min-h-14 min-w-0 flex-1 grid-cols-5 divide-x divide-white/[0.08] overflow-hidden"
             aria-label={t("layout.mainNavAria")}
           >
             {MAIN_NAV.map(({ labelKey, href }) => {

@@ -152,14 +152,13 @@ export function bendPlateHolePolygonsOnFlatBlankMm(
   if (state.template === "plate") {
     const L = Math.max(0, state.plate.lengthMm);
     const W = Math.max(0, state.plate.widthMm);
-    for (let segIdx = 0; segIdx < rows.length; segIdx++) {
-      for (const h of rows[segIdx] ?? []) {
-        const uv = holeOutlinePolygonUvMm(h);
-        const blank = uv.map(([u, v]) =>
-          plateSegmentHoleCenterOnRectangleBlank(segIdx, u, v, L, W)
-        );
-        if (blank.length >= 3) polys.push(blank);
-      }
+    /** Top-surface holes only (row 0); same mapping as segIdx 0 in `plateSegmentHoleCenterOnRectangleBlank`. */
+    for (const h of rows[0] ?? []) {
+      const uv = holeOutlinePolygonUvMm(h);
+      const blank = uv.map(([u, v]) =>
+        plateSegmentHoleCenterOnRectangleBlank(0, u, v, L, W)
+      );
+      if (blank.length >= 3) polys.push(blank);
     }
     return polys;
   }
