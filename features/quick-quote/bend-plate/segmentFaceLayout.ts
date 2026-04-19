@@ -250,10 +250,11 @@ export function segmentFaceAnnotationStylesForView(
   const labelFontUser = labelPx / scale;
   const segmentLabelFontUser = labelFontUser * 1.25 * 1.25;
 
-  const dimStrokePx = clamp(geomLongPx * 0.002, 0.72, 1.12);
+  /** Keep in sync with ProfilePreview2D.annotationStylesForView */
+  const dimStrokePx = clamp(geomLongPx * 0.002, 0.72, 1.12) / 1.25;
   const extStrokePx = dimStrokePx * 0.92;
-  const dashLenPx = clamp(geomLongPx * 0.011, 3.2, 5.8);
-  const dashGapPx = clamp(geomLongPx * 0.0085, 2.4, 4.5);
+  const dashLenPx = clamp(geomLongPx * 0.011, 3.2, 5.8) / 2;
+  const dashGapPx = clamp(geomLongPx * 0.0085, 2.4, 4.5) / 2;
 
   return {
     meetScale: scale,

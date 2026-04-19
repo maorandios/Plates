@@ -290,7 +290,7 @@ export default function ProjectsPage() {
                       <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] px-2 py-2">
                         <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" asChild>
                           <Link
-                            href={`/plate-project?id=${encodeURIComponent(p.id)}`}
+                            href={`/projects/${encodeURIComponent(p.id)}/preview`}
                             title={t("projects.viewAria", { ref: p.referenceNumber })}
                           >
                             <Eye className="h-4 w-4" />

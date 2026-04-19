@@ -261,11 +261,19 @@ function setLatFont(doc: jsPDF, size: number, _bold = false): void {
 // Drawing primitives
 // ---------------------------------------------------------------------------
 
-/** All geometry and dimensions render in black. */
+/** Solid part outlines (profile, flat blank, bend axis) — black on white. */
 const STROKE_RGB: [number, number, number] = [0, 0, 0];
-const DIM_RGB: [number, number, number] = [0, 0, 0];
-/** Unified stroke width (mm): geometry, dimensions, frames, headers, title block, sheet border. */
+/**
+ * Dimensions, extension lines, angle arcs, bend-plan mm labels — neutral gray (not pure black).
+ * Matches on-screen bend preview dim tone (~slate-500).
+ */
+const DIM_RGB: [number, number, number] = [100, 108, 118];
+/** Sheet chrome: outer frame, view headers, column rules — keep readable on print. */
 const GEO_LINE_MM = 0.45;
+/** Drawing content geometry: 1.25× thinner than the legacy single `GEO_LINE_MM` for all views. */
+const VIEW_GEOM_LINE_MM = GEO_LINE_MM / 1.25;
+/** Dimension graphics (dashed lines + arrow strokes): same 1.25× reduction vs legacy. */
+const DIM_LINE_MM = GEO_LINE_MM / 1.25;
 
 /** Filled arrow: tip at witness/dimension intersection, base inside along the dim line. */
 const DIM_ARROW_DEPTH_MM = 2.05;
@@ -284,8 +292,10 @@ const DIM_VISUAL_GAP_MM = 3.0;
  */
 const HALF_ASCENT_FACTOR = 0.352778 * 0.35;
 
-/** Dash pattern for dimension line (mm units). */
-const DIM_LINE_DASH = [1.15, 0.95] as [number, number];
+/** Dash pattern for dimension line (mm units) — half-length dashes/gaps → ~2× denser hatching. */
+const DIM_LINE_DASH = [1.15 / 2, 0.95 / 2] as [number, number];
+/** Extension lines (witness → dim string): denser dash to match main dim rhythm. */
+const DIM_EXT_DASH = [0.7 / 2, 1.1 / 2] as [number, number];
 
 /** Profile angle arc radius is scaled down (÷ this) vs the computed layout radius. */
 const ANGLE_ARC_RADIUS_DIVISOR = 1.25;
@@ -372,10 +382,10 @@ function drawDimension(
   const dimMidX = (ax + bx) / 2;
   const dimMidY = (ay + by) / 2;
 
-  doc.setLineWidth(GEO_LINE_MM);
+  doc.setLineWidth(DIM_LINE_MM);
   doc.setDrawColor(DIM_RGB[0], DIM_RGB[1], DIM_RGB[2]);
 
-  doc.setLineDashPattern([0.7, 1.1], 0);
+  doc.setLineDashPattern(DIM_EXT_DASH, 0);
   doc.line(x1, y1, ax, ay);
   doc.line(x2, y2, bx, by);
   doc.setLineDashPattern([], 0);
@@ -469,7 +479,7 @@ function drawAngleArc(
     ea = tmp + 2 * Math.PI;
   }
   const steps = Math.max(16, Math.ceil(((ea - sa) * 180) / Math.PI));
-  doc.setLineWidth(GEO_LINE_MM);
+  doc.setLineWidth(DIM_LINE_MM);
   doc.setDrawColor(DIM_RGB[0], DIM_RGB[1], DIM_RGB[2]);
   for (let i = 0; i < steps; i++) {
     const a1 = sa + ((ea - sa) * i) / steps;
@@ -548,7 +558,7 @@ function drawProfileView(
   tcy /= pts.length;
   const centroid = { x: tcx, y: tcy };
 
-  doc.setLineWidth(GEO_LINE_MM);
+  doc.setLineWidth(VIEW_GEOM_LINE_MM);
   doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
   for (let i = 0; i < pts.length - 1; i++) {
     doc.line(tx(pts[i]), ty(pts[i]), tx(pts[i + 1]), ty(pts[i + 1]));
@@ -639,7 +649,7 @@ function drawFlatBlankView(
   const rx = cxInner - rectW / 2;
   const ry = topFree + (availH - rectH) / 2;
 
-  doc.setLineWidth(GEO_LINE_MM);
+  doc.setLineWidth(VIEW_GEOM_LINE_MM);
   doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
   doc.rect(rx, ry, rectW, rectH);
   doc.setDrawColor(0);
@@ -680,7 +690,7 @@ function drawFlatBlankView(
       outsideSetbackMm(a, insideRadiusMm, thicknessMm)
     );
 
-    doc.setLineWidth(GEO_LINE_MM);
+    doc.setLineWidth(VIEW_GEOM_LINE_MM);
     doc.setDrawColor(0, 0, 0);
     let curX = 0;
 
@@ -694,7 +704,7 @@ function drawFlatBlankView(
       const bendCX = curX + ba / 2;
       const px = rx + bendCX * scale;
 
-      doc.setLineDashPattern([1.2, 1.0], 0);
+      doc.setLineDashPattern([1.2 / 2, 1.0 / 2], 0);
       doc.line(px, ry, px, ry + rectH);
       doc.setLineDashPattern([], 0);
 
@@ -704,7 +714,7 @@ function drawFlatBlankView(
   }
 
   if (holePolysMm && holePolysMm.length > 0) {
-    doc.setLineWidth(GEO_LINE_MM);
+    doc.setLineWidth(VIEW_GEOM_LINE_MM);
     doc.setDrawColor(0, 0, 0);
     for (const loop of holePolysMm) {
       if (loop.length < 3) continue;
@@ -745,7 +755,7 @@ function drawFlatSideStripView(
   const rx = inner.l + areaW / 2 - rw / 2;
   const ry = inner.t + areaH / 2 - rh / 2;
 
-  doc.setLineWidth(GEO_LINE_MM);
+  doc.setLineWidth(VIEW_GEOM_LINE_MM);
   doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
   doc.rect(rx, ry, rw, rh);
   doc.setDrawColor(0);
@@ -956,7 +966,7 @@ function drawBendPlanFlatView(
   const rx = cxInner - stripW / 2;
   const lineY = inner.b - blankDimSpace;
 
-  doc.setLineWidth(GEO_LINE_MM);
+  doc.setLineWidth(VIEW_GEOM_LINE_MM);
   doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
   doc.line(rx, lineY, rx + stripW, lineY);
   doc.setDrawColor(0);
@@ -999,7 +1009,7 @@ function drawBendPlanFlatView(
     const px = rx + bendCenters[i] * scale;
 
     // Bend tick + leader — one continuous segment from reference line to callout stack.
-    doc.setLineWidth(GEO_LINE_MM);
+    doc.setLineWidth(VIEW_GEOM_LINE_MM);
     doc.setDrawColor(STROKE_RGB[0], STROKE_RGB[1], STROKE_RGB[2]);
     doc.line(px, lineY + tickHalf, px, dirY + arrowSize / 2 + 0.4);
 

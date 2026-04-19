@@ -1139,6 +1139,14 @@
     "removeDialogDescription": "להסיר את הפרויקט ״{{projectName}}״ מהרשימה? לא ניתן לשחזר את הנתונים לאחר המחיקה.",
     "removeDialogConfirm": "מחק"
   },
+  "projectPreview": {
+    "backToList": "חזרה לפרויקטים",
+    "plateDetailTableTitle": "פירוט פלטות לפרויקט",
+    "notesGeneral": "הערות",
+    "exportError": "לא ניתן להוריד את החבילה. נסו שוב.",
+    "noSnapshotTitle": "אין נתונים שמורים לתצוגה",
+    "noSnapshotDescription": "פתחו את הפרויקט מתהליך היצירה והשלימו שמירה לרשימה כדי לראות את פירוט הפלטות."
+  },
   "quotePreview": {
     "title": "תצוגת הצעה — {{ref}}",
     "backToList": "חזרה להצעות",

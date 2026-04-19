@@ -4,13 +4,13 @@
  */
 
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
-import type { MaterialType } from "@/types/materials";
+import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import {
   materialPricingRowKey,
   parseMaterialPricePerKg,
 } from "../job-overview/materialCalculations";
 import type { BendTemplateId } from "../bend-plate/types";
-import { formatMaterialGradeAndFinish } from "./plateFields";
+import { formatMaterialGradeAndFinish, splitMaterialGradeAndFinish } from "./plateFields";
 import { normalizeFinishFromImport } from "./materialSettingsOptions";
 import type { QuotePartRow } from "../types/quickQuote";
 
@@ -142,4 +142,40 @@ export function finalizeDraftLineToQuotePart(
     excelRowRef: base?.excelRowRef ?? "—",
     notes: row.description ?? "",
   };
+}
+
+/**
+ * BOM rows for read-only previews (quote/project) when only merged {@link QuotePartRow}s exist.
+ * Line sell uses the same kg × $/kg rule as {@link buildQuotePdfRequestBody}.
+ */
+export function finalizeDraftItemsFromQuoteParts(
+  parts: QuotePartRow[],
+  materialType: MaterialType,
+  materialPricePerKgByRow: Record<string, string>
+): FinalizeDraftLineItem[] {
+  const materialFamilyLabel = MATERIAL_TYPE_LABELS[materialType];
+  return parts.map((p) => {
+    const { grade, finish } = splitMaterialGradeAndFinish(p.material);
+    const q = Math.max(0, Math.floor(p.qty));
+    const lineWeightKg = Math.max(0, p.weightKg) * q;
+    const key = materialPricingRowKey(p, materialType);
+    const pricePerKg = parseMaterialPricePerKg(materialPricePerKgByRow[key] ?? "");
+    const lineSell = Math.max(0, lineWeightKg * pricePerKg);
+    return {
+      part_number: p.partName,
+      qty: p.qty,
+      thickness_mm: p.thicknessMm,
+      material_type: materialFamilyLabel,
+      material_grade: grade === "—" ? "" : grade,
+      finish: finish === "—" ? "" : finish,
+      width_mm: p.widthMm,
+      length_mm: p.lengthMm,
+      area_m2: roundN(p.areaM2 * q, 6),
+      weight_kg: roundN(lineWeightKg, 6),
+      line_total: roundN(lineSell, 6),
+      plate_shape: p.bendTemplateId ?? "flat",
+      description: (p.notes ?? "").trim(),
+      source_row_id: p.id,
+    };
+  });
 }

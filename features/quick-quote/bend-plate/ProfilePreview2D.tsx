@@ -50,9 +50,9 @@ function arcPathBetweenRays(
   return parts.join(" ");
 }
 
-/** Slate dimension strokes — same family as plate builder feature dims (`#64748b`). */
-const DIM_STROKE = "#94a3b8";
-const DIM_STROKE_MUTED = "#64748b";
+/** Dimension graphics — neutral gray (lighter than prior slate for softer CAD dims). */
+const DIM_STROKE = "#9ca3af";
+const DIM_STROKE_MUTED = "#6b7280";
 /** Profile polyline + vertex markers (matches `<path stroke="…">`). */
 const PROFILE_STROKE = "hsl(142 70% 45%)";
 /**
@@ -60,7 +60,7 @@ const PROFILE_STROKE = "hsl(142 70% 45%)";
  * stays a thin hairline at any zoom — do not scale with viewBox (large values
  * look comically thick on screen when the diagram is wide).
  */
-const PROFILE_PATH_STROKE_WIDTH = 1.15;
+const PROFILE_PATH_STROKE_WIDTH = 1.15 / 1.25;
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.min(Math.max(n, lo), hi);
@@ -73,7 +73,7 @@ function angleArcStrokePx(
   fallbackArcStrokePx: number
 ): number {
   const legPx = legMinUser * meetScale;
-  return clamp(Math.min(legPx * 0.045, fallbackArcStrokePx * 1.15), 0.62, 1.28);
+  return clamp(Math.min(legPx * 0.045, fallbackArcStrokePx * 1.15), 0.62 / 1.25, 1.28 / 1.25);
 }
 
 /**
@@ -97,11 +97,12 @@ function annotationStylesForView(
   const labelFontUser = labelPx / scale;
   const segmentLabelFontUser = labelFontUser * 1.25 * 1.25;
 
-  const dimStrokePx = clamp(geomLongPx * 0.002, 0.72, 1.12);
+  /** 1.25× thinner than legacy dim strokes; dash segment lengths halved → twice as many dashes. */
+  const dimStrokePx = clamp(geomLongPx * 0.002, 0.72, 1.12) / 1.25;
   const extStrokePx = dimStrokePx * 0.92;
-  const dashLenPx = clamp(geomLongPx * 0.011, 3.2, 5.8);
-  const dashGapPx = clamp(geomLongPx * 0.0085, 2.4, 4.5);
-  const arcStrokePx = clamp(dimStrokePx * 1.05, 0.78, 1.18);
+  const dashLenPx = clamp(geomLongPx * 0.011, 3.2, 5.8) / 2;
+  const dashGapPx = clamp(geomLongPx * 0.0085, 2.4, 4.5) / 2;
+  const arcStrokePx = clamp(dimStrokePx * 1.05, 0.78 / 1.25, 1.18 / 1.25);
 
   return {
     meetScale: scale,

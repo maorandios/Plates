@@ -12,9 +12,9 @@ import { SegmentFaceKonvaHolesOverlay } from "./SegmentFaceKonvaHolesOverlay";
 
 /** Match ProfilePreview2D. */
 const PROFILE_STROKE = "hsl(142 70% 45%)";
-const DIM_STROKE = "#94a3b8";
-const DIM_STROKE_MUTED = "#64748b";
-const PROFILE_PATH_STROKE_WIDTH = 1.15;
+const DIM_STROKE = "#9ca3af";
+const DIM_STROKE_MUTED = "#6b7280";
+const PROFILE_PATH_STROKE_WIDTH = 1.15 / 1.25;
 
 const ED = "quote.bendPlatePhase.editor";
 
@@ -181,7 +181,7 @@ export function SegmentFacePreview2D({
               strokeLinecap="round"
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
-              strokeDasharray={svg.widthPlaceholder ? "6 4" : undefined}
+              strokeDasharray={svg.widthPlaceholder ? "3 2" : undefined}
               opacity={svg.widthPlaceholder ? 0.88 : 1}
             />
           </>
