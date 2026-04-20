@@ -63,20 +63,20 @@ export function DxfExcelCompareScreen({
   );
 
   return (
-    <div className="mt-3 min-w-0 w-full rounded-xl border border-white/10 bg-card sm:mt-4">
+    <div className="mt-3 min-w-0 w-full rounded-xl border border-border bg-card sm:mt-4">
       {/* Scrolls with the DXF phase panel — not a separate sticky band */}
-      <div className="border-b border-white/10 px-4 pb-4 pt-4 sm:px-6 sm:pb-5 sm:pt-5">
+      <div className="border-b border-border px-4 pb-4 pt-4 sm:px-6 sm:pb-5 sm:pt-5">
         <div className="flex flex-wrap items-start justify-between gap-3 gap-y-2">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
             <h2 className="text-pretty text-lg font-semibold leading-snug text-foreground sm:text-xl">
               {t("quote.dxfPhase.excelDxfCompare.title")}
             </h2>
             <span
-              className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/[0.14] px-3 py-1 text-xs font-medium text-primary/90 dark:text-primary/80"
+              className="inline-flex items-center gap-2 rounded-full border border-[#7123F7] bg-[#F4EEFF] px-3 py-1 text-xs font-medium text-[#4a2563]"
               role="status"
             >
               <span
-                className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_0_2px_rgb(106_35_247/0.35)]"
+                className="h-2 w-2 shrink-0 rounded-full bg-[#7123F7] shadow-[0_0_0_2px_rgb(113_35_247/0.35)]"
                 aria-hidden
               />
               {t("quote.dxfPhase.excelDxfCompare.rowsCheckedLine", {
@@ -186,7 +186,7 @@ function CompareTooltipColumnHeader({
     <div
       className={cn(
         "flex items-center justify-center gap-1.5 px-3 py-2.5 text-center font-semibold text-muted-foreground",
-        withEndBorder && "border-e border-white/10"
+        withEndBorder && "border-e border-border"
       )}
     >
       <Icon className="size-[1.15em] shrink-0 opacity-80" aria-hidden />
@@ -199,11 +199,11 @@ function CompareTooltipColumnHeader({
 function TooltipNumericValueCell({ unit, value }: { unit: string; value: string }) {
   return (
     <div
-      className="flex flex-row items-center justify-center gap-2 px-3 py-3 tabular-nums text-white"
+      className="flex flex-row items-center justify-center gap-2 px-3 py-3 tabular-nums text-foreground"
       dir="ltr"
     >
-      <span className="shrink-0 text-white">{unit}</span>
-      <span className="min-w-0 text-white">{value}</span>
+      <span className="shrink-0 text-foreground">{unit}</span>
+      <span className="min-w-0 font-semibold text-foreground">{value}</span>
     </div>
   );
 }
@@ -333,7 +333,7 @@ function CompareMetricCard({
       <TooltipTrigger asChild>
         <Card
           className={cn(
-            "cursor-help border-white/[0.1] bg-gradient-to-b from-card to-card/80 shadow-sm transition-colors hover:bg-white/[0.04]",
+            "cursor-help border-border bg-gradient-to-b from-card to-card/80 shadow-sm transition-colors hover:bg-white/[0.04]",
             result.matches
               ? "ring-1 ring-primary/20 hover:ring-primary/35"
               : "ring-1 ring-amber-500/30 bg-amber-500/[0.03] hover:ring-amber-500/45"
@@ -372,7 +372,7 @@ function CompareMetricCard({
       <TooltipContent
         side="top"
         sideOffset={8}
-        className="max-w-[24rem] border-white/15 bg-popover px-5 py-4 text-center text-sm leading-relaxed shadow-lg"
+        className="max-w-[24rem] border-border bg-popover px-5 py-4 text-center text-sm leading-relaxed text-popover-foreground shadow-lg"
         dir="ltr"
       >
         <div className="mx-auto flex w-full max-w-full flex-col items-center justify-center gap-3 text-center">
@@ -384,7 +384,7 @@ function CompareMetricCard({
           </p>
           {variant === "material" ? (
             <>
-              <div dir="ltr" className="w-full overflow-hidden rounded-md border border-white/10 leading-tight">
+              <div dir="ltr" className="w-full overflow-hidden rounded-md border border-border leading-tight">
                 <div className="grid grid-cols-2 bg-muted/40">
                   <CompareTooltipColumnHeader
                     icon={FileCode}
@@ -396,16 +396,16 @@ function CompareMetricCard({
                     label={t(`${m}.cardTooltipColExcel`)}
                   />
                 </div>
-                <div className="grid grid-cols-2 divide-x divide-white/10 bg-popover/90">
+                <div className="grid grid-cols-2 divide-x divide-border bg-popover">
                   <div
                     dir="rtl"
-                    className="flex items-center justify-center px-3 py-3 text-center text-white"
+                    className="flex items-center justify-center px-3 py-3 text-center text-foreground"
                   >
                     {t(`${m}.cardTooltipMaterialColDxfHint`)}
                   </div>
                   <div
                     dir="rtl"
-                    className="flex items-center justify-center px-3 py-3 text-center text-white"
+                    className="flex items-center justify-center px-3 py-3 text-center text-foreground"
                   >
                     {t(`${m}.cardTooltipMaterialColExcelHint`)}
                   </div>
@@ -413,7 +413,7 @@ function CompareMetricCard({
               </div>
               <p
                 dir="rtl"
-                className="w-full border-t border-white/10 pt-3 text-pretty text-center leading-relaxed text-white"
+                className="w-full border-t border-border pt-3 text-pretty text-center leading-relaxed text-foreground"
               >
                 {materialMismatchRows === 0
                   ? t(`${m}.cardTooltipMaterialAnalysisAllMatch`)
@@ -425,7 +425,7 @@ function CompareMetricCard({
             </>
           ) : totals ? (
             <>
-              <div dir="ltr" className="w-full overflow-hidden rounded-md border border-white/10 leading-tight">
+              <div dir="ltr" className="w-full overflow-hidden rounded-md border border-border leading-tight">
                 <div className="grid grid-cols-2 bg-muted/40">
                   <CompareTooltipColumnHeader
                     icon={FileCode}
@@ -437,14 +437,14 @@ function CompareMetricCard({
                     label={t(`${m}.cardTooltipColExcel`)}
                   />
                 </div>
-                <div className="grid grid-cols-2 divide-x divide-white/10 bg-popover/90">
+                <div className="grid grid-cols-2 divide-x divide-border bg-popover">
                   <TooltipNumericValueCell unit={totals.dxf.unit} value={totals.dxf.value} />
                   <TooltipNumericValueCell unit={totals.excel.unit} value={totals.excel.value} />
                 </div>
               </div>
               <p
                 dir="rtl"
-                className="w-full border-t border-white/10 pt-3 text-pretty text-center leading-relaxed text-white"
+                className="w-full border-t border-border pt-3 text-pretty text-center leading-relaxed text-foreground"
               >
                 {numericTooltipAnalysisText(m, variant, result)}
               </p>

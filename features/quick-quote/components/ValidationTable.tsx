@@ -42,9 +42,12 @@ const MISMATCH_CELL_CLASS =
   "bg-amber-500/[0.06] font-medium text-amber-600 dark:bg-amber-500/[0.08] dark:text-amber-400";
 
 /** Section dividers — physical left edge so header/body align in RTL table. */
-const SEC_BORDER = "border-l border-white/[0.12]";
-/** Lighter split between Excel | DXF within a section. */
-const INNER_BORDER = "border-l border-white/[0.06]";
+const SEC_BORDER = "border-l border-border";
+/** Split between Excel | DXF within a section (same token — visible on light surfaces). */
+const INNER_BORDER = "border-l border-border";
+
+/** Filter row: paler field fill than default `bg-input` on light theme. */
+const FILTER_FIELD_SURFACE = "border-border bg-white dark:bg-input";
 
 function SectionGroupTitle({
   titleKey,
@@ -99,7 +102,7 @@ function statusBadge(status: ValidationRowStatus) {
       return (
         <Badge
           variant="outline"
-          className="border-primary/40 bg-primary/10 font-medium text-primary/90 dark:text-primary/80"
+          className="border-[#00E35F] bg-[#D2FFEE] font-medium text-[#14765F]"
         >
           {t(`${VT}.exportStatusOk`)}
         </Badge>
@@ -200,7 +203,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
               placeholder={t(`${VT}.searchPlaceholder`)}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 ps-8"
+              className={cn("h-9 ps-8", FILTER_FIELD_SURFACE)}
             />
           </div>
           <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
@@ -209,7 +212,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                 {t(`${VT}.filterThicknessLabel`)}
               </span>
               <Select value={thicknessFilter} onValueChange={setThicknessFilter}>
-                <SelectTrigger className="h-9 w-full">
+                <SelectTrigger className={cn("h-9 w-full", FILTER_FIELD_SURFACE)}>
                   <SelectValue placeholder={t(`${VT}.allThicknesses`)} />
                 </SelectTrigger>
                 <SelectContent>
@@ -227,7 +230,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                 {t(`${VT}.filterMaterialLabel`)}
               </span>
               <Select value={materialFilter} onValueChange={setMaterialFilter}>
-                <SelectTrigger className="h-9 w-full">
+                <SelectTrigger className={cn("h-9 w-full", FILTER_FIELD_SURFACE)}>
                   <SelectValue placeholder={t(`${VT}.allMaterials`)} />
                 </SelectTrigger>
                 <SelectContent>
@@ -245,7 +248,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                 {t(`${VT}.filterStatusLabel`)}
               </span>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-full">
+                <SelectTrigger className={cn("h-9 w-full", FILTER_FIELD_SURFACE)}>
                   <SelectValue placeholder={t(`${VT}.allStatuses`)} />
                 </SelectTrigger>
                 <SelectContent>
@@ -271,14 +274,14 @@ export function ValidationTable({ rows }: ValidationTableProps) {
       </div>
 
       <TooltipProvider delayDuration={250}>
-        <div className="min-w-0 rounded-md border border-white/[0.08]">
+        <div className="min-w-0 rounded-md border border-border">
           <Table
             dir="rtl"
             className="min-w-[1080px] border-separate border-spacing-0"
             containerClassName="overflow-visible"
           >
-            <TableHeader className="sticky top-0 z-40 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_tr]:border-b-0">
-              <TableRow className="border-b-0 hover:bg-transparent">
+            <TableHeader className="sticky top-0 z-40 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card">
+              <TableRow className="border-b border-border hover:bg-transparent">
                 <TableHead
                   colSpan={3}
                   className="sticky start-0 z-50 min-w-[180px] bg-card py-3 text-start shadow-[1px_0_0_0_hsl(var(--border)/0.35)]"
@@ -316,7 +319,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                   <SectionGroupTitle titleKey={`${VT}.groupStatus`} />
                 </TableHead>
               </TableRow>
-              <TableRow className="border-b-0 bg-card hover:bg-transparent [&_th]:bg-card">
+              <TableRow className="border-b border-border bg-card hover:bg-transparent [&_th]:bg-card">
                 <TableHead
                   className={cn(
                     "sticky start-0 z-50 min-w-[100px] bg-card py-3 text-start text-xs font-medium text-muted-foreground shadow-[1px_0_0_0_hsl(var(--border)/0.35)]",
@@ -433,7 +436,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
+                <TableRow className="border-b border-border hover:bg-transparent">
                   <TableCell
                     colSpan={14}
                     className="h-20 text-center text-muted-foreground"
@@ -445,7 +448,10 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                 filtered.map((r) => (
                   <TableRow
                     key={r.id}
-                    className={cn(r.status === "error" && "bg-destructive/[0.04]")}
+                    className={cn(
+                      "border-b border-border",
+                      r.status === "error" && "bg-destructive/[0.04]"
+                    )}
                   >
                     <TableCell
                       className={cn(

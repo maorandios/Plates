@@ -205,7 +205,7 @@ export function GeneralSection({
               />
             </div>
           </div>
-          <ScrollArea className="h-[min(320px,45vh)] border-t border-white/[0.08]">
+          <ScrollArea className="h-[min(320px,45vh)] border-t border-border">
             <div className="p-3">
               {filteredClients.length === 0 ? (
                 <div
@@ -247,7 +247,7 @@ export function GeneralSection({
               )}
             </div>
           </ScrollArea>
-          <div className="flex justify-end border-t border-white/[0.08] bg-card/40 px-5 py-4">
+          <div className="flex justify-end border-t border-border bg-card/40 px-5 py-4">
             <Button
               type="button"
               variant="secondary"

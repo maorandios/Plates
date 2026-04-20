@@ -52,7 +52,7 @@ export function ClientsTable({
     "2.5rem minmax(200px, 2fr) repeat(7, minmax(0, 1fr))" as const;
 
   return (
-    <div className="rounded-xl overflow-hidden border border-white/[0.08]" dir="rtl">
+    <div className="rounded-xl overflow-hidden border border-border" dir="rtl">
       <Dialog
         open={!!clientPendingDelete}
         onOpenChange={(open) => {
@@ -101,31 +101,31 @@ export function ClientsTable({
       >
         <TableHeader className="contents">
           <TableRow className="contents border-0 hover:bg-transparent">
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border font-medium">
               {t("pages.clients.table.colIndex")}
             </TableHead>
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right font-medium">
               {t("pages.clients.table.colName")}
             </TableHead>
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right font-medium">
               {t("pages.clients.table.colCompanyReg")}
             </TableHead>
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right font-medium">
               {t("pages.clients.table.colClientId")}
             </TableHead>
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right tabular-nums font-medium">
               {t("pages.clients.table.colWeight")}
             </TableHead>
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right tabular-nums font-medium">
               {t("pages.clients.table.colArea")}
             </TableHead>
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right tabular-nums font-medium">
               {t("pages.clients.table.colPartQty")}
             </TableHead>
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border font-medium">
               {t("pages.clients.table.colView")}
             </TableHead>
-            <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium">
+            <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border font-medium">
               {t("pages.clients.table.colDelete")}
             </TableHead>
           </TableRow>
@@ -136,30 +136,30 @@ export function ClientsTable({
             const reg = c.companyRegistrationNumber?.trim();
             return (
               <TableRow key={c.id} className="contents border-0">
-                <TableCell className="text-center tabular-nums text-muted-foreground border-b border-white/[0.06]">
+                <TableCell className="text-center tabular-nums text-muted-foreground border-b border-border">
                   {index + 1}
                 </TableCell>
-                <TableCell className="min-w-0 text-right font-medium truncate border-b border-white/[0.06]">
+                <TableCell className="min-w-0 text-right font-medium truncate border-b border-border">
                   {c.fullName}
                 </TableCell>
-                <TableCell className="min-w-0 text-right text-sm text-muted-foreground tabular-nums border-b border-white/[0.06]">
+                <TableCell className="min-w-0 text-right text-sm text-muted-foreground tabular-nums border-b border-border">
                   <span className="block truncate">{reg || "—"}</span>
                 </TableCell>
-                <TableCell className="min-w-0 border-b border-white/[0.06] text-right">
+                <TableCell className="min-w-0 border-b border-border text-right">
                   <span className="font-mono text-sm font-bold tracking-wider block truncate">
                     {c.shortCode}
                   </span>
                 </TableCell>
-                <TableCell className="min-w-0 text-right tabular-nums border-b border-white/[0.06]">
+                <TableCell className="min-w-0 text-right tabular-nums border-b border-border">
                   {formatDecimal(m?.totalWeight ?? 0, 1)}
                 </TableCell>
-                <TableCell className="min-w-0 text-right tabular-nums border-b border-white/[0.06]">
+                <TableCell className="min-w-0 text-right tabular-nums border-b border-border">
                   {formatDecimal(m?.totalAreaM2 ?? 0, 2)}
                 </TableCell>
-                <TableCell className="min-w-0 text-right tabular-nums border-b border-white/[0.06]">
+                <TableCell className="min-w-0 text-right tabular-nums border-b border-border">
                   {formatInteger(m?.totalQuantity ?? 0)}
                 </TableCell>
-                <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] p-2">
+                <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border p-2">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -174,7 +174,7 @@ export function ClientsTable({
                     </Link>
                   </Button>
                 </TableCell>
-                <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] p-2">
+                <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border p-2">
                   <Button
                     variant="ghost"
                     size="icon"

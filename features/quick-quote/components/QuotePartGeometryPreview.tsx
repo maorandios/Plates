@@ -44,14 +44,15 @@ function RectangularPlateSvg({
   const vl = l * (1 + 2 * pad);
   const strokeW = Math.max(w, l) * 0.004;
   const fill =
-    rectStyle === "dxfPreviewModal" ? "#160822" : "hsl(var(--muted) / 0.35)";
+    rectStyle === "dxfPreviewModal" ? "#F4EEFF" : "hsl(var(--muted) / 0.35)";
   const stroke =
     rectStyle === "dxfPreviewModal" ? "#6A23F7" : "hsl(var(--primary))";
 
   return (
     <div
       className={cn(
-        "w-full min-h-[240px] rounded-xl border-0 bg-card/80 flex items-center justify-center p-4",
+        "flex w-full min-h-[240px] items-center justify-center rounded-xl border-0 p-4",
+        rectStyle === "dxfPreviewModal" ? "bg-transparent" : "bg-card/80",
         className
       )}
     >
@@ -82,7 +83,7 @@ interface QuotePartGeometryPreviewProps {
   className?: string;
   /**
    * When there is no DXF geometry, style the nominal rectangle like the DXF part preview modal
-   * (dark green fill + mint stroke).
+   * (lavender fill #F4EEFF + brand purple stroke).
    */
   rectangleAppearance?: "default" | "dxfPreviewModal";
 }
@@ -127,7 +128,10 @@ export function QuotePartGeometryPreview({
       <GeometryPreviewErrorBoundary fallback={rectFallback}>
         <div
           className={cn(
-            "w-full min-h-[240px] rounded-xl border-0 bg-white/[0.03] overflow-hidden flex items-center justify-center",
+            "flex w-full min-h-[240px] items-center justify-center overflow-hidden rounded-xl border-0",
+            rectangleAppearance === "dxfPreviewModal"
+              ? "bg-transparent"
+              : "bg-white/[0.03]",
             className
           )}
         >

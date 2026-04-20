@@ -65,7 +65,7 @@ export function CalculationsSection({
   if (parts.length === 0) {
     return (
       <section dir="rtl">
-        <div className="rounded-md border border-dashed border-white/15 px-4 py-12 text-center text-sm leading-relaxed text-muted-foreground">
+        <div className="rounded-md border border-dashed border-border px-4 py-12 text-center text-sm leading-relaxed text-muted-foreground">
           {t(`${PF}.calculationsEmptyCard`)}
         </div>
       </section>
@@ -74,7 +74,7 @@ export function CalculationsSection({
 
   return (
     <section dir="rtl">
-      <div className="overflow-x-auto rounded-md border border-white/[0.08]">
+      <div className="overflow-x-auto rounded-md border border-border">
         <Table
           dir="rtl"
           containerClassName="overflow-visible"
@@ -141,7 +141,7 @@ export function CalculationsSection({
               </TableRow>
             ))}
           </TableBody>
-          <TableFooter className="border-t border-white/10 bg-muted/35 p-0 [&>tr]:border-b-0">
+          <TableFooter className="border-t border-border bg-muted/35 p-0 [&>tr]:border-b-0">
             <TableRow className="border-0 bg-transparent hover:bg-transparent data-[state=selected]:bg-transparent">
               <TableCell colSpan={5} className="bg-inherit py-3.5" />
               <TableCell className="bg-black/[0.22] py-3.5 text-start align-middle dark:bg-black/35">

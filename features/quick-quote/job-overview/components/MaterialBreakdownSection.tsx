@@ -49,7 +49,7 @@ export function MaterialBreakdownSection({
       {stockRows.length === 0 ? (
         <Card className="shadow-sm overflow-hidden">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-white/15 rounded-xl leading-relaxed px-2">
+            <p className="text-sm text-muted-foreground py-16 text-center border border-dashed border-border rounded-xl leading-relaxed px-2">
               {parts.length === 0
                 ? t(`${QA}.noPartRows`)
                 : !thicknessStockProvided

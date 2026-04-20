@@ -160,7 +160,7 @@ export function DxfQuotePhase({
       dir="rtl"
     >
       <div className="flex min-h-0 min-w-0 flex-1 gap-0">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-border bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold text-foreground leading-snug">
               {t("quote.dxfPhase.sidebarTitle")}
@@ -170,7 +170,7 @@ export function DxfQuotePhase({
             </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border">
             <MethodPhaseMetricStrip
               icon={Package}
               label={t("methodMetrics.quantity")}
@@ -221,7 +221,7 @@ export function DxfQuotePhase({
 
       {/* Full viewport width — same pattern as method picker: sidebar ends above this bar */}
       <div
-        className="shrink-0 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+        className="shrink-0 border-t border-border bg-card/60 px-4 py-3 sm:px-5"
         dir="ltr"
       >
         <div className="flex flex-wrap items-center justify-start gap-2">

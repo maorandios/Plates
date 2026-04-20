@@ -188,17 +188,17 @@ export default function ClientDetailPage() {
           {t("clientDetail.projectsTitle")}
         </h2>
         {projects.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 border border-dashed border-white/15 rounded-xl text-center px-4">
+          <p className="text-sm text-muted-foreground py-8 border border-dashed border-border rounded-xl text-center px-4">
             {t("clientDetail.projectsEmpty")}
           </p>
         ) : (
           <div
-            className="rounded-xl overflow-hidden border border-white/[0.08]"
+            className="rounded-xl overflow-hidden border border-border"
             dir="rtl"
           >
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent border-white/[0.08]">
+                <TableRow className="hover:bg-transparent border-border">
                   <TableHead className="w-10 text-center font-medium">
                     {t("clientDetail.table.colIndex")}
                   </TableHead>
@@ -233,7 +233,7 @@ export default function ClientDetailPage() {
               </TableHeader>
               <TableBody>
                 {projects.map((q, index) => (
-                  <TableRow key={q.id} className="border-white/[0.06]">
+                  <TableRow key={q.id} className="border-border">
                     <TableCell className="text-center tabular-nums text-muted-foreground">
                       {index + 1}
                     </TableCell>
@@ -325,7 +325,7 @@ function SummaryCard({
   icon: LucideIcon;
 }) {
   return (
-    <Card className="flex h-full min-h-[11rem] flex-col border border-white/[0.08] shadow-none">
+    <Card className="flex h-full min-h-[11rem] flex-col border border-border shadow-none">
       <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center sm:gap-3.5 sm:px-5 sm:py-9">
         <Icon
           className="h-7 w-7 shrink-0 text-muted-foreground/55 sm:h-8 sm:w-8"

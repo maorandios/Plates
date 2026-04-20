@@ -63,7 +63,7 @@ export function ListScreenHebrewDatePicker({
           type="button"
           variant="outline"
           className={cn(
-            "h-10 w-full min-w-[11rem] justify-between gap-2 border-white/[0.12] bg-background px-3 font-normal text-start sm:w-[14rem]",
+            "h-10 w-full min-w-[11rem] justify-between gap-2 border-border bg-background px-3 font-normal text-start sm:w-[14rem]",
             !selected && "text-muted-foreground"
           )}
           aria-label={t("listScreen.dateLabel")}
@@ -73,7 +73,7 @@ export function ListScreenHebrewDatePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-auto border border-white/10 bg-popover p-0 text-popover-foreground shadow-xl"
+        className="w-auto border border-border bg-popover p-0 text-popover-foreground shadow-xl"
         align="start"
         dir="rtl"
       >
@@ -104,7 +104,7 @@ export function ListScreenHebrewDatePicker({
             defaultMonth={selected ?? new Date()}
           />
           {selected ? (
-            <div className="border-t border-white/10 pt-2">
+            <div className="border-t border-border pt-2">
               <button
                 type="button"
                 className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"

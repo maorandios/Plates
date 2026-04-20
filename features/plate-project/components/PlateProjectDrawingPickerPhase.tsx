@@ -66,7 +66,7 @@ export function PlateProjectDrawingPickerPhase({
       )}
     >
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-border bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
               {t("plateProject.drawingPhase.title")}
@@ -76,7 +76,7 @@ export function PlateProjectDrawingPickerPhase({
             </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border">
             <MethodPhaseMetricStrip
               icon={Package}
               label={t("methodMetrics.quantity")}
@@ -98,7 +98,7 @@ export function PlateProjectDrawingPickerPhase({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <div className="shrink-0 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4">
+          <div className="shrink-0 border-b border-border bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4">
             {/* Physical layout: reset = left, copy = right (grid avoids parent RTL flex quirks). */}
             <div
               className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3"

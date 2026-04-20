@@ -166,13 +166,13 @@ export default function ProjectsPage() {
           />
           {filteredRows.length === 0 ? (
             <div
-              className="rounded-xl border border-white/[0.08] px-4 py-12 text-center text-sm text-muted-foreground"
+              className="rounded-xl border border-border px-4 py-12 text-center text-sm text-muted-foreground"
               dir="rtl"
             >
               {t("listScreen.noMatch")}
             </div>
           ) : (
-        <div className="overflow-x-auto rounded-xl border border-white/[0.08]" dir="rtl">
+        <div className="overflow-x-auto rounded-xl border border-border" dir="rtl">
           <div className="min-w-[1140px] px-3 sm:px-5">
             <Table
               className="grid w-full border-collapse border-spacing-0 [&_thead]:contents [&_tbody]:contents [&_tr]:contents"
@@ -180,37 +180,37 @@ export default function ProjectsPage() {
             >
               <TableHeader className="contents">
                 <TableRow className="contents border-0 hover:bg-transparent">
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] text-xs font-medium sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border text-xs font-medium sm:text-sm">
                     {t("projects.colIndex")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right text-xs font-medium sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right text-xs font-medium sm:text-sm">
                     {t("projects.colClient")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right text-xs font-medium sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right text-xs font-medium sm:text-sm">
                     {t("projects.colProject")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right text-xs font-medium sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right text-xs font-medium sm:text-sm">
                     {t("projects.colReference")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right text-xs font-medium sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right text-xs font-medium sm:text-sm">
                     {t("projects.colCreated")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right text-xs font-medium tabular-nums sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right text-xs font-medium tabular-nums sm:text-sm">
                     {t("projects.colMaterial")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right text-xs font-medium tabular-nums sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right text-xs font-medium tabular-nums sm:text-sm">
                     {t("projects.colTotalWeight")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right text-xs font-medium tabular-nums sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right text-xs font-medium tabular-nums sm:text-sm">
                     {t("projects.colTotalArea")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] text-xs font-medium sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border text-xs font-medium sm:text-sm">
                     {t("projects.colStatus")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] text-xs font-medium sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border text-xs font-medium sm:text-sm">
                     {t("projects.colView")}
                   </TableHead>
-                  <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] pe-1 text-xs font-medium sm:pe-2 sm:text-sm">
+                  <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border pe-1 text-xs font-medium sm:pe-2 sm:text-sm">
                     {t("projects.colDelete")}
                   </TableHead>
                 </TableRow>
@@ -225,39 +225,39 @@ export default function ProjectsPage() {
                       key={p.id}
                       className="group/row contents border-0 hover:bg-white/[0.02]"
                     >
-                      <TableCell className="border-b border-white/[0.06] text-center text-sm tabular-nums text-muted-foreground">
+                      <TableCell className="border-b border-border text-center text-sm tabular-nums text-muted-foreground">
                         {index + 1}
                       </TableCell>
-                      <TableCell className="min-w-0 border-b border-white/[0.06] text-right font-medium">
+                      <TableCell className="min-w-0 border-b border-border text-right font-medium">
                         <span className="block truncate" title={p.customerName || undefined}>
                           {p.customerName?.trim() || "—"}
                         </span>
                       </TableCell>
-                      <TableCell className="min-w-0 border-b border-white/[0.06] text-right text-sm">
+                      <TableCell className="min-w-0 border-b border-border text-right text-sm">
                         <span className="block truncate" title={p.projectName?.trim() || undefined}>
                           {p.projectName?.trim() || "—"}
                         </span>
                       </TableCell>
-                      <TableCell className="min-w-0 border-b border-white/[0.06] text-right">
+                      <TableCell className="min-w-0 border-b border-border text-right">
                         <span className="block truncate font-mono text-sm" title={p.referenceNumber}>
                           {p.referenceNumber}
                         </span>
                       </TableCell>
-                      <TableCell className="min-w-0 whitespace-nowrap border-b border-white/[0.06] text-right text-sm tabular-nums text-muted-foreground">
+                      <TableCell className="min-w-0 whitespace-nowrap border-b border-border text-right text-sm tabular-nums text-muted-foreground">
                         {formatCreated(p.createdAt)}
                       </TableCell>
-                      <TableCell className="min-w-0 border-b border-white/[0.06] text-right text-sm">
+                      <TableCell className="min-w-0 border-b border-border text-right text-sm">
                         <span className="block truncate" title={mat}>
                           {mat}
                         </span>
                       </TableCell>
-                      <TableCell className="min-w-0 border-b border-white/[0.06] text-right text-sm tabular-nums">
+                      <TableCell className="min-w-0 border-b border-border text-right text-sm tabular-nums">
                         {w != null && Number.isFinite(w) ? formatDecimal(w, 1) : "—"}
                       </TableCell>
-                      <TableCell className="min-w-0 border-b border-white/[0.06] text-right text-sm tabular-nums">
+                      <TableCell className="min-w-0 border-b border-border text-right text-sm tabular-nums">
                         {a != null && Number.isFinite(a) ? formatDecimal(a, 2) : "—"}
                       </TableCell>
-                      <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] px-1">
+                      <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border px-1">
                         <Select
                           value={p.status}
                           onValueChange={(v) =>
@@ -287,7 +287,7 @@ export default function ProjectsPage() {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] px-2 py-2">
+                      <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border px-2 py-2">
                         <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" asChild>
                           <Link
                             href={`/projects/${encodeURIComponent(p.id)}/preview`}
@@ -297,7 +297,7 @@ export default function ProjectsPage() {
                           </Link>
                         </Button>
                       </TableCell>
-                      <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] py-2 pe-1 ps-2 sm:pe-2">
+                      <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border py-2 pe-1 ps-2 sm:pe-2">
                         <Button
                           type="button"
                           variant="ghost"
@@ -329,7 +329,7 @@ export default function ProjectsPage() {
         <DialogContent
           dir="rtl"
           showCloseButton={false}
-          className="max-w-md border-white/10 text-start sm:text-start"
+          className="max-w-md border-border text-start sm:text-start"
         >
           <DialogHeader className="text-start sm:text-start">
             <DialogTitle>{t("projects.removeDialogTitle")}</DialogTitle>

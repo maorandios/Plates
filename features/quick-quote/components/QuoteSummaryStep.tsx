@@ -35,7 +35,7 @@ export function QuoteSummaryStep({
   return (
     <div className="space-y-8 pb-12" dir="rtl">
       <div className="ds-surface overflow-hidden print:shadow-none">
-        <div className="ds-surface-header py-5 sm:px-6 border-b border-white/[0.06]">
+        <div className="ds-surface-header py-5 sm:px-6 border-b border-border">
           <div className="min-w-0 space-y-1.5 text-start">
             <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
               {t(`${QA}.pageTitle`)}

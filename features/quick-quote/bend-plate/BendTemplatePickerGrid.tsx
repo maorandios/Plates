@@ -78,9 +78,9 @@ export function BendTemplatePickerGrid({
               "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               /* Selection: one inset stroke only — avoids double borders + outer ring fighting rounded corners */
               hasData &&
-                "border-white/[0.12] shadow-[0_0_32px_-14px_hsl(var(--primary)/0.5)] ring-2 ring-inset ring-primary hover:ring-primary",
+                "border-border shadow-[0_0_32px_-14px_hsl(var(--primary)/0.5)] ring-2 ring-inset ring-primary hover:ring-primary",
               !hasData &&
-                "border-white/[0.08] hover:border-primary/35 hover:bg-card/90 hover:shadow-[0_0_24px_-16px_hsl(var(--primary)/0.25)]"
+                "border-border hover:border-primary/35 hover:bg-card/90 hover:shadow-[0_0_24px_-16px_hsl(var(--primary)/0.25)]"
             )}
           >
             {plateCount > 0 ? (
@@ -110,7 +110,7 @@ export function BendTemplatePickerGrid({
                 "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5",
                 hasData
                   ? "border-primary/30 bg-primary/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                  : "border-white/[0.12] bg-muted/35"
+                  : "border-border bg-muted/35"
               )}
               dir="rtl"
             >

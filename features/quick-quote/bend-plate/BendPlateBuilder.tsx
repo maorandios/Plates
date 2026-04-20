@@ -125,7 +125,7 @@ const SEGMENT_DIM_BOX =
 
 /** Bent-plate editor right panel cards (dark sidebar). */
 const EDITOR_PANEL_CARD =
-  "border border-white/[0.08] bg-card/50 shadow-none";
+  "border border-border bg-card/50 shadow-none";
 const EDITOR_CARD_TITLE = "text-sm font-semibold leading-tight text-foreground";
 
 const TEMPLATE_IDS: BendTemplateId[] = ["l", "u", "z", "omega", "gutter", "plate", "custom"];
@@ -499,7 +499,7 @@ function BendPlateHub({
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-0", BEND_HUB_VIEWPORT)} dir="rtl">
       <div className="flex min-h-0 min-w-0 flex-1 gap-0">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-border bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold text-foreground leading-snug">
               {t(`${BP}.sidebarTitle`)}
@@ -507,7 +507,7 @@ function BendPlateHub({
             <p className="text-sm text-muted-foreground leading-relaxed">{t(`${BP}.sidebarIntro`)}</p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border">
             <MethodPhaseMetricStrip
               icon={Package}
               label={t("methodMetrics.quantity")}
@@ -569,7 +569,7 @@ function BendPlateHub({
                 </div>
               ) : (
                 <>
-                  <div className="max-h-[min(70vh,800px)] overflow-auto rounded-md border border-white/[0.08] bg-card">
+                  <div className="max-h-[min(70vh,800px)] overflow-auto rounded-md border border-border bg-card">
                     <Table
                       className="border-separate border-spacing-0"
                       containerClassName="overflow-visible"
@@ -713,7 +713,7 @@ function BendPlateHub({
       </div>
 
       <div
-        className="shrink-0 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+        className="shrink-0 border-t border-border bg-card/60 px-4 py-3 sm:px-5"
         dir="ltr"
       >
         <div className="flex flex-wrap items-center justify-start gap-2">
@@ -1403,7 +1403,7 @@ function BendPlateShapeEditor({
     <div className={cn(BEND_PLATE_FILL)} dir="rtl">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          <aside className="flex w-[min(100%,23.4375rem)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60 sm:w-[min(100%,26.5625rem)]">
+          <aside className="flex w-[min(100%,23.4375rem)] shrink-0 flex-col border-e border-border bg-card/60 sm:w-[min(100%,26.5625rem)]">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
               {editorSidebarScreen === "hub" ? (
                 <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
@@ -1673,7 +1673,7 @@ function BendPlateShapeEditor({
                                   "w-full rounded-lg border px-3 py-2.5 text-right transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                   holeViewSegmentIndex === null
                                     ? "border-primary bg-primary/12 shadow-sm ring-1 ring-primary/35"
-                                    : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                                    : "border-border bg-white/[0.03] hover:bg-white/[0.06]"
                                 )}
                               >
                                 <span className="block text-sm font-semibold tabular-nums leading-snug">
@@ -1700,7 +1700,7 @@ function BendPlateShapeEditor({
                                         ? "border-primary bg-primary/12 shadow-sm ring-1 ring-primary/35"
                                         : hasHoles
                                           ? "border-primary/70 bg-primary/[0.07] ring-1 ring-primary/25"
-                                          : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                                          : "border-border bg-white/[0.03] hover:bg-white/[0.06]"
                                     )}
                                   >
                                     <span className="block text-sm font-semibold tabular-nums leading-snug">
@@ -1723,7 +1723,7 @@ function BendPlateShapeEditor({
                             <Button
                               type="button"
                               variant="outline"
-                              className="flex w-full items-center justify-center rounded-lg border border-dashed border-white/15 bg-transparent px-3 py-3 text-sm font-medium transition-colors hover:bg-white/[0.04]"
+                              className="flex w-full items-center justify-center rounded-lg border border-dashed border-border bg-transparent px-3 py-3 text-sm font-medium transition-colors hover:bg-white/[0.04]"
                               onClick={addSegmentHole}
                             >
                               {t(`${ED}.holesAddPunchingNew`)}
@@ -1742,7 +1742,7 @@ function BendPlateShapeEditor({
                     ) : null}
                   </div>
 
-                  <div className="shrink-0 border-t border-white/10 pt-3">
+                  <div className="shrink-0 border-t border-border pt-3">
                     <div className="flex gap-2">
                       <Button
                         type="button"
@@ -1882,7 +1882,7 @@ function BendPlateShapeEditor({
         </div>
 
         <div
-          className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+          className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-t border-border bg-card/60 px-4 py-3 sm:px-5"
           dir="ltr"
         >
           <Button type="button" className="gap-2" onClick={handleSaveClick}>
@@ -1903,7 +1903,7 @@ function BendPlateShapeEditor({
 
       <Dialog open={preview3dOpen} onOpenChange={setPreview3dOpen}>
         <DialogContent className="max-w-[min(96vw,56rem)] gap-0 p-0" dir="rtl" showCloseButton={false}>
-          <DialogHeader className="border-b border-white/[0.08] px-6 py-4 sm:text-start">
+          <DialogHeader className="border-b border-border px-6 py-4 sm:text-start">
             <DialogTitle>{t(`${ED}.preview3dTitle`)}</DialogTitle>
             <DialogDescription className="text-sm">{t(`${ED}.preview3dDescription`)}</DialogDescription>
           </DialogHeader>
@@ -1920,7 +1920,7 @@ function BendPlateShapeEditor({
               className="h-full min-h-[min(64vh,500px)] w-full rounded-md border-0 bg-transparent"
             />
           </div>
-          <DialogFooter className="border-t border-white/[0.08] px-6 py-3">
+          <DialogFooter className="border-t border-border px-6 py-3">
             <Button type="button" variant="outline" onClick={() => setPreview3dOpen(false)}>
               {t(`${ED}.close`)}
             </Button>

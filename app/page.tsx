@@ -106,14 +106,14 @@ export default function DashboardPage() {
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-4">
           {/* RTL: first column = visual right = projects */}
-          <Card className="flex min-h-0 flex-1 flex-col border border-white/[0.08] bg-card/80 shadow-none">
-            <div className="shrink-0 border-b border-white/[0.06] px-4 py-3">
+          <Card className="flex min-h-0 flex-1 flex-col border border-border bg-card/80 shadow-none">
+            <div className="shrink-0 border-b border-border px-4 py-3">
               <h2 className="text-base font-semibold text-foreground sm:text-lg">
                 {t("dashboard.sectionProjects")}
               </h2>
             </div>
             <div className="shrink-0 px-4 pb-3 pt-1">
-              <div className="overflow-hidden rounded-md border border-white/[0.08] bg-white/[0.08]">
+              <div className="overflow-hidden rounded-md border border-border bg-white/[0.08]">
                 <div className="grid min-w-0 grid-cols-4 gap-px">
                   <div className="min-w-0 bg-card">
                     <DashboardSummaryMetricCard
@@ -163,7 +163,7 @@ export default function DashboardPage() {
             <div className="flex min-h-0 flex-1 flex-col justify-end p-4 pt-0">
               <Link
                 href="/plate-project"
-                className="group flex min-h-[5.5rem] w-full flex-1 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-5 text-center transition-colors hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:py-8"
+                className="group flex min-h-[5.5rem] w-full flex-1 items-center justify-center rounded-xl border border-border bg-white/[0.04] px-4 py-5 text-center transition-colors hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:py-8"
               >
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary sm:h-14 sm:w-14 sm:rounded-2xl">
@@ -181,14 +181,14 @@ export default function DashboardPage() {
             </div>
           </Card>
 
-          <Card className="flex min-h-0 flex-1 flex-col border border-white/[0.08] bg-card/80 shadow-none">
-            <div className="shrink-0 border-b border-white/[0.06] px-4 py-3">
+          <Card className="flex min-h-0 flex-1 flex-col border border-border bg-card/80 shadow-none">
+            <div className="shrink-0 border-b border-border px-4 py-3">
               <h2 className="text-base font-semibold text-foreground sm:text-lg">
                 {t("dashboard.sectionQuotes")}
               </h2>
             </div>
             <div className="shrink-0 px-4 pb-3 pt-1">
-              <div className="overflow-hidden rounded-md border border-white/[0.08] bg-white/[0.08]">
+              <div className="overflow-hidden rounded-md border border-border bg-white/[0.08]">
                 <div className="grid min-w-0 grid-cols-4 gap-px">
                   <div className="min-w-0 bg-card">
                     <DashboardSummaryMetricCard
@@ -238,7 +238,7 @@ export default function DashboardPage() {
             <div className="flex min-h-0 flex-1 flex-col justify-end p-4 pt-0">
               <Link
                 href="/quick-quote"
-                className="group flex min-h-[5.5rem] w-full flex-1 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-5 text-center transition-colors hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:py-8"
+                className="group flex min-h-[5.5rem] w-full flex-1 items-center justify-center rounded-xl border border-border bg-white/[0.04] px-4 py-5 text-center transition-colors hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:py-8"
               >
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 sm:h-14 sm:w-14 sm:rounded-2xl">

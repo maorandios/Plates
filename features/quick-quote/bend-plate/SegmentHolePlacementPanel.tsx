@@ -298,7 +298,7 @@ function EdgeInput({
       type="text"
       inputMode="decimal"
       data-edge={edge}
-      className="h-8 w-[3.75rem] border-white/15 bg-background/90 px-1.5 text-center font-mono text-xs tabular-nums shadow-sm"
+      className="h-8 w-[3.75rem] border-border bg-background/90 px-1.5 text-center font-mono text-xs tabular-nums shadow-sm"
       value={value}
       onFocus={onFocus}
       onChange={(e) => onChange(e.target.value)}
@@ -488,7 +488,7 @@ export function SegmentHolePlacementPanel({
 
   return (
     <div
-      className="pointer-events-auto absolute left-1/2 top-1/2 z-[70] max-h-[min(85vh,calc(100%-2rem))] w-[min(94vw,320px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-white/15 bg-card/98 p-3 shadow-2xl backdrop-blur-sm"
+      className="pointer-events-auto absolute left-1/2 top-1/2 z-[70] max-h-[min(85vh,calc(100%-2rem))] w-[min(94vw,320px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-card/98 p-3 shadow-2xl backdrop-blur-sm"
       dir="rtl"
       role="dialog"
       aria-modal="true"
@@ -549,7 +549,7 @@ export function SegmentHolePlacementPanel({
         </div>
       </div>
 
-      <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+      <div className="mt-4 space-y-3 border-t border-border pt-4">
         <div className="space-y-2">
           <Label className="text-xs font-normal text-muted-foreground" id="hole-kind-picker-label">
             {t(`${ED}.holesKind`)}
@@ -576,7 +576,7 @@ export function SegmentHolePlacementPanel({
                     "flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     active
                       ? "border-primary bg-primary/12 text-foreground shadow-sm"
-                      : "border-white/10 bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07] hover:text-foreground"
+                      : "border-border bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07] hover:text-foreground"
                   )}
                   aria-pressed={active}
                   aria-label={label}

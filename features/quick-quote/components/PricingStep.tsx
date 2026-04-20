@@ -34,7 +34,7 @@ export function PricingStep({
   return (
     <div className="space-y-8 pb-12" dir="rtl">
       <div className="ds-surface overflow-hidden">
-        <div className="border-b border-white/[0.08] bg-card/40 px-4 py-4 sm:px-6">
+        <div className="border-b border-border bg-card/40 px-4 py-4 sm:px-6">
           <h1 className="text-lg font-semibold tracking-tight text-foreground text-start">
             {t(`${PF}.pageTitle`)}
           </h1>

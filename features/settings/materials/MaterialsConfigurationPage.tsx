@@ -40,8 +40,8 @@ function MaterialTypeSettingsColumn({ materialType }: { materialType: MaterialTy
   const materialLabel = MATERIAL_TYPE_LABELS[materialType];
 
   return (
-    <div className="flex min-w-0 flex-col gap-6 rounded-xl border border-white/[0.08] bg-card/40 p-4 sm:p-5">
-      <h2 className="border-b border-white/10 pb-3 text-start text-base font-semibold text-foreground">
+    <div className="flex min-w-0 flex-col gap-6 rounded-xl border border-border bg-card/40 p-4 sm:p-5">
+      <h2 className="border-b border-border pb-3 text-start text-base font-semibold text-foreground">
         {t(`${SK}.columnHeading`, { material: materialLabel })}
       </h2>
       <MaterialPricingCard config={config} onUpdate={handleUpdate} />

@@ -95,10 +95,10 @@ function SheetCard({
 
   return (
     <div
-      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-card/60 shadow-sm"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card/60 shadow-sm"
       dir="rtl"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-white/[0.06] px-3 pb-2.5 pt-3">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border px-3 pb-2.5 pt-3">
         <div className="min-w-0 space-y-0.5 text-start">
           <p className="text-sm font-semibold leading-tight text-foreground">
             {title}
@@ -127,12 +127,12 @@ function SheetCard({
         <SheetSvg layout={layout} />
       </div>
 
-      <div className="mx-3.5 mb-4 mt-1 border-t border-white/[0.07] pt-4 sm:mx-4 sm:mb-5">
+      <div className="mx-3.5 mb-4 mt-1 border-t border-border pt-4 sm:mx-4 sm:mb-5">
         <div
           className={cn(
-            "overflow-hidden rounded-lg border border-white/[0.09] bg-muted/25 text-[13.75px] leading-snug text-muted-foreground shadow-[inset_0_1px_0_0_hsl(0_0%_100%/_0.04)]",
-            "flex flex-col divide-y divide-white/[0.12]",
-            "sm:flex-row sm:divide-x sm:divide-y-0 sm:divide-white/[0.12]"
+            "overflow-hidden rounded-lg border border-border bg-muted/25 text-[13.75px] leading-snug text-muted-foreground shadow-[inset_0_1px_0_0_hsl(0_0%_100%/_0.04)]",
+            "flex flex-col divide-y divide-border",
+            "sm:flex-row sm:divide-x sm:divide-y-0 sm:divide-border"
           )}
         >
           <div className="min-w-0 flex-1 px-4 py-3.5 text-center sm:px-5">
@@ -189,7 +189,7 @@ function buildGridCells(layouts: SheetLayout[]): GridCell[] {
 function MoreSheetsGridCell({ extraCount }: { extraCount: number }) {
   return (
     <div
-      className="flex min-h-[200px] min-w-0 flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-muted/25 px-4 py-6 text-center shadow-sm"
+      className="flex min-h-[200px] min-w-0 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/25 px-4 py-6 text-center shadow-sm"
       dir="rtl"
     >
       <p className="text-sm font-medium leading-relaxed text-muted-foreground">
@@ -326,7 +326,7 @@ export function NestingPreviewSection({
               key={thicknessMm}
               className={cn(
                 "overflow-hidden border bg-card/80 shadow-sm transition-colors",
-                "border-white/10",
+                "border-border",
                 open && "border-primary/25 bg-primary/[0.04]"
               )}
             >
@@ -361,7 +361,7 @@ export function NestingPreviewSection({
               </CardHeader>
 
               {open && (
-                <CardContent className="border-t border-white/10 bg-card/40 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4">
+                <CardContent className="border-t border-border bg-card/40 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4">
                   <SheetsTwoColumnGrid
                     layouts={layouts}
                     showThickness={!multipleThicknesses}

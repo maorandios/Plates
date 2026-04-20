@@ -54,7 +54,7 @@ export function QuickQuoteBottomBar({
   }
 
   return (
-    <div className="sticky bottom-0 z-30 w-full shrink-0 border-t border-white/[0.08] bg-background/95 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/85">
+    <div className="sticky bottom-0 z-30 w-full shrink-0 border-t border-border bg-background/95 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/85">
       <div className="mx-auto flex w-full max-w-none items-center justify-start rtl:justify-end gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center gap-2">
           {showBackBtn && (

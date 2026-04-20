@@ -127,10 +127,6 @@ html.light {
   --viewer-canvas: 220 14% 96%;
 }
 
-* {
-  border-color: hsl(var(--border));
-}
-
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
@@ -177,8 +173,9 @@ body {
     text-align: start;
   }
 
-  /* Dark scrollbars (Firefox + WebKit) */
+  /* Default border color (Tailwind `border-*` colors override). Dark scrollbars (Firefox + WebKit). */
   * {
+    border-color: hsl(var(--border));
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) hsl(var(--card));
   }
@@ -300,17 +297,17 @@ html.light .ds-empty-state {
  * utilities and the global `* { border-color }` rule cannot override these colors.
  */
 button.excel-dxf-mismatch-banner {
-  background-color: #1c0004 !important;
-  border-color: #ff007b !important;
-  color: #ff006f !important;
+  background-color: #ffd8e6 !important;
+  border-color: #f72378 !important;
+  color: #87003c !important;
   transition: background-color 0.15s ease;
 }
 button.excel-dxf-mismatch-banner:hover {
-  background-color: #3a1824 !important;
+  background-color: #ffcee0 !important;
 }
 button.excel-dxf-mismatch-banner:focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 2px rgb(255 0 123 / 0.55) !important;
+  box-shadow: 0 0 0 2px rgb(247 35 120 / 0.45) !important;
 }
 
 /* Quantity analysis metrics — same neon-on-dark language as Excel–DXF mismatch (green pair). */

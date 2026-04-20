@@ -162,13 +162,13 @@ export default function QuotesPage() {
           />
           {filteredRows.length === 0 ? (
             <div
-              className="rounded-xl border border-white/[0.08] px-4 py-12 text-center text-sm text-muted-foreground"
+              className="rounded-xl border border-border px-4 py-12 text-center text-sm text-muted-foreground"
               dir="rtl"
             >
               {t("listScreen.noMatch")}
             </div>
           ) : (
-        <div className="rounded-xl border border-white/[0.08] overflow-x-auto" dir="rtl">
+        <div className="rounded-xl border border-border overflow-x-auto" dir="rtl">
           <div className="min-w-[1140px] px-3 sm:px-5">
           <Table
             className="grid w-full border-collapse border-spacing-0 [&_thead]:contents [&_tbody]:contents [&_tr]:contents"
@@ -176,37 +176,37 @@ export default function QuotesPage() {
           >
             <TableHeader className="contents">
               <TableRow className="contents border-0 hover:bg-transparent">
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border font-medium text-xs sm:text-sm">
                   {t("quotes.colIndex")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right font-medium text-xs sm:text-sm">
                   {t("quotes.colClient")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right font-medium text-xs sm:text-sm">
                   {t("quotes.colProject")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right font-medium text-xs sm:text-sm">
                   {t("quotes.colReference")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right font-medium text-xs sm:text-sm">
                   {t("quotes.colCreated")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right tabular-nums font-medium text-xs sm:text-sm">
                   {t("quotes.colTotalWeight")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right tabular-nums font-medium text-xs sm:text-sm">
                   {t("quotes.colTotalArea")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-white/[0.08] text-right tabular-nums font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right tabular-nums font-medium text-xs sm:text-sm">
                   {t("quotes.colTotalInclVat")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border font-medium text-xs sm:text-sm">
                   {t("quotes.colStatus")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium text-xs sm:text-sm">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border font-medium text-xs sm:text-sm">
                   {t("quotes.colView")}
                 </TableHead>
-                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.08] font-medium text-xs sm:text-sm pe-1 sm:pe-2">
+                <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border font-medium text-xs sm:text-sm pe-1 sm:pe-2">
                   {t("quotes.colDelete")}
                 </TableHead>
               </TableRow>
@@ -218,37 +218,37 @@ export default function QuotesPage() {
                 const vat = q.totalInclVat;
                 return (
                   <TableRow key={q.id} className="contents border-0 group/row hover:bg-white/[0.02]">
-                    <TableCell className="text-center tabular-nums text-muted-foreground border-b border-white/[0.06] text-sm">
+                    <TableCell className="text-center tabular-nums text-muted-foreground border-b border-border text-sm">
                       {index + 1}
                     </TableCell>
-                    <TableCell className="min-w-0 text-right font-medium border-b border-white/[0.06]">
+                    <TableCell className="min-w-0 text-right font-medium border-b border-border">
                       <span className="block truncate" title={q.customerName || undefined}>
                         {q.customerName?.trim() || "—"}
                       </span>
                     </TableCell>
-                    <TableCell className="min-w-0 text-right text-sm border-b border-white/[0.06]">
+                    <TableCell className="min-w-0 text-right text-sm border-b border-border">
                       <span className="block truncate" title={q.projectName?.trim() || undefined}>
                         {q.projectName?.trim() || "—"}
                       </span>
                     </TableCell>
-                    <TableCell className="min-w-0 border-b border-white/[0.06] text-right">
+                    <TableCell className="min-w-0 border-b border-border text-right">
                       <span className="font-mono text-sm block truncate" title={q.referenceNumber}>
                         {q.referenceNumber}
                       </span>
                     </TableCell>
-                    <TableCell className="min-w-0 text-right text-muted-foreground text-sm tabular-nums whitespace-nowrap border-b border-white/[0.06]">
+                    <TableCell className="min-w-0 text-right text-muted-foreground text-sm tabular-nums whitespace-nowrap border-b border-border">
                       {formatCreated(q.createdAt)}
                     </TableCell>
-                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-white/[0.06]">
+                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-border">
                       {w != null && Number.isFinite(w) ? formatDecimal(w, 1) : "—"}
                     </TableCell>
-                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-white/[0.06]">
+                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-border">
                       {a != null && Number.isFinite(a) ? formatDecimal(a, 2) : "—"}
                     </TableCell>
-                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-white/[0.06]">
+                    <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-border">
                       {vat != null && Number.isFinite(vat) ? formatDecimal(vat, 2) : "—"}
                     </TableCell>
-                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] px-1">
+                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border px-1">
                       <Select
                         value={q.status}
                         onValueChange={(v) =>
@@ -280,7 +280,7 @@ export default function QuotesPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] px-2 py-2">
+                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border px-2 py-2">
                       <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" asChild>
                         <Link
                           href={`/quotes/${q.id}/preview`}
@@ -290,7 +290,7 @@ export default function QuotesPage() {
                         </Link>
                       </Button>
                     </TableCell>
-                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-white/[0.06] ps-2 py-2 pe-1 sm:pe-2">
+                    <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border ps-2 py-2 pe-1 sm:pe-2">
                       <Button
                         type="button"
                         variant="ghost"
@@ -322,7 +322,7 @@ export default function QuotesPage() {
         <DialogContent
           dir="rtl"
           showCloseButton={false}
-          className="max-w-md border-white/10 text-start sm:text-start"
+          className="max-w-md border-border text-start sm:text-start"
         >
           <DialogHeader className="text-start sm:text-start">
             <DialogTitle>{t("quotes.removeDialogTitle")}</DialogTitle>

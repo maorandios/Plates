@@ -23,7 +23,7 @@ export function PlateProjectStepper({
   onStepSelect,
 }: PlateProjectStepperProps) {
   return (
-    <div className="sticky top-0 z-40 w-full border-b border-white/[0.08] bg-background/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
+    <div className="sticky top-0 z-40 w-full border-b border-border bg-background/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
       <div className="px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex w-full min-w-0 items-center justify-between gap-2 overflow-x-auto">
           {STEP_KEYS.map((labelKey, index) => {
@@ -57,8 +57,8 @@ export function PlateProjectStepper({
                       !isCurrent &&
                         !isComplete &&
                         (isReachable
-                          ? "border-white/15 bg-card text-muted-foreground"
-                          : "border-white/[0.06] bg-muted/40 text-muted-foreground/45")
+                          ? "border-border bg-card text-muted-foreground"
+                          : "border-border bg-muted/40 text-muted-foreground/45")
                     )}
                   >
                     {isComplete ? (

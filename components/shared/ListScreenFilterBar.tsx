@@ -37,7 +37,7 @@ export function ListScreenFilterBar({
 }: ListScreenFilterBarProps) {
   return (
     <div
-      className="mb-4 flex flex-col gap-3 rounded-md border border-white/[0.08] bg-card px-4 py-3 sm:px-5 lg:flex-row lg:flex-wrap lg:items-end lg:gap-3"
+      className="mb-4 flex flex-col gap-3 rounded-md border border-border bg-card px-4 py-3 sm:px-5 lg:flex-row lg:flex-wrap lg:items-end lg:gap-3"
       dir="rtl"
     >
       <div className="min-w-0 flex-1 lg:min-w-[220px] lg:max-w-md">

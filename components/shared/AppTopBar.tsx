@@ -46,7 +46,7 @@ const navItemBase =
   "inline-flex h-9 max-w-full min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium leading-none tracking-tight transition-colors";
 
 const navItemIdle =
-  "border-transparent bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground";
+  "border-border bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground";
 
 /** Selected: purple outline + small purple indicator dot */
 const navItemActive =

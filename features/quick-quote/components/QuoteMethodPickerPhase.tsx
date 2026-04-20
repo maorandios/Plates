@@ -95,7 +95,7 @@ export function QuoteMethodPickerPhase({
       )}
     >
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-border bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
               {t("quoteMethodScreen.title")}
@@ -105,7 +105,7 @@ export function QuoteMethodPickerPhase({
             </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border">
             <MethodPhaseMetricStrip
               icon={Package}
               label={t("methodMetrics.quantity")}
@@ -128,7 +128,7 @@ export function QuoteMethodPickerPhase({
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
           <div
-            className="shrink-0 border-b border-white/[0.08] bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4"
+            className="shrink-0 border-b border-border bg-card/45 px-4 py-3.5 sm:px-6 sm:py-4"
             dir="rtl"
           >
             <p className="text-sm leading-relaxed text-foreground/90 sm:text-[15px]">
@@ -165,7 +165,7 @@ export function QuoteMethodPickerPhase({
                       hasData &&
                         "border-primary shadow-[0_0_28px_-10px_hsl(var(--primary)/0.55)] ring-2 ring-primary/50 hover:border-primary hover:ring-primary/60",
                       !hasData &&
-                        "border-white/[0.08] hover:border-primary/50 hover:bg-card/90"
+                        "border-border hover:border-primary/50 hover:bg-card/90"
                     )}
                   >
                     <div
@@ -187,7 +187,7 @@ export function QuoteMethodPickerPhase({
                         "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5",
                         hasData
                           ? "border-primary/30 bg-primary/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                          : "border-white/[0.12] bg-muted/35"
+                          : "border-border bg-muted/35"
                       )}
                       dir="rtl"
                     >

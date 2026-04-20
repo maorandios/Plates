@@ -563,25 +563,25 @@ export function PartBreakdownTable({
   const { finish: previewFinishLabel } = splitMaterialGradeAndFinish(p?.material ?? "");
 
   const headBase =
-    "sticky top-0 z-30 py-2 pe-3 ps-3 text-xs font-medium align-middle whitespace-nowrap bg-card border-e border-white/10";
+    "sticky top-0 z-30 py-2 pe-3 ps-3 text-xs font-medium align-middle whitespace-nowrap bg-card border-e border-border";
   const headStart = `${headBase} text-start`;
   const headNum = `${headBase} text-start tabular-nums`;
 
-  const cellBase = "py-2 pe-3 ps-3 align-middle text-sm border-b border-white/[0.06]";
+  const cellBase = "py-2 pe-3 ps-3 align-middle text-sm border-b border-border";
   const cellStart = `${cellBase} text-start`;
   const cellNum = `${cellBase} text-start tabular-nums`;
 
   return (
     <div className="mt-4 flex w-full min-w-0 flex-col gap-4 sm:mt-5" dir="rtl">
-      <div className="overflow-hidden rounded-md border border-white/[0.08] bg-card">
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <div
           className={cn(
             "grid grid-cols-2 items-stretch sm:grid-cols-4",
             /* Mobile 2×2 only: column + row dividers (don’t use odd/e rules on sm — they fight not-last-child) */
-            "max-sm:[&>*:nth-child(odd)]:border-e max-sm:[&>*:nth-child(odd)]:border-white/[0.08]",
-            "max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(n+3)]:border-white/[0.08]",
+            "max-sm:[&>*:nth-child(odd)]:border-e max-sm:[&>*:nth-child(odd)]:border-border",
+            "max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(n+3)]:border-border",
             /* sm+: vertical line between every card (all but the last) */
-            "sm:[&>*:not(:last-child)]:border-e sm:[&>*:not(:last-child)]:border-white/[0.08]"
+            "sm:[&>*:not(:last-child)]:border-e sm:[&>*:not(:last-child)]:border-border"
           )}
         >
           <SummaryMetricCard
@@ -643,7 +643,7 @@ export function PartBreakdownTable({
         </div>
       ) : null}
 
-      <div className="rounded-md border border-white/[0.08] bg-card px-4 py-3 sm:px-5">
+      <div className="rounded-md border border-border bg-card px-4 py-3 sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
           <div className="min-w-0 flex-1 lg:min-w-[220px] lg:max-w-md">
             <label
@@ -725,7 +725,7 @@ export function PartBreakdownTable({
         </div>
       </div>
 
-      <div className="rounded-md border border-white/[0.08] bg-card">
+      <div className="rounded-md border border-border bg-card">
         <Table
           dir="rtl"
           className={cn(
@@ -866,7 +866,7 @@ export function PartBreakdownTable({
                     <TableCell
                       className={cn(
                         cellStart,
-                        "text-xs font-medium min-w-0 border-e border-white/10",
+                        "text-xs font-medium min-w-0 border-e border-border",
                         STICKY_FIRST_CELL
                       )}
                     >
@@ -878,7 +878,7 @@ export function PartBreakdownTable({
                   <TableCell
                     className={cn(
                       cellStart,
-                      "font-medium min-w-0 border-e border-white/10",
+                      "font-medium min-w-0 border-e border-border",
                       !showRefColumn && STICKY_FIRST_CELL
                     )}
                   >
@@ -886,30 +886,30 @@ export function PartBreakdownTable({
                       {row.partName}
                     </span>
                   </TableCell>
-                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-border")}>
                     {row.qty}
                   </TableCell>
-                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-border")}>
                     {formatInteger(Math.round(row.thicknessMm))}
                   </TableCell>
-                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-border")}>
                     {formatDecimal(row.lengthMm, 2)}
                   </TableCell>
-                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-border")}>
                     {formatDecimal(row.widthMm, 2)}
                   </TableCell>
-                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-border")}>
                     {formatDecimal(row.areaM2, 3)}
                   </TableCell>
-                  <TableCell className={cn(cellNum, "text-xs border-e border-white/10")}>
+                  <TableCell className={cn(cellNum, "text-xs border-e border-border")}>
                     {formatDecimal(lineWeightKg, 2)}
                   </TableCell>
-                  <TableCell className={cn(cellStart, "text-xs min-w-0 border-e border-white/10")}>
+                  <TableCell className={cn(cellStart, "text-xs min-w-0 border-e border-border")}>
                     <span className="truncate block" title={grade}>
                       {grade}
                     </span>
                   </TableCell>
-                  <TableCell className={cn(cellStart, "text-xs min-w-0 border-e border-white/10")}>
+                  <TableCell className={cn(cellStart, "text-xs min-w-0 border-e border-border")}>
                     <span className="truncate block" title={finishLabel(finish)}>
                       {finishLabel(finish)}
                     </span>
@@ -918,7 +918,7 @@ export function PartBreakdownTable({
                     <TableCell
                       className={cn(
                         cellNum,
-                        "text-xs font-medium text-foreground border-e border-white/10"
+                        "text-xs font-medium text-foreground border-e border-border"
                       )}
                     >
                       {fmtAmount(
@@ -931,7 +931,7 @@ export function PartBreakdownTable({
                   ) : null}
                   {showExportRow ? (
                     <TableCell
-                      className={cn(cellBase, "text-center border-e border-white/10")}
+                      className={cn(cellBase, "text-center border-e border-border")}
                     >
                       <Button
                         type="button"
@@ -953,7 +953,7 @@ export function PartBreakdownTable({
                   <TableCell
                     className={cn(
                       cellBase,
-                      "text-center border-e border-white/10",
+                      "text-center border-e border-border",
                       !showDelete && "border-e-0"
                     )}
                   >
@@ -1019,7 +1019,7 @@ export function PartBreakdownTable({
                   </div>
                 </div>
 
-                <div className="w-full shrink-0 border-t border-white/10">
+                <div className="w-full shrink-0 border-t border-border">
                   <div dir="ltr" className="w-full overflow-hidden">
                     <div className="grid w-full grid-cols-4 grid-rows-2">
                       {(

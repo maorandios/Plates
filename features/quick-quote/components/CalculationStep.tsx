@@ -91,7 +91,7 @@ export function CalculationStep({
 
       <div className="grid gap-6 xl:grid-cols-[1fr_300px] xl:items-start">
         <Card className="shadow-sm">
-          <CardHeader className="border-b border-white/[0.08] bg-card/40">
+          <CardHeader className="border-b border-border bg-card/40">
             <CardTitle className="text-base">Progress</CardTitle>
             <CardDescription>
               Current task: <span className="text-foreground font-medium">{currentTask}</span>
@@ -121,7 +121,7 @@ export function CalculationStep({
                     "flex items-start gap-3 rounded-md border px-3 py-2.5 text-sm",
                     s.state === "active" && "border-primary/40 bg-primary/5",
                     s.state === "complete" && "border-primary/25 bg-primary/[0.04]",
-                    s.state === "pending" && "border-white/[0.08] bg-white/[0.03] text-muted-foreground"
+                    s.state === "pending" && "border-border bg-white/[0.03] text-muted-foreground"
                   )}
                 >
                   <span className="mt-0.5 shrink-0">
@@ -150,7 +150,7 @@ export function CalculationStep({
         </Card>
 
         <Card className="shadow-sm xl:sticky xl:top-4">
-          <CardHeader className="border-b border-white/[0.08] bg-card/40 pb-3">
+          <CardHeader className="border-b border-border bg-card/40 pb-3">
             <CardTitle className="text-sm">Quote snapshot</CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-3 text-sm">

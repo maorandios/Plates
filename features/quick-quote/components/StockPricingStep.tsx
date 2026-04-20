@@ -204,7 +204,7 @@ function ThicknessSheetsPanel({
         <Label className="text-xs text-muted-foreground font-normal block text-start">
           {t(`${SP}.sheetSizesLabel`)}
         </Label>
-        <div className="overflow-x-auto rounded-md border border-white/[0.08]">
+        <div className="overflow-x-auto rounded-md border border-border">
           <Table dir="rtl" className="table-fixed min-w-[32rem]">
             <TableHeader>
               <TableRow>
@@ -471,7 +471,7 @@ export function StockPricingStep({
             return (
               <details
                 key={row.thicknessMm}
-                className="group/details rounded-lg border border-white/10 bg-card overflow-hidden open:border-primary/25 open:bg-primary/[0.04]"
+                className="group/details rounded-lg border border-border bg-card overflow-hidden open:border-primary/25 open:bg-primary/[0.04]"
                 open={index === 0}
               >
                 <summary
@@ -533,7 +533,7 @@ export function StockPricingStep({
                   />
                 </summary>
 
-                <div className="border-t border-white/10 px-4 py-4 space-y-4 bg-card/40">
+                <div className="border-t border-border px-4 py-4 space-y-4 bg-card/40">
                   <ThicknessSheetsPanel
                     sheets={row.sheets}
                     materialType={materialType}
@@ -546,7 +546,7 @@ export function StockPricingStep({
         </div>
 
         {stockRows.length === 0 && (
-          <p className="text-sm text-muted-foreground rounded-lg border border-dashed border-white/15 px-4 py-8 text-center leading-relaxed max-w-4xl mx-auto">
+          <p className="text-sm text-muted-foreground rounded-lg border border-dashed border-border px-4 py-8 text-center leading-relaxed max-w-4xl mx-auto">
             {t(`${SP}.noPartsHint`)}
           </p>
         )}

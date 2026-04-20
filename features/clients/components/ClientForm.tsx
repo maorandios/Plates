@@ -300,7 +300,7 @@ export function ClientForm({
 
         <div
           className={cn(
-            "mt-auto flex shrink-0 flex-wrap items-center gap-3 border-t border-white/[0.08] px-2 pb-1 pt-5 sm:px-3 sm:pt-6",
+            "mt-auto flex shrink-0 flex-wrap items-center gap-3 border-t border-border px-2 pb-1 pt-5 sm:px-3 sm:pt-6",
             compact && "mt-3"
           )}
           dir="ltr"

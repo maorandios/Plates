@@ -230,54 +230,55 @@ export function ExcelColumnMappingModal({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 space-y-3">
             {file && headersResult && mapping && (
               <>
-                <div className="flex w-full justify-start">
-                  <div className="min-w-0 w-full max-w-full sm:max-w-[50%]">
-                    <div className="flex w-full flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <FileSpreadsheet
-                          className="h-5 w-5 shrink-0 text-primary"
-                          aria-hidden
-                        />
-                        <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-                          <div className="min-w-0 space-y-0.5">
-                            <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                              {t(`${DXF_EXCEL_UI}.excelUploadedFileName`)}
-                            </p>
-                            <p className="truncate text-sm font-medium text-foreground" title={file.name}>
-                              {file.name}
-                            </p>
-                          </div>
-                          <div className="min-w-0 space-y-0.5">
-                            <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                              {t(`${DXF_EXCEL_UI}.excelUploadedFileSize`)}
-                            </p>
-                            <p className="text-sm font-medium tabular-nums text-foreground">
-                              {formatDecimal(file.size / 1024, 1)} KB
-                            </p>
-                          </div>
-                          <div className="min-w-0 space-y-0.5">
-                            <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                              {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
-                            </p>
-                            <p className="text-sm font-medium tabular-nums text-primary/90 dark:text-primary/80">
-                              {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
-                                n: excelStripDataRowCount,
-                              })}
-                            </p>
-                          </div>
+                <div className="w-full min-w-0">
+                  <div className="flex w-full min-w-0 flex-col gap-2 rounded-lg border border-[#7123F7] bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <FileSpreadsheet
+                        className="h-5 w-5 shrink-0 text-primary"
+                        aria-hidden
+                      />
+                      <div className="grid w-full min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-3 sm:items-center sm:gap-x-6">
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {t(`${DXF_EXCEL_UI}.excelUploadedFileName`)}
+                          </p>
+                          <p
+                            className="truncate text-sm font-medium text-foreground"
+                            title={file.name}
+                          >
+                            {file.name}
+                          </p>
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {t(`${DXF_EXCEL_UI}.excelUploadedFileSize`)}
+                          </p>
+                          <p className="text-sm font-medium tabular-nums text-foreground">
+                            {formatDecimal(file.size / 1024, 1)} KB
+                          </p>
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                            {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
+                          </p>
+                          <p className="text-sm font-medium tabular-nums text-primary/90 dark:text-primary/80">
+                            {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
+                              n: excelStripDataRowCount,
+                            })}
+                          </p>
                         </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={requestDiscard}
-                        className="shrink-0 self-center"
-                        aria-label={t(`${DXF_EXCEL_UI}.excelRemoveFileAria`)}
-                      >
-                        <X className="h-4 w-4" aria-hidden />
-                      </Button>
                     </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={requestDiscard}
+                      className="shrink-0 self-center"
+                      aria-label={t(`${DXF_EXCEL_UI}.excelRemoveFileAria`)}
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                    </Button>
                   </div>
                 </div>
 
@@ -426,7 +427,7 @@ export function ExcelColumnMappingModal({
             ) : null}
           </div>
 
-          <DialogFooter className="shrink-0 w-full border-t border-white/[0.08] bg-card/40 px-4 py-3 sm:px-5">
+          <DialogFooter className="shrink-0 w-full border-t border-border bg-card/40 px-4 py-3 sm:px-5">
             <Button
               type="button"
               onClick={() => void handleComplete()}

@@ -248,20 +248,20 @@ export function ProjectPreviewView({
   const plateTableColWidths = useMemo(() => equalColumnWidthsPct(N_COLS), []);
 
   const headBase =
-    "sticky top-0 z-30 !h-auto min-h-[3.5rem] py-3.5 pe-3 ps-3 text-sm font-semibold text-foreground align-middle whitespace-nowrap bg-card border-e border-white/10 [vertical-align:middle] shadow-[0_1px_0_0_hsl(var(--border))]";
+    "sticky top-0 z-30 !h-auto min-h-[3.5rem] py-3.5 pe-3 ps-3 text-sm font-semibold text-foreground align-middle whitespace-nowrap bg-card border-e border-border [vertical-align:middle] shadow-[0_1px_0_0_hsl(var(--border))]";
   const headStart = `${headBase} text-start`;
   const headNum = `${headBase} text-start tabular-nums`;
   const cellBase =
-    "py-2.5 pe-3 ps-3 align-middle text-sm border-b border-white/[0.06] [vertical-align:middle]";
+    "py-2.5 pe-3 ps-3 align-middle text-sm border-b border-border [vertical-align:middle]";
   const cellStart = `${cellBase} text-start min-w-0`;
   const cellNum = `${cellBase} text-start tabular-nums min-w-0`;
   const stickyViewHead = cn(
     headBase,
-    "sticky end-0 z-[45] border-e-0 border-s border-white/10 text-center shadow-[inset_1px_0_0_0_rgba(255,255,255,0.06)]"
+    "sticky end-0 z-[45] border-e-0 border-s border-border text-center shadow-[inset_1px_0_0_0_hsl(var(--border))]"
   );
   const stickyViewCell = cn(
     cellBase,
-    "sticky end-0 z-20 border-e-0 border-s border-white/10 bg-card shadow-[inset_1px_0_0_0_rgba(255,255,255,0.06)] group-hover/row:bg-white/[0.03]"
+    "sticky end-0 z-20 border-e-0 border-s border-border bg-card shadow-[inset_1px_0_0_0_hsl(var(--border))] group-hover/row:bg-white/[0.03]"
   );
 
   function resolvePreviewBasePart(
@@ -376,7 +376,7 @@ export function ProjectPreviewView({
       <div className="ds-surface text-start">
         <div className="space-y-5 p-4 sm:p-6">
           <div dir="rtl" className="text-start">
-            <div className="overflow-hidden rounded-md border border-white/[0.08] bg-white/[0.08]">
+            <div className="overflow-hidden rounded-md border border-border bg-white/[0.08]">
               <div className="grid grid-cols-2 gap-px sm:grid-cols-3 lg:grid-cols-5">
                 <div className="bg-card">
                   <PreviewMetricCard
@@ -446,7 +446,7 @@ export function ProjectPreviewView({
             </div>
           </div>
 
-          <Card dir="rtl" className="border-white/[0.08] bg-card/40 text-start shadow-none">
+          <Card dir="rtl" className="border-border bg-card/40 text-start shadow-none">
             <CardHeader className="space-y-0 pb-3">
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <CardTitle className="text-base leading-tight">
@@ -493,7 +493,7 @@ export function ProjectPreviewView({
             </CardHeader>
             <CardContent className="px-0 sm:px-0">
               <div className="px-4 pb-4 sm:px-6">
-                <div className="rounded-md border border-white/[0.08] bg-card">
+                <div className="rounded-md border border-border bg-card">
                   <Table
                     dir="rtl"
                     containerClassName="overflow-visible"
@@ -554,42 +554,42 @@ export function ProjectPreviewView({
                           key={row.source_row_id ?? `row-${i}`}
                           className="group/row hover:bg-white/[0.03]"
                         >
-                          <TableCell className={cn(cellStart, "border-e border-white/10")}>
+                          <TableCell className={cn(cellStart, "border-e border-border")}>
                             <span className="block min-w-0 truncate px-0.5 py-1.5 text-sm font-medium">
                               {finalizePlateTypeLabel(row.plate_shape)}
                             </span>
                           </TableCell>
-                          <TableCell className={cn(cellStart, "border-e border-white/10 text-sm")}>
+                          <TableCell className={cn(cellStart, "border-e border-border text-sm")}>
                             {row.part_number}
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10 text-xs")}>
+                          <TableCell className={cn(cellNum, "border-e border-border text-xs")}>
                             {row.qty}
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10 text-xs")}>
+                          <TableCell className={cn(cellNum, "border-e border-border text-xs")}>
                             {roundDisplay(row.thickness_mm, 3)}
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10 text-xs")}>
+                          <TableCell className={cn(cellNum, "border-e border-border text-xs")}>
                             {roundDisplay(row.length_mm, 3)}
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10 text-xs")}>
+                          <TableCell className={cn(cellNum, "border-e border-border text-xs")}>
                             {roundDisplay(row.width_mm, 3)}
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10 text-xs")}>
+                          <TableCell className={cn(cellNum, "border-e border-border text-xs")}>
                             {roundDisplay(row.area_m2, 4)}
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10 text-xs")}>
+                          <TableCell className={cn(cellNum, "border-e border-border text-xs")}>
                             {roundDisplay(row.weight_kg, 3)}
                           </TableCell>
-                          <TableCell className={cn(cellStart, "border-e border-white/10 text-xs")}>
+                          <TableCell className={cn(cellStart, "border-e border-border text-xs")}>
                             {row.material_grade}
                           </TableCell>
-                          <TableCell className={cn(cellStart, "border-e border-white/10 text-xs")}>
+                          <TableCell className={cn(cellStart, "border-e border-border text-xs")}>
                             {row.finish}
                           </TableCell>
                           <TableCell
                             className={cn(
                               cellNum,
-                              "border-e border-white/10 text-xs font-medium text-foreground"
+                              "border-e border-border text-xs font-medium text-foreground"
                             )}
                           >
                             {formatQuickQuoteCurrencyAmount(row.line_total, PRICE_CCY)}
@@ -621,7 +621,7 @@ export function ProjectPreviewView({
           </Card>
 
           {notesBlocks.length > 0 ? (
-            <Card dir="rtl" className="border-white/[0.08] bg-card/40 text-start shadow-none">
+            <Card dir="rtl" className="border-border bg-card/40 text-start shadow-none">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{t(`quotePreview.notesTitle`)}</CardTitle>
               </CardHeader>
@@ -629,7 +629,7 @@ export function ProjectPreviewView({
                 {notesBlocks.map((b, idx) => (
                   <div key={`${b.title}-${idx}`} className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">{b.title}</p>
-                    <p className="whitespace-pre-wrap rounded-md border border-white/[0.06] bg-muted/20 px-3 py-2 text-start">
+                    <p className="whitespace-pre-wrap rounded-md border border-border bg-muted/20 px-3 py-2 text-start">
                       {b.body}
                     </p>
                   </div>
@@ -665,7 +665,7 @@ export function ProjectPreviewView({
                     />
                   </div>
                 </div>
-                <div className="w-full shrink-0 border-t border-white/10">
+                <div className="w-full shrink-0 border-t border-border">
                   <div dir="ltr" className="w-full overflow-hidden">
                     <div className="grid w-full grid-cols-4 grid-rows-2">
                       {(

@@ -88,7 +88,7 @@ const PREVIEW_STROKE = "#6A23F7";
 
 /** Editable cell inputs — pill outline to match Quick Quote tables. */
 const FINALIZE_CELL_INPUT =
-  "h-8 w-full min-w-0 rounded-full border border-white/10 bg-muted/35 px-3 text-sm shadow-none text-foreground placeholder:text-muted-foreground focus-visible:border-[#6A23F7]/50 focus-visible:ring-1 focus-visible:ring-[#6A23F7]/30";
+  "h-8 w-full min-w-0 rounded-full border border-border bg-muted/35 px-3 text-sm shadow-none text-foreground placeholder:text-muted-foreground focus-visible:border-[#6A23F7]/50 focus-visible:ring-1 focus-visible:ring-[#6A23F7]/30";
 
 function finishLabelFromCode(code: string): string {
   const key = `quote.finishLabels.${code}`;
@@ -547,10 +547,10 @@ export function QuoteFinalizeExportStep({
   );
 
   const headBase =
-    "sticky top-0 z-30 py-2 pe-3 ps-3 text-xs font-medium align-middle whitespace-nowrap bg-card border-e border-white/10";
+    "sticky top-0 z-30 py-2 pe-3 ps-3 text-xs font-medium align-middle whitespace-nowrap bg-card border-e border-border";
   const headStart = `${headBase} text-start`;
   const headNum = `${headBase} text-start tabular-nums`;
-  const cellBase = "py-2 pe-3 ps-3 align-middle text-sm border-b border-white/[0.06]";
+  const cellBase = "py-2 pe-3 ps-3 align-middle text-sm border-b border-border";
   const cellStart = `${cellBase} text-start min-w-0`;
   const cellNum = `${cellBase} text-start tabular-nums min-w-0`;
 
@@ -586,7 +586,7 @@ export function QuoteFinalizeExportStep({
         </div>
 
         <div className="space-y-5 p-4 sm:p-6">
-          <Card className="border-white/[0.08] bg-card/40 text-start shadow-none" dir="rtl">
+          <Card className="border-border bg-card/40 text-start shadow-none" dir="rtl">
             <CardHeader className="space-y-0 pb-2 pt-4">
               <CardTitle className="text-sm font-semibold">{t(`${FP}.quoteDetailsTitle`)}</CardTitle>
             </CardHeader>
@@ -597,7 +597,7 @@ export function QuoteFinalizeExportStep({
                 </p>
                 <div className="flex max-w-md items-center gap-1.5">
                   <div
-                    className="flex h-8 min-h-8 min-w-0 flex-1 max-w-[13rem] items-center justify-start rounded-md border border-white/[0.06] bg-muted/25 px-3 text-xs text-muted-foreground"
+                    className="flex h-8 min-h-8 min-w-0 flex-1 max-w-[13rem] items-center justify-start rounded-md border border-border bg-muted/25 px-3 text-xs text-muted-foreground"
                     dir="rtl"
                   >
                     <bdi dir="ltr" className="tabular-nums">
@@ -729,7 +729,7 @@ export function QuoteFinalizeExportStep({
                 <FileDown className="ms-1.5 h-4 w-4 shrink-0" aria-hidden />
               </Button>
             </div>
-            <div className="overflow-hidden rounded-md border border-white/[0.08] bg-white/[0.08]">
+            <div className="overflow-hidden rounded-md border border-border bg-white/[0.08]">
               <div className="grid grid-cols-2 gap-px sm:grid-cols-3 lg:grid-cols-5">
                 <div className="bg-card">
                   <FinalizeSummaryMetricCard
@@ -820,7 +820,7 @@ export function QuoteFinalizeExportStep({
             <CardContent className="px-0 sm:px-0">
               {/* No overflow-* on wrappers here — sticky `th` must stick to the page scroll like PartBreakdownTable. */}
               <div className="px-4 pb-4 sm:px-6">
-                <div className="rounded-md border border-white/[0.08] bg-card">
+                <div className="rounded-md border border-border bg-card">
                   <Table
                     dir="rtl"
                     containerClassName="overflow-visible"
@@ -893,7 +893,7 @@ export function QuoteFinalizeExportStep({
                           key={row.source_row_id ?? `row-${i}`}
                           className="group/row hover:bg-white/[0.03]"
                         >
-                          <TableCell className={cn(cellStart, "border-e border-white/10")}>
+                          <TableCell className={cn(cellStart, "border-e border-border")}>
                             <span
                               className="block min-w-0 truncate px-0.5 py-1.5 text-sm font-medium text-foreground"
                               title={finalizePlateTypeLabel(row.plate_shape)}
@@ -901,7 +901,7 @@ export function QuoteFinalizeExportStep({
                               {finalizePlateTypeLabel(row.plate_shape)}
                             </span>
                           </TableCell>
-                          <TableCell className={cn(cellStart, "border-e border-white/10")}>
+                          <TableCell className={cn(cellStart, "border-e border-border")}>
                             <Input
                               className={FINALIZE_CELL_INPUT}
                               dir="rtl"
@@ -916,7 +916,7 @@ export function QuoteFinalizeExportStep({
                               }
                             />
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10")}>
+                          <TableCell className={cn(cellNum, "border-e border-border")}>
                             <Input
                               className={cn(FINALIZE_CELL_INPUT, "text-start")}
                               inputMode="numeric"
@@ -930,7 +930,7 @@ export function QuoteFinalizeExportStep({
                               }}
                             />
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10")}>
+                          <TableCell className={cn(cellNum, "border-e border-border")}>
                             <Input
                               className={cn(FINALIZE_CELL_INPUT, "text-start")}
                               inputMode="decimal"
@@ -950,7 +950,7 @@ export function QuoteFinalizeExportStep({
                               }}
                             />
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10")}>
+                          <TableCell className={cn(cellNum, "border-e border-border")}>
                             <Input
                               className={cn(FINALIZE_CELL_INPUT, "text-start")}
                               inputMode="decimal"
@@ -970,7 +970,7 @@ export function QuoteFinalizeExportStep({
                               }}
                             />
                           </TableCell>
-                          <TableCell className={cn(cellNum, "border-e border-white/10")}>
+                          <TableCell className={cn(cellNum, "border-e border-border")}>
                             <Input
                               className={cn(FINALIZE_CELL_INPUT, "text-start")}
                               inputMode="decimal"
@@ -993,7 +993,7 @@ export function QuoteFinalizeExportStep({
                           <TableCell
                             className={cn(
                               cellNum,
-                              "border-e border-white/10 text-xs text-muted-foreground"
+                              "border-e border-border text-xs text-muted-foreground"
                             )}
                           >
                             {formatUpTo3Decimals(row.area_m2)}
@@ -1001,12 +1001,12 @@ export function QuoteFinalizeExportStep({
                           <TableCell
                             className={cn(
                               cellNum,
-                              "border-e border-white/10 text-xs text-muted-foreground"
+                              "border-e border-border text-xs text-muted-foreground"
                             )}
                           >
                             {formatUpTo3Decimals(row.weight_kg)}
                           </TableCell>
-                          <TableCell className={cn(cellStart, "border-e border-white/10")}>
+                          <TableCell className={cn(cellStart, "border-e border-border")}>
                             <Input
                               className={FINALIZE_CELL_INPUT}
                               dir="rtl"
@@ -1016,7 +1016,7 @@ export function QuoteFinalizeExportStep({
                               }
                             />
                           </TableCell>
-                          <TableCell className={cn(cellStart, "border-e border-white/10")}>
+                          <TableCell className={cn(cellStart, "border-e border-border")}>
                             <Input
                               className={FINALIZE_CELL_INPUT}
                               dir="rtl"
@@ -1029,7 +1029,7 @@ export function QuoteFinalizeExportStep({
                           <TableCell
                             className={cn(
                               cellNum,
-                              "border-e border-white/10 font-medium text-foreground"
+                              "border-e border-border font-medium text-foreground"
                             )}
                           >
                             <Input
@@ -1059,7 +1059,7 @@ export function QuoteFinalizeExportStep({
                           <TableCell
                             className={cn(
                               cellBase,
-                              "border-e border-white/10 text-center"
+                              "border-e border-border text-center"
                             )}
                           >
                             <button
@@ -1134,7 +1134,7 @@ export function QuoteFinalizeExportStep({
                       </div>
                     </div>
 
-                    <div className="w-full shrink-0 border-t border-white/10">
+                    <div className="w-full shrink-0 border-t border-border">
                       <div dir="ltr" className="w-full overflow-hidden">
                         <div className="grid w-full grid-cols-4 grid-rows-2">
                           {(
@@ -1338,7 +1338,7 @@ export function QuoteFinalizeExportStep({
                 <Label htmlFor="pr-incl">{t(`${FP}.totalInclVat`)}</Label>
                 <div
                   id="pr-incl"
-                  className="flex h-10 w-full items-center justify-between gap-2 rounded-[10px] border border-white/10 bg-white/[0.04] px-3 text-base font-semibold tabular-nums text-foreground"
+                  className="flex h-10 w-full items-center justify-between gap-2 rounded-[10px] border border-border bg-white/[0.04] px-3 text-base font-semibold tabular-nums text-foreground"
                   aria-readonly
                   dir="ltr"
                 >

@@ -185,7 +185,7 @@ function ExcelImportPreviewStatCell({
   return (
     <div
       className={cn(
-        "flex aspect-square min-h-0 w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden px-2 py-2.5 text-center",
+        "flex aspect-square min-h-0 w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden bg-transparent px-2 py-2.5 text-center",
         className
       )}
     >
@@ -864,54 +864,55 @@ export function ExcelUploadStep({
       {subStep === 2 && file && headersResult && mapping && (
         <>
           {variant === "quoteImport" ? (
-            <div className="flex w-full justify-start">
-              <div className="min-w-0 w-full max-w-full sm:max-w-[50%]">
-                <div className="flex w-full flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <FileSpreadsheet
-                      className="h-5 w-5 shrink-0 text-primary"
-                      aria-hidden
-                    />
-                    <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                          {t(`${DXF_EXCEL_UI}.excelUploadedFileName`)}
-                        </p>
-                        <p className="truncate text-sm font-medium text-foreground" title={file.name}>
-                          {file.name}
-                        </p>
-                      </div>
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                          {t(`${DXF_EXCEL_UI}.excelUploadedFileSize`)}
-                        </p>
-                        <p className="text-sm font-medium tabular-nums text-foreground">
-                          {formatDecimal(file.size / 1024, 1)} KB
-                        </p>
-                      </div>
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-[10px] font-medium leading-tight text-muted-foreground">
-                          {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
-                        </p>
-                        <p className="text-sm font-medium tabular-nums text-primary/90 dark:text-primary/80">
-                          {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
-                            n: excelBadgeDataRowCount,
-                          })}
-                        </p>
-                      </div>
+            <div className="w-full min-w-0">
+              <div className="flex w-full min-w-0 flex-col gap-2 rounded-lg border border-[#7123F7] bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <FileSpreadsheet
+                    className="h-5 w-5 shrink-0 text-primary"
+                    aria-hidden
+                  />
+                  <div className="grid w-full min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-3 sm:items-center sm:gap-x-6">
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                        {t(`${DXF_EXCEL_UI}.excelUploadedFileName`)}
+                      </p>
+                      <p
+                        className="truncate text-sm font-medium text-foreground"
+                        title={file.name}
+                      >
+                        {file.name}
+                      </p>
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                        {t(`${DXF_EXCEL_UI}.excelUploadedFileSize`)}
+                      </p>
+                      <p className="text-sm font-medium tabular-nums text-foreground">
+                        {formatDecimal(file.size / 1024, 1)} KB
+                      </p>
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                        {t(`${DXF_EXCEL_UI}.excelUploadedRowCount`)}
+                      </p>
+                      <p className="text-sm font-medium tabular-nums text-primary/90 dark:text-primary/80">
+                        {t(`${DXF_EXCEL_UI}.excelUploadedRowsDetectedValue`, {
+                          n: excelBadgeDataRowCount,
+                        })}
+                      </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRemoveFile}
-                    className="shrink-0 self-center"
-                    aria-label={t(`${DXF_EXCEL_UI}.excelRemoveFileAria`)}
-                  >
-                    <X className="h-4 w-4" aria-hidden />
-                  </Button>
                 </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveFile}
+                  className="shrink-0 self-center"
+                  aria-label={t(`${DXF_EXCEL_UI}.excelRemoveFileAria`)}
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </Button>
               </div>
             </div>
           ) : (
@@ -1213,7 +1214,7 @@ export function ExcelUploadStep({
               </p>
             </CardHeader>
             <CardContent className="min-h-0">
-              <div className="rounded-md border border-white/[0.08] bg-card">
+              <div className="rounded-md border border-border bg-card">
                 <Table
                   className="border-separate border-spacing-0"
                   containerClassName="overflow-visible"
@@ -1638,7 +1639,7 @@ export function ExcelUploadStep({
   return (
     <div className={cn(IMPORT_METHOD_VIEWPORT, QUOTE_IMPORT_PHASE_VIEWPORT)} dir="rtl">
       <div className="flex min-h-0 min-w-0 flex-1 gap-0">
-        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-white/[0.08] bg-card/60">
+        <aside className="flex h-full min-h-0 w-full max-w-[min(336px,33.6vw)] shrink-0 flex-col border-e border-border bg-card/60">
           <div className="shrink-0 space-y-2 px-5 pt-5 pb-4 sm:px-7 sm:pt-6 sm:pb-5">
             <h1 className="text-xl font-semibold text-foreground leading-snug">
               {t(`${EI}.sidebarTitle`)}
@@ -1647,7 +1648,7 @@ export function ExcelUploadStep({
               {t(`${EI}.sidebarIntro`)}
             </p>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.06]">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-border">
             <MethodPhaseMetricStrip
               icon={Package}
               label={t("methodMetrics.quantity")}
@@ -1681,7 +1682,7 @@ export function ExcelUploadStep({
       </div>
 
       <div
-        className="shrink-0 border-t border-white/[0.08] bg-card/60 px-4 py-3 sm:px-5"
+        className="shrink-0 border-t border-border bg-card/60 px-4 py-3 sm:px-5"
         dir="ltr"
       >
         <div className="flex flex-wrap items-center justify-start gap-2">
@@ -1765,7 +1766,7 @@ export function ExcelUploadStep({
         <DialogContent
           showCloseButton={false}
           className={cn(
-            "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-white/10 bg-card p-0 sm:max-w-[30rem] sm:rounded-xl"
+            "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-border bg-card p-0 sm:max-w-[30rem] sm:rounded-xl"
           )}
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden" dir="rtl">
@@ -1793,10 +1794,10 @@ export function ExcelUploadStep({
                 </div>
               </div>
 
-              <div className="w-full shrink-0 border-t border-white/10">
+              <div className="w-full shrink-0 border-t border-border">
                 {excelImportPreviewStats ? (
-                  <div dir="ltr" className="w-full overflow-hidden">
-                    <div className="grid w-full grid-cols-4 grid-rows-2">
+                  <div dir="ltr" className="w-full overflow-hidden bg-transparent">
+                    <div className="grid w-full grid-cols-4 grid-rows-2 bg-transparent">
                       {(
                         [
                           {

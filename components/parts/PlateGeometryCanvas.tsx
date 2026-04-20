@@ -127,7 +127,7 @@ interface PlateGeometryCanvasProps {
   /** Plate marking preview: part name ± client code; empty hides the MARKING text layer */
   plateMarkingText?: string;
   /**
-   * DXF review modal: cyan stroke, dark green fill, transparent canvas — matches dark dialog bg.
+   * DXF review modal: brand purple stroke, light lavender plate fill (#F4EEFF), transparent canvas.
    * Hides the bottom W×H overlay (dimensions shown in the modal panel instead).
    */
   appearance?: "default" | "previewModal";
@@ -351,7 +351,7 @@ export function PlateGeometryCanvas({
       ? "#6A23F7"
       : "#1e40af";
   const outerFill = previewModal
-    ? "#160822"
+    ? "#F4EEFF"
     : debugMode
       ? "rgba(106,35,247,0.15)"
       : "#e0f2fe";

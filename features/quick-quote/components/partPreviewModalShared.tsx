@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 /** DialogContent `className` shared by plate part preview modals (DXF / Excel / manual / merged summary). */
 export const PART_PREVIEW_DIALOG_CONTENT_CLASS =
-  "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-white/10 bg-card p-0 sm:max-w-[30rem] sm:rounded-xl";
+  "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-border bg-card p-0 sm:max-w-[30rem] sm:rounded-xl";
 
 export function StatValueUnitLeft({
   numericText,

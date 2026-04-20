@@ -148,7 +148,7 @@ function DxfPreviewStatCell({
   return (
     <div
       className={cn(
-        "flex aspect-square min-h-0 w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden px-2 py-2.5 text-center",
+        "flex aspect-square min-h-0 w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden bg-transparent px-2 py-2.5 text-center",
         className
       )}
     >
@@ -1148,7 +1148,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
             <Card
               className={cn(
                 "flex flex-col min-h-0",
-                dxfQuotePhaseLayout && "h-full min-h-[14rem] border-white/[0.08]"
+                dxfQuotePhaseLayout && "h-full min-h-[14rem] border-border"
               )}
             >
               <CardHeader>
@@ -1172,7 +1172,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 )}
               >
                 {dxfQuotePhaseLayout && uploadedFiles.length > 0 ? (
-                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-[#7123F7] bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <DxfFileBadgeIcon
                         className="h-6 w-6 shrink-0 text-primary"
@@ -1337,7 +1337,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
               className={cn(
                 "flex flex-col min-h-0",
                 dxfQuotePhaseLayout
-                  ? "h-full min-h-[14rem] border border-white/[0.08]"
+                  ? "h-full min-h-[14rem] border border-border"
                   : "border-0"
               )}
             >
@@ -1428,7 +1428,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 )}
 
                 {excelMappedComplete && optionalExcelFile && mappedExcelRows && (
-                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="w-full max-w-4xl mx-auto flex flex-col gap-3 rounded-lg border border-[#7123F7] bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <FileSpreadsheet
                         className="h-5 w-5 shrink-0 text-primary"
@@ -1659,7 +1659,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 </div>
               )}
               <TooltipProvider delayDuration={250}>
-                <div className="rounded-md border border-white/[0.08]">
+                <div className="rounded-md border border-border">
                   <Table
                     className="border-separate border-spacing-0"
                     containerClassName="overflow-visible"
@@ -1964,7 +1964,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         <DialogContent
           showCloseButton={false}
           className={cn(
-            "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-white/10 bg-card p-0 sm:max-w-[30rem] sm:rounded-xl"
+            "flex h-auto min-h-[min(88vh,760px)] max-h-[min(96vh,980px)] w-[calc(100vw-1.5rem)] max-w-[27.5rem] flex-col gap-0 overflow-hidden border-border bg-card p-0 sm:max-w-[30rem] sm:rounded-xl"
           )}
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden" dir="rtl">
@@ -1997,10 +1997,10 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 </div>
               </div>
 
-              <div className="w-full shrink-0 border-t border-white/10">
+              <div className="w-full shrink-0 border-t border-border">
                 {previewPartStats ? (
-                  <div dir="ltr" className="w-full overflow-hidden">
-                    <div className="grid w-full grid-cols-4 grid-rows-2">
+                  <div dir="ltr" className="w-full overflow-hidden bg-transparent">
+                    <div className="grid w-full grid-cols-4 grid-rows-2 bg-transparent">
                       {(
                         [
                           {

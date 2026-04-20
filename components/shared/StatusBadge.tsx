@@ -41,7 +41,7 @@ export function BatchStatusBadge({ status }: BatchStatusBadgeProps) {
   const config: Record<BatchStatus, { labelKey: string; className: string }> = {
     draft: {
       labelKey: "status.batchDraft",
-      className: "bg-white/[0.06] text-muted-foreground border-white/10 hover:bg-white/[0.08]",
+      className: "bg-white/[0.06] text-muted-foreground border-border hover:bg-white/[0.08]",
     },
     active: {
       labelKey: "status.batchActive",
@@ -53,7 +53,7 @@ export function BatchStatusBadge({ status }: BatchStatusBadgeProps) {
     },
     archived: {
       labelKey: "status.batchArchived",
-      className: "bg-white/[0.04] text-muted-foreground/80 border-white/10 hover:bg-white/[0.06]",
+      className: "bg-white/[0.04] text-muted-foreground/80 border-border hover:bg-white/[0.06]",
     },
   };
 

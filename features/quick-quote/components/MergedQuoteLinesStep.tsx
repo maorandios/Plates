@@ -129,7 +129,7 @@ export function MergedQuoteLinesStep({
         <DialogContent
           showCloseButton={false}
           dir="rtl"
-          className="gap-6 rounded-md border border-white/[0.08] bg-card p-7 text-card-foreground shadow-xl sm:max-w-md sm:rounded-md sm:p-8"
+          className="gap-6 rounded-md border border-border bg-card p-7 text-card-foreground shadow-xl sm:max-w-md sm:rounded-md sm:p-8"
         >
           <DialogHeader className="sm:text-start">
             <DialogTitle>{t(`${PP}.confirmResetTitle`)}</DialogTitle>

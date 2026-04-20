@@ -236,7 +236,7 @@ export function ValidationStep({
 
       <ValidationTable rows={rows} />
 
-      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-border">
         <div className="flex flex-wrap gap-2 justify-end w-full sm:w-auto">
           <Button type="button" variant="outline" onClick={onBack}>
             Back to upload
