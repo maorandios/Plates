@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { Noto_Sans_Hebrew } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { AppTopBar } from "@/components/shared/AppTopBar";
+import { LoadingBadgeProvider } from "@/components/shared/LoadingBadgeProvider";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { PLATE_THEME_STORAGE_KEY } from "@/lib/theme/plateTheme";
 import messages from "@/messages/he.json";
 
 const notoSansHebrew = Noto_Sans_Hebrew({
@@ -26,15 +30,26 @@ export default function RootLayout({
       <body
         className={`${notoSansHebrew.variable} ${notoSansHebrew.className} antialiased`}
       >
-        <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
-          <AppTopBar />
-          <div
-            id="app-shell-scroll"
-            className="flex min-h-0 min-w-0 w-full max-w-none flex-1 flex-col overflow-auto"
-          >
-            {children}
-          </div>
-        </div>
+        <Script
+          id="plate-theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var k=${JSON.stringify(PLATE_THEME_STORAGE_KEY)};if(localStorage.getItem(k)==="light")document.documentElement.classList.add("light");}catch(e){}})();`,
+          }}
+        />
+        <ThemeProvider>
+          <LoadingBadgeProvider>
+            <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
+              <AppTopBar />
+              <div
+                id="app-shell-scroll"
+                className="flex min-h-0 min-w-0 w-full max-w-none flex-1 flex-col overflow-auto"
+              >
+                {children}
+              </div>
+            </div>
+          </LoadingBadgeProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

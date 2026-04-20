@@ -1757,7 +1757,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                                 inputMode="numeric"
                                 autoComplete="off"
                                 spellCheck={false}
-                                className="h-8 w-20 [color-scheme:dark]"
+                                className="h-8 w-20"
                                 value={String(upload.quantity)}
                                 onChange={(e) => {
                                   const digits = e.target.value.replace(/\D/g, "");
@@ -1778,7 +1778,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                                 inputMode="decimal"
                                 autoComplete="off"
                                 spellCheck={false}
-                                className="h-8 w-[4.5rem] tabular-nums [color-scheme:dark]"
+                                className="h-8 w-[4.5rem] tabular-nums"
                                 value={
                                   Number.isFinite(upload.thicknessMm)
                                     ? String(upload.thicknessMm)
@@ -1833,7 +1833,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                                 updateUploadRow(index, { materialGrade: v })
                               }
                             >
-                              <SelectTrigger className="h-8 min-w-[7rem] max-w-[200px] [color-scheme:dark]">
+                              <SelectTrigger className="h-8 min-w-[7rem] max-w-[200px]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1860,7 +1860,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                                 updateUploadRow(index, { finish: v })
                               }
                             >
-                              <SelectTrigger className="h-8 w-[160px] max-w-[220px] [color-scheme:dark]">
+                              <SelectTrigger className="h-8 w-[160px] max-w-[220px]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>

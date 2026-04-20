@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { usePlateTheme } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
 import type { BendSegmentHole } from "./types";
 import type { Point2 } from "./geometry";
@@ -536,6 +537,7 @@ export function ProfilePreview3D({
   flatPlateBlankMm = null,
 }: ProfilePreview3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { theme } = usePlateTheme();
   /** Deep signature so the WebGL effect re-runs even if callers mutate nested hole arrays in place. */
   const segmentFaceHolesKey = JSON.stringify(segmentFaceHoles ?? []);
 
@@ -547,7 +549,9 @@ export function ProfilePreview3D({
     const h = el.clientHeight || 220;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f1419);
+    const viewerBg =
+      theme === "light" ? 0xf4f4f5 /* matches --viewer-canvas light */ : 0x0f1419;
+    scene.background = new THREE.Color(viewerBg);
 
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.001, 500);
     const b = boundsOfPolyline(pts);
@@ -702,6 +706,7 @@ export function ProfilePreview3D({
     flatPlate,
     segmentFaceHolesKey,
     flatPlateBlankMm,
+    theme,
   ]);
 
   return (
@@ -709,8 +714,8 @@ export function ProfilePreview3D({
       ref={containerRef}
       className={cn(
         fill
-          ? "h-full min-h-0 w-full rounded-lg bg-[#0f1419]"
-          : "min-h-[220px] w-full rounded-lg bg-[#0f1419]",
+          ? "h-full min-h-0 w-full rounded-lg bg-[hsl(var(--viewer-canvas))]"
+          : "min-h-[220px] w-full rounded-lg bg-[hsl(var(--viewer-canvas))]",
         className
       )}
     />

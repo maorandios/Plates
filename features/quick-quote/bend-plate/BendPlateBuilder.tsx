@@ -1774,7 +1774,7 @@ function BendPlateShapeEditor({
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
               <div
                 ref={canvasFaceWrapRef}
-                className="relative flex min-h-0 flex-1 overflow-hidden bg-[#0f1419] p-1.5 sm:p-2"
+                className="relative flex min-h-0 flex-1 overflow-hidden bg-[hsl(var(--viewer-canvas))] p-1.5 sm:p-2"
               >
                 {editorSidebarScreen === "hub" ? (
                   <Button
@@ -1783,7 +1783,6 @@ function BendPlateShapeEditor({
                     size="sm"
                     className={cn(
                       "absolute left-2 top-2 z-10 gap-1.5 shadow-md sm:left-3 sm:top-3",
-                      "[color-scheme:dark]"
                     )}
                     onClick={() => setPreview3dOpen(true)}
                   >
@@ -1908,7 +1907,7 @@ function BendPlateShapeEditor({
             <DialogTitle>{t(`${ED}.preview3dTitle`)}</DialogTitle>
             <DialogDescription className="text-sm">{t(`${ED}.preview3dDescription`)}</DialogDescription>
           </DialogHeader>
-          <div className="relative min-h-[min(70vh,560px)] w-full bg-[#0f1419] p-4 sm:p-5">
+          <div className="relative min-h-[min(70vh,560px)] w-full bg-[hsl(var(--viewer-canvas))] p-4 sm:p-5">
             <ProfilePreview3D
               pts={pts}
               plateWidthMm={form.global.plateWidthMm}

@@ -200,7 +200,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
               placeholder={t(`${VT}.searchPlaceholder`)}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 ps-8 [color-scheme:dark]"
+              className="h-9 ps-8"
             />
           </div>
           <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
@@ -209,7 +209,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                 {t(`${VT}.filterThicknessLabel`)}
               </span>
               <Select value={thicknessFilter} onValueChange={setThicknessFilter}>
-                <SelectTrigger className="h-9 w-full [color-scheme:dark]">
+                <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder={t(`${VT}.allThicknesses`)} />
                 </SelectTrigger>
                 <SelectContent>
@@ -227,7 +227,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                 {t(`${VT}.filterMaterialLabel`)}
               </span>
               <Select value={materialFilter} onValueChange={setMaterialFilter}>
-                <SelectTrigger className="h-9 w-full [color-scheme:dark]">
+                <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder={t(`${VT}.allMaterials`)} />
                 </SelectTrigger>
                 <SelectContent>
@@ -245,7 +245,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
                 {t(`${VT}.filterStatusLabel`)}
               </span>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-full [color-scheme:dark]">
+                <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder={t(`${VT}.allStatuses`)} />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,7 +261,7 @@ export function ValidationTable({ rows }: ValidationTableProps) {
             type="button"
             variant="outline"
             size="sm"
-            className="h-9 shrink-0 gap-1.5 [color-scheme:dark]"
+            className="h-9 shrink-0 gap-1.5"
             onClick={resetFilters}
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden />

@@ -89,7 +89,7 @@ export function DxfExcelCompareScreen({
               type="button"
               variant="outline"
               size="sm"
-              className="shrink-0 gap-1.5 [color-scheme:dark]"
+              className="shrink-0 gap-1.5"
               disabled={exportXlsxDisabled}
               onClick={() => onExportXlsx()}
             >

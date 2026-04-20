@@ -230,7 +230,7 @@ function HolePlacementSchematic({ hole }: { hole: BendSegmentHole }) {
         height={side}
         rx={2}
         fill="none"
-        stroke="hsl(142 70% 45%)"
+        stroke="hsl(262 92% 55%)"
         strokeWidth={1.2}
       />
       <line

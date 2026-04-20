@@ -10,8 +10,8 @@ import {
 } from "./segmentFaceLayout";
 import { SegmentFaceKonvaHolesOverlay } from "./SegmentFaceKonvaHolesOverlay";
 
-/** Match ProfilePreview2D. */
-const PROFILE_STROKE = "hsl(142 70% 45%)";
+/** Match ProfilePreview2D — brand primary purple. */
+const PROFILE_STROKE = "hsl(262 92% 55%)";
 const DIM_STROKE = "#9ca3af";
 const DIM_STROKE_MUTED = "#6b7280";
 const PROFILE_PATH_STROKE_WIDTH = 1.15 / 1.25;
@@ -83,7 +83,7 @@ export function SegmentFacePreview2D({
         "relative flex items-center justify-center overflow-hidden",
         fill
           ? "h-full min-h-0 w-full"
-          : "aspect-[4/3] rounded-lg bg-[#0f1419]",
+          : "aspect-[4/3] rounded-lg bg-[hsl(var(--viewer-canvas))]",
         className
       )}
     >

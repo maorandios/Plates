@@ -18,8 +18,8 @@
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-border: hsl(var(--border));
-  /* Field surfaces: rgb(12, 19, 24) — shared by bg-input / primitives */
-  --color-input: #0c1318;
+  /* Field surfaces — follow `html.light` / default dark via --input */
+  --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
   --color-ring-offset-background: hsl(var(--background));
   --color-sidebar-bg: hsl(var(--sidebar-bg));
@@ -39,6 +39,7 @@
  * #182430 — inner rows, nested surfaces (popover, etc.)
  * #6A23F7 — primary actions (accent purple)
  */
+/* Default = dark (industrial SaaS) */
 :root {
   color-scheme: dark;
   --background: 180 25% 4.7%; /* #090F0F */
@@ -50,15 +51,14 @@
   --popover: 210 33% 14.1%; /* #182430 */
   --popover-foreground: 0 0% 100%;
 
-  /* #6A23F7 — brand purple (hsl approx. for hsl(var(--primary))) */
+  /* #6A23F7 — brand purple */
   --primary: 262 92% 55%;
-  --primary-foreground: 0 0% 100%; /* white on purple buttons */
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 210 33% 14.1%; /* #182430 */
+  --secondary: 210 33% 14.1%;
   --secondary-foreground: 0 0% 100%;
 
-  --muted: 210 33% 14.1%; /* #182430 */
-  /* ~#9CA3AF secondary text */
+  --muted: 210 33% 14.1%;
   --muted-foreground: 218 11% 65%;
 
   --accent: 210 28% 18%;
@@ -68,19 +68,63 @@
   --destructive-foreground: 0 0% 100%;
 
   --border: 205 22% 22%;
-  /* Legacy HSL token; theme field fill uses --color-input #0c1318 */
-  --input: 204 35% 14%;
+  --input: 204 35% 9%; /* ~#0c1318 field fill */
   --ring: 262 92% 55%;
 
   --radius: 0.75rem;
 
-  --sidebar-bg: 180 25% 4.7%; /* align with #090F0F */
+  --sidebar-bg: 180 25% 4.7%;
   --sidebar-fg: 0 0% 100%;
-  --sidebar-accent: 199 34% 10.8%; /* #121F25 */
+  --sidebar-accent: 199 34% 10.8%;
   --sidebar-border: 205 18% 18%;
 
   --success: 262 92% 55%;
   --warning: 38 92% 50%;
+
+  /* 2D/3D preview wells (~#0f1419) — bend profile, segment face */
+  --viewer-canvas: 210 22% 9%;
+}
+
+/* Light mode — purple primary/accent; white & light gray surfaces; black + gray text */
+html.light {
+  color-scheme: light;
+  --background: 220 20% 98%;
+  --foreground: 0 0% 7%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 7%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 7%;
+
+  --primary: 262 92% 55%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 0 0% 7%;
+
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+
+  --accent: 262 92% 96%;
+  --accent-foreground: 262 55% 35%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 220 13% 91%;
+  --input: 220 14% 96%;
+  --ring: 262 92% 55%;
+
+  --sidebar-bg: 220 20% 98%;
+  --sidebar-fg: 0 0% 7%;
+  --sidebar-accent: 0 0% 100%;
+  --sidebar-border: 220 13% 91%;
+
+  --success: 262 92% 55%;
+  --warning: 38 92% 50%;
+
+  --viewer-canvas: 220 14% 96%;
 }
 
 * {
@@ -124,8 +168,8 @@ body {
     ):not([type="image"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]),
   textarea,
   select {
-    background-color: rgb(12, 19, 24);
-    border-color: rgba(255, 255, 255, 0.08);
+    background-color: hsl(var(--input));
+    border-color: hsl(var(--border));
   }
 
   table th,
@@ -166,7 +210,7 @@ input[type="number"] {
   appearance: textfield;
 }
 
-/* WebKit autofill — match field bg rgb(12, 19, 24) */
+/* WebKit autofill — match themed field bg */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
@@ -178,8 +222,8 @@ select:-webkit-autofill:hover,
 select:-webkit-autofill:focus {
   -webkit-text-fill-color: hsl(var(--foreground));
   caret-color: hsl(var(--foreground));
-  -webkit-box-shadow: 0 0 0 1000px #0c1318 inset;
-  box-shadow: 0 0 0 1000px #0c1318 inset;
+  -webkit-box-shadow: 0 0 0 1000px hsl(var(--input)) inset;
+  box-shadow: 0 0 0 1000px hsl(var(--input)) inset;
   transition: background-color 99999s ease-out 0s;
 }
 
@@ -210,6 +254,45 @@ select:-webkit-autofill:focus {
   .ds-empty-state {
     @apply rounded-xl border-0 bg-white/[0.03] px-6 py-12;
   }
+}
+
+html.light .ds-empty-state {
+  background-color: hsl(var(--muted) / 0.55);
+}
+
+/* Bottom loading pill — three-dot bounce wave (see BottomLoadingIndicator) */
+@keyframes plate-loading-dot-wave {
+  0%,
+  60%,
+  100% {
+    opacity: 0.28;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.plate-loading-dot {
+  display: inline-block;
+  height: 0.3rem;
+  width: 0.3rem;
+  border-radius: 9999px;
+  background: hsl(var(--foreground));
+  animation: plate-loading-dot-wave 1.35s ease-in-out infinite;
+}
+
+.plate-loading-dot:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.plate-loading-dot:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.plate-loading-dot:nth-child(3) {
+  animation-delay: 320ms;
 }
 
 /*

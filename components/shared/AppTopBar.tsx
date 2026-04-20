@@ -9,12 +9,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { usePlateTheme } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-
-const dividerClass = "w-px shrink-0 self-stretch bg-white/[0.08]";
 
 const MAIN_NAV: {
   labelKey: "nav.dashboard" | "nav.quotes" | "nav.projects" | "nav.clients";
@@ -40,38 +41,53 @@ function linkActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-/** Shared sizing for industrial equal-width nav cells */
-const navCellClass =
-  "flex h-14 min-h-14 w-full min-w-0 items-center justify-center px-2 text-center text-sm font-medium leading-tight tracking-tight";
+/** Nav tabs: soft surface, rounded corners (not pills) — same look for all */
+const navItemBase =
+  "inline-flex h-9 max-w-full min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium leading-none tracking-tight transition-colors";
+
+const navItemIdle =
+  "border-transparent bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground";
+
+/** Selected: purple outline + small purple indicator dot */
+const navItemActive =
+  "border-primary bg-primary/[0.06] text-foreground shadow-none ring-1 ring-primary/20";
+
+function NavActiveDot() {
+  return (
+    <span
+      className="size-1.5 shrink-0 rounded-full bg-primary ring-2 ring-primary/35"
+      aria-hidden
+    />
+  );
+}
 
 export function AppTopBar() {
   const pathname = usePathname();
   const settingsActive = pathname.startsWith("/settings");
+  const { theme, setTheme, mounted: themeMounted } = usePlateTheme();
 
   return (
-    <header className="sticky top-0 z-50 w-full shrink-0 border-b border-white/[0.08] bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
-      <div className="flex h-14 w-full max-w-none items-stretch justify-between gap-3 px-4 lg:px-6">
+    <header className="sticky top-0 z-50 w-full shrink-0 bg-transparent">
+      <div className="flex min-h-14 w-full max-w-none flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5 lg:px-6">
         {/* RTL: first cluster → inline-end (right); logo + primary nav */}
-        <div className="flex min-w-0 flex-1 items-stretch gap-0">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 sm:gap-4">
           <Link
             href="/"
-            className="flex shrink-0 items-center py-2 pe-4 sm:pe-5"
+            className="flex shrink-0 items-center py-0.5"
             aria-label={t("brand.name")}
           >
             <Image
-              src="/main%20logo.svg"
+              src="/mainlogo.svg?v=20260420"
               alt=""
-              width={538}
-              height={209}
+              width={1374}
+              height={364}
               priority
-              className="h-9 w-auto max-w-[12rem] object-contain object-center drop-shadow-[0_1px_3px_rgba(0,0,0,0.45)] sm:h-10 sm:max-w-[14.5rem]"
+              className="h-9 w-auto max-w-[12rem] object-contain object-center sm:h-10 sm:max-w-[14.5rem]"
             />
           </Link>
 
-          <div className={dividerClass} aria-hidden />
-
           <nav
-            className="grid h-14 min-h-14 min-w-0 flex-1 grid-cols-5 divide-x divide-white/[0.08] overflow-hidden"
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
             aria-label={t("layout.mainNavAria")}
           >
             {MAIN_NAV.map(({ labelKey, href }) => {
@@ -80,39 +96,36 @@ export function AppTopBar() {
                 <Link
                   key={href}
                   href={href}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
-                    navCellClass,
-                    active
-                      ? "bg-white/[0.1] text-foreground"
-                      : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                    navItemBase,
+                    active ? navItemActive : navItemIdle
                   )}
                 >
+                  {active ? <NavActiveDot /> : null}
                   {t(labelKey)}
                 </Link>
               );
             })}
 
-            <div className="flex min-h-0 min-w-0 items-stretch">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      navCellClass,
-                      "gap-1",
-                      settingsActive
-                        ? "bg-white/[0.1] text-foreground"
-                        : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                    )}
-                  >
-                    <span className="min-w-0 truncate">{t("nav.settings")}</span>
-                    <ChevronDown
-                      className="h-3.5 w-3.5 shrink-0 opacity-70"
-                      aria-hidden
-                    />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[12rem]">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    navItemBase,
+                    settingsActive ? navItemActive : navItemIdle
+                  )}
+                >
+                  {settingsActive ? <NavActiveDot /> : null}
+                  <span className="min-w-0 truncate">{t("nav.settings")}</span>
+                  <ChevronDown
+                    className="h-3.5 w-3.5 shrink-0 opacity-60"
+                    aria-hidden
+                  />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[14rem]">
                   {SETTINGS_LINKS.map(({ labelKey, href }) => (
                     <DropdownMenuItem key={href} asChild>
                       <Link href={href} className="cursor-pointer">
@@ -120,19 +133,52 @@ export function AppTopBar() {
                       </Link>
                     </DropdownMenuItem>
                   ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                  <DropdownMenuSeparator />
+                  <div
+                    className="flex items-center justify-between gap-3 px-2 py-2.5"
+                    dir="rtl"
+                  >
+                    <span
+                      className={cn(
+                        "text-sm",
+                        themeMounted && theme === "dark"
+                          ? "font-semibold text-foreground"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {t("theme.appearanceDark")}
+                    </span>
+                    <Switch
+                      checked={themeMounted && theme === "light"}
+                      onCheckedChange={(on) => setTheme(on ? "light" : "dark")}
+                      disabled={!themeMounted}
+                      aria-label={t("theme.appearanceToggleAria")}
+                    />
+                    <span
+                      className={cn(
+                        "text-sm",
+                        themeMounted && theme === "light"
+                          ? "font-semibold text-foreground"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {t("theme.appearanceLight")}
+                    </span>
+                  </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
         </div>
 
         {/* RTL: second cluster → inline-start (left); logout */}
-        <div className="flex shrink-0 items-center self-center">
+        <div className="flex shrink-0 items-center">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-foreground"
+            className={cn(
+              "h-9 w-9 rounded-xl border border-border/60 bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            )}
             aria-label={t("layout.logoutAria")}
             title={t("layout.logout")}
             onClick={() => {}}

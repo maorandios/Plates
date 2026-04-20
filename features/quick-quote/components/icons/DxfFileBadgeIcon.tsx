@@ -14,7 +14,7 @@ export const DxfFileBadgeIcon = forwardRef<
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth={1.35}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -32,7 +32,7 @@ export const DxfFileBadgeIcon = forwardRef<
         fill="currentColor"
         fillOpacity="0.08"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth={1.2}
       />
       <text
         x="12"

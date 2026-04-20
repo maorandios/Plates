@@ -29,6 +29,11 @@
     "logoutAria": "התנתקות מהמערכת",
     "createNewQuote": "הצעת מחיר חדשה"
   },
+  "theme": {
+    "appearanceDark": "תצוגה כהה",
+    "appearanceLight": "תצוגה בהירה",
+    "appearanceToggleAria": "מעבר בין תצוגה כהה לתצוגה בהירה"
+  },
   "listScreen": {
     "searchLabel": "חיפוש",
     "searchPlaceholder": "חפש טקסט חופשי",
@@ -58,6 +63,7 @@
     "close": "סגירה",
     "search": "חיפוש",
     "loading": "טוען…",
+    "loadingData": "טוען נתונים",
     "error": "שגיאה",
     "yes": "כן",
     "no": "לא",

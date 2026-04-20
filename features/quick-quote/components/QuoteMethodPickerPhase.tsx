@@ -160,7 +160,7 @@ export function QuoteMethodPickerPhase({
                     }}
                     aria-label={title}
                     className={cn(
-                      "group flex h-full min-h-[14rem] min-w-0 flex-col items-center justify-center rounded-xl border-2 bg-card p-5 text-center transition-all duration-150",
+                      "group flex h-full min-h-[16rem] min-w-0 flex-col items-center justify-center rounded-xl border-2 bg-card p-6 text-center transition-all duration-150 sm:min-h-[17rem]",
                       "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       hasData &&
                         "border-primary shadow-[0_0_28px_-10px_hsl(var(--primary)/0.55)] ring-2 ring-primary/50 hover:border-primary hover:ring-primary/60",
@@ -170,13 +170,17 @@ export function QuoteMethodPickerPhase({
                   >
                     <div
                       className={cn(
-                        "mb-4 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors",
+                        "mb-5 flex size-28 shrink-0 items-center justify-center rounded-2xl transition-colors sm:size-32",
                         hasData
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-foreground group-hover:bg-muted/90"
                       )}
                     >
-                      <Icon className="h-5 w-5" aria-hidden />
+                      <Icon
+                        className="size-16 sm:size-[4.25rem]"
+                        strokeWidth={1.35}
+                        aria-hidden
+                      />
                     </div>
                     <div
                       className={cn(

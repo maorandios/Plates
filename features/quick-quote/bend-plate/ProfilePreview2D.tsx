@@ -53,8 +53,8 @@ function arcPathBetweenRays(
 /** Dimension graphics — neutral gray (lighter than prior slate for softer CAD dims). */
 const DIM_STROKE = "#9ca3af";
 const DIM_STROKE_MUTED = "#6b7280";
-/** Profile polyline + vertex markers (matches `<path stroke="…">`). */
-const PROFILE_STROKE = "hsl(142 70% 45%)";
+/** Profile polyline — brand primary purple (same as `--primary`). */
+const PROFILE_STROKE = "hsl(262 92% 55%)";
 /**
  * With `vectorEffect="non-scaling-stroke"`, keep this near 1–1.5 so the profile
  * stays a thin hairline at any zoom — do not scale with viewBox (large values
@@ -441,8 +441,8 @@ export function ProfilePreview2D({
       className={cn(
         "flex items-center justify-center overflow-hidden",
         fill
-          ? "h-full min-h-0 w-full rounded-lg bg-[#0f1419]"
-          : "rounded-lg bg-[#0f1419] aspect-[4/3]",
+          ? "h-full min-h-0 w-full rounded-lg bg-[hsl(var(--viewer-canvas))]"
+          : "rounded-lg bg-[hsl(var(--viewer-canvas))] aspect-[4/3]",
         className
       )}
     >

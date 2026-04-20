@@ -1291,7 +1291,7 @@ export function ExcelUploadStep({
                             )}
                           >
                             <Input
-                              className="h-8 min-w-[100px] [color-scheme:dark]"
+                              className="h-8 min-w-[100px]"
                               value={row.partName}
                               onChange={(e) =>
                                 patchParsedRow(row.id, { partName: e.target.value })
@@ -1300,7 +1300,7 @@ export function ExcelUploadStep({
                           </TableCell>
                           <TableCell className="py-2 pe-3 ps-3">
                             <Input
-                              className="h-8 w-20 [color-scheme:dark]"
+                              className="h-8 w-20"
                               inputMode="numeric"
                               value={String(row.quantity)}
                               onChange={(e) => {
@@ -1313,7 +1313,7 @@ export function ExcelUploadStep({
                           </TableCell>
                           <TableCell className="py-2 pe-3 ps-3">
                             <Input
-                              className="h-8 w-[4.5rem] tabular-nums [color-scheme:dark]"
+                              className="h-8 w-[4.5rem] tabular-nums"
                               inputMode="decimal"
                               value={
                                 row.thickness != null && Number.isFinite(row.thickness)
@@ -1330,7 +1330,7 @@ export function ExcelUploadStep({
                           </TableCell>
                           <TableCell className="py-2 pe-3 ps-3">
                             <Input
-                              className="h-8 w-24 [color-scheme:dark]"
+                              className="h-8 w-24"
                               inputMode="decimal"
                               value={row.width != null ? String(row.width) : ""}
                               onChange={(e) => {
@@ -1341,7 +1341,7 @@ export function ExcelUploadStep({
                           </TableCell>
                           <TableCell className="py-2 pe-3 ps-3">
                             <Input
-                              className="h-8 w-24 [color-scheme:dark]"
+                              className="h-8 w-24"
                               inputMode="decimal"
                               value={row.length != null ? String(row.length) : ""}
                               onChange={(e) => {
@@ -1364,7 +1364,7 @@ export function ExcelUploadStep({
                                   patchParsedRow(row.id, { material: v })
                                 }
                               >
-                                <SelectTrigger className="h-8 min-w-[7rem] max-w-[200px] [color-scheme:dark]">
+                                <SelectTrigger className="h-8 min-w-[7rem] max-w-[200px]">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1380,7 +1380,7 @@ export function ExcelUploadStep({
                               </Select>
                             ) : (
                               <Input
-                                className="h-8 min-w-[7rem] [color-scheme:dark]"
+                                className="h-8 min-w-[7rem]"
                                 value={matDisplay}
                                 placeholder={t(`${DXF_RV}.gradePlaceholder`)}
                                 onChange={(e) =>
@@ -1397,7 +1397,7 @@ export function ExcelUploadStep({
                                   patchParsedRow(row.id, { finish: v })
                                 }
                               >
-                                <SelectTrigger className="h-8 w-[160px] max-w-[220px] [color-scheme:dark]">
+                                <SelectTrigger className="h-8 w-[160px] max-w-[220px]">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1413,7 +1413,7 @@ export function ExcelUploadStep({
                               </Select>
                             ) : (
                               <Input
-                                className="h-8 w-[140px] [color-scheme:dark]"
+                                className="h-8 w-[140px]"
                                 value={(row.finish ?? "").trim()}
                                 onChange={(e) =>
                                   patchParsedRow(row.id, { finish: e.target.value })
