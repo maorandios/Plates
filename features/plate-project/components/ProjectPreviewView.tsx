@@ -460,8 +460,7 @@ export function ProjectPreviewView({
                       disabled={
                         draftItems.length === 0 ||
                         pdfExporting ||
-                        packageExporting ||
-                        !pdfDraft?.company.name.trim()
+                        packageExporting
                       }
                       onClick={() => void handleExportPdf()}
                       className="gap-2"

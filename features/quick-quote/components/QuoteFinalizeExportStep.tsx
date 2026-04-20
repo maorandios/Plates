@@ -537,10 +537,7 @@ export function QuoteFinalizeExportStep({
 
   const notesText = draft.quote.notes.join("\n");
 
-  const exportPdfDisabled =
-    exporting ||
-    draft.items.length === 0 ||
-    !draft.company.name.trim();
+  const exportPdfDisabled = exporting || draft.items.length === 0;
 
   const pv = previewPart;
   const previewTotalWeightLine = pv ? pv.weightKg * pv.qty : 0;

@@ -8,6 +8,8 @@ export interface AppPreferences {
   unitSystem: UnitSystem;
   /** Letterhead defaults for quotations (overrides env when set in Settings). */
   companyName?: string;
+  /** Company registration number (ח.פ) — shown on PDF letterhead when set. */
+  companyRegistration?: string;
   companyEmail?: string;
   companyPhone?: string;
   companyWebsite?: string;

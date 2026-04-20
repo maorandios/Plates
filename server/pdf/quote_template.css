@@ -1,16 +1,37 @@
-/* Hebrew RTL quotation — portrait A4, print layout */
+/* =====================================================================
+ * Hebrew RTL quotation — A4 portrait
+ * Fresh template. Grayscale-only. Modern typography, generous whitespace.
+ * Page margins are applied via the CSS `@page` rule below (reliable
+ * across all Chromium builds) — Playwright `margin: 0` in render script
+ * simply lets CSS own the layout.
+ * ===================================================================== */
 
 @page {
   size: A4;
-  margin: 0;
+  /* Microsoft Word "Normal" A4 margins: 2.54 cm top/bottom, 2.54 cm left/right.
+     Applied by Chromium's print renderer. */
+  margin: 25.4mm;
 }
 
 * {
   box-sizing: border-box;
 }
 
+/* ————————————————————————————————————————————————————————————
+   Design tokens — grayscale only
+   ———————————————————————————————————————————————————————————— */
+:root {
+  --ink:         #0f0f0f;
+  --ink-soft:    #2a2a2a;
+  --muted:       #9a9a9a;
+  --muted-deep:  #6b6b6b;
+  --line:        #e5e5e5;
+  --line-strong: #c9c9c9;
+  --paper:       #ffffff;
+}
+
 html {
-  font-size: 10px;
+  font-size: 12px;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -19,466 +40,203 @@ body {
   margin: 0;
   padding: 0;
   font-family:
+    "Assistant",
     "Noto Sans Hebrew",
     "Noto Sans",
     "Segoe UI",
     system-ui,
     sans-serif;
-  color: #0f172a;
-  /* Single page background — avoids odd strips next to .doc when padded */
-  background: #fff;
+  color: var(--ink);
+  background: var(--paper);
   line-height: 1.5;
   direction: rtl;
   text-align: right;
-}
-
-/* Inner safe area: PDF margins alone inset the page; this pads content so blocks/tables
-   don’t sit flush against the printable box edges inside Chromium’s layout. */
-.doc {
-  max-width: 100%;
-  background: #fff;
-  min-height: 100%;
-  padding: 10mm 12mm 12mm;
-  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .num {
   unicode-bidi: isolate;
-  font-feature-settings: "tnum" 1;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
-/* —— Header —— */
-.header {
-  position: relative;
-  margin-bottom: 1.25rem;
-  border-radius: 0 0 12px 12px;
-  overflow: hidden;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0f172a 100%);
-  color: #f8fafc;
+/* Inner safety inset — belt & suspenders in case `@page` margin is
+   clipped by any viewer (some PDF readers render full-bleed). */
+.page {
+  background: var(--paper);
+  min-height: 100%;
+  padding: 6mm 4mm;
 }
 
-.header-accent {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 5px;
-  background: linear-gradient(180deg, #6a23f7 0%, #8b5cf6 100%);
+/* =====================================================================
+ * SECTION 1 — Letterhead
+ *   grid col 1 (DOM first) = visual RIGHT in RTL → company
+ *   grid col 2 (DOM second) = visual LEFT in RTL → quote
+ * ===================================================================== */
+.letterhead {
+  padding-bottom: 2.2rem;
+  margin-bottom: 2.2rem;
+  border-bottom: 1.5px solid var(--line-strong);
 }
 
-.header-inner {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1.5rem;
-  padding: 1.25rem 1.5rem 1.35rem 1.75rem;
+.letterhead__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 0 3.5rem;
+  width: 100%;
 }
 
+/* ——————————————————————————————————————————————————————————
+   Right column — BRAND / COMPANY (app / sender details)
+   2×2 labeled grid: שם החברה · מספר ח.פ
+                    כתובת     · דוא"ל
+   ————————————————————————————————————————————————————————— */
 .brand {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
+  justify-self: start;          /* inline-start (RTL) = visual right */
   min-width: 0;
-  flex: 1;
-}
-
-.brand img.logo {
-  max-height: 52px;
-  max-width: 170px;
-  object-fit: contain;
-}
-
-.brand-name {
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.brand-address {
-  margin-top: 0.35rem;
-  font-size: 0.78rem;
-  opacity: 0.88;
-  line-height: 1.45;
-  max-width: 280px;
-}
-
-.brand-contact {
-  margin-top: 0.5rem;
-  font-size: 0.72rem;
-  opacity: 0.82;
-}
-
-.brand-contact .ci {
-  display: inline-block;
-  margin-inline-end: 0.75rem;
-}
-
-.doc-headline {
+  max-width: 100%;
   text-align: right;
-  flex-shrink: 0;
+  direction: rtl;
 }
 
-.doc-kicker {
-  margin: 0 0 0.2rem 0;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #5eead4;
+.brand__logo {
+  display: block;
+  max-height: 48px;
+  max-width: 160px;
+  object-fit: contain;
+  filter: grayscale(100%);
+  margin-bottom: 0.9rem;
 }
 
-.doc-title {
-  margin: 0 0 0.75rem 0;
-  font-size: 1.65rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.meta-grid {
+/* 2×2 company card — bounded width so it never bleeds past the page
+   margin and its visual footprint roughly matches the left quote card. */
+.brand__grid {
   display: grid;
-  grid-template-columns: repeat(3, auto);
-  gap: 0.65rem 1.25rem;
-  justify-content: end;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 1.4rem;
+  row-gap: 0.7rem;
+  direction: rtl;
+  width: 100%;
+  max-width: 22rem;             /* ≈ 70mm @ 12px root */
 }
 
-.meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  align-items: flex-end;
+.brand__cell {
+  min-width: 0;
 }
 
-.meta-label {
-  font-size: 0.68rem;
-  opacity: 0.75;
-}
-
-.meta-value {
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-/* —— Sections —— */
-.section {
-  margin-bottom: 1.15rem;
+.brand__cell-label {
+  margin: 0 0 0.15rem 0;
   padding: 0;
-}
-
-.section-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 0.65rem 0;
-  padding-bottom: 0.35rem;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.break-inside {
-  page-break-inside: auto;
-}
-
-/* —— Customer —— */
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem 2rem;
-}
-
-.panel {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.85rem 1rem;
-}
-
-.kv {
-  margin-bottom: 0.65rem;
-}
-
-.kv:last-child {
-  margin-bottom: 0;
-}
-
-.kv-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: #64748b;
-  margin-bottom: 0.2rem;
-}
-
-.kv-value {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-/* —— KPI strip —— */
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.45rem;
-  margin-bottom: 0.85rem;
-}
-
-.kpi-card {
-  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 0.45rem 0.35rem;
-  text-align: center;
-  min-height: 3.6rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.kpi-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 0.35rem;
-}
-
-.kpi-value {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #059669;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--muted);
   line-height: 1.2;
 }
 
-.tech-box {
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  border-radius: 10px;
-  padding: 0.65rem 0.85rem;
-}
-
-.tech-title {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #475569;
-}
-
-.tech-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: 0.35rem 0.65rem;
-}
-
-.tech-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.78rem;
-}
-
-.tech-label {
-  color: #64748b;
-}
-
-.tech-val {
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.scope-block {
+.brand__cell-value {
   margin: 0;
-  font-size: 0.82rem;
-  color: #334155;
-  line-height: 1.55;
-  background: #f8fafc;
-  border-radius: 10px;
-  padding: 0.85rem 1rem;
-  border: 1px solid #e2e8f0;
-}
-
-/* —— Table —— */
-.table-wrap {
-  width: 100%;
-  overflow: visible;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-table.parts {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  font-size: 0.52rem;
-}
-
-table.parts thead {
-  display: table-header-group;
-}
-
-table.parts th,
-table.parts td {
-  padding: 0.28rem 0.15rem;
-  text-align: right;
-  vertical-align: top;
-  border-bottom: 1px solid #e8eef4;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
   overflow-wrap: anywhere;
-  hyphens: auto;
-}
-
-table.parts th {
-  background: #1e293b;
-  color: #f1f5f9;
-  font-weight: 700;
-  font-size: 0.5rem;
-  letter-spacing: 0.01em;
-}
-
-table.parts tbody tr:nth-child(even) {
-  background: #fafbfc;
-}
-
-table.parts tbody tr {
-  page-break-inside: avoid;
-}
-
-table.parts td.num,
-table.parts th.num {
-  text-align: left;
-  direction: ltr;
-  white-space: nowrap;
-}
-
-table.parts td.cen,
-table.parts th.cen {
-  text-align: center;
-}
-
-table.parts td.desc {
-  max-width: none;
   word-break: break-word;
 }
 
-table.parts td.pn {
-  word-break: break-all;
-}
-
-table.parts td.price {
-  font-weight: 700;
-  color: #047857;
-}
-
-/* —— Pricing —— */
-.pricing-section .section-title {
-  border-bottom-color: #a7f3d0;
-}
-
-.pricing-wrap {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: 0.35rem;
-}
-
-.pricing-box {
-  min-width: 280px;
-  max-width: 420px;
-  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 40%);
-  border: 1px solid #a7f3d0;
-  border-radius: 12px;
-  padding: 0.85rem 1rem;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
-}
-
-.pricing-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 0.82rem;
-  padding: 0.35rem 0;
-  gap: 1rem;
-}
-
-.pricing-row .plabel {
-  color: #475569;
-  font-weight: 500;
-}
-
-.pricing-row .pvalue {
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.pricing-row.muted {
-  opacity: 0.88;
-}
-
-.pricing-row.muted .plabel,
-.pricing-row.muted .pvalue {
-  font-weight: 500;
-  color: #64748b;
-}
-
-.pricing-row.total-final {
-  margin-top: 0.45rem;
-  padding-top: 0.55rem;
-  border-top: 2px solid #059669;
-}
-
-.pricing-row.total-final .plabel {
-  font-size: 0.92rem;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.pricing-row.total-final .pvalue {
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: #047857;
-}
-
-/* —— Lists —— */
-.bullets {
-  margin: 0;
-  padding: 0 1.1rem 0 0;
-  font-size: 0.8rem;
-  color: #334155;
-  line-height: 1.55;
-}
-
-.bullets li {
-  margin-bottom: 0.35rem;
-}
-
-/* —— Footer —— */
-.footer {
-  margin-top: 1.25rem;
-  padding: 0.85rem 0 1rem;
-  border-top: 1px solid #e2e8f0;
-  font-size: 0.68rem;
-  color: #64748b;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.5rem;
-  background: #f8fafc;
-}
-
-.footer-main {
+/* ——————————————————————————————————————————————————————————
+   Left column — QUOTE title + meta
+   Column is pinned to inline-end of the grid (visual LEFT in RTL).
+   Contents flow naturally RTL so Hebrew reads right-to-left and the
+   number sits on the visual left of the title.
+   ————————————————————————————————————————————————————————— */
+.quote {
+  justify-self: end;            /* inline-end (RTL) = visual left */
+  min-width: 0;
+  direction: rtl;
+  text-align: right;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  max-width: 75%;
+  align-items: flex-end;        /* pin meta rows to same edge as title (visual left) */
 }
 
-.footer-main .fn {
-  color: #0f172a;
+/* Quote card typography is scaled 1 / 1.25 ≈ 0.8 vs the company card,
+   keeping the hierarchy without dominating the header visually. */
+.quote__title {
+  margin: 0 0 1.2rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.5rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  direction: rtl;
 }
 
-.footer-main .fa {
-  line-height: 1.4;
+.quote__title-word {
+  font-size: 2.4rem;         /* was 3rem — scaled down 1.25× */
+  font-weight: 800;
+  color: var(--ink);
 }
 
-.footer-note {
-  opacity: 0.85;
-  align-self: flex-end;
+.quote__title-num {
+  font-size: 2.4rem;         /* was 3rem — scaled down 1.25× */
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Meta: each row = one line — value on the LEFT, label on the RIGHT (Hebrew),
+   with a small gap only between them (like your first request). DOM order is
+   still dt then dd; `row-reverse` places dd visually left, dt visually right. */
+.quote__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin: 0;
+  padding: 0;
+  width: max-content;
+  max-width: 100%;
+}
+
+.quote__meta-row {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  align-items: baseline;
+  gap: 0.4rem;
+  direction: ltr;
+  margin: 0;
+  padding: 0;
+}
+
+.quote__meta-row dt,
+.quote__meta-row dd {
+  margin: 0;
+  padding: 0;
+}
+
+.quote__meta-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  direction: rtl;
+  text-align: right;
+}
+
+/* Fixed-width value “cell” so every line lines up on the same left edge
+   (green boxes): text is left-flush inside the cell like rows 2–3 in your markup. */
+.quote__meta-value {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 10ch;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  direction: ltr;
   text-align: left;
-  max-width: 40%;
 }

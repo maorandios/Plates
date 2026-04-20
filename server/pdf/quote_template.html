@@ -6,232 +6,77 @@
   <title>הצעת מחיר {{ quote_number }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=Noto+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
   <style>{{ css_text | safe }}</style>
 </head>
 <body>
-  <div class="doc">
-    <header class="header">
-      <div class="header-accent"></div>
-      <div class="header-inner">
-        <div class="brand">
+  <div class="page">
+    <!-- ==============================================================
+         SECTION 1 — Letterhead
+         Right: company (logo/name · address · ח.פ · phone)
+         Left:  quote title + meta
+         ============================================================== -->
+    <header class="letterhead">
+      <div class="letterhead__grid">
+        <!-- DOM col 1 · visual RIGHT (RTL): company info (app / sender)
+             2×2 labeled grid: company name · registration ח.פ
+                                address      · email -->
+        <section class="brand" aria-label="פרטי חברה">
           {% if logo_data_uri %}
-          <img class="logo" src="{{ logo_data_uri }}" alt="" />
+          <img class="brand__logo" src="{{ logo_data_uri }}" alt="" />
           {% endif %}
-          <div class="brand-text">
-            <div class="brand-name">{{ company_name }}</div>
-            {% if company_address_lines %}
-            <div class="brand-address">
-              {% for line in company_address_lines %}<span>{{ line }}</span>{% if not loop.last %}<br />{% endif %}{% endfor %}
+
+          <div class="brand__grid">
+            <div class="brand__cell">
+              <p class="brand__cell-label">שם החברה</p>
+              <p class="brand__cell-value">{{ company_name or "—" }}</p>
             </div>
-            {% endif %}
-            <div class="brand-contact">
-              {% if company_phone %}<span class="ci">{{ company_phone }}</span>{% endif %}
-              {% if company_email %}<span class="ci">{{ company_email }}</span>{% endif %}
-              {% if company_website %}<span class="ci">{{ company_website }}</span>{% endif %}
+            <div class="brand__cell">
+              <p class="brand__cell-label">מספר ח.פ</p>
+              <p class="brand__cell-value num" dir="ltr">{{ company_registration or "—" }}</p>
             </div>
-          </div>
-        </div>
-        <div class="doc-headline">
-          <p class="doc-kicker">הצעת מחיר</p>
-          <h1 class="doc-title">{{ quote_number }}</h1>
-          <div class="meta-grid">
-            <div class="meta-item">
-              <span class="meta-label">תאריך</span>
-              <span class="meta-value num" dir="ltr">{{ quote_date }}</span>
+            <div class="brand__cell">
+              <p class="brand__cell-label">כתובת</p>
+              <p class="brand__cell-value">
+                {% if company_address_lines %}{% for line in company_address_lines %}{{ line }}{% if not loop.last %}<br />{% endif %}{% endfor %}{% else %}—{% endif %}
+              </p>
             </div>
-            <div class="meta-item">
-              <span class="meta-label">בתוקף עד</span>
-              <span class="meta-value num" dir="ltr">{{ valid_until }}</span>
-            </div>
-            <div class="meta-item">
-              <span class="meta-label">מטבע</span>
-              <span class="meta-value num" dir="ltr">{{ currency }}</span>
+            <div class="brand__cell">
+              <p class="brand__cell-label">דוא&quot;ל</p>
+              <p class="brand__cell-value">{{ company_email or "—" }}</p>
             </div>
           </div>
-        </div>
+        </section>
+
+        <!-- DOM col 2 · visual LEFT (RTL): quote headline + meta -->
+        <section class="quote" aria-label="פרטי הצעה">
+          <h1 class="quote__title">
+            <span class="quote__title-word">הצעת מחיר</span>
+            <span class="quote__title-num num" dir="ltr">{{ quote_number }}</span>
+          </h1>
+
+          <dl class="quote__meta">
+            <div class="quote__meta-row">
+              <dt class="quote__meta-label">מספר הצעה</dt>
+              <dd class="quote__meta-value num" dir="ltr">{{ quote_number }}</dd>
+            </div>
+            <div class="quote__meta-row">
+              <dt class="quote__meta-label">תאריך הנפקה</dt>
+              <dd class="quote__meta-value num" dir="ltr">{{ quote_date }}</dd>
+            </div>
+            <div class="quote__meta-row">
+              <dt class="quote__meta-label">בתוקף עד</dt>
+              <dd class="quote__meta-value num" dir="ltr">{{ valid_until }}</dd>
+            </div>
+          </dl>
+        </section>
       </div>
     </header>
 
-    <section class="section">
-      <h2 class="section-title">פרטי לקוח והצעה</h2>
-      <div class="grid-2">
-        <div class="panel">
-          <div class="kv">
-            <div class="kv-label">שם לקוח</div>
-            <div class="kv-value">{{ customer_name or "—" }}</div>
-          </div>
-          <div class="kv">
-            <div class="kv-label">חברה</div>
-            <div class="kv-value">{{ customer_company or "—" }}</div>
-          </div>
-          <div class="kv">
-            <div class="kv-label">פרויקט / עבודה</div>
-            <div class="kv-value">{{ project_name or "—" }}</div>
-          </div>
-        </div>
-        <div class="panel">
-          <div class="kv">
-            <div class="kv-label">אסמכתא / מספר</div>
-            <div class="kv-value num" dir="ltr">{{ reference_number or "—" }}</div>
-          </div>
-          {% if prepared_by %}
-          <div class="kv">
-            <div class="kv-label">הוכן ע״י</div>
-            <div class="kv-value">{{ prepared_by }}</div>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <h2 class="section-title">מדדי סיכום</h2>
-      <div class="kpi-row">
-        {% for card in kpi_cards %}
-        <div class="kpi-card">
-          <div class="kpi-label">{{ card.label }}</div>
-          <div class="kpi-value">{% if loop.last %}<span class="num" dir="ltr">{{ card.value }}</span>{% else %}{{ card.value }}{% endif %}</div>
-        </div>
-        {% endfor %}
-      </div>
-      <div class="tech-box">
-        <p class="tech-title">נתונים טכניים נוספים</p>
-        <div class="tech-grid">
-          {% for row in technical_rows %}
-          <div class="tech-item">
-            <span class="tech-label">{{ row.label }}</span>
-            <span class="tech-val">{{ row.value }}</span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </section>
-
-    {% if scope_has %}
-    <section class="section">
-      <h2 class="section-title">היקף העבודה</h2>
-      <p class="scope-block">{{ scope_text }}</p>
-    </section>
-    {% endif %}
-
-    <section class="section break-inside">
-      <h2 class="section-title">פירוט פלטות</h2>
-      <div class="table-wrap">
-        <table class="parts">
-          <colgroup>
-            <col style="width: 9%" />
-            <col style="width: 8%" />
-            <col style="width: 9%" />
-            <col style="width: 5%" />
-            <col style="width: 6%" />
-            <col style="width: 6%" />
-            <col style="width: 6%" />
-            <col style="width: 7%" />
-            <col style="width: 8%" />
-            <col style="width: 8%" />
-            <col style="width: 7%" />
-            <col style="width: 11%" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>תיאור</th>
-              <th>סוג חומר</th>
-              <th>מספר חלק</th>
-              <th class="cen">כמות</th>
-              <th class="num">עובי (מ״מ)</th>
-              <th class="num">אורך (מ״מ)</th>
-              <th class="num">רוחב (מ״מ)</th>
-              <th class="num">שטח (מ״ר)</th>
-              <th class="num">משקל (ק״ג)</th>
-              <th>דרגת פלדה</th>
-              <th>גימור</th>
-              <th class="num">מחיר</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in item_rows %}
-            <tr>
-              <td class="desc">{{ row.description }}</td>
-              <td>{{ row.material_type }}</td>
-              <td class="pn num" dir="ltr">{{ row.part_number }}</td>
-              <td class="cen">{{ row.qty }}</td>
-              <td class="num" dir="ltr">{{ row.thickness }}</td>
-              <td class="num" dir="ltr">{{ row.length_mm }}</td>
-              <td class="num" dir="ltr">{{ row.width_mm }}</td>
-              <td class="num" dir="ltr">{{ row.area_m2 }}</td>
-              <td class="num" dir="ltr">{{ row.weight }}</td>
-              <td>{{ row.material_grade }}</td>
-              <td>{{ row.finish }}</td>
-              <td class="num price" dir="ltr">{{ row.line_total }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="section pricing-section">
-      <h2 class="section-title">סיכום מחיר</h2>
-      <div class="pricing-wrap">
-        <div class="pricing-box">
-          <div class="pricing-row">
-            <span class="plabel">הצעת מחיר לפני מע״מ</span>
-            <span class="pvalue num" dir="ltr">{{ pricing_subtotal }}</span>
-          </div>
-          {% if has_discount %}
-          <div class="pricing-row muted">
-            <span class="plabel">הנחה</span>
-            <span class="pvalue num" dir="ltr">{{ pricing_discount }}</span>
-          </div>
-          <div class="pricing-row">
-            <span class="plabel">סה״כ אחרי הנחה (לפני מע״מ)</span>
-            <span class="pvalue num" dir="ltr">{{ pricing_net_after_discount }}</span>
-          </div>
-          {% endif %}
-          <div class="pricing-row muted">
-            <span class="plabel">{{ pricing_vat_label }}</span>
-            <span class="pvalue num" dir="ltr">{{ pricing_vat_amount }}</span>
-          </div>
-          <div class="pricing-row total-final">
-            <span class="plabel">סה״כ כולל מע״מ</span>
-            <span class="pvalue num" dir="ltr">{{ pricing_total_incl_vat }}</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    {% if notes_lines %}
-    <section class="section">
-      <h2 class="section-title">הערות</h2>
-      <ul class="bullets">
-        {% for line in notes_lines %}
-        <li>{{ line }}</li>
-        {% endfor %}
-      </ul>
-    </section>
-    {% endif %}
-
-    {% if terms_lines %}
-    <section class="section">
-      <h2 class="section-title">תנאים</h2>
-      <ul class="bullets">
-        {% for line in terms_lines %}
-        <li>{{ line }}</li>
-        {% endfor %}
-      </ul>
-    </section>
-    {% endif %}
-
-    <footer class="footer">
-      <div class="footer-main">
-        <span class="fn"><strong>{{ company_name }}</strong></span>
-        {% if company_address_lines %}
-        <span class="fa">{% for line in company_address_lines %}{{ line }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
-        {% endif %}
-      </div>
-      <div class="footer-note">{{ footer_generated }}</div>
-    </footer>
+    <!-- Additional sections (client · metrics+table · pricing) will be added here -->
   </div>
 </body>
 </html>

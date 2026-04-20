@@ -18,6 +18,8 @@ export interface PlateProjectListRecord {
   updatedAt: string;
   /** Material family from General step. */
   materialType: "carbonSteel" | "stainlessSteel" | "aluminum";
+  /** Sum of part quantities (כמות פלטות) when synced from the wizard. */
+  totalItemQty?: number;
   totalWeightKg?: number;
   totalAreaM2?: number;
 }
@@ -66,6 +68,7 @@ function normalizeRecord(r: PlateProjectListRecord): PlateProjectListRecord {
     createdAt: typeof r.createdAt === "string" ? r.createdAt : new Date().toISOString(),
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : new Date().toISOString(),
     materialType,
+    totalItemQty: numOrUndef(r.totalItemQty),
     totalWeightKg: numOrUndef(r.totalWeightKg),
     totalAreaM2: numOrUndef(r.totalAreaM2),
   };
@@ -107,6 +110,7 @@ export function upsertPlateProjectInProgress(
     | "customerName"
     | "projectName"
     | "materialType"
+    | "totalItemQty"
     | "totalWeightKg"
     | "totalAreaM2"
   > & { currentStep: number }
@@ -123,6 +127,7 @@ export function upsertPlateProjectInProgress(
       projectName: patch.projectName ?? prev.projectName,
       materialType: patch.materialType,
       currentStep: patch.currentStep,
+      totalItemQty: patch.totalItemQty ?? prev.totalItemQty,
       totalWeightKg: patch.totalWeightKg ?? prev.totalWeightKg,
       totalAreaM2: patch.totalAreaM2 ?? prev.totalAreaM2,
       updatedAt: now,
@@ -139,6 +144,7 @@ export function upsertPlateProjectInProgress(
       currentStep: patch.currentStep,
       createdAt: now,
       updatedAt: now,
+      totalItemQty: patch.totalItemQty,
       totalWeightKg: patch.totalWeightKg,
       totalAreaM2: patch.totalAreaM2,
     });
@@ -156,6 +162,7 @@ export function patchPlateProjectListRecord(
       | "referenceNumber"
       | "projectName"
       | "materialType"
+      | "totalItemQty"
       | "totalWeightKg"
       | "totalAreaM2"
     >

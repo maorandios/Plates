@@ -412,8 +412,7 @@ export function QuotePreviewView({
                       disabled={
                         draft.items.length === 0 ||
                         pdfExporting ||
-                        packageExporting ||
-                        !draft.company.name.trim()
+                        packageExporting
                       }
                       onClick={() => void handleExportPdf()}
                       className="gap-2"

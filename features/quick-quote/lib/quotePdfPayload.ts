@@ -56,9 +56,19 @@ export function computeTotalInclVatFromQuoteParts(
   return computeQuoteTotalInclVat(totalPrice, null, vatRate);
 }
 
+/** Strip legacy placeholder so it never appears on PDF letterhead. */
+export function sanitizeLetterheadCompanyName(name: string): string {
+  const t = name.trim();
+  if (!t) return "";
+  if (t.toLowerCase() === "fabrication partner") return "";
+  return t;
+}
+
 /** Sender / letterhead block (editable before PDF export). */
 export interface QuotePdfCompanyBlock {
   name: string;
+  /** Company registration number (Hebrew: ח.פ). Shown under the company name on the letterhead. */
+  registration: string;
   email: string;
   phone: string;
   website: string;
@@ -148,7 +158,10 @@ function addDaysIso(isoDate: string, days: number): string {
 
 function envCompanyDefaults(): QuotePdfCompanyBlock {
   return {
-    name: process.env.NEXT_PUBLIC_QUOTE_COMPANY_NAME?.trim() || "Fabrication partner",
+    name: sanitizeLetterheadCompanyName(
+      process.env.NEXT_PUBLIC_QUOTE_COMPANY_NAME?.trim() || ""
+    ),
+    registration: process.env.NEXT_PUBLIC_QUOTE_COMPANY_REGISTRATION?.trim() || "",
     email: process.env.NEXT_PUBLIC_QUOTE_COMPANY_EMAIL?.trim() || "",
     phone: process.env.NEXT_PUBLIC_QUOTE_COMPANY_PHONE?.trim() || "",
     website: process.env.NEXT_PUBLIC_QUOTE_COMPANY_WEBSITE?.trim() || "",
@@ -162,7 +175,9 @@ export function getDefaultPdfCompany(): QuotePdfCompanyBlock {
   if (typeof window === "undefined") return base;
   const p = getAppPreferences();
   return {
-    name: (p.companyName?.trim() || base.name) || "Fabrication partner",
+    name: sanitizeLetterheadCompanyName((p.companyName?.trim() || base.name) || ""),
+    registration:
+      (p.companyRegistration?.trim() ?? base.registration) || "",
     email: (p.companyEmail?.trim() ?? base.email) || "",
     phone: (p.companyPhone?.trim() ?? base.phone) || "",
     website: (p.companyWebsite?.trim() ?? base.website) || "",

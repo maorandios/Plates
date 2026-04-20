@@ -8,7 +8,11 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class CompanyBlock(BaseModel):
-    name: str = Field(..., min_length=1)
+    name: str = Field(default="", description="Letterhead name; may be empty.")
+    registration: str | None = Field(
+        default=None,
+        description="Company registration number (Hebrew: ח.פ).",
+    )
     logo_path: str | None = None
     email: str | None = None
     phone: str | None = None

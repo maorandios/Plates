@@ -34,6 +34,19 @@ from quote_pdf_types import QuotePdfPayload
 
 DIR = Path(__file__).resolve().parent
 
+# Legacy UI default — never show on PDF letterhead
+_PLACEHOLDER_COMPANY = "fabrication partner"
+
+
+def _sanitize_letterhead_company_name(name: str | None) -> str:
+    t = (name or "").strip()
+    if not t:
+        return ""
+    if t.lower() == _PLACEHOLDER_COMPANY:
+        return ""
+    return t
+
+
 def _logo_data_uri(logo_path: str | None) -> str | None:
     if not logo_path:
         return None
@@ -121,7 +134,8 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
     return {
         "css_text": css_text,
         "logo_data_uri": _logo_data_uri(cc.logo_path),
-        "company_name": cc.name,
+        "company_name": _sanitize_letterhead_company_name(cc.name),
+        "company_registration": (cc.registration or "").strip(),
         "company_email": cc.email or "",
         "company_phone": cc.phone or "",
         "company_website": cc.website or "",
@@ -175,15 +189,12 @@ async def html_to_pdf_bytes(html: str) -> bytes:
                 format="A4",
                 landscape=False,
                 print_background=True,
-                # Let Playwright/Chromium apply margins below (CSS @page alone is unreliable here).
-                prefer_css_page_size=False,
-                # Standard print margins (~1 in / 2.5 cm), common for A4 business documents.
-                margin={
-                    "top": "25mm",
-                    "right": "25mm",
-                    "bottom": "25mm",
-                    "left": "25mm",
-                },
+                # Honor the CSS `@page { margin: 25.4mm }` rule inside
+                # quote_template.css. This is reliable across Chromium builds;
+                # passing a separate `margin` kwarg here can be ignored or
+                # collapsed by some versions, which caused the "content flush
+                # to paper edge" bug previously.
+                prefer_css_page_size=True,
             )
             return pdf
         finally:
@@ -201,6 +212,7 @@ def sample_payload() -> QuotePdfPayload:
     return QuotePdfPayload(
         company={
             "name": "Acme Fabrication Ltd.",
+            "registration": "514123456",
             "logo_path": str(DIR / "assets" / "logo.png") if (DIR / "assets" / "logo.png").is_file() else None,
             "email": "quotes@acmefab.example",
             "phone": "+1 (555) 010-0200",

@@ -15,6 +15,9 @@ const SA = "pages.settingsAccount" as const;
 export function AccountSettingsCard() {
   const { preferences, setPreferences } = useAppPreferences();
   const [name, setName] = useState(preferences.companyName ?? "");
+  const [registration, setRegistration] = useState(
+    preferences.companyRegistration ?? ""
+  );
   const [email, setEmail] = useState(preferences.companyEmail ?? "");
   const [phone, setPhone] = useState(preferences.companyPhone ?? "");
   const [website, setWebsite] = useState(preferences.companyWebsite ?? "");
@@ -22,12 +25,14 @@ export function AccountSettingsCard() {
 
   useEffect(() => {
     setName(preferences.companyName ?? "");
+    setRegistration(preferences.companyRegistration ?? "");
     setEmail(preferences.companyEmail ?? "");
     setPhone(preferences.companyPhone ?? "");
     setWebsite(preferences.companyWebsite ?? "");
     setAddress(preferences.companyAddress ?? "");
   }, [
     preferences.companyName,
+    preferences.companyRegistration,
     preferences.companyEmail,
     preferences.companyPhone,
     preferences.companyWebsite,
@@ -55,6 +60,23 @@ export function AccountSettingsCard() {
             placeholder={t(`${SA}.companyNamePlaceholder`)}
             autoComplete="organization"
             dir="rtl"
+            className="text-start"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="settings-company-registration">
+            {t(`${SA}.companyRegistrationLabel`)}
+          </Label>
+          <Input
+            id="settings-company-registration"
+            value={registration}
+            onChange={(e) => setRegistration(e.target.value)}
+            onBlur={() =>
+              persist({ companyRegistration: registration.trim() || undefined })
+            }
+            placeholder={t(`${SA}.companyRegistrationPlaceholder`)}
+            inputMode="numeric"
+            dir="ltr"
             className="text-start"
           />
         </div>

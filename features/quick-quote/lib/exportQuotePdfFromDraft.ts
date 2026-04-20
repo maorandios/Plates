@@ -32,7 +32,6 @@ export async function exportQuotePdfFromDraft(
   materialFamilyLabel: string
 ): Promise<void> {
   if (draft.items.length === 0) return;
-  if (!draft.company.name.trim()) return;
 
   const quoteDateIso = draft.quote.quote_date;
   const validUntilIso = draft.quote.valid_until;

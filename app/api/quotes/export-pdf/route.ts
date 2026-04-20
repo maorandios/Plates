@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { sanitizeLetterheadCompanyName } from "@/features/quick-quote/lib/quotePdfPayload";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -60,7 +61,8 @@ const pricingSchema = z.object({
 });
 
 const companySchema = z.object({
-  name: z.string().min(1),
+  name: z.string(),
+  registration: z.string().optional().nullable(),
   email: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   website: z.string().optional().nullable(),
@@ -77,7 +79,8 @@ const clientBodySchema = z.object({
 
 function companyFromEnv() {
   return {
-    name: process.env.QUOTE_PDF_COMPANY_NAME?.trim() || "Fabrication partner",
+    name: sanitizeLetterheadCompanyName(process.env.QUOTE_PDF_COMPANY_NAME?.trim() || ""),
+    registration: process.env.QUOTE_PDF_COMPANY_REGISTRATION?.trim() || null,
     logo_path: process.env.QUOTE_PDF_LOGO_PATH?.trim() || null,
     email: process.env.QUOTE_PDF_COMPANY_EMAIL?.trim() || null,
     phone: process.env.QUOTE_PDF_COMPANY_PHONE?.trim() || null,
@@ -96,7 +99,8 @@ function mergeCompany(
     return t === "" ? null : t;
   };
   return {
-    name: fromClient.name.trim(),
+    name: sanitizeLetterheadCompanyName(fromClient.name.trim()),
+    registration: empty(fromClient.registration) ?? fromEnv.registration,
     logo_path: fromEnv.logo_path,
     email: empty(fromClient.email),
     phone: empty(fromClient.phone),

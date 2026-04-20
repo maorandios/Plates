@@ -218,6 +218,7 @@ export function PlateProjectPage() {
       projectName: jobDetails.projectName.trim(),
       materialType,
       currentStep: step,
+      totalItemQty: js.totalQty,
       totalWeightKg: js.totalEstWeightKg,
       totalAreaM2: js.totalPlateAreaM2,
     });
@@ -304,6 +305,7 @@ export function PlateProjectPage() {
       projectName: jobDetails.projectName.trim(),
       materialType,
       currentStep: 3,
+      totalItemQty: js.totalQty,
       totalWeightKg: js.totalEstWeightKg,
       totalAreaM2: js.totalPlateAreaM2,
     });

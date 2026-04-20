@@ -18,6 +18,10 @@ function loadRaw(): AppPreferences {
           : DEFAULT_APP_PREFERENCES.unitSystem,
       companyName:
         typeof parsed.companyName === "string" ? parsed.companyName : undefined,
+      companyRegistration:
+        typeof parsed.companyRegistration === "string"
+          ? parsed.companyRegistration
+          : undefined,
       companyEmail:
         typeof parsed.companyEmail === "string" ? parsed.companyEmail : undefined,
       companyPhone:
