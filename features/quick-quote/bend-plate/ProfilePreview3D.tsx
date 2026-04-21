@@ -1,10 +1,28 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from "react";
+import { Button } from "@/components/ui/button";
+import { t } from "@/lib/i18n";
 import * as THREE from "three";
+import {
+  Brush,
+  Evaluator,
+  HOLLOW_SUBTRACTION,
+  SUBTRACTION,
+} from "three-bvh-csg";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {
+  mergeGeometries,
+  mergeVertices,
+  toCreasedNormals,
+} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { usePlateTheme } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
 import type { BendSegmentHole } from "./types";
@@ -16,6 +34,63 @@ import {
   resolvedOvalLengthMm,
   segmentFaceEffectiveWidthMm,
 } from "./segmentFaceHolesBounds";
+
+const I18N_ED = "quote.bendPlatePhase.editor";
+
+/** Orthographic-style views: profile lies in XY; +Z is plate-width / “top” of strip (matches 2D plan). */
+export type Preview3DViewId =
+  | "top"
+  | "bottom"
+  | "right"
+  | "left"
+  | "front"
+  | "back";
+
+const PREVIEW_3D_VIEW_BUTTONS: { id: Preview3DViewId; labelKey: string }[] = [
+  { id: "top", labelKey: `${I18N_ED}.preview3dViewTop` },
+  { id: "right", labelKey: `${I18N_ED}.preview3dViewRight` },
+  { id: "left", labelKey: `${I18N_ED}.preview3dViewLeft` },
+  { id: "bottom", labelKey: `${I18N_ED}.preview3dViewBottom` },
+  { id: "front", labelKey: `${I18N_ED}.preview3dViewFront` },
+  { id: "back", labelKey: `${I18N_ED}.preview3dViewBack` },
+];
+
+export type ProfilePreview3DHandle = {
+  applyView: (view: Preview3DViewId) => void;
+};
+
+/** Full-width row of orthographic view presets (pairs with `ProfilePreview3D` via ref). */
+export function Preview3DViewToolbar({
+  onSelect,
+  className,
+}: {
+  onSelect: (id: Preview3DViewId) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      role="toolbar"
+      aria-label={t(`${I18N_ED}.preview3dViewPanelAria`)}
+      className={cn(
+        "flex w-full shrink-0 flex-row gap-1 px-1.5 sm:gap-1.5 sm:px-2",
+        className
+      )}
+    >
+      {PREVIEW_3D_VIEW_BUTTONS.map(({ id, labelKey }) => (
+        <Button
+          key={id}
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-auto min-h-9 min-w-0 flex-1 justify-center whitespace-normal px-1 py-1.5 text-center text-[10px] leading-tight sm:text-xs sm:leading-snug"
+          onClick={() => onSelect(id)}
+        >
+          {t(labelKey)}
+        </Button>
+      ))}
+    </div>
+  );
+}
 
 interface ProfilePreview3DProps {
   pts: Point2[];
@@ -39,72 +114,64 @@ interface ProfilePreview3DProps {
   segmentFaceHoles?: BendSegmentHole[][];
   /** When `flatPlate`, rectangle dimensions (mm) for mapping perimeter holes onto the slab top. */
   flatPlateBlankMm?: { lengthMm: number; widthMm: number } | null;
+  /** When false, render only the canvas; use `Preview3DViewToolbar` + `ref.applyView` from the parent. */
+  viewToolbar?: boolean;
 }
 
 const SCALE = 0.001;
 
-/** Shared renderer tuning — softer shading on all bend-plate 3D previews. */
+/** Dark gray sheet metal — cool neutral with a hint of blue-steel (IBL still picks up highlights). */
+const PREVIEW_PLATE_COLOR = new THREE.Color().setHSL(205 / 360, 0.035, 0.4);
+
+/** Mild tone mapping — exposure tuned for RoomEnvironment IBL + directional key. */
 function configurePreviewRenderer(renderer: THREE.WebGLRenderer): void {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
-}
-
-/** Flat ריבוע slab only — slight clearcoat reads well on rounded box. */
-function createPreviewSlabMaterial(): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
-    color: 0x5a9e7a,
-    metalness: 0.2,
-    roughness: 0.58,
-    clearcoat: 0.12,
-    clearcoatRoughness: 0.48,
-    flatShading: false,
-  });
+  renderer.shadowMap.enabled = false;
 }
 
 /**
- * Bent profiles (L/U/Z/Ω/gutter/custom): path-swept rectangular section — no clearcoat so edges stay crisp.
- * (Solid prism per straight run — planar faces; ring-sweeps gave non-planar quads and noisy edge lines.)
+ * Physical material: dark gray brushed metal — slightly higher env response so dark base still reads.
  */
-function createPreviewStripMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    color: 0x5a9e7a,
-    metalness: 0.28,
-    roughness: 0.52,
+function createPreviewPlateMaterial(): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({
+    color: PREVIEW_PLATE_COLOR,
+    metalness: 0.88,
+    roughness: 0.34,
+    clearcoat: 0.1,
+    clearcoatRoughness: 0.38,
+    envMapIntensity: 1.22,
+    emissive: new THREE.Color(0x000000),
+    emissiveIntensity: 0,
     flatShading: false,
   });
 }
 
-/** Hemisphere + key + fill — same for flat slab and extruded strip profiles. */
+function createPreviewSlabMaterial(): THREE.MeshPhysicalMaterial {
+  return createPreviewPlateMaterial();
+}
+
+function createPreviewStripMaterial(): THREE.MeshPhysicalMaterial {
+  return createPreviewPlateMaterial();
+}
+
+/** Key + fill + hemisphere: stronger contrast on edges than flat ambient-only. */
 function addPreviewLighting(scene: THREE.Scene): THREE.Light[] {
-  const amb = new THREE.AmbientLight(0xffffff, 0.42);
-  const hemi = new THREE.HemisphereLight(0xc8d4e0, 0x1a2228, 0.35);
+  const amb = new THREE.AmbientLight(0xffffff, 0.28);
+  const hemi = new THREE.HemisphereLight(0xeef2ff, 0x9aa5b8, 0.42);
   hemi.position.set(0, 1, 0);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.72);
-  dir.position.set(2, 4, 3);
-  const fillLight = new THREE.DirectionalLight(0xa8c4b8, 0.28);
-  fillLight.position.set(-3, -1, -2);
-  for (const L of [amb, hemi, dir, fillLight]) scene.add(L);
-  return [amb, hemi, dir, fillLight];
+  const key = new THREE.DirectionalLight(0xffffff, 0.78);
+  key.position.set(1.1, 1.35, 0.85);
+  const fill = new THREE.DirectionalLight(0xe8ecff, 0.32);
+  fill.position.set(-1.2, 0.45, -0.95);
+  for (const L of [amb, hemi, key, fill]) scene.add(L);
+  return [amb, hemi, key, fill];
 }
 
 function disposeLights(lights: THREE.Light[]): void {
   for (const L of lights) L.dispose();
 }
-
-/**
- * Dark, slightly-emissive, double-sided material so holes read from any view angle
- * (including grazing angles on thin stock). polygonOffset is intentionally OFF — pushing
- * hole fragments backward behind the plate caused the earlier "disappearing" popping.
- */
-const HOLE_MAT = new THREE.MeshStandardMaterial({
-  color: 0x1a2420,
-  emissive: 0x0c1210,
-  emissiveIntensity: 0.22,
-  metalness: 0.32,
-  roughness: 0.52,
-  side: THREE.DoubleSide,
-});
 
 /** Align hole rows with polyline edges `pts[i]→pts[i+1]` (pad / trim so index `s` is always segment `s`). */
 function padSegmentFaceHolesToSegmentCount(
@@ -165,7 +232,24 @@ function buildOvalSlotShape(slotLenWorld: number, diameterWorld: number): THREE.
  * stock but make the hole stick out like a post on thick stock — this stays flush on thick
  * plates while still preventing z-fighting on thin ones.
  */
-const HOLE_OVERSHOOT_PER_SIDE_MM = 0.2;
+/**
+ * Extra depth so the cutter fully clears curved strips. CSG often leaves sliver faces inside
+ * the opening if the cutter barely reaches the far surface — a bit more depth removes them.
+ */
+const HOLE_OVERSHOOT_PER_SIDE_MM = 2.75;
+
+/**
+ * Preview-only: expand the cutter slightly vs. nominal hole size so boolean subtraction eats
+ * numerical tolerance on merged prism meshes (stops “floors” / blocking planes inside holes).
+ * Does not change 2D / DXF hole definitions — 3D preview only.
+ */
+const HOLE_CSG_PLANAR_INFLATE = 1.014;
+
+/** Radial segments for round hole cylinders — higher reduces jagged CSG cuts on bends. */
+const HOLE_ROUND_RADIAL_SEGMENTS = 64;
+
+/** Height segments along the hole axis — helps the cutter intersect curved plate triangles cleanly. */
+const HOLE_ROUND_HEIGHT_SEGMENTS = 8;
 
 /**
  * Build the hole as a solid in a canonical local frame:
@@ -188,16 +272,29 @@ function buildHoleLocalGeometry(
 
   let geom: THREE.BufferGeometry;
   if (h.kind === "round") {
-    const r = Math.max((h.diameterMm * SCALE) / 2, 1e-5);
-    geom = new THREE.CylinderGeometry(r, r, depth, 32);
+    const r =
+      Math.max((h.diameterMm * SCALE) / 2, 1e-5) * HOLE_CSG_PLANAR_INFLATE;
+    geom = new THREE.CylinderGeometry(
+      r,
+      r,
+      depth,
+      HOLE_ROUND_RADIAL_SEGMENTS,
+      HOLE_ROUND_HEIGHT_SEGMENTS,
+      false
+    );
     /** Cylinder axis is +Y by default; rotate so axis = +Z (plate normal). */
     geom.rotateX(Math.PI / 2);
+    geom.computeVertexNormals();
     return geom;
   }
 
   if (h.kind === "oval") {
-    const d = Math.max(h.diameterMm * SCALE, 1e-5);
-    const slotL = Math.max(resolvedOvalLengthMm(h) * SCALE, d);
+    const d =
+      Math.max(h.diameterMm * SCALE, 1e-5) * HOLE_CSG_PLANAR_INFLATE;
+    const slotL = Math.max(
+      resolvedOvalLengthMm(h) * SCALE * HOLE_CSG_PLANAR_INFLATE,
+      d
+    );
     const shape = buildOvalSlotShape(slotL, d);
     geom = new THREE.ExtrudeGeometry(shape, {
       depth,
@@ -211,8 +308,10 @@ function buildHoleLocalGeometry(
     return geom;
   }
 
-  const rw = Math.max((h.rectWidthMm ?? 0) * SCALE, 1e-5);
-  const rl = Math.max((h.rectLengthMm ?? 0) * SCALE, 1e-5);
+  const rw =
+    Math.max((h.rectWidthMm ?? 0) * SCALE, 1e-5) * HOLE_CSG_PLANAR_INFLATE;
+  const rl =
+    Math.max((h.rectLengthMm ?? 0) * SCALE, 1e-5) * HOLE_CSG_PLANAR_INFLATE;
   /** BoxGeometry local axes: X=rectLength (+u at 0°), Y=rectWidth (+v at 0°), Z=depth (normal). */
   geom = new THREE.BoxGeometry(rl, rw, depth);
   if (θ !== 0) geom.rotateZ(θ);
@@ -230,55 +329,115 @@ function bentFaceBasis(Pa: THREE.Vector3, Pb: THREE.Vector3): FaceBasis | null {
   return makeFaceBasis(B, T);
 }
 
-/** Place a single hole: canonical local geometry → (uHat, vHat, nHat) basis → world position. */
-function spawnHoleMesh(
-  scene: THREE.Scene,
+/** CSG brush for one hole in world space (same placement as former overlay meshes). */
+function spawnHoleBrush(
   h: BendSegmentHole,
   thicknessMm: number,
   basis: FaceBasis,
-  centerWorld: THREE.Vector3,
-  meshes: THREE.Mesh[]
-): void {
-  const geom = buildHoleLocalGeometry(h, thicknessMm);
-  const mesh = new THREE.Mesh(geom, HOLE_MAT);
-  mesh.quaternion.setFromRotationMatrix(
+  centerWorld: THREE.Vector3
+): Brush {
+  const g = buildHoleLocalGeometry(h, thicknessMm);
+  const brush = new Brush(g);
+  brush.quaternion.setFromRotationMatrix(
     new THREE.Matrix4().makeBasis(basis.uHat, basis.vHat, basis.nHat)
   );
-  mesh.position.copy(centerWorld);
-  scene.add(mesh);
-  meshes.push(mesh);
+  brush.position.copy(centerWorld);
+  brush.updateMatrixWorld();
+  return brush;
 }
 
-function addHoleMeshesBent(
-  scene: THREE.Scene,
-  /** Logical profile vertices (same as 2D editor) — NOT the filleted high-res polyline. */
-  profilePts: Point2[],
+/** Arc length of `filleted[iFrom] → … → filleted[iTo]` along edges (inclusive endpoints). */
+function polylineLength2D(
+  filleted: Point2[],
+  iFrom: number,
+  iTo: number
+): number {
+  let len = 0;
+  for (let i = iFrom; i < iTo; i++) {
+    const a = filleted[i];
+    const b = filleted[i + 1];
+    if (!a || !b) break;
+    len += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return len;
+}
+
+/**
+ * Point at distance `dist` along the sub-polyline from `iFrom` to `iTo` (inclusive),
+ * plus the micro-edge Pa→Pb that contains that point (for `bentFaceBasis` matching the prism mesh).
+ */
+function pointAtDistanceAlongPolyline(
+  filleted: Point2[],
+  iFrom: number,
+  iTo: number,
+  dist: number
+): { point: THREE.Vector3; pa: THREE.Vector3; pb: THREE.Vector3 } | null {
+  const dt = Math.max(0, dist);
+  let acc = 0;
+  for (let i = iFrom; i < iTo; i++) {
+    const a = filleted[i];
+    const b = filleted[i + 1];
+    if (!a || !b) break;
+    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+    if (segLen < 1e-18) continue;
+    if (acc + segLen >= dt - 1e-12) {
+      const t = Math.max(0, Math.min(1, (dt - acc) / segLen));
+      const px = a.x + (b.x - a.x) * t;
+      const py = a.y + (b.y - a.y) * t;
+      return {
+        point: new THREE.Vector3(px * SCALE, py * SCALE, 0),
+        pa: new THREE.Vector3(a.x * SCALE, a.y * SCALE, 0),
+        pb: new THREE.Vector3(b.x * SCALE, b.y * SCALE, 0),
+      };
+    }
+    acc += segLen;
+  }
+  const last = filleted[iTo];
+  if (!last) return null;
+  const z = new THREE.Vector3(last.x * SCALE, last.y * SCALE, 0);
+  return { point: z.clone(), pa: z.clone(), pb: z.clone() };
+}
+
+function collectHoleBrushesBent(
+  /** High-res filleted centerline — same polyline as `buildBentProfilePrismGeometry`. */
+  filletedPts: Point2[],
+  /** Logical profile vertices (same as 2D editor) — chord length & hole row index. */
+  originalPts: Point2[],
+  /** Inclusive vertex index per logical segment on `filletedPts` (from fillet). */
+  segmentStartIdx: number[],
+  segmentEndIdx: number[],
   segmentFaceHoles: BendSegmentHole[][],
   plateWidthMm: number,
   thicknessMm: number
-): THREE.Mesh[] {
-  const meshes: THREE.Mesh[] = [];
+): Brush[] {
+  const brushes: Brush[] = [];
   const hpw = Math.max((plateWidthMm * SCALE) / 2, 0.00005);
-  const nSeg = Math.max(0, profilePts.length - 1);
+  const nSeg = Math.max(0, originalPts.length - 1);
 
   for (let s = 0; s < nSeg; s++) {
     const row = segmentFaceHoles[s] ?? [];
     if (!row.length) continue;
-    const Pa = new THREE.Vector3(
-      profilePts[s]!.x * SCALE,
-      profilePts[s]!.y * SCALE,
-      0
-    );
-    const Pb = new THREE.Vector3(
-      profilePts[s + 1]!.x * SCALE,
-      profilePts[s + 1]!.y * SCALE,
-      0
-    );
-    const basis = bentFaceBasis(Pa, Pb);
-    if (!basis) continue;
-    /** Segment length in world (meters) and mm — for hole placement along T. */
-    const Llen = Pa.distanceTo(Pb);
-    const Lmm = Llen / SCALE;
+    const iFrom = segmentStartIdx[s] ?? 0;
+    /**
+     * Include the bend arc through the next vertex so holes can sit on / through the radius
+     * (same strip as the mesh), not only the straight run ending at P1 before the fillet.
+     * Last segment has no following arc — end at the profile tip.
+     */
+    const iTo =
+      s < nSeg - 1
+        ? (segmentStartIdx[s + 1] ?? segmentEndIdx[s] ?? 0)
+        : (segmentEndIdx[s] ?? 0);
+    if (iTo < iFrom || iFrom < 0 || iTo >= filletedPts.length) continue;
+
+    const oa = originalPts[s];
+    const ob = originalPts[s + 1];
+    if (!oa || !ob) continue;
+    const Lmm = Math.hypot(ob.x - oa.x, ob.y - oa.y);
+    if (Lmm < 1e-12) continue;
+
+    const pathLen = polylineLength2D(filletedPts, iFrom, iTo);
+    if (pathLen < 1e-12) continue;
+
     const layout = computeSegmentFaceSvgModel(Lmm, plateWidthMm, `${s}`);
     if (layout.kind !== "ok") continue;
     const Wmm = segmentFaceEffectiveWidthMm(
@@ -288,15 +447,22 @@ function addHoleMeshesBent(
     );
 
     for (const h of row) {
-      const vAlong = (h.vMm / Lmm) * Llen;
+      const dist = Math.max(
+        0,
+        Math.min(pathLen, (h.vMm / Lmm) * pathLen)
+      );
+      const hit = pointAtDistanceAlongPolyline(filletedPts, iFrom, iTo, dist);
+      if (!hit) continue;
+      const basis = bentFaceBasis(hit.pa, hit.pb);
+      if (!basis) continue;
       const uAcross = (h.uMm / Wmm - 0.5) * (2 * hpw);
-      const center = Pa.clone()
-        .add(basis.vHat.clone().multiplyScalar(vAlong))
+      const center = hit.point
+        .clone()
         .add(basis.uHat.clone().multiplyScalar(uAcross));
-      spawnHoleMesh(scene, h, thicknessMm, basis, center, meshes);
+      brushes.push(spawnHoleBrush(h, thicknessMm, basis, center));
     }
   }
-  return meshes;
+  return brushes;
 }
 
 /**
@@ -310,8 +476,7 @@ function flatPlateTopSurfaceBasis(): FaceBasis {
   );
 }
 
-function addHoleMeshesFlatPlate(
-  scene: THREE.Scene,
+function collectHoleBrushesFlatPlate(
   segmentFaceHoles: BendSegmentHole[][],
   lengthMm: number,
   widthMm: number,
@@ -320,42 +485,97 @@ function addHoleMeshesFlatPlate(
   cx: number,
   cy: number,
   td: number
-): THREE.Mesh[] {
-  const meshes: THREE.Mesh[] = [];
+): Brush[] {
+  const brushes: Brush[] = [];
   const L = Math.max(lengthMm, 1e-6);
   const W = Math.max(widthMm, 1e-6);
   const thicknessMm = td / SCALE;
 
   const row = segmentFaceHoles[0];
-  if (!row?.length) return meshes;
+  if (!row?.length) return brushes;
 
   const basis = flatPlateTopSurfaceBasis();
   for (const h of row) {
     const p = plateSegmentHoleCenterOnRectangleBlank(0, h.uMm, h.vMm, L, W);
     const wx = cx + (p.x / L - 0.5) * bw;
     const wy = cy + (p.y / W - 0.5) * bh;
-    /** Mid-plane of the slab in world Z so the centered extrusion punches through both faces. */
     const wz = td / 2;
-    spawnHoleMesh(scene, h, thicknessMm, basis, new THREE.Vector3(wx, wy, wz), meshes);
+    brushes.push(
+      spawnHoleBrush(h, thicknessMm, basis, new THREE.Vector3(wx, wy, wz))
+    );
   }
-  return meshes;
+  return brushes;
 }
 
-function addPreviewEdgeOverlay(
-  scene: THREE.Scene,
-  geom: THREE.BufferGeometry,
-  thresholdDeg: number
-): THREE.LineSegments {
-  const edge = new THREE.LineSegments(
-    new THREE.EdgesGeometry(geom, thresholdDeg),
-    new THREE.LineBasicMaterial({
-      color: 0x9ec4b0,
-      transparent: true,
-      opacity: 0.4,
-    })
-  );
-  scene.add(edge);
-  return edge;
+/**
+ * Subtract hole volumes from plate mesh so openings show the viewer background.
+ * Solid SUBTRACTION usually gives cleaner through-holes than HOLLOW_SUBTRACTION on merged
+ * strips; we try several splitter / operation combinations before giving up.
+ */
+function subtractHolesFromPlateGeometry(
+  plateGeom: THREE.BufferGeometry,
+  holeBrushes: Brush[]
+): THREE.BufferGeometry | null {
+  if (holeBrushes.length === 0) return plateGeom;
+
+  const evaluateChain = (
+    operation: typeof HOLLOW_SUBTRACTION | typeof SUBTRACTION,
+    useCDT: boolean
+  ) => {
+    const evaluator = new Evaluator() as Evaluator & { useCDTClipping: boolean };
+    evaluator.useCDTClipping = useCDT;
+    evaluator.useGroups = false;
+    let plateBrush: Brush = new Brush(plateGeom.clone());
+    plateBrush.updateMatrixWorld();
+    for (const hb of holeBrushes) {
+      plateBrush = evaluator.evaluate(plateBrush, hb, operation);
+    }
+    const g = plateBrush.geometry;
+    g.computeVertexNormals();
+    return g;
+  };
+
+  const attempts: Array<
+    [typeof SUBTRACTION | typeof HOLLOW_SUBTRACTION, boolean]
+  > = [
+    [SUBTRACTION, true],
+    [SUBTRACTION, false],
+    [HOLLOW_SUBTRACTION, true],
+    [HOLLOW_SUBTRACTION, false],
+  ];
+
+  for (const [op, useCDT] of attempts) {
+    try {
+      return evaluateChain(op, useCDT);
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
+function disposeHoleBrushes(brushes: Brush[]): void {
+  for (const b of brushes) {
+    b.geometry.dispose();
+  }
+}
+
+/**
+ * Smooth vertex normals so bend prism facets shade as one surface. `toCreasedNormals` keeps
+ * edges sharper than `creaseAngle` — ~81° keeps hole rims crisp while merging small facet angles
+ * along the fillet (see three.js BufferGeometryUtils.toCreasedNormals).
+ */
+function applyBentPreviewSmoothing(
+  g: THREE.BufferGeometry,
+  hasThroughHoles: boolean
+): THREE.BufferGeometry {
+  g.computeVertexNormals();
+  const creaseAngle = hasThroughHoles ? Math.PI * 0.45 : Math.PI * 0.48;
+  const out = toCreasedNormals(g, creaseAngle);
+  if (out !== g) {
+    g.dispose();
+  }
+  return out;
 }
 
 const MM_EPS = 1e-4;
@@ -366,16 +586,40 @@ function distSq2D(a: Point2, b: Point2): number {
   return dx * dx + dy * dy;
 }
 
+interface FilletCenterlineResult {
+  points: Point2[];
+  /** Inclusive index in `points` where logical segment `s` (edge originalPts[s]→originalPts[s+1]) starts. */
+  segmentStartIdx: number[];
+  /** Inclusive index in `points` where logical segment `s` ends. */
+  segmentEndIdx: number[];
+}
+
 /**
  * Replaces sharp polyline corners with tangent arcs (centerline = neutral axis: Ri + t/2).
  * Short legs clamp the arc so the preview never inverts.
+ * Also records per logical segment vertex ranges on the filleted path (straight runs only, not bend arcs).
  */
 function filletCenterlinePolyline(
   pts: Point2[],
   insideRadiusMm: number,
   thicknessMm: number
-): Point2[] {
-  if (pts.length < 3) return pts.map((p) => ({ ...p }));
+): FilletCenterlineResult {
+  const n = pts.length;
+  const nSeg = Math.max(0, n - 1);
+  const segmentStartIdx = new Array<number>(nSeg);
+  const segmentEndIdx = new Array<number>(nSeg);
+
+  if (n < 2) {
+    return { points: [], segmentStartIdx: [], segmentEndIdx: [] };
+  }
+  if (n < 3) {
+    const points = pts.map((p) => ({ ...p }));
+    if (nSeg === 1) {
+      segmentStartIdx[0] = 0;
+      segmentEndIdx[0] = Math.max(0, points.length - 1);
+    }
+    return { points, segmentStartIdx, segmentEndIdx };
+  }
 
   const tMm = Math.max(thicknessMm, 0.01);
   const ri = Math.max(insideRadiusMm, 0.01);
@@ -389,8 +633,14 @@ function filletCenterlinePolyline(
   };
 
   pushDistinct(pts[0]);
+  segmentStartIdx[0] = 0;
 
-  for (let i = 1; i <= pts.length - 2; i++) {
+  const recordCornerDegenerate = (segmentEnd: number, segmentStart: number) => {
+    segmentEndIdx[segmentEnd] = out.length - 1;
+    segmentStartIdx[segmentStart] = out.length - 1;
+  };
+
+  for (let i = 1; i <= n - 2; i++) {
     const A = pts[i - 1];
     const B = pts[i];
     const C = pts[i + 1];
@@ -403,6 +653,7 @@ function filletCenterlinePolyline(
     const lenBC = Math.hypot(vBCx, vBCy);
     if (lenAB < 1e-9 || lenBC < 1e-9) {
       pushDistinct(B);
+      recordCornerDegenerate(i - 1, i);
       continue;
     }
 
@@ -417,6 +668,7 @@ function filletCenterlinePolyline(
     const delta = Math.acos(Math.max(-1, Math.min(1, dot)));
     if (delta < 1e-4 || delta > Math.PI - 1e-4) {
       pushDistinct(B);
+      recordCornerDegenerate(i - 1, i);
       continue;
     }
 
@@ -432,6 +684,7 @@ function filletCenterlinePolyline(
     }
     if (rEff < 0.02) {
       pushDistinct(B);
+      recordCornerDegenerate(i - 1, i);
       continue;
     }
 
@@ -452,11 +705,13 @@ function filletCenterlinePolyline(
     }
 
     pushDistinct(P1);
+    segmentEndIdx[i - 1] = out.length - 1;
 
     const arcDeg = (Math.abs(sweep) * 180) / Math.PI;
-    const nSteps = Math.max(10, Math.ceil(arcDeg / 5));
-    for (let s = 1; s < nSteps; s++) {
-      const u = s / nSteps;
+    /** Dense arc tessellation (~≤1° per step) so bend reads as one smooth piece in 3D. */
+    const nSteps = Math.max(48, Math.ceil(arcDeg / 1.05));
+    for (let step = 1; step < nSteps; step++) {
+      const u = step / nSteps;
       const ang = a1 + sweep * u;
       pushDistinct({
         x: O.x + rEff * Math.cos(ang),
@@ -464,16 +719,21 @@ function filletCenterlinePolyline(
       });
     }
     pushDistinct(P2);
+    segmentStartIdx[i] = out.length - 1;
   }
 
-  pushDistinct(pts[pts.length - 1]);
-  return out;
+  pushDistinct(pts[n - 1]);
+  segmentEndIdx[nSeg - 1] = out.length - 1;
+  return { points: out, segmentStartIdx, segmentEndIdx };
 }
 
 /**
  * One rectangular prism per straight segment: local X = in-plane thickness, Y = plate width (Z
- * world), Z = along path. Keeps every face truly planar (no twisted quads between bent rings —
- * those split into triangles with different normals and show diagonal “polylines” in EdgesGeometry).
+ * world), Z = along path.
+ *
+ * Adjacent boxes meet at a bend angle; their end faces are not coplanar, so exact-length prisms
+ * leave hairline cracks (background showing through). Extend each segment along the path by a
+ * small overlap so consecutive solids intersect — reads as one continuous bent plate in preview.
  */
 function buildBentProfilePrismGeometry(
   pts: Point2[],
@@ -504,7 +764,11 @@ function buildBentProfilePrismGeometry(
     const rot = new THREE.Matrix4().makeBasis(N, B, T);
     quat.setFromRotationMatrix(rot);
 
-    const box = new THREE.BoxGeometry(hx * 2, hy * 2, L);
+    /** Per-end extension along T so joints seal (world units ≈ metres). */
+    const overlapLen = Math.max(L * 0.008, hx * 0.32, 5e-8);
+    const Lext = L + 2 * overlapLen;
+
+    const box = new THREE.BoxGeometry(hx * 2, hy * 2, Lext);
     const mtx = new THREE.Matrix4().compose(mid, quat, scale);
     box.applyMatrix4(mtx);
     parts.push(box);
@@ -521,23 +785,49 @@ function buildBentProfilePrismGeometry(
   if (!merged) {
     return new THREE.BoxGeometry(hx * 2, hy * 2, Math.max(hx * 2, 1e-4));
   }
-  merged.computeVertexNormals();
-  return merged;
+  /**
+   * Weld only truly coincident vertices (keep normals/UVs so half-edge / CSG stay valid).
+   * Smooth shading is applied after hole subtraction via `applyBentPreviewSmoothing`.
+   */
+  const welded = mergeVertices(merged, 1e-5);
+  merged.dispose();
+  welded.computeVertexNormals();
+  return welded;
 }
 
-export function ProfilePreview3D({
-  pts,
-  plateWidthMm,
-  thicknessMm = 2,
-  insideRadiusMm: insideRadiusMmProp,
-  flatPlate = false,
-  className,
-  fill,
-  segmentFaceHoles,
-  flatPlateBlankMm = null,
-}: ProfilePreview3DProps) {
+export const ProfilePreview3D = forwardRef<
+  ProfilePreview3DHandle,
+  ProfilePreview3DProps
+>(function ProfilePreview3D(
+  {
+    pts,
+    plateWidthMm,
+    thicknessMm = 2,
+    insideRadiusMm: insideRadiusMmProp,
+    flatPlate = false,
+    className,
+    fill,
+    segmentFaceHoles,
+    flatPlateBlankMm = null,
+    viewToolbar = true,
+  },
+  ref
+) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<{
+    applyView: (view: Preview3DViewId) => void;
+  } | null>(null);
   const { theme } = usePlateTheme();
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      applyView: (view: Preview3DViewId) => {
+        viewerRef.current?.applyView(view);
+      },
+    }),
+    []
+  );
   /** Deep signature so the WebGL effect re-runs even if callers mutate nested hole arrays in place. */
   const segmentFaceHolesKey = JSON.stringify(segmentFaceHoles ?? []);
 
@@ -569,6 +859,11 @@ export function ProfilePreview3D({
     el.innerHTML = "";
     el.appendChild(renderer.domElement);
 
+    /** IBL for realistic metal/paint response (reflections define edges without wireframe). */
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const envTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envTexture;
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
@@ -577,6 +872,8 @@ export function ProfilePreview3D({
     const lights = addPreviewLighting(scene);
 
     let pathPtsForHoles: Point2[] = pts;
+    let bendSegmentStartIdx: number[] = [];
+    let bendSegmentEndIdx: number[] = [];
     let geom: THREE.BufferGeometry;
     if (flatPlate) {
       const bw = Math.max((b.maxX - b.minX) * SCALE, 0.001);
@@ -595,12 +892,19 @@ export function ProfilePreview3D({
       const ht = Math.max((thicknessMm * SCALE) / 2, 0.00005);
       const hpw = Math.max((plateWidthMm * SCALE) / 2, 0.00005);
       const ri = insideRadiusMmProp ?? thicknessMm;
-      pathPtsForHoles = filletCenterlinePolyline(pts, ri, thicknessMm);
+      const filletRes = filletCenterlinePolyline(pts, ri, thicknessMm);
+      pathPtsForHoles = filletRes.points;
+      bendSegmentStartIdx = filletRes.segmentStartIdx;
+      bendSegmentEndIdx = filletRes.segmentEndIdx;
       geom = buildBentProfilePrismGeometry(pathPtsForHoles, ht, hpw);
     }
 
     geom.computeBoundingBox();
     const bb = geom.boundingBox;
+    let meshCx = cx;
+    let meshCy = cy;
+    let meshCz = 0;
+    let meshExtent = 0.1;
     if (bb) {
       const mtx = (bb.min.x + bb.max.x) / 2;
       const mty = (bb.min.y + bb.max.y) / 2;
@@ -611,6 +915,10 @@ export function ProfilePreview3D({
         bb.max.z - bb.min.z,
         0.001
       );
+      meshCx = mtx;
+      meshCy = mty;
+      meshCz = mtz;
+      meshExtent = ext;
       /** Tight near/far around the part improves depth resolution for very thin thickness. */
       camera.near = Math.max(ext * 1e-4, 1e-6);
       camera.far = Math.max(ext * 80, 1);
@@ -618,50 +926,101 @@ export function ProfilePreview3D({
       camera.position.set(mtx + ext * 0.55, mty + ext * 0.42, mtz + ext * 0.92);
       controls.target.set(mtx, mty, mtz);
       camera.lookAt(mtx, mty, mtz);
+    } else {
+      camera.position.set(cx + 0.01, cy + 0.01, 0.05);
+      controls.target.set(cx, cy, 0);
+      camera.lookAt(cx, cy, 0);
     }
     controls.update();
 
-    const mat = flatPlate ? createPreviewSlabMaterial() : createPreviewStripMaterial();
-    const mesh = new THREE.Mesh(geom, mat);
-    scene.add(mesh);
+    function applyView(view: Preview3DViewId) {
+      const d = Math.max(meshExtent * 1.2, 0.01);
+      switch (view) {
+        case "top":
+          camera.position.set(meshCx, meshCy, meshCz + d);
+          break;
+        case "bottom":
+          camera.position.set(meshCx, meshCy, meshCz - d);
+          break;
+        case "right":
+          camera.position.set(meshCx + d, meshCy, meshCz);
+          break;
+        case "left":
+          camera.position.set(meshCx - d, meshCy, meshCz);
+          break;
+        case "front":
+          camera.position.set(meshCx, meshCy + d, meshCz);
+          break;
+        case "back":
+          camera.position.set(meshCx, meshCy - d, meshCz);
+          break;
+      }
+      camera.up.set(0, 1, 0);
+      controls.target.set(meshCx, meshCy, meshCz);
+      camera.lookAt(meshCx, meshCy, meshCz);
+      controls.update();
+    }
+    viewerRef.current = { applyView };
 
-    const holeMeshes: THREE.Mesh[] = [];
+    const mat = flatPlate ? createPreviewSlabMaterial() : createPreviewStripMaterial();
+
     const rowsRaw = segmentFaceHoles ?? [];
     const hasAnyHole = rowsRaw.some((row) => row && row.length > 0);
+    let holeBrushes: Brush[] = [];
     if (hasAnyHole) {
       if (flatPlate && flatPlateBlankMm) {
         const bw = Math.max((b.maxX - b.minX) * SCALE, 0.001);
         const bh = Math.max((b.maxY - b.minY) * SCALE, 0.001);
         const td = Math.max(thicknessMm * SCALE, 0.001);
-        holeMeshes.push(
-          ...addHoleMeshesFlatPlate(
-            scene,
-            rowsRaw,
-            flatPlateBlankMm.lengthMm,
-            flatPlateBlankMm.widthMm,
-            bw,
-            bh,
-            cx,
-            cy,
-            td
-          )
+        holeBrushes = collectHoleBrushesFlatPlate(
+          rowsRaw,
+          flatPlateBlankMm.lengthMm,
+          flatPlateBlankMm.widthMm,
+          bw,
+          bh,
+          cx,
+          cy,
+          td
         );
       } else if (!flatPlate) {
         const segBent = Math.max(0, pts.length - 1);
         const paddedBent = padSegmentFaceHolesToSegmentCount(rowsRaw, segBent);
-        holeMeshes.push(
-          ...addHoleMeshesBent(
-            scene,
-            pts,
-            paddedBent,
-            plateWidthMm,
-            thicknessMm
-          )
+        holeBrushes = collectHoleBrushesBent(
+          pathPtsForHoles,
+          pts,
+          bendSegmentStartIdx,
+          bendSegmentEndIdx,
+          paddedBent,
+          plateWidthMm,
+          thicknessMm
         );
       }
     }
 
-    const edge = addPreviewEdgeOverlay(scene, geom, flatPlate ? 30 : 22);
+    let geomForRender = geom;
+    if (holeBrushes.length > 0) {
+      geom.clearGroups();
+      const carved = subtractHolesFromPlateGeometry(geom, holeBrushes);
+      disposeHoleBrushes(holeBrushes);
+      if (carved) {
+        geom.dispose();
+        geomForRender = carved;
+      } else if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[ProfilePreview3D] CSG hole subtraction failed; showing solid plate."
+        );
+      }
+    }
+
+    if (!flatPlate) {
+      geomForRender = applyBentPreviewSmoothing(
+        geomForRender,
+        holeBrushes.length > 0
+      );
+    }
+
+    const mesh = new THREE.Mesh(geomForRender, mat);
+    scene.add(mesh);
 
     let raf = 0;
     const animate = () => {
@@ -683,17 +1042,16 @@ export function ProfilePreview3D({
     ro.observe(el);
 
     return () => {
+      viewerRef.current = null;
       cancelAnimationFrame(raf);
       ro.disconnect();
       controls.dispose();
-      geom.dispose();
+      scene.remove(mesh);
+      geomForRender.dispose();
       mat.dispose();
-      for (const hm of holeMeshes) {
-        hm.geometry.dispose();
-        scene.remove(hm);
-      }
-      edge.geometry.dispose();
-      (edge.material as THREE.Material).dispose();
+      scene.environment = null;
+      envTexture.dispose();
+      pmremGenerator.dispose();
       disposeLights(lights);
       renderer.dispose();
       el.removeChild(renderer.domElement);
@@ -711,13 +1069,27 @@ export function ProfilePreview3D({
 
   return (
     <div
-      ref={containerRef}
       className={cn(
-        fill
-          ? "h-full min-h-0 w-full rounded-lg bg-[hsl(var(--viewer-canvas))]"
-          : "min-h-[220px] w-full rounded-lg bg-[hsl(var(--viewer-canvas))]",
+        "relative flex min-h-0 flex-col overflow-hidden rounded-lg",
+        fill ? "h-full min-h-0 w-full" : "min-h-[220px] w-full",
         className
       )}
-    />
+    >
+      <div
+        ref={containerRef}
+        className={cn(
+          "min-h-0 w-full flex-1 bg-[hsl(var(--viewer-canvas))]",
+          fill ? "h-full" : "min-h-[220px]"
+        )}
+      />
+      {viewToolbar ? (
+        <div className="shrink-0 border-t border-border bg-background">
+          <Preview3DViewToolbar
+            className="py-2"
+            onSelect={(id) => viewerRef.current?.applyView(id)}
+          />
+        </div>
+      ) : null}
+    </div>
   );
-}
+});

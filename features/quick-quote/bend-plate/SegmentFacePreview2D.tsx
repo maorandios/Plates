@@ -157,7 +157,7 @@ export function SegmentFacePreview2D({
                       x={lb.x}
                       y={lb.y}
                       fill={DIM_STROKE}
-                      fontSize={ann.segmentLabelFontUser}
+                      fontSize={ann.segmentDimLabelFontUser}
                       fontWeight={600}
                       letterSpacing="0.06em"
                       style={{ fontVariantNumeric: "tabular-nums" }}
@@ -165,7 +165,10 @@ export function SegmentFacePreview2D({
                       dominantBaseline="middle"
                       transform={`rotate(${lb.angle}, ${lb.x}, ${lb.y})`}
                     >
-                      {lb.text}
+                      <tspan direction="ltr" unicodeBidi="embed">
+                        {"\u200e"}
+                        {lb.text}
+                      </tspan>
                     </text>
                   ))
                 : null}

@@ -55,6 +55,8 @@ const DIM_STROKE = "#9ca3af";
 const DIM_STROKE_MUTED = "#6b7280";
 /** Profile polyline — brand primary purple (same as `--primary`). */
 const PROFILE_STROKE = "hsl(262 92% 55%)";
+/** Non-focused segments while editing a dimension in the panel. */
+const PROFILE_SEGMENT_INACTIVE = "#94a3b8";
 /**
  * With `vectorEffect="non-scaling-stroke"`, keep this near 1–1.5 so the profile
  * stays a thin hairline at any zoom — do not scale with viewBox (large values
@@ -64,6 +66,21 @@ const PROFILE_PATH_STROKE_WIDTH = 1.15 / 1.25;
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.min(Math.max(n, lo), hi);
+}
+
+/**
+ * Distance from bend vertex along bisector: past arc radius to ° label anchor (user units = mm).
+ * Default stays close to the arc (like legacy); extra padding only for very short legs to avoid overlap.
+ */
+function angleLabelRadialGapMm(legMin: number, rArc: number): number {
+  const leg = Math.max(legMin, 1e-6);
+  const r = Math.max(rArc, 1e-6);
+  const base = Math.min(Math.max(r * 0.52, 1.1), leg * 0.2);
+  const tightCorner = leg < 20;
+  const tightExtra = tightCorner
+    ? Math.min(r * 0.45 + leg * 0.12, 5)
+    : 0;
+  return clamp(base + tightExtra, 1.35, leg * 0.26);
 }
 
 /** Optional per-vertex arc hairline (px) from shorter leg so the arc matches the corner scale. */
@@ -95,7 +112,8 @@ function annotationStylesForView(
 
   const labelPx = clamp(geomLongPx * 0.0225, 10.5, 12.75);
   const labelFontUser = labelPx / scale;
-  const segmentLabelFontUser = labelFontUser * 1.25 * 1.25;
+  /** Segment length labels — 1.25× smaller than previous (was labelFontUser × 1.25²). */
+  const segmentDimLabelFontUser = labelFontUser * 1.25;
 
   /** 1.25× thinner than legacy dim strokes; dash segment lengths halved → twice as many dashes. */
   const dimStrokePx = clamp(geomLongPx * 0.002, 0.72, 1.12) / 1.25;
@@ -106,7 +124,7 @@ function annotationStylesForView(
 
   return {
     meetScale: scale,
-    segmentLabelFontUser,
+    segmentDimLabelFontUser,
     dimStrokePx,
     extStrokePx,
     dashArray: `${dashLenPx}px ${dashGapPx}px`,
@@ -125,6 +143,11 @@ interface ProfilePreview2DProps {
   segments?: BendProfileSegmentDim[];
   /** Signed path turn (°) after each segment — same order as interior bend vertices (CCW +). */
   bendAnglesDeg?: number[];
+  /**
+   * When set (e.g. user focused a length field), those segment indices stay purple; others mute.
+   * `null` / `undefined` = all segments use the active stroke.
+   */
+  highlightedSegmentIndices?: number[] | null;
   className?: string;
   /** Stretch to parent height (e.g. split-pane editor). */
   fill?: boolean;
@@ -134,6 +157,7 @@ export function ProfilePreview2D({
   pts,
   segments,
   bendAnglesDeg,
+  highlightedSegmentIndices = null,
   className,
   fill,
 }: ProfilePreview2DProps) {
@@ -156,7 +180,7 @@ export function ProfilePreview2D({
   const svg = useMemo(() => {
     if (pts.length < 2) {
       return {
-        pathD: "",
+        segmentPaths: [] as { d: string; segIndex: number }[],
         vb: "0 0 100 100",
         vbW: 100,
         vbH: 100,
@@ -165,7 +189,13 @@ export function ProfilePreview2D({
         dimLayers: null as null | {
           extenders: { x1: number; y1: number; x2: number; y2: number }[];
           dimLines: { x1: number; y1: number; x2: number; y2: number }[];
-          labels: { x: number; y: number; text: string; angle: number }[];
+          labels: {
+            x: number;
+            y: number;
+            text: string;
+            textLen: number;
+            angle: number;
+          }[];
         },
         angleMarkup: null as null | {
           arcs: { path: string; legMin: number }[];
@@ -210,10 +240,17 @@ export function ProfilePreview2D({
 
     const extenders: { x1: number; y1: number; x2: number; y2: number }[] = [];
     const dimLines: { x1: number; y1: number; x2: number; y2: number }[] = [];
-    const labels: { x: number; y: number; text: string; angle: number }[] = [];
+    const labels: {
+      x: number;
+      y: number;
+      text: string;
+      textLen: number;
+      angle: number;
+    }[] = [];
 
     const offset = Math.max(span0 * 0.09, 5);
-    const textGap = Math.max(span0 * 0.055, 3.5);
+    /** Space from dashed dim line toward label — keep small for a tighter CAD read. */
+    const textGap = Math.max(span0 * 0.03, 2);
 
     if (showDims) {
       for (let i = 0; i < nSeg; i++) {
@@ -249,13 +286,19 @@ export function ProfilePreview2D({
         });
 
         const seg = segments![i];
-        const text = `${seg.label} · ${formatDimMm(seg.lengthMm)} mm`;
+        const text = formatDimMm(seg.lengthMm);
         const tx = midX + nx * (offset + textGap);
         const ty = midY + ny * (offset + textGap);
         let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
         if (angleDeg > 90) angleDeg -= 180;
         if (angleDeg < -90) angleDeg += 180;
-        labels.push({ x: tx, y: ty, text, angle: angleDeg });
+        labels.push({
+          x: tx,
+          y: ty,
+          text,
+          textLen: text.length,
+          angle: angleDeg,
+        });
       }
     }
 
@@ -289,10 +332,7 @@ export function ProfilePreview2D({
         /** Arc radius ÷2 vs previous (0.42/0.34 caps) — smaller tick between the two segments. */
         const rArcMax = legMin * 0.21;
         const rArcLocal = clamp(legMin * 0.17, 1.25, rArcMax);
-        const angleTextGapLocal = Math.min(
-          Math.max(rArcLocal * 0.52, 1.2),
-          legMin * 0.2
-        );
+        const angleTextGapLocal = angleLabelRadialGapMm(legMin, rArcLocal);
 
         arcData.push({ p, u1, u2, r: rArcLocal, legMin });
         const tx = p.x + bx * (rArcLocal + angleTextGapLocal);
@@ -329,10 +369,12 @@ export function ProfilePreview2D({
     }
     /** User-space bbox pad for labels (text is drawn in px; pad tracks mm span). */
     const labelBoxUnit = Math.max(span0 * 0.04, 6);
-    const segLabelBox = 1.25 * 1.25;
+    const segmentDimLabelBox = 1.25;
+    const angleLabelBox = 1.25 * 1.25;
     for (const lb of labels) {
-      const hw = lb.text.length * labelBoxUnit * 0.32 * segLabelBox;
-      const hh = labelBoxUnit * 0.72 * segLabelBox;
+      const hw =
+        lb.textLen * labelBoxUnit * 0.32 * segmentDimLabelBox;
+      const hh = labelBoxUnit * 0.72 * segmentDimLabelBox;
       expand(lb.x - hw, lb.y - hh);
       expand(lb.x + hw, lb.y + hh);
     }
@@ -350,8 +392,8 @@ export function ProfilePreview2D({
     }
     for (const lb of angleLabelsRaw) {
       const approxChars = lb.degMain.length + 1;
-      const hw = approxChars * labelBoxUnit * 0.32 * segLabelBox;
-      const hh = labelBoxUnit * 0.72 * segLabelBox;
+      const hw = approxChars * labelBoxUnit * 0.32 * angleLabelBox;
+      const hh = labelBoxUnit * 0.72 * angleLabelBox;
       expand(lb.x - hw, lb.y - hh);
       expand(lb.x + hw, lb.y + hh);
     }
@@ -369,14 +411,18 @@ export function ProfilePreview2D({
 
     const shift = (p: Point2) => ({ x: p.x + shiftX, y: p.y + shiftY });
 
-    const pathD = ptsLocal
-      .map((p, i) => {
-        const q = shift(p);
-        return `${i === 0 ? "M" : "L"} ${q.x.toFixed(2)} ${q.y.toFixed(2)}`;
-      })
-      .join(" ");
-
     const shiftedPts = ptsLocal.map((p) => shift(p));
+
+    const segmentPaths: { d: string; segIndex: number }[] = [];
+    for (let si = 0; si < shiftedPts.length - 1; si++) {
+      const a = shiftedPts[si];
+      const b = shiftedPts[si + 1];
+      segmentPaths.push({
+        d: `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} L ${b.x.toFixed(2)} ${b.y.toFixed(2)}`,
+        segIndex: si,
+      });
+    }
+
     const strokeW = PROFILE_PATH_STROKE_WIDTH;
 
     const dimLayers =
@@ -398,6 +444,7 @@ export function ProfilePreview2D({
               x: lb.x + shiftX,
               y: lb.y + shiftY,
               text: lb.text,
+              textLen: lb.textLen,
               angle: lb.angle,
             })),
           }
@@ -422,7 +469,7 @@ export function ProfilePreview2D({
         : null;
 
     return {
-      pathD,
+      segmentPaths,
       vb: `0 0 ${vbW.toFixed(2)} ${vbH.toFixed(2)}`,
       vbW,
       vbH,
@@ -502,7 +549,7 @@ export function ProfilePreview2D({
                       x={lb.x}
                       y={lb.y}
                       fill={DIM_STROKE}
-                      fontSize={ann.segmentLabelFontUser}
+                      fontSize={ann.segmentDimLabelFontUser}
                       fontWeight={600}
                       letterSpacing="0.06em"
                       style={{ fontVariantNumeric: "tabular-nums" }}
@@ -510,7 +557,10 @@ export function ProfilePreview2D({
                       dominantBaseline="middle"
                       transform={`rotate(${lb.angle}, ${lb.x}, ${lb.y})`}
                     >
-                      {lb.text}
+                      <tspan direction="ltr" unicodeBidi="embed">
+                        {"\u200e"}
+                        {lb.text}
+                      </tspan>
                     </text>
                   ))}
                 </>
@@ -518,17 +568,27 @@ export function ProfilePreview2D({
             })()}
           </g>
         ) : null}
-        {svg.pathD ? (
-          <path
-            d={svg.pathD}
-            fill="none"
-            stroke={PROFILE_STROKE}
-            strokeWidth={svg.strokeW}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-          />
-        ) : null}
+        {svg.segmentPaths.length > 0
+          ? svg.segmentPaths.map((sp) => {
+              const hi = highlightedSegmentIndices;
+              const dimFocus =
+                hi != null && hi.length > 0;
+              const active =
+                !dimFocus || hi.includes(sp.segIndex);
+              return (
+                <path
+                  key={`prof-seg-${sp.segIndex}`}
+                  d={sp.d}
+                  fill="none"
+                  stroke={active ? PROFILE_STROKE : PROFILE_SEGMENT_INACTIVE}
+                  strokeWidth={svg.strokeW}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              );
+            })
+          : null}
         {svg.angleMarkup ? (
           <g aria-hidden>
             {svg.angleMarkup.arcs.map((a, i) => (
@@ -548,25 +608,35 @@ export function ProfilePreview2D({
         ) : null}
         {svg.angleMarkup ? (
           <g aria-hidden>
-            {svg.angleMarkup.labels.map((lb, i) => (
-              <text
-                key={`ang-lbl-${i}`}
-                x={lb.x}
-                y={lb.y}
-                fill={DIM_STROKE}
-                fontSize={ann.segmentLabelFontUser}
-                fontWeight={600}
-                letterSpacing="0.06em"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-                textAnchor="middle"
-                dominantBaseline="middle"
-              >
-                <tspan fontWeight={700}>{lb.degMain}</tspan>
-                <tspan fontWeight={600} fontSize="0.9em">
-                  °
-                </tspan>
-              </text>
-            ))}
+            {svg.angleMarkup.labels.map((lb, i) => {
+              const leg = Math.max(lb.legMin, 1e-6);
+              /** Same base size as segment dim text; cap vs leg on tight corners. */
+              const raw = Math.min(ann.segmentDimLabelFontUser, leg * 0.36);
+              const angleFontUser = clamp(
+                raw,
+                Math.max(leg * 0.09, 1.85),
+                ann.segmentDimLabelFontUser
+              );
+              return (
+                <text
+                  key={`ang-lbl-${i}`}
+                  x={lb.x}
+                  y={lb.y}
+                  fill={DIM_STROKE}
+                  fontSize={angleFontUser}
+                  fontWeight={600}
+                  letterSpacing="0.06em"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  <tspan direction="ltr" unicodeBidi="embed">
+                    {"\u200e"}
+                    {lb.degMain}°
+                  </tspan>
+                </text>
+              );
+            })}
           </g>
         ) : null}
       </svg>

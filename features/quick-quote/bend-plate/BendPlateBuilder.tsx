@@ -95,7 +95,11 @@ import {
 } from "./bendEditorValidation";
 import { MethodPhaseMetricStrip } from "../components/method-phases/MethodPhaseMetricStrip";
 import { ProfilePreview2D } from "./ProfilePreview2D";
-import { ProfilePreview3D } from "./ProfilePreview3D";
+import {
+  Preview3DViewToolbar,
+  ProfilePreview3D,
+  type ProfilePreview3DHandle,
+} from "./ProfilePreview3D";
 import { SegmentFacePreview2D } from "./SegmentFacePreview2D";
 import { SegmentHolePlacementPanel } from "./SegmentHolePlacementPanel";
 import { computeSegmentFaceSvgModel } from "./segmentFaceLayout";
@@ -170,6 +174,8 @@ function NumField({
   min,
   step: _step = 1,
   className,
+  onFocus,
+  onBlur,
 }: {
   label: string;
   value: number;
@@ -178,6 +184,10 @@ function NumField({
   /** Reserved for future numeric spinners / hints. */
   step?: number;
   className?: string;
+  /** Fires after internal focus setup (e.g. segment highlight in profile preview). */
+  onFocus?: () => void;
+  /** Fires after commit on blur (e.g. clear segment highlight). */
+  onBlur?: () => void;
 }) {
   const [focused, setFocused] = useState(false);
   const [local, setLocal] = useState("");
@@ -223,6 +233,7 @@ function NumField({
         onFocus={() => {
           setFocused(true);
           setLocal(Number.isFinite(value) ? String(value) : "");
+          onFocus?.();
         }}
         onChange={(e) => {
           const raw = e.target.value;
@@ -234,7 +245,10 @@ function NumField({
             onChange(n);
           }
         }}
-        onBlur={commitBlur}
+        onBlur={() => {
+          commitBlur();
+          onBlur?.();
+        }}
         aria-valuemin={min}
       />
     </div>
@@ -826,6 +840,7 @@ function BendPlateShapeEditor({
   }, [setForm]);
 
   const [preview3dOpen, setPreview3dOpen] = useState(false);
+  const preview3dRef = useRef<ProfilePreview3DHandle | null>(null);
   const [saveValidationOpen, setSaveValidationOpen] = useState(false);
   const [saveValidationLines, setSaveValidationLines] = useState<string[]>([]);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
@@ -855,6 +870,29 @@ function BendPlateShapeEditor({
   const [addHoleFaceError, setAddHoleFaceError] = useState<string | null>(null);
 
   const [holesResetConfirmOpen, setHolesResetConfirmOpen] = useState(false);
+  /** Side profile: which polyline segment edges stay purple while a length field is focused. */
+  const [dimHighlightSegments, setDimHighlightSegments] = useState<number[] | null>(
+    null
+  );
+  const dimHighlightBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const clearDimHighlight = useCallback(() => {
+    if (dimHighlightBlurTimerRef.current) {
+      clearTimeout(dimHighlightBlurTimerRef.current);
+    }
+    dimHighlightBlurTimerRef.current = setTimeout(() => {
+      setDimHighlightSegments(null);
+      dimHighlightBlurTimerRef.current = null;
+    }, 0);
+  }, []);
+  const focusDimSegments = useCallback((indices: number[]) => {
+    if (dimHighlightBlurTimerRef.current) {
+      clearTimeout(dimHighlightBlurTimerRef.current);
+      dimHighlightBlurTimerRef.current = null;
+    }
+    setDimHighlightSegments(indices);
+  }, []);
   const pendingHoleResetRef = useRef<
     | { kind: "global"; patch: Partial<BendPlateFormState["global"]> }
     | { kind: "form"; action: SetStateAction<BendPlateFormState> }
@@ -983,6 +1021,16 @@ function BendPlateShapeEditor({
       setHolePanelExpand(null);
     }
     prevEditorSidebarScreenRef.current = editorSidebarScreen;
+  }, [editorSidebarScreen]);
+
+  useEffect(() => {
+    if (editorSidebarScreen !== "dimensions") {
+      if (dimHighlightBlurTimerRef.current) {
+        clearTimeout(dimHighlightBlurTimerRef.current);
+        dimHighlightBlurTimerRef.current = null;
+      }
+      setDimHighlightSegments(null);
+    }
   }, [editorSidebarScreen]);
 
   useEffect(() => {
@@ -1640,7 +1688,12 @@ function BendPlateShapeEditor({
                             {t(`${ED}.templateDimsHintCustom`)}
                           </p>
                         ) : null}
-                        <TemplateFields form={form} setForm={setFormGuarded} />
+                        <TemplateFields
+                          form={form}
+                          setForm={setFormGuarded}
+                          onSegmentDimFocus={focusDimSegments}
+                          onSegmentDimBlur={clearDimHighlight}
+                        />
                       </div>
                     ) : null}
 
@@ -1660,7 +1713,7 @@ function BendPlateShapeEditor({
                               {t(`${ED}.holesPickSegment`)}
                             </Label>
                             <div
-                              className="flex max-h-[min(42vh,20rem)] flex-col gap-2 overflow-y-auto pr-0.5"
+                              className="flex flex-col gap-2"
                               role="listbox"
                               aria-label={t(`${ED}.holesPickSegment`)}
                             >
@@ -1704,7 +1757,9 @@ function BendPlateShapeEditor({
                                     )}
                                   >
                                     <span className="block text-sm font-semibold tabular-nums leading-snug">
-                                      {seg.label}
+                                      {t(`${ED}.holesSegmentCardTitle`, {
+                                        label: seg.label,
+                                      })}
                                     </span>
                                     <span className="mt-0.5 block text-xs font-normal text-muted-foreground tabular-nums">
                                       {t(`${ED}.holesSegmentCardLength`, {
@@ -1872,6 +1927,7 @@ function BendPlateShapeEditor({
                     pts={pts}
                     segments={profileSegmentDims}
                     bendAnglesDeg={profileBendAnglesDeg}
+                    highlightedSegmentIndices={dimHighlightSegments}
                     fill
                     className="h-full w-full min-h-0 rounded-md border-0 bg-transparent"
                   />
@@ -1902,29 +1958,43 @@ function BendPlateShapeEditor({
       </div>
 
       <Dialog open={preview3dOpen} onOpenChange={setPreview3dOpen}>
-        <DialogContent className="max-w-[min(96vw,56rem)] gap-0 p-0" dir="rtl" showCloseButton={false}>
+        <DialogContent
+          className="max-w-[min(96vw,56rem)] gap-0 overflow-hidden p-0"
+          dir="rtl"
+          showCloseButton={false}
+        >
           <DialogHeader className="border-b border-border px-6 py-4 sm:text-start">
             <DialogTitle>{t(`${ED}.preview3dTitle`)}</DialogTitle>
             <DialogDescription className="text-sm">{t(`${ED}.preview3dDescription`)}</DialogDescription>
           </DialogHeader>
-          <div className="relative min-h-[min(70vh,560px)] w-full bg-[hsl(var(--viewer-canvas))] p-4 sm:p-5">
-            <ProfilePreview3D
-              pts={pts}
-              plateWidthMm={form.global.plateWidthMm}
-              thicknessMm={form.global.thicknessMm}
-              insideRadiusMm={form.global.insideRadiusMm ?? form.global.thicknessMm}
-              flatPlate={form.template === "plate"}
-              segmentFaceHoles={form.segmentFaceHoles}
-              flatPlateBlankMm={preview3dFlatBlankMm}
-              fill
-              className="h-full min-h-[min(64vh,500px)] w-full rounded-md border-0 bg-transparent"
-            />
+          <div className="flex min-h-[min(70vh,560px)] w-full flex-col">
+            <div className="min-h-0 flex-1 bg-[hsl(var(--viewer-canvas))] px-4 pt-4 sm:px-5 sm:pt-5">
+              <ProfilePreview3D
+                ref={preview3dRef}
+                pts={pts}
+                plateWidthMm={form.global.plateWidthMm}
+                thicknessMm={form.global.thicknessMm}
+                insideRadiusMm={form.global.insideRadiusMm ?? form.global.thicknessMm}
+                flatPlate={form.template === "plate"}
+                segmentFaceHoles={form.segmentFaceHoles}
+                flatPlateBlankMm={preview3dFlatBlankMm}
+                fill
+                viewToolbar={false}
+                className="h-full min-h-[min(64vh,500px)] w-full rounded-b-none rounded-t-md border-0 bg-transparent"
+              />
+            </div>
+            <div className="border-t border-border bg-background">
+              <Preview3DViewToolbar
+                className="px-4 py-2.5 sm:px-6"
+                onSelect={(id) => preview3dRef.current?.applyView(id)}
+              />
+              <DialogFooter className="border-0 bg-transparent px-4 py-3 sm:justify-start sm:px-6">
+                <Button type="button" variant="outline" onClick={() => setPreview3dOpen(false)}>
+                  {t(`${ED}.close`)}
+                </Button>
+              </DialogFooter>
+            </div>
           </div>
-          <DialogFooter className="border-t border-border px-6 py-3">
-            <Button type="button" variant="outline" onClick={() => setPreview3dOpen(false)}>
-              {t(`${ED}.close`)}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1992,9 +2062,14 @@ function BendPlateShapeEditor({
 function TemplateFields({
   form,
   setForm,
+  onSegmentDimFocus,
+  onSegmentDimBlur,
 }: {
   form: BendPlateFormState;
   setForm: Dispatch<SetStateAction<BendPlateFormState>>;
+  /** Indices of profile polyline segments (same order as bend profile dimensions). */
+  onSegmentDimFocus?: (segmentIndices: number[]) => void;
+  onSegmentDimBlur?: () => void;
 }) {
   const tmpl = form.template;
 
@@ -2011,6 +2086,8 @@ function TemplateFields({
               value={form.l.aMm}
               onChange={(n) => setForm((s) => ({ ...s, l: { ...s.l, aMm: Math.max(0, n) } }))}
               min={0}
+              onFocus={() => onSegmentDimFocus?.([0])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.l.includedAngle`)}
@@ -2034,6 +2111,8 @@ function TemplateFields({
             value={form.l.bMm}
             onChange={(n) => setForm((s) => ({ ...s, l: { ...s.l, bMm: Math.max(0, n) } }))}
             min={0}
+            onFocus={() => onSegmentDimFocus?.([1])}
+            onBlur={onSegmentDimBlur}
           />
         </div>
       </div>
@@ -2056,6 +2135,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, u: { ...s.u, aMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([0])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.u.includedAngle1`)}
@@ -2082,6 +2163,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, u: { ...s.u, bMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([1])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.u.includedAngle2`)}
@@ -2107,6 +2190,8 @@ function TemplateFields({
               setForm((s) => ({ ...s, u: { ...s.u, cMm: Math.max(0, n) } }))
             }
             min={0}
+            onFocus={() => onSegmentDimFocus?.([2])}
+            onBlur={onSegmentDimBlur}
           />
         </div>
       </div>
@@ -2129,6 +2214,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, z: { ...s.z, aMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([0])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.z.includedAngle1`)}
@@ -2155,6 +2242,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, z: { ...s.z, bMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([1])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.z.includedAngle2`)}
@@ -2180,6 +2269,8 @@ function TemplateFields({
               setForm((s) => ({ ...s, z: { ...s.z, cMm: Math.max(0, n) } }))
             }
             min={0}
+            onFocus={() => onSegmentDimFocus?.([2])}
+            onBlur={onSegmentDimBlur}
           />
         </div>
       </div>
@@ -2202,6 +2293,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, omega: { ...s.omega, aMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([0])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.omega.angN`, { n: 1 })}
@@ -2228,6 +2321,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, omega: { ...s.omega, bMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([1])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.omega.angN`, { n: 2 })}
@@ -2254,6 +2349,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, omega: { ...s.omega, cMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([2])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.omega.angN`, { n: 3 })}
@@ -2280,6 +2377,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, omega: { ...s.omega, dMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([3])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.omega.angN`, { n: 4 })}
@@ -2305,6 +2404,8 @@ function TemplateFields({
               setForm((s) => ({ ...s, omega: { ...s.omega, eMm: Math.max(0, n) } }))
             }
             min={0}
+            onFocus={() => onSegmentDimFocus?.([4])}
+            onBlur={onSegmentDimBlur}
           />
         </div>
       </div>
@@ -2331,6 +2432,8 @@ function TemplateFields({
                 }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([0, 2])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.plate.widthMm`)}
@@ -2342,6 +2445,8 @@ function TemplateFields({
                 }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([1, 3])}
+              onBlur={onSegmentDimBlur}
             />
           </div>
         </div>
@@ -2365,6 +2470,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, gutter: { ...s.gutter, aMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([0])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.gutter.angN`, { n: 1 })}
@@ -2391,6 +2498,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, gutter: { ...s.gutter, bMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([1])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.gutter.angN`, { n: 2 })}
@@ -2417,6 +2526,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, gutter: { ...s.gutter, cMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([2])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.gutter.angN`, { n: 3 })}
@@ -2443,6 +2554,8 @@ function TemplateFields({
                 setForm((s) => ({ ...s, gutter: { ...s.gutter, dMm: Math.max(0, n) } }))
               }
               min={0}
+              onFocus={() => onSegmentDimFocus?.([3])}
+              onBlur={onSegmentDimBlur}
             />
             <NumField
               label={t(`${ED}.gutter.angN`, { n: 4 })}
@@ -2468,6 +2581,8 @@ function TemplateFields({
               setForm((s) => ({ ...s, gutter: { ...s.gutter, eMm: Math.max(0, n) } }))
             }
             min={0}
+            onFocus={() => onSegmentDimFocus?.([4])}
+            onBlur={onSegmentDimBlur}
           />
         </div>
       </div>
@@ -2526,6 +2641,8 @@ function TemplateFields({
                       })
                     }
                     min={0}
+                    onFocus={() => onSegmentDimFocus?.([i])}
+                    onBlur={onSegmentDimBlur}
                   />
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
@@ -2541,6 +2658,8 @@ function TemplateFields({
                         })
                       }
                       min={0}
+                      onFocus={() => onSegmentDimFocus?.([i])}
+                      onBlur={onSegmentDimBlur}
                     />
                     <NumField
                       label={t(`${ED}.turnAfterDeg`, { n: i + 1 })}

@@ -1,7 +1,4 @@
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
-import { t } from "@/lib/i18n";
-
-const ED = "quote.bendPlatePhase.editor";
 
 function fmtMm(n: number): string {
   const r = Math.round(n * 10) / 10;
@@ -36,7 +33,7 @@ export type SegmentFaceSvgModel =
 export function computeSegmentFaceSvgModel(
   lengthMm: number,
   widthMm: number,
-  segmentLabel: string
+  _segmentLabel: string
 ): SegmentFaceSvgModel {
   const L = Math.max(0, lengthMm);
   const rawW = Math.max(0, widthMm);
@@ -60,7 +57,8 @@ export function computeSegmentFaceSvgModel(
   const rectH = segLen;
   const span0 = Math.max(rectW, rectH, 1);
   const offset = Math.max(span0 * 0.09, 5);
-  const textGap = Math.max(span0 * 0.055, 3.5);
+  /** Match ProfilePreview2D — label sits closer to the dashed dimension line. */
+  const textGap = Math.max(span0 * 0.03, 2);
 
   const rx0 = 0;
   const ry0 = 0;
@@ -100,7 +98,7 @@ export function computeSegmentFaceSvgModel(
         { x1: p1.x, y1: p1.y, x2: p1o.x, y2: p1o.y }
       );
       dimLines.push({ x1: p0o.x, y1: p0o.y, x2: p1o.x, y2: p1o.y });
-      const text = t(`${ED}.holesFaceDimWidth`, { mm: fmtMm(rawW) });
+      const text = fmtMm(rawW);
       const tx = midX + nx * (offset + textGap);
       const ty = midY + ny * (offset + textGap);
       let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -134,10 +132,7 @@ export function computeSegmentFaceSvgModel(
         { x1: p1.x, y1: p1.y, x2: p1o.x, y2: p1o.y }
       );
       dimLines.push({ x1: p0o.x, y1: p0o.y, x2: p1o.x, y2: p1o.y });
-      const text = t(`${ED}.holesFaceDimLen`, {
-        label: segmentLabel,
-        mm: fmtMm(L),
-      });
+      const text = fmtMm(L);
       const tx = midX + nx * (offset + textGap);
       const ty = midY + ny * (offset + textGap);
       let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -248,7 +243,8 @@ export function segmentFaceAnnotationStylesForView(
 
   const labelPx = clamp(geomLongPx * 0.0225, 10.5, 12.75);
   const labelFontUser = labelPx / scale;
-  const segmentLabelFontUser = labelFontUser * 1.25 * 1.25;
+  /** Match ProfilePreview2D `segmentDimLabelFontUser`. */
+  const segmentDimLabelFontUser = labelFontUser * 1.25;
 
   /** Keep in sync with ProfilePreview2D.annotationStylesForView */
   const dimStrokePx = clamp(geomLongPx * 0.002, 0.72, 1.12) / 1.25;
@@ -258,7 +254,7 @@ export function segmentFaceAnnotationStylesForView(
 
   return {
     meetScale: scale,
-    segmentLabelFontUser,
+    segmentDimLabelFontUser,
     dimStrokePx,
     extStrokePx,
     dashArray: `${dashLenPx}px ${dashGapPx}px`,
