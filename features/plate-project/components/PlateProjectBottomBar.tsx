@@ -77,7 +77,7 @@ export function PlateProjectBottomBar({
               size="default"
               variant={saveProjectToList.saved ? "outline" : "default"}
               className="min-w-[10rem] gap-1"
-              disabled={saveProjectToList.saved || !saveProjectToList.canSave}
+              disabled={!saveProjectToList.canSave}
               onClick={saveProjectToList.onClick}
             >
               {saveProjectToList.saved ? (

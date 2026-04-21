@@ -36,6 +36,10 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { QuotePartRow, ThicknessStockInput } from "../../types/quickQuote";
+import {
+  displayNestingMaterialGradeKey,
+  nestingMaterialGradeKey,
+} from "../../lib/plateFields";
 
 const QA = "quote.quantityAnalysis" as const;
 
@@ -49,41 +53,28 @@ const NESTING_TABLE_COL_WIDTHS_PCT = (() => {
 function partsInNestingGroup(
   parts: QuotePartRow[],
   thicknessMm: number,
-  corrugated: boolean
+  corrugated: boolean,
+  materialGradeKey: string
 ): QuotePartRow[] {
   return parts.filter(
     (p) =>
       p.thicknessMm === thicknessMm &&
-      (p.corrugated === true) === corrugated
+      (p.corrugated === true) === corrugated &&
+      nestingMaterialGradeKey(p.material) === materialGradeKey
   );
-}
-
-/** Steel grade codes only (e.g. S235, S355JR) — strips finish text like "ללא", coatings, etc. */
-function steelClassificationsFromMaterial(raw: string): string[] {
-  const m = raw.match(/\bS\d{3}[A-Za-z0-9+]*\b/g);
-  if (!m?.length) return [];
-  return [...new Set(m.map((x) => x.toUpperCase()))];
-}
-
-function steelGradeLabel(groupParts: QuotePartRow[]): string {
-  const all = new Set<string>();
-  for (const p of groupParts) {
-    for (const code of steelClassificationsFromMaterial(p.material || "")) {
-      all.add(code);
-    }
-  }
-  const sorted = [...all].sort();
-  if (sorted.length === 0) return "—";
-  return sorted.join(" · ");
 }
 
 function thicknessResultForGroup(
   summary: RectPackResult,
   thicknessMm: number,
-  corrugated: boolean
+  corrugated: boolean,
+  materialGradeKey: string
 ) {
   return summary.perThickness.find(
-    (r) => r.thicknessMm === thicknessMm && r.corrugated === corrugated
+    (r) =>
+      r.thicknessMm === thicknessMm &&
+      r.corrugated === corrugated &&
+      r.materialGradeKey === materialGradeKey
   );
 }
 
@@ -322,7 +313,7 @@ function SheetsTwoColumnGrid({
         <GridCellView
           key={
             cell.kind === "sheet"
-              ? `${cell.layout.thicknessMm}-${cell.layout.corrugated ? "c" : "p"}-${cell.layout.sheetIndex}-${i}`
+              ? `${cell.layout.thicknessMm}-${cell.layout.corrugated ? "c" : "p"}-${cell.layout.materialGradeKey}-${cell.layout.sheetIndex}-${i}`
               : `more-${i}`
           }
           cell={cell}
@@ -370,6 +361,7 @@ export function NestingPreviewSection({
       areaM2: p.areaM2,
       qty: p.qty,
       corrugated: p.corrugated === true,
+      materialGradeKey: nestingMaterialGradeKey(p.material),
     }));
 
     return rectPackWithPlacements(packParts, stockLines, 0, 3);
@@ -385,7 +377,7 @@ export function NestingPreviewSection({
     if (!result?.layouts.length) return [];
     const m = new Map<string, SheetLayout[]>();
     for (const layout of result.layouts) {
-      const gk = `${layout.thicknessMm}\u0000${layout.corrugated ? "1" : "0"}`;
+      const gk = `${layout.thicknessMm}\u0000${layout.corrugated ? "1" : "0"}\u0000${layout.materialGradeKey}`;
       const existing = m.get(gk);
       if (existing) existing.push(layout);
       else m.set(gk, [layout]);
@@ -413,12 +405,7 @@ export function NestingPreviewSection({
         });
       }
       thicknessSet.add(String(Math.round(f.thicknessMm * 100) / 100));
-      const gp = partsInNestingGroup(parts, f.thicknessMm, f.corrugated);
-      for (const p of gp) {
-        for (const c of steelClassificationsFromMaterial(p.material || "")) {
-          steelSet.add(c);
-        }
-      }
+      steelSet.add(displayNestingMaterialGradeKey(f.materialGradeKey));
     }
     sizes.sort((a, b) => {
       const [aw, al] = a.key.split("x").map(Number);
@@ -447,14 +434,8 @@ export function NestingPreviewSection({
       if (filterCorrugated === "yes" && !f.corrugated) return false;
       if (filterCorrugated === "no" && f.corrugated) return false;
       if (filterSteel !== "all") {
-        const gp = partsInNestingGroup(parts, f.thicknessMm, f.corrugated);
-        const codes = new Set<string>();
-        for (const p of gp) {
-          for (const c of steelClassificationsFromMaterial(p.material || "")) {
-            codes.add(c);
-          }
-        }
-        if (!codes.has(filterSteel)) return false;
+        const label = displayNestingMaterialGradeKey(f.materialGradeKey);
+        if (label !== filterSteel) return false;
       }
       return true;
     });
@@ -642,15 +623,18 @@ export function NestingPreviewSection({
               const first = layouts[0];
               const thicknessMm = first.thicknessMm;
               const isCorrugated = first.corrugated;
+              const gradeKey = first.materialGradeKey;
               const groupParts = partsInNestingGroup(
                 parts,
                 thicknessMm,
-                isCorrugated
+                isCorrugated,
+                gradeKey
               );
               const thResult = thicknessResultForGroup(
                 result.summary,
                 thicknessMm,
-                isCorrugated
+                isCorrugated,
+                gradeKey
               );
               const grossM2 =
                 thResult != null
@@ -684,9 +668,9 @@ export function NestingPreviewSection({
                   <TableCell className="min-w-0 overflow-hidden px-2 py-2.5 align-middle text-start text-sm leading-snug">
                     <span
                       className="block truncate"
-                      title={steelGradeLabel(groupParts)}
+                      title={displayNestingMaterialGradeKey(gradeKey)}
                     >
-                      {steelGradeLabel(groupParts)}
+                      {displayNestingMaterialGradeKey(gradeKey)}
                     </span>
                   </TableCell>
                   <TableCell className="min-w-0 px-2 py-2.5 align-middle text-sm">

@@ -4,6 +4,7 @@ import {
   type RectPackPart,
   type RectPackStockLine,
 } from "@/lib/quotes/rectPackNesting";
+import { nestingMaterialGradeKey } from "../lib/plateFields";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -107,6 +108,7 @@ export function estimateSheetsForNetArea(
       areaM2: p.areaM2,
       qty: p.qty,
       corrugated: p.corrugated === true,
+      materialGradeKey: nestingMaterialGradeKey(p.material),
     }));
     const result = rectPackEstimate(packParts, stockLines);
 
@@ -225,8 +227,14 @@ export function buildMaterialBreakdown(
       r.stockSheetsCaption = "No sheet sizes for this thickness in the quote";
       continue;
     }
-    // Pass the parts for this thickness so rect-pack can use exact dimensions
-    const thicknessParts = parts.filter((p) => p.thicknessMm === r.thicknessMm);
+    const matFromLabel = r.label
+      .replace(/\s*\/\s*[\d.]+\s*mm\s*$/u, "")
+      .trim();
+    const thicknessParts = parts.filter(
+      (p) =>
+        p.thicknessMm === r.thicknessMm &&
+        (p.material || "—").trim() === matFromLabel
+    );
     const est = estimateSheetsForNetArea(r.netAreaM2, lines, thicknessParts.length > 0 ? thicknessParts : undefined);
     r.stockSheetsCaption = est
       ? formatStockSheetsCaption(est)
@@ -295,6 +303,7 @@ export function buildStockSheetSizeBreakdown(
       areaM2: p.areaM2,
       qty: p.qty,
       corrugated: p.corrugated === true,
+      materialGradeKey: nestingMaterialGradeKey(p.material),
     }));
 
     const result = rectPackEstimate(packParts, stockLines, 0);

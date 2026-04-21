@@ -3,7 +3,7 @@
  *
  * Algorithm: Maximal Rectangles (MaxRects) with multi-heuristic search.
  *
- * For each thickness × stock type (plain vs פח מרוג — never mixed on one sheet)
+ * For each thickness × stock type (plain vs פח מרוג) × דרגת פלדה (never mixed on one sheet)
  * the packer automatically tries 6 combinations of:
  *   Sort order  × Scoring heuristic:
  *     - area   × BSSF  (Best Short Side Fit)
@@ -40,6 +40,11 @@ export interface RectPackPart {
    * Omitted/false = standard stock.
    */
   corrugated?: boolean;
+  /**
+   * Normalized steel grade (דרגת פלדה); different grades must not share sheets.
+   * Set from BOM grade (e.g. via `nestingMaterialGradeKey(material)`).
+   */
+  materialGradeKey?: string;
 }
 
 export interface RectPackStockLine {
@@ -51,6 +56,8 @@ export interface RectPackThicknessResult {
   thicknessMm: number;
   /** True when this run is for פח מרוג stock only (separate nesting from plain). */
   corrugated: boolean;
+  /** Steel grade bucket for this run (normalized lowercase). */
+  materialGradeKey: string;
   sheetCount: number;
   sheetWidthMm: number;
   sheetLengthMm: number;
@@ -80,6 +87,7 @@ export interface PlacedRect {
 export interface SheetLayout {
   thicknessMm: number;
   corrugated: boolean;
+  materialGradeKey: string;
   sheetWidthMm: number;
   sheetLengthMm: number;
   sheetIndex: number;
@@ -95,21 +103,28 @@ export interface RectPackWithPlacementsResult {
 }
 
 // ---------------------------------------------------------------------------
-// Stock grouping (plain vs פח מרוג at same thickness)
+// Stock grouping (plain vs פח מרוג × grade at same thickness)
 // ---------------------------------------------------------------------------
 
-function rectPackGroupKey(p: RectPackPart): string {
-  const c = p.corrugated === true;
-  return `${p.thicknessMm}\u0000${c ? "1" : "0"}`;
+function normalizePackMaterialGradeKey(raw: string | undefined): string {
+  const g = (raw ?? "—").trim().toLowerCase();
+  return g || "—";
 }
 
-/** Sort groups: ascending thickness, plain before corrugated at same thickness. */
+function rectPackGroupKey(p: RectPackPart): string {
+  const c = p.corrugated === true ? "1" : "0";
+  const g = normalizePackMaterialGradeKey(p.materialGradeKey);
+  return `${p.thicknessMm}\u0000${c}\u0000${g}`;
+}
+
+/** Sort groups: thickness → plain before corrugated → grade. */
 export function compareRectPackGroupKeys(a: string, b: string): number {
-  const [ta, ca] = a.split("\u0000");
-  const [tb, cb] = b.split("\u0000");
+  const [ta, ca, ga = ""] = a.split("\u0000");
+  const [tb, cb, gb = ""] = b.split("\u0000");
   const d = Number(ta) - Number(tb);
   if (d !== 0) return d;
-  return ca.localeCompare(cb);
+  if (ca !== cb) return ca.localeCompare(cb);
+  return ga.localeCompare(gb, undefined, { sensitivity: "base" });
 }
 
 // ---------------------------------------------------------------------------
@@ -463,6 +478,7 @@ function buildBaseInstances(parts: RectPackPart[]): Instance[] {
 function estimateForThickness(
   thicknessMm: number,
   corrugated: boolean,
+  materialGradeKey: string,
   parts: RectPackPart[],
   stockLines: RectPackStockLine[],
   spacing: number
@@ -494,6 +510,7 @@ function estimateForThickness(
     const candidate: RectPackThicknessResult = {
       thicknessMm,
       corrugated,
+      materialGradeKey: normalizePackMaterialGradeKey(materialGradeKey),
       sheetCount: pack.sheetCount,
       sheetWidthMm,
       sheetLengthMm,
@@ -542,9 +559,13 @@ export function rectPackEstimate(
     if (!thParts?.length) continue;
     const thicknessMm = thParts[0].thicknessMm;
     const corrugated = thParts[0].corrugated === true;
+    const materialGradeKey = normalizePackMaterialGradeKey(
+      thParts[0].materialGradeKey
+    );
     const r = estimateForThickness(
       thicknessMm,
       corrugated,
+      materialGradeKey,
       thParts,
       stockLines,
       spacingMm
@@ -578,6 +599,7 @@ export function rectPackEstimate(
 function layoutForThickness(
   thicknessMm: number,
   corrugated: boolean,
+  materialGradeKey: string,
   parts: RectPackPart[],
   bestLine: RectPackStockLine,
   spacing: number,
@@ -610,6 +632,7 @@ function layoutForThickness(
     layouts.push({
       thicknessMm,
       corrugated,
+      materialGradeKey: normalizePackMaterialGradeKey(materialGradeKey),
       sheetWidthMm: binW,
       sheetLengthMm: binH,
       sheetIndex,
@@ -644,13 +667,14 @@ export function rectPackWithPlacements(
 
   const layouts: SheetLayout[] = [];
   for (const th of summary.perThickness) {
-    const key = `${th.thicknessMm}\u0000${th.corrugated ? "1" : "0"}`;
+    const key = `${th.thicknessMm}\u0000${th.corrugated ? "1" : "0"}\u0000${normalizePackMaterialGradeKey(th.materialGradeKey)}`;
     const thParts = byGroup.get(key);
     if (!thParts) continue;
     layouts.push(
       ...layoutForThickness(
         th.thicknessMm,
         th.corrugated,
+        th.materialGradeKey,
         thParts,
         { sheetWidthMm: th.sheetWidthMm, sheetLengthMm: th.sheetLengthMm },
         spacingMm,

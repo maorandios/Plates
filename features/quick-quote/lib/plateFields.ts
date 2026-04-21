@@ -90,3 +90,21 @@ export function splitMaterialGradeAndFinish(material: string): {
   }
   return { grade: s, finish: "—" };
 }
+
+/**
+ * Stable token for nesting / rect-pack grouping: same thickness + פח מרוג must still split
+ * by דרגת פלדה (different grades never share a sheet).
+ */
+export function nestingMaterialGradeKey(material: string | undefined): string {
+  const { grade } = splitMaterialGradeAndFinish(material ?? "");
+  const g = grade.trim().toLowerCase();
+  return g || "—";
+}
+
+/** Table/UI label from {@link nestingMaterialGradeKey} (e.g. s235 → S235). */
+export function displayNestingMaterialGradeKey(key: string): string {
+  if (!key || key === "—") return "—";
+  const m = key.match(/^s(\d{3})([a-z0-9+]{0,12})$/i);
+  if (m) return `S${m[1]}${m[2].toUpperCase()}`;
+  return key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+}

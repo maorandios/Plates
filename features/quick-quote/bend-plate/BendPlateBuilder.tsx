@@ -17,16 +17,13 @@ import {
   Cuboid,
   LayoutGrid,
   Package,
-  Pencil,
   Plus,
   RotateCcw,
   Ruler,
   Save,
-  Trash2,
   Weight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { OptimisticCheckbox } from "@/components/ui/optimistic-checkbox";
 import {
   Card,
   CardContent,
@@ -51,14 +48,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { nanoid } from "@/lib/utils/nanoid";
 import { cn } from "@/lib/utils";
@@ -91,6 +80,7 @@ import {
   formStateFromQuoteItem,
 } from "./defaults";
 import { BendTemplatePickerGrid } from "./BendTemplatePickerGrid";
+import { BendPlateLineItemsTable } from "./BendPlateLineItemsTable";
 import {
   getBendEditorBasicDataIssueCodes,
   getBendEditorValidationIssueCodes,
@@ -142,20 +132,6 @@ const EDITOR_HUB_CARD_TITLE =
   "text-[1.09375rem] font-semibold leading-tight text-foreground";
 const EDITOR_HUB_CARD_DESC =
   "text-[12.5px] leading-snug sm:text-[13.75px] sm:leading-relaxed";
-
-const TEMPLATE_IDS: BendTemplateId[] = ["l", "u", "z", "omega", "gutter", "plate", "custom"];
-
-function templateLabel(id: BendTemplateId): string {
-  return t(`${BP}.template.${id}.name`);
-}
-
-/** Hub / labels: legacy PlateFinish codes → i18n; settings Hebrew strings pass through. */
-function bendPlateFinishDisplay(finish: string): string {
-  if (finish === "carbon" || finish === "galvanized" || finish === "paint") {
-    return t(`quote.finishLabels.${finish}`);
-  }
-  return finish;
-}
 
 function bendEditorBasicDataValidationMessages(form: BendPlateFormState): string[] {
   return getBendEditorBasicDataIssueCodes(form).map((code) => t(`${BP}.issues.${code}`));
@@ -335,6 +311,11 @@ interface BendPlateBuilderProps {
    */
   initialEditorTemplate?: BendTemplateId | null;
   /**
+   * When set on mount (and the id exists in `quoteItems`), opens the editor for that line item
+   * (e.g. plate-project list → edit). Takes precedence over `initialEditorTemplate`.
+   */
+  initialEditItemId?: string | null;
+  /**
    * Plate-project flow: after save or cancel in the editor, call this instead of showing the
    * internal hub (line-items table). Parent typically returns to the template card grid.
    */
@@ -351,6 +332,7 @@ export function BendPlateBuilder({
   onBack,
   onComplete,
   initialEditorTemplate = null,
+  initialEditItemId = null,
   onLeaveEditorToParent,
 }: BendPlateBuilderProps) {
   const [screen, setScreen] = useState<"hub" | "editor">("hub");
@@ -390,11 +372,6 @@ export function BendPlateBuilder({
   }, [materialType]);
 
   const initialEditorOpenedRef = useRef(false);
-  useLayoutEffect(() => {
-    if (!initialEditorTemplate || initialEditorOpenedRef.current) return;
-    initialEditorOpenedRef.current = true;
-    openNewEditor(initialEditorTemplate);
-  }, [initialEditorTemplate, openNewEditor]);
 
   const openEditEditor = useCallback(
     (item: BendPlateQuoteItem) => {
@@ -413,6 +390,30 @@ export function BendPlateBuilder({
     },
     [materialType]
   );
+
+  useLayoutEffect(() => {
+    if (initialEditorOpenedRef.current) return;
+
+    if (initialEditItemId) {
+      const item = quoteItems.find((x) => x.id === initialEditItemId);
+      if (item) {
+        initialEditorOpenedRef.current = true;
+        openEditEditor(item);
+      }
+      return;
+    }
+
+    if (initialEditorTemplate) {
+      initialEditorOpenedRef.current = true;
+      openNewEditor(initialEditorTemplate);
+    }
+  }, [
+    initialEditItemId,
+    initialEditorTemplate,
+    quoteItems,
+    openNewEditor,
+    openEditEditor,
+  ]);
 
   const handleComplete = useCallback(() => {
     const item = snapshotItem(form, calc, editingId);
@@ -563,10 +564,7 @@ function BendPlateHub({
           >
             <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
               {quoteItems.length === 0 ? (
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-                  <p className="mx-auto max-w-lg shrink-0 text-center text-sm leading-relaxed text-muted-foreground">
-                    {t(`${BP}.emptyState`)}
-                  </p>
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                   <div className="flex min-h-[min(20rem,50vh)] min-w-0 flex-1 overflow-x-auto overflow-y-auto">
                     <BendTemplatePickerGrid
                       quoteItems={quoteItems}
@@ -597,149 +595,12 @@ function BendPlateHub({
                 </div>
               ) : (
                 <>
-                  <div className="max-h-[min(70vh,800px)] overflow-auto rounded-md border border-border bg-card">
-                    <Table
-                      className="border-separate border-spacing-0"
-                      containerClassName="overflow-visible"
-                    >
-                      <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_tr]:border-b-0">
-                        <TableRow className="border-b-0 hover:bg-transparent">
-                          <TableHead
-                            className={cn(
-                              "min-w-[3.5rem] sticky top-0 right-0 z-40 bg-card py-2 pe-3 ps-3 text-center text-xs font-medium border-e border-border"
-                            )}
-                          >
-                            {t(`${BP}.colIndex`)}
-                          </TableHead>
-                          <TableHead className="min-w-[72px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colShape`)}
-                          </TableHead>
-                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colThickness`)}
-                          </TableHead>
-                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colWidth`)}
-                          </TableHead>
-                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colLength`)}
-                          </TableHead>
-                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colQuantity`)}
-                          </TableHead>
-                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colArea`)}
-                          </TableHead>
-                          <TableHead className="min-w-[88px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colWeight`)}
-                          </TableHead>
-                          <TableHead className="min-w-[120px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colMaterial`)}
-                          </TableHead>
-                          <TableHead className="min-w-[100px] py-2 pe-3 ps-3 text-xs font-medium">
-                            {t(`${BP}.colFinish`)}
-                          </TableHead>
-                          <TableHead className="min-w-[5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
-                            {t(`${BP}.colCorrugated`)}
-                          </TableHead>
-                          <TableHead className="min-w-[4.5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
-                            {t(`${BP}.colEdit`)}
-                          </TableHead>
-                          <TableHead className="min-w-[4.5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
-                            {t(`${BP}.colDelete`)}
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {quoteItems.map((it, index) => {
-                          const q = Math.max(0, Math.floor(it.global.quantity) || 0);
-                          const lineArea = it.calc.areaM2 * q;
-                          return (
-                            <TableRow key={it.id} className="group/row">
-                              <TableCell
-                                className={cn(
-                                  "sticky right-0 z-20 bg-card py-2 pe-3 ps-3 text-center text-sm tabular-nums text-muted-foreground border-e border-border",
-                                  "group-hover/row:bg-white/[0.04]"
-                                )}
-                              >
-                                {index + 1}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm font-medium tabular-nums">
-                                {templateLabel(it.template)}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
-                                {formatDecimal(it.global.thicknessMm, 2)}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
-                                {formatDecimal(it.calc.blankWidthMm, 1)}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
-                                {formatDecimal(it.calc.blankLengthMm, 1)}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
-                                {formatInteger(q)}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
-                                {formatDecimal(lineArea, 3)}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm tabular-nums">
-                                {formatDecimal(it.calc.weightKg, 2)}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm text-muted-foreground max-w-[180px] truncate">
-                                {it.global.material || "—"}
-                              </TableCell>
-                              <TableCell className="py-2 pe-3 ps-3 text-sm text-muted-foreground whitespace-nowrap">
-                                {bendPlateFinishDisplay(it.global.finish)}
-                              </TableCell>
-                              <TableCell className="py-2 pe-2 ps-2">
-                                <div className="flex justify-center">
-                                  <OptimisticCheckbox
-                                    checked={it.global.corrugated === true}
-                                    aria-label={t(`${BP}.ariaCorrugatedRow`, {
-                                      index: index + 1,
-                                    })}
-                                    onCheckedChange={(v) =>
-                                      onUpdateItem({
-                                        ...it,
-                                        global: { ...it.global, corrugated: v },
-                                      })
-                                    }
-                                  />
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-2 pe-2 ps-2">
-                                <div className="flex justify-center">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    aria-label={t(`${BP}.editRowAria`)}
-                                    onClick={() => onEdit(it)}
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-2 pe-2 ps-2">
-                                <div className="flex justify-center">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    aria-label={t(`${BP}.deleteRowAria`)}
-                                    onClick={() => onRemove(it.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <BendPlateLineItemsTable
+                    quoteItems={quoteItems}
+                    onEdit={onEdit}
+                    onUpdateItem={onUpdateItem}
+                    onRemove={onRemove}
+                  />
                   <div className="mt-4 flex justify-start" dir="rtl">
                     <Button
                       type="button"

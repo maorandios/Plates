@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
-import { LayoutGrid, Package, RotateCcw, Weight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronRight, LayoutGrid, Package, Plus, RotateCcw, Weight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import type { DxfPartGeometry } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import type { BendPlateQuoteItem, BendTemplateId } from "@/features/quick-quote/bend-plate/types";
+import { BendPlateLineItemsTable } from "@/features/quick-quote/bend-plate/BendPlateLineItemsTable";
 import { BendTemplatePickerGrid } from "@/features/quick-quote/bend-plate/BendTemplatePickerGrid";
 import { MethodPhaseMetricStrip } from "@/features/quick-quote/components/method-phases/MethodPhaseMetricStrip";
 import { jobSummaryFromParts } from "@/features/quick-quote/lib/deriveQuoteSelection";
@@ -16,6 +17,7 @@ import type { ManualQuotePartRow } from "@/features/quick-quote/types/quickQuote
 import { t } from "@/lib/i18n";
 
 const VIEWPORT = "flex h-full min-h-0 max-h-full flex-col overflow-hidden";
+const BP = "quote.bendPlatePhase";
 
 export interface PlateProjectDrawingPickerPhaseProps {
   materialType: MaterialType;
@@ -24,6 +26,9 @@ export interface PlateProjectDrawingPickerPhaseProps {
   dxfMethodGeometries: DxfPartGeometry[];
   bendPlateQuoteItems: BendPlateQuoteItem[];
   onSelectTemplate: (template: BendTemplateId) => void;
+  onEditBendPlateItem: (item: BendPlateQuoteItem) => void;
+  onUpdateBendPlateItem: (item: BendPlateQuoteItem) => void;
+  onRemoveBendPlateItem: (id: string) => void;
   onResetRequest: () => void;
   resetDisabled: boolean;
 }
@@ -35,9 +40,19 @@ export function PlateProjectDrawingPickerPhase({
   dxfMethodGeometries,
   bendPlateQuoteItems,
   onSelectTemplate,
+  onEditBendPlateItem,
+  onUpdateBendPlateItem,
+  onRemoveBendPlateItem,
   onResetRequest,
   resetDisabled,
 }: PlateProjectDrawingPickerPhaseProps) {
+  /** Same as Quick Quote bend hub: table vs full-screen template picker. */
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  useEffect(() => {
+    if (bendPlateQuoteItems.length === 0) setShowTemplatePicker(false);
+  }, [bendPlateQuoteItems.length]);
+
   const mergedParts = useMemo(
     () =>
       mergeAllQuoteMethodParts(
@@ -125,11 +140,64 @@ export function PlateProjectDrawingPickerPhase({
               </div>
             </div>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-auto p-4 sm:p-5">
-            <BendTemplatePickerGrid
-              quoteItems={bendPlateQuoteItems}
-              onSelectTemplate={onSelectTemplate}
-            />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {bendPlateQuoteItems.length === 0 ? (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-auto overflow-y-auto p-4 sm:p-5">
+                <div className="flex min-h-[min(20rem,50vh)] min-w-0 flex-1 overflow-x-auto overflow-y-auto">
+                  <BendTemplatePickerGrid
+                    quoteItems={bendPlateQuoteItems}
+                    onSelectTemplate={onSelectTemplate}
+                  />
+                </div>
+              </div>
+            ) : showTemplatePicker ? (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-x-auto overflow-y-auto p-4 sm:p-5">
+                <div className="flex w-full shrink-0 justify-end" dir="rtl">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={() => setShowTemplatePicker(false)}
+                  >
+                    <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+                    {t(`${BP}.backToPartsList`)}
+                  </Button>
+                </div>
+                <div className="flex min-h-[min(22rem,55vh)] min-w-0 flex-1 overflow-x-auto overflow-y-auto">
+                  <BendTemplatePickerGrid
+                    quoteItems={bendPlateQuoteItems}
+                    onSelectTemplate={onSelectTemplate}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-auto p-4 sm:p-5">
+                <div className="shrink-0 space-y-2">
+                  <h2 className="text-sm font-semibold text-foreground">
+                    {t("plateProject.drawingPhase.platesListTitle")}
+                  </h2>
+                  <BendPlateLineItemsTable
+                    quoteItems={bendPlateQuoteItems}
+                    onEdit={onEditBendPlateItem}
+                    onUpdateItem={onUpdateBendPlateItem}
+                    onRemove={onRemoveBendPlateItem}
+                  />
+                </div>
+                <div className="mt-4 flex justify-start" dir="rtl">
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="default"
+                    className="gap-2"
+                    onClick={() => setShowTemplatePicker(true)}
+                  >
+                    <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                    {t(`${BP}.addNewPart`)}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -14,6 +14,8 @@ interface BendPlateQuotePhaseProps {
   onBack: () => void;
   onComplete: () => void;
   initialEditorTemplate?: BendTemplateId | null;
+  /** Opens the editor for an existing line (takes precedence over `initialEditorTemplate`). */
+  initialEditItemId?: string | null;
   /** When set, editor save/cancel exits to parent instead of the bend-plate line-items hub. */
   onLeaveEditorToParent?: () => void;
 }
@@ -28,6 +30,7 @@ export function BendPlateQuotePhase({
   onBack,
   onComplete,
   initialEditorTemplate = null,
+  initialEditItemId = null,
   onLeaveEditorToParent,
 }: BendPlateQuotePhaseProps) {
   return (
@@ -41,6 +44,7 @@ export function BendPlateQuotePhase({
       onBack={onBack}
       onComplete={onComplete}
       initialEditorTemplate={initialEditorTemplate}
+      initialEditItemId={initialEditItemId}
       onLeaveEditorToParent={onLeaveEditorToParent}
     />
   );

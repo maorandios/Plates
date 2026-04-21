@@ -679,32 +679,6 @@ export function PartBreakdownTable({
         </div>
       </div>
 
-      {showExportRow &&
-      showFullExecutionPackageButton &&
-      parts.length > 0 ? (
-        <div
-          className="flex w-full justify-end pe-1.5 ps-4 pb-1 pt-0 sm:pe-2 sm:ps-5 sm:pb-1.5"
-          dir="rtl"
-        >
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-10 gap-2"
-            disabled={exportingFullPackage}
-            aria-label={t(`${PP}.ariaExportExecutionPackage`)}
-            onClick={handleExportFullPackage}
-          >
-            {exportingFullPackage ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-            ) : (
-              <Package className="h-4 w-4 shrink-0" aria-hidden />
-            )}
-            {t(`${PP}.exportExecutionPackage`)}
-          </Button>
-        </div>
-      ) : null}
-
       <div className="rounded-md border border-border bg-card px-4 py-3 sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
           <div className="min-w-0 flex-1 lg:min-w-[220px] lg:max-w-md">
@@ -792,6 +766,33 @@ export function PartBreakdownTable({
               >
                 <RotateCcw className="h-4 w-4 shrink-0" aria-hidden />
                 {t(`${PP}.filterReset`)}
+              </Button>
+            </div>
+          ) : null}
+
+          {showExportRow &&
+          showFullExecutionPackageButton &&
+          parts.length > 0 ? (
+            <div className="flex w-full shrink-0 lg:ms-auto lg:w-auto lg:pb-0">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-10 gap-2 rounded-xl border-2 border-[#00C7A5] bg-[#D2FFEE] text-[#14765F] shadow-sm transition-colors",
+                  "hover:bg-[#c5f5e8] hover:border-[#00b396] hover:text-[#14765F]",
+                  "disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-60 disabled:shadow-none disabled:hover:bg-muted"
+                )}
+                disabled={exportingFullPackage}
+                aria-label={t(`${PP}.ariaExportExecutionPackage`)}
+                onClick={handleExportFullPackage}
+              >
+                {exportingFullPackage ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                ) : (
+                  <Package className="h-4 w-4 shrink-0" aria-hidden />
+                )}
+                {t(`${PP}.exportExecutionPackage`)}
               </Button>
             </div>
           ) : null}

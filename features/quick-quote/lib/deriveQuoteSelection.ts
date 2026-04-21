@@ -6,6 +6,7 @@ import {
   seedSheetsForThickness,
 } from "./quoteStockAvailability";
 import { rectPackEstimate } from "@/lib/quotes/rectPackNesting";
+import { nestingMaterialGradeKey } from "./plateFields";
 import type {
   JobSummaryMetrics,
   ManufacturingParameters,
@@ -237,15 +238,20 @@ function formatStockSummary(rows: ThicknessStockInput[], pricePerKg: number): st
 }
 
 /**
- * Stable key for nesting / rect-pack cache: geometry, qty, and plain vs פח מרוג
- * (separate sheet runs — affects sheet count and waste).
+ * Stable key for nesting / rect-pack cache: geometry, qty, plain vs פח מרוג, and grade.
  */
 export function nestingGeometrySignatureForParts(parts: QuotePartRow[]): string {
   return parts
     .map((p) =>
-      [p.id, p.thicknessMm, p.widthMm, p.lengthMm, p.qty, p.corrugated ? 1 : 0].join(
-        ":"
-      )
+      [
+        p.id,
+        p.thicknessMm,
+        p.widthMm,
+        p.lengthMm,
+        p.qty,
+        p.corrugated ? 1 : 0,
+        nestingMaterialGradeKey(p.material),
+      ].join(":")
     )
     .join("|");
 }
@@ -328,6 +334,7 @@ function estimateSheetUsageFromStock(
     areaM2: p.areaM2,
     qty: p.qty,
     corrugated: p.corrugated === true,
+    materialGradeKey: nestingMaterialGradeKey(p.material),
   }));
 
   const result = rectPackEstimate(packParts, stockLines);
