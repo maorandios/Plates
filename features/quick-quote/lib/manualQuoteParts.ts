@@ -116,6 +116,7 @@ export function excelRowsToManualQuoteRows(
       quantity: Math.max(1, Math.floor(r.quantity) || 1),
       material: (r.material ?? "").trim() || defaultMaterialGradeForFamily(materialType),
       finish: normalizeFinishFromImport(materialType, r.finish),
+      corrugated: r.corrugated === true,
       sourceMethod: "excelImport",
       clientPartLabel: partNumber,
     };
@@ -141,6 +142,7 @@ export function manualQuoteRowsToRestoredExcelRows(
     width: r.widthMm > 0 ? r.widthMm : undefined,
     length: r.lengthMm > 0 ? r.lengthMm : undefined,
     finish: r.finish,
+    corrugated: r.corrugated === true,
     rawRow: {},
   }));
 }
@@ -180,6 +182,7 @@ export function manualQuoteRowsToQuoteParts(
       pierceCount: 0,
       validationStatus: "valid",
       estimatedLineCost: 0,
+      corrugated: r.corrugated === true,
       dxfFileName: "—",
       excelRowRef: trimmed || displayName,
       notes: r.sourceMethod

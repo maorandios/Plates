@@ -679,6 +679,7 @@ export async function parseExcelFileWithMapping(
       area,
       weight,
       totalWeight,
+      corrugated: false,
       rawRow: rawRecord,
     });
   }

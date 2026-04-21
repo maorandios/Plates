@@ -31,9 +31,17 @@ export type FinalizeDraftLineItem = {
   source_row_id?: string;
   /** Free-text description (maps to part notes). */
   description?: string;
+  /** Bend / shaped plate rows only — פח מרוג. */
+  corrugated?: boolean;
 };
 
 const BEND_SHAPE_IDS = new Set<string>(["l", "u", "z", "omega", "gutter", "plate", "custom"]);
+
+/** True when `plate_shape` in finalize/PDF is a bent profile (not `flat`). */
+export function isFinalizeBendPlateRowShape(plateShape: string): boolean {
+  const s = (plateShape || "flat").toLowerCase();
+  return BEND_SHAPE_IDS.has(s);
+}
 
 function roundN(n: number, decimals: number): number {
   const p = 10 ** decimals;
@@ -138,6 +146,7 @@ export function finalizeDraftLineToQuotePart(
     validationStatus: "valid",
     estimatedLineCost: 0,
     bendTemplateId,
+    corrugated: row.corrugated ?? base?.corrugated,
     dxfFileName: base?.dxfFileName ?? "—",
     excelRowRef: base?.excelRowRef ?? "—",
     notes: row.description ?? "",
@@ -176,6 +185,7 @@ export function finalizeDraftItemsFromQuoteParts(
       plate_shape: p.bendTemplateId ?? "flat",
       description: (p.notes ?? "").trim(),
       source_row_id: p.id,
+      corrugated: p.bendTemplateId != null ? p.corrugated : undefined,
     };
   });
 }

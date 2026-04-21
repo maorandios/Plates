@@ -18,15 +18,18 @@ import type { StockSheetSizeBreakdownRow } from "../jobOverview.types";
 const QA = "quote.quantityAnalysis" as const;
 
 /** Phase 5 material breakdown stacked bars */
-const CHART_UTIL = "#6A23F7";
-const CHART_WASTE = "#530021";
-const CHART_HOVER_BG = "#111C21";
+const CHART_UTIL = "#18E2A8";
+const CHART_UTIL_LABEL = "#14765F";
+const CHART_WASTE = "#4D4D4D";
+const CHART_WASTE_LABEL = "#E4E4E4";
+/** Bar hover band (Recharts Tooltip cursor) */
+const CHART_CURSOR_HOVER = "#f3f4f6";
 /** 1.25× former default (~56px auto cap); use explicit `barSize` so width actually changes */
 const BAR_WIDTH_PX = Math.round(56 * 1.25);
 const BAR_LABEL_FONT = 11 * 1.25; // 13.75 — % labels on bars
 
-/** Axis typography — prior sizes ÷1.25 */
-const AXIS_X_TICK = 18;
+/** Axis typography — X labels ÷1.25 vs former 18px */
+const AXIS_X_TICK = 18 / 1.25;
 const AXIS_Y_TICK = 11;
 
 interface MaterialBreakdownBarChartProps {
@@ -112,7 +115,7 @@ export function MaterialBreakdownBarChart({ rows }: MaterialBreakdownBarChartPro
               tickFormatter={(v) => `${v}%`}
             />
             <Tooltip
-              cursor={{ fill: CHART_HOVER_BG }}
+              cursor={{ fill: CHART_CURSOR_HOVER }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const p = payload[0].payload as {
@@ -130,7 +133,10 @@ export function MaterialBreakdownBarChart({ rows }: MaterialBreakdownBarChartPro
                         mm: formatDecimal(p.thicknessMm, 1),
                       })}
                     </p>
-                    <p className="tabular-nums text-primary">
+                    <p
+                      className="tabular-nums font-medium"
+                      style={{ color: CHART_UTIL_LABEL }}
+                    >
                       {t(`${QA}.chartTooltipLineUtil`, {
                         pct: formatDecimal(p.utilizationPct, 1),
                       })}
@@ -149,14 +155,15 @@ export function MaterialBreakdownBarChart({ rows }: MaterialBreakdownBarChartPro
               stackId="full"
               name={utilName}
               fill={CHART_UTIL}
-              radius={[0, 0, 6, 6]}
+              stroke="none"
+              radius={0}
               barSize={BAR_WIDTH_PX}
               activeBar={false}
             >
               <LabelList
                 dataKey="utilizationPct"
                 position="center"
-                fill="#f4fafb"
+                fill={CHART_UTIL_LABEL}
                 fontSize={BAR_LABEL_FONT}
                 fontWeight={600}
                 formatter={(label) => {
@@ -171,14 +178,15 @@ export function MaterialBreakdownBarChart({ rows }: MaterialBreakdownBarChartPro
               stackId="full"
               name={wasteName}
               fill={CHART_WASTE}
-              radius={[6, 6, 0, 0]}
+              stroke="none"
+              radius={0}
               barSize={BAR_WIDTH_PX}
               activeBar={false}
             >
               <LabelList
                 dataKey="wastePct"
                 position="center"
-                fill="#fceff4"
+                fill={CHART_WASTE_LABEL}
                 fontSize={BAR_LABEL_FONT}
                 fontWeight={600}
                 formatter={(label) => {

@@ -13,6 +13,8 @@ export interface BendPlateGlobalParams {
    */
   insideRadiusMm?: number;
   quantity: number;
+  /** פח מרוג — all templates; default false (לא). */
+  corrugated: boolean;
 }
 
 export interface LTemplateParams {

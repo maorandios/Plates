@@ -23,6 +23,7 @@ import {
   Weight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -63,6 +64,7 @@ import {
   parseMaterialPricePerKg,
 } from "../job-overview/materialCalculations";
 import { splitMaterialGradeAndFinish } from "../lib/plateFields";
+import { UNIFIED_SOURCE_REF } from "../lib/mergeAllQuoteMethods";
 import { formatUnifiedSourceForRow, formatUnifiedSourceLabel } from "../lib/unifiedSourceColumnLabel";
 import type { QuotePartRow } from "../types/quickQuote";
 import { QuotePartGeometryPreview } from "./QuotePartGeometryPreview";
@@ -90,6 +92,17 @@ type PartBreakdownSortKey =
 const PP = "quote.partsPhase" as const;
 const MOD = "quote.dxfPhase.partPreviewModal" as const;
 
+function rowShowsCorrugatedIndicator(row: QuotePartRow): boolean {
+  if (row.bendTemplateId != null) return true;
+  const refs = (row.sourceRef ?? "")
+    .split("·")
+    .map((s) => s.trim());
+  return (
+    refs.includes(UNIFIED_SOURCE_REF.dxf) ||
+    refs.includes(UNIFIED_SOURCE_REF.excelImport)
+  );
+}
+
 /** Matches method-phase metrics / sidebar accent. 1.25× former `text-2xl` / `1.65rem` sizes. */
 const METRIC_VALUE_ROW =
   "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#6A23F7] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
@@ -102,10 +115,10 @@ const PREVIEW_ICON_CLASS = "text-[#6A23F7]";
 const PREVIEW_STROKE = "#6A23F7";
 
 /** Horizontal + vertical corner stick; z above other header cells. `top-0` comes from headBase. */
-const STICKY_FIRST_HEAD =
-  "right-0 z-[50] shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]";
+/** Inline-end border only — avoids box-shadow stacking blur on the first body row (same idea as Excel import review). */
+const STICKY_FIRST_HEAD = "right-0 z-[50]";
 const STICKY_FIRST_CELL =
-  "sticky right-0 z-20 bg-card shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.25)] group-hover/row:bg-white/[0.04]";
+  "sticky right-0 z-20 bg-card group-hover/row:bg-white/[0.04]";
 
 function SummaryMetricCard({
   icon: Icon,
@@ -194,13 +207,18 @@ function filterPartRows(
   refSelected: string[],
   thicknessSelected: string[],
   gradeSelected: string[],
-  finishSelected: string[]
+  finishSelected: string[],
+  corrugatedSelected: string[]
 ): QuotePartRow[] {
   const q = partNameQuery.trim().toLowerCase();
   const refSet = new Set(refSelected);
   const thickSet = new Set(thicknessSelected);
   const gradeSet = new Set(gradeSelected);
   const finishSet = new Set(finishSelected);
+  const corrSet = new Set(corrugatedSelected);
+  const wantsYes = corrSet.has("yes");
+  const wantsNo = corrSet.has("no");
+  const corrugatedFilterActive = wantsYes !== wantsNo;
 
   return rows.filter((row) => {
     if (q && !row.partName.toLowerCase().includes(q)) return false;
@@ -213,6 +231,10 @@ function filterPartRows(
     const { grade, finish } = splitMaterialGradeAndFinish(row.material);
     if (gradeSet.size > 0 && !gradeSet.has(grade)) return false;
     if (finishSet.size > 0 && !finishSet.has(finish)) return false;
+    if (corrugatedFilterActive) {
+      if (wantsYes && row.corrugated !== true) return false;
+      if (wantsNo && row.corrugated === true) return false;
+    }
     return true;
   });
 }
@@ -242,13 +264,15 @@ function columnCount(
   showRef: boolean,
   showDelete: boolean,
   showMaterialPricing: boolean,
-  showExportRow: boolean
+  showExportRow: boolean,
+  showCorrugated: boolean
 ): number {
   const dim = showMaterialPricing ? 5 : 4;
   return (
     (showRef ? 1 : 0) +
     5 +
     dim +
+    (showCorrugated ? 1 : 0) +
     (showExportRow ? 1 : 0) +
     1 +
     (showDelete ? 1 : 0)
@@ -401,6 +425,7 @@ export function PartBreakdownTable({
   const [filterThickness, setFilterThickness] = useState<string[]>([]);
   const [filterGrade, setFilterGrade] = useState<string[]>([]);
   const [filterFinish, setFilterFinish] = useState<string[]>([]);
+  const [filterCorrugated, setFilterCorrugated] = useState<string[]>([]);
 
   const filterI18n = useMemo<MultiSelectI18n>(
     () => ({
@@ -416,6 +441,10 @@ export function PartBreakdownTable({
     () => parts.some((row) => Boolean(row.sourceRef?.trim())),
     [parts]
   );
+  const showCorrugatedColumn = useMemo(
+    () => parts.some((row) => rowShowsCorrugatedIndicator(row)),
+    [parts]
+  );
   const showDelete = Boolean(onDeletePart);
   const showMaterialPricing = Boolean(materialType && materialPricePerKgByRow);
   const showExportRow = Boolean(partPackageExport);
@@ -423,9 +452,15 @@ export function PartBreakdownTable({
   const columnWidthsPct = useMemo(
     () =>
       equalColumnWidthsPct(
-        columnCount(showRefColumn, showDelete, showMaterialPricing, showExportRow)
+        columnCount(
+          showRefColumn,
+          showDelete,
+          showMaterialPricing,
+          showExportRow,
+          showCorrugatedColumn
+        )
       ),
-    [showRefColumn, showDelete, showMaterialPricing, showExportRow]
+    [showRefColumn, showDelete, showMaterialPricing, showExportRow, showCorrugatedColumn]
   );
 
   const handleExportRow = useCallback(
@@ -506,6 +541,14 @@ export function PartBreakdownTable({
     [filterOptions.finishes]
   );
 
+  const corrugatedFilterOptions = useMemo(
+    () => [
+      { value: "yes", label: t(`${PP}.filterCorrugatedYes`) },
+      { value: "no", label: t(`${PP}.filterCorrugatedNo`) },
+    ],
+    []
+  );
+
   const filteredParts = useMemo(
     () =>
       filterPartRows(
@@ -514,9 +557,18 @@ export function PartBreakdownTable({
         filterRef,
         filterThickness,
         filterGrade,
-        filterFinish
+        filterFinish,
+        filterCorrugated
       ),
-    [parts, partNameSearch, filterRef, filterThickness, filterGrade, filterFinish]
+    [
+      parts,
+      partNameSearch,
+      filterRef,
+      filterThickness,
+      filterGrade,
+      filterFinish,
+      filterCorrugated,
+    ]
   );
 
   const sortedParts = useMemo(() => {
@@ -536,9 +588,17 @@ export function PartBreakdownTable({
       filterRef.length > 0 ||
       filterThickness.length > 0 ||
       filterGrade.length > 0 ||
-      filterFinish.length > 0
+      filterFinish.length > 0 ||
+      filterCorrugated.length > 0
     );
-  }, [partNameSearch, filterRef, filterThickness, filterGrade, filterFinish]);
+  }, [
+    partNameSearch,
+    filterRef,
+    filterThickness,
+    filterGrade,
+    filterFinish,
+    filterCorrugated,
+  ]);
 
   function clearFilters() {
     setPartNameSearch("");
@@ -546,6 +606,7 @@ export function PartBreakdownTable({
     setFilterThickness([]);
     setFilterGrade([]);
     setFilterFinish([]);
+    setFilterCorrugated([]);
   }
 
   const showRefFilter = filterOptions.refs.length > 0;
@@ -553,7 +614,8 @@ export function PartBreakdownTable({
     showRefColumn,
     showDelete,
     showMaterialPricing,
-    showExportRow
+    showExportRow,
+    showCorrugatedColumn
   );
 
   const p = previewPart;
@@ -707,6 +769,17 @@ export function PartBreakdownTable({
             i18n={filterI18n}
           />
 
+          {showCorrugatedColumn ? (
+            <MultiSelectFilter
+              label={t(`${PP}.filterCorrugated`)}
+              options={corrugatedFilterOptions}
+              selected={filterCorrugated}
+              onChange={setFilterCorrugated}
+              disabled={parts.length === 0}
+              i18n={filterI18n}
+            />
+          ) : null}
+
           {parts.length > 0 ? (
             <div className="flex w-full shrink-0 lg:w-auto lg:pb-0">
               <Button
@@ -767,7 +840,7 @@ export function PartBreakdownTable({
               <col key={i} style={{ width: `${pct}%` }} />
             ))}
           </colgroup>
-          <TableHeader className="relative z-30 border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+          <TableHeader className="relative z-30 border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_tr]:border-b-0">
             <TableRow className="border-b-0 hover:bg-transparent">
               {showRefColumn ? (
                 <TableHead
@@ -807,6 +880,14 @@ export function PartBreakdownTable({
               <TableHead scope="col" className={headStart}>
                 {t(`${PP}.colFinish`)}
               </TableHead>
+              {showCorrugatedColumn ? (
+                <TableHead
+                  scope="col"
+                  className={cn(headBase, "min-w-[3.5rem] text-center")}
+                >
+                  {t(`${PP}.colCorrugated`)}
+                </TableHead>
+              ) : null}
               {showMaterialPricing ? (
                 <TableHead
                   scope="col"
@@ -914,6 +995,25 @@ export function PartBreakdownTable({
                       {finishLabel(finish)}
                     </span>
                   </TableCell>
+                  {showCorrugatedColumn ? (
+                    <TableCell
+                      className={cn(cellBase, "border-e border-border text-center")}
+                    >
+                      {rowShowsCorrugatedIndicator(row) ? (
+                        <div className="flex justify-center py-1">
+                          <Checkbox
+                            checked={row.corrugated === true}
+                            disabled
+                            aria-label={t(`${PP}.ariaCorrugatedRow`, {
+                              name: row.partName,
+                            })}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  ) : null}
                   {showMaterialPricing && materialType && materialPricePerKgByRow ? (
                     <TableCell
                       className={cn(

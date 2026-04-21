@@ -14,6 +14,7 @@ import {
   Check,
   ChevronRight,
   CircleDot,
+  Cuboid,
   LayoutGrid,
   Package,
   Pencil,
@@ -25,6 +26,7 @@ import {
   Weight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { OptimisticCheckbox } from "@/components/ui/optimistic-checkbox";
 import {
   Card,
   CardContent,
@@ -131,6 +133,15 @@ const SEGMENT_DIM_BOX =
 const EDITOR_PANEL_CARD =
   "border border-border bg-card/50 shadow-none";
 const EDITOR_CARD_TITLE = "text-sm font-semibold leading-tight text-foreground";
+
+/** Hub screen sidebar cards: titles/descriptions/icons scaled 1.25× vs defaults above. */
+const EDITOR_HUB_ICON_WRAP =
+  "flex h-[3.125rem] w-[3.125rem] shrink-0 items-center justify-center rounded-lg bg-white/[0.06]";
+const EDITOR_HUB_ICON = "h-[1.5625rem] w-[1.5625rem]";
+const EDITOR_HUB_CARD_TITLE =
+  "text-[1.09375rem] font-semibold leading-tight text-foreground";
+const EDITOR_HUB_CARD_DESC =
+  "text-[12.5px] leading-snug sm:text-[13.75px] sm:leading-relaxed";
 
 const TEMPLATE_IDS: BendTemplateId[] = ["l", "u", "z", "omega", "gutter", "plate", "custom"];
 
@@ -454,6 +465,7 @@ export function BendPlateBuilder({
       hubMetrics={hubMetrics}
       onSelectTemplate={openNewEditor}
       onEdit={openEditEditor}
+      onUpdateItem={onUpdateItem}
       onRemove={onRemoveItem}
       onResetAll={onResetAll}
       onBack={onBack}
@@ -467,6 +479,7 @@ function BendPlateHub({
   hubMetrics,
   onSelectTemplate,
   onEdit,
+  onUpdateItem,
   onRemove,
   onResetAll,
   onBack,
@@ -476,6 +489,7 @@ function BendPlateHub({
   hubMetrics: ReturnType<typeof aggregateMetrics>;
   onSelectTemplate: (id: BendTemplateId) => void;
   onEdit: (item: BendPlateQuoteItem) => void;
+  onUpdateItem: (item: BendPlateQuoteItem) => void;
   onRemove: (id: string) => void;
   onResetAll: () => void;
   onBack: () => void;
@@ -588,11 +602,11 @@ function BendPlateHub({
                       className="border-separate border-spacing-0"
                       containerClassName="overflow-visible"
                     >
-                      <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+                      <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_tr]:border-b-0">
                         <TableRow className="border-b-0 hover:bg-transparent">
                           <TableHead
                             className={cn(
-                              "min-w-[3.5rem] sticky top-0 right-0 z-40 bg-card py-2 pe-3 ps-3 text-center text-xs font-medium shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]"
+                              "min-w-[3.5rem] sticky top-0 right-0 z-40 bg-card py-2 pe-3 ps-3 text-center text-xs font-medium border-e border-border"
                             )}
                           >
                             {t(`${BP}.colIndex`)}
@@ -624,6 +638,9 @@ function BendPlateHub({
                           <TableHead className="min-w-[100px] py-2 pe-3 ps-3 text-xs font-medium">
                             {t(`${BP}.colFinish`)}
                           </TableHead>
+                          <TableHead className="min-w-[5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
+                            {t(`${BP}.colCorrugated`)}
+                          </TableHead>
                           <TableHead className="min-w-[4.5rem] py-2 pe-3 ps-3 text-center text-xs font-medium">
                             {t(`${BP}.colEdit`)}
                           </TableHead>
@@ -640,7 +657,7 @@ function BendPlateHub({
                             <TableRow key={it.id} className="group/row">
                               <TableCell
                                 className={cn(
-                                  "sticky right-0 z-20 bg-card py-2 pe-3 ps-3 text-center text-sm tabular-nums text-muted-foreground shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.25)]",
+                                  "sticky right-0 z-20 bg-card py-2 pe-3 ps-3 text-center text-sm tabular-nums text-muted-foreground border-e border-border",
                                   "group-hover/row:bg-white/[0.04]"
                                 )}
                               >
@@ -672,6 +689,22 @@ function BendPlateHub({
                               </TableCell>
                               <TableCell className="py-2 pe-3 ps-3 text-sm text-muted-foreground whitespace-nowrap">
                                 {bendPlateFinishDisplay(it.global.finish)}
+                              </TableCell>
+                              <TableCell className="py-2 pe-2 ps-2">
+                                <div className="flex justify-center">
+                                  <OptimisticCheckbox
+                                    checked={it.global.corrugated === true}
+                                    aria-label={t(`${BP}.ariaCorrugatedRow`, {
+                                      index: index + 1,
+                                    })}
+                                    onCheckedChange={(v) =>
+                                      onUpdateItem({
+                                        ...it,
+                                        global: { ...it.global, corrugated: v },
+                                      })
+                                    }
+                                  />
+                                </div>
                               </TableCell>
                               <TableCell className="py-2 pe-2 ps-2">
                                 <div className="flex justify-center">
@@ -1468,15 +1501,23 @@ function BendPlateShapeEditor({
                     >
                       <CardHeader className="flex flex-1 flex-col items-center justify-center gap-1.5 px-3 py-4 text-center sm:gap-2 sm:px-4">
                         <span
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-primary"
+                          className={cn(
+                            EDITOR_HUB_ICON_WRAP,
+                            "text-primary"
+                          )}
                           aria-hidden
                         >
-                          <Package className="h-5 w-5" />
+                          <Package className={EDITOR_HUB_ICON} />
                         </span>
-                        <CardTitle className={cn(EDITOR_CARD_TITLE, "text-center")}>
+                        <CardTitle className={cn(EDITOR_HUB_CARD_TITLE, "text-center")}>
                           {t(`${ED}.cardBasicData`)}
                         </CardTitle>
-                        <CardDescription className="text-center text-[10px] leading-snug sm:text-[11px] sm:leading-relaxed">
+                        <CardDescription
+                          className={cn(
+                            EDITOR_HUB_CARD_DESC,
+                            "text-center"
+                          )}
+                        >
                           {t(`${ED}.cardBasicDataDescription`)}
                         </CardDescription>
                       </CardHeader>
@@ -1505,17 +1546,22 @@ function BendPlateShapeEditor({
                       <CardHeader className="flex flex-1 flex-col items-center justify-center gap-1.5 px-3 py-4 text-center sm:gap-2 sm:px-4">
                         <span
                           className={cn(
-                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]",
+                            EDITOR_HUB_ICON_WRAP,
                             basicDataGateOk ? "text-primary" : "text-muted-foreground"
                           )}
                           aria-hidden
                         >
-                          <Ruler className="h-5 w-5" />
+                          <Ruler className={EDITOR_HUB_ICON} />
                         </span>
-                        <CardTitle className={cn(EDITOR_CARD_TITLE, "text-center")}>
+                        <CardTitle className={cn(EDITOR_HUB_CARD_TITLE, "text-center")}>
                           {t(`${ED}.cardDimensions`)}
                         </CardTitle>
-                        <CardDescription className="text-center text-[10px] leading-snug sm:text-[11px] sm:leading-relaxed">
+                        <CardDescription
+                          className={cn(
+                            EDITOR_HUB_CARD_DESC,
+                            "text-center"
+                          )}
+                        >
                           {basicDataGateOk
                             ? t(`${ED}.cardDimensionsDescription`)
                             : t(`${ED}.cardLockedUntilBasicSaved`)}
@@ -1550,19 +1596,24 @@ function BendPlateShapeEditor({
                       <CardHeader className="flex flex-1 flex-col items-center justify-center gap-1.5 px-3 py-4 text-center sm:gap-2 sm:px-4">
                         <span
                           className={cn(
-                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]",
+                            EDITOR_HUB_ICON_WRAP,
                             perforationsAvailable && basicDataGateOk
                               ? "text-primary"
                               : "text-muted-foreground"
                           )}
                           aria-hidden
                         >
-                          <CircleDot className="h-5 w-5" />
+                          <CircleDot className={EDITOR_HUB_ICON} />
                         </span>
-                        <CardTitle className={cn(EDITOR_CARD_TITLE, "text-center")}>
+                        <CardTitle className={cn(EDITOR_HUB_CARD_TITLE, "text-center")}>
                           {t(`${ED}.cardPerforations`)}
                         </CardTitle>
-                        <CardDescription className="text-center text-[10px] leading-snug sm:text-[11px] sm:leading-relaxed">
+                        <CardDescription
+                          className={cn(
+                            EDITOR_HUB_CARD_DESC,
+                            "text-center"
+                          )}
+                        >
                           {!perforationsAvailable
                             ? t(`${ED}.cardPerforationsUnavailable`)
                             : !basicDataGateOk
@@ -1574,14 +1625,14 @@ function BendPlateShapeEditor({
                   </button>
                 </div>
               ) : (
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pb-2">
+                <div className="flex min-h-0 flex-1 min-w-0 flex-col overflow-hidden">
+                  <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-2 pb-2 [scrollbar-gutter:stable]">
                     {editorSidebarScreen === "basic" ? (
                       <div className="space-y-3">
                         <h2 className="text-base font-semibold leading-tight">
                           {t(`${ED}.cardBasicData`)}
                         </h2>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-3">
                           <NumField
                             label={t(`${ED}.thicknessMm`)}
                             value={form.global.thicknessMm}
@@ -1614,10 +1665,8 @@ function BendPlateShapeEditor({
                             }
                             min={0}
                           />
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground font-normal">
+                            <Label className="text-xs font-normal text-muted-foreground">
                               {t(`${ED}.materialGrade`)}
                             </Label>
                             <Select
@@ -1640,7 +1689,7 @@ function BendPlateShapeEditor({
                             </Select>
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground font-normal">
+                            <Label className="text-xs font-normal text-muted-foreground">
                               {t(`${ED}.finish`)}
                             </Label>
                             <Select
@@ -1659,6 +1708,31 @@ function BendPlateShapeEditor({
                                     {f}
                                   </SelectItem>
                                 ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-normal text-muted-foreground">
+                              {t(`${ED}.plateCorrugated`)}
+                            </Label>
+                            <Select
+                              value={form.global.corrugated ? "yes" : "no"}
+                              onValueChange={(v) =>
+                                patchGlobalGuarded({
+                                  corrugated: v === "yes",
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-9 max-w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent dir="rtl">
+                                <SelectItem value="no">
+                                  {t(`${ED}.plateCorrugatedNo`)}
+                                </SelectItem>
+                                <SelectItem value="yes">
+                                  {t(`${ED}.plateCorrugatedYes`)}
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1834,13 +1908,16 @@ function BendPlateShapeEditor({
                 {editorSidebarScreen === "hub" ? (
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     size="sm"
                     className={cn(
                       "absolute left-2 top-2 z-10 gap-1.5 shadow-md sm:left-3 sm:top-3",
+                      "border-[#006AE3] bg-[#D2E5FF] text-[#143B76]",
+                      "hover:bg-[#c4d9f5] hover:text-[#143B76] hover:border-[#006AE3]"
                     )}
                     onClick={() => setPreview3dOpen(true)}
                   >
+                    <Cuboid className="h-4 w-4 shrink-0" aria-hidden />
                     {t(`${ED}.preview3d`)}
                   </Button>
                 ) : null}

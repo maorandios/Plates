@@ -20,6 +20,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -45,6 +46,7 @@ import { finalizePlateTypeLabel } from "@/features/quick-quote/lib/finalizePlate
 import {
   finalizeDraftItemsFromQuoteParts,
   finalizeDraftLineToQuotePart,
+  isFinalizeBendPlateRowShape,
   type FinalizeDraftLineItem,
 } from "@/features/quick-quote/lib/finalizeLineRecalc";
 import { mergeAllQuoteMethodParts } from "@/features/quick-quote/lib/mergeAllQuoteMethods";
@@ -73,7 +75,7 @@ const MOD = "quote.dxfPhase.partPreviewModal" as const;
 const PRJ = "projectPreview" as const;
 const PRICE_CCY = "ILS" as const;
 
-const N_COLS = 12;
+const N_COLS = 13;
 
 function equalColumnWidthsPct(n: number): number[] {
   if (n <= 0) return [];
@@ -499,7 +501,7 @@ export function ProjectPreviewView({
                     containerClassName="overflow-visible"
                     className={cn(
                       "table-fixed border-collapse text-start",
-                      "min-w-[1000px] w-full",
+                      "min-w-[1060px] w-full",
                       "[&_th]:text-start [&_td]:text-start"
                     )}
                   >
@@ -508,7 +510,7 @@ export function ProjectPreviewView({
                         <col key={i} style={{ width: `${pct}%` }} />
                       ))}
                     </colgroup>
-                    <TableHeader className="relative isolate z-30 border-b border-border bg-card [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+                    <TableHeader className="relative isolate z-30 border-b border-border bg-card [&_th]:bg-card [&_tr]:border-b-0">
                       <TableRow className="border-b-0 hover:bg-transparent">
                         <TableHead scope="col" className={headStart}>
                           {t(`${FP}.colDescription`)}
@@ -539,6 +541,12 @@ export function ProjectPreviewView({
                         </TableHead>
                         <TableHead scope="col" className={headStart}>
                           {t(`${FP}.colFinish`)}
+                        </TableHead>
+                        <TableHead
+                          scope="col"
+                          className={cn(headBase, "min-w-[3.25rem] text-center")}
+                        >
+                          {t(`${FP}.colCorrugated`)}
                         </TableHead>
                         <TableHead scope="col" className={headNum}>
                           {t(`${FP}.colPrice`)}
@@ -585,6 +593,23 @@ export function ProjectPreviewView({
                           </TableCell>
                           <TableCell className={cn(cellStart, "border-e border-border text-xs")}>
                             {row.finish}
+                          </TableCell>
+                          <TableCell
+                            className={cn(cellBase, "border-e border-border text-center")}
+                          >
+                            {isFinalizeBendPlateRowShape(row.plate_shape) ? (
+                              <div className="flex justify-center py-0.5">
+                                <Checkbox
+                                  checked={row.corrugated === true}
+                                  disabled
+                                  aria-label={t(`${FP}.ariaCorrugatedRow`, {
+                                    name: row.part_number || String(i + 1),
+                                  })}
+                                />
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell
                             className={cn(

@@ -17,10 +17,13 @@ function GlyphSvg({
   children: ReactNode;
   viewBox: string;
 }) {
+  /** Selected template tiles pass `!text-primary-foreground` — skip purple accent so stroke wins. */
+  const usePurpleAccent =
+    className == null || !/primary-foreground/.test(className);
   return (
     <svg
       viewBox={viewBox}
-      className={cn(GLYPH_CLASS, className)}
+      className={cn(usePurpleAccent && GLYPH_CLASS, className)}
       fill="none"
       aria-hidden
     >

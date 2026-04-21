@@ -100,6 +100,13 @@ function mergeQuotePartGroup(rows: QuotePartRow[]): QuotePartRow {
     bendIds.length === rows.length && bendIds.every((x) => x === bendIds[0])
       ? bendIds[0]
       : undefined;
+  const allHaveCorrugatedFlag = rows.every((r) => typeof r.corrugated === "boolean");
+  const corrugated =
+    bendTemplateId != null
+      ? rows.every((r) => r.corrugated === true)
+      : allHaveCorrugatedFlag
+        ? rows.every((r) => r.corrugated === true)
+        : undefined;
   const first = rows[0];
   const lineSourceIds = rows.flatMap((r) =>
     r.lineSourceIds?.length ? r.lineSourceIds : [r.id]
@@ -121,6 +128,7 @@ function mergeQuotePartGroup(rows: QuotePartRow[]): QuotePartRow {
     validationStatus: worstValidationStatus(rows.map((r) => r.validationStatus)),
     estimatedLineCost,
     bendTemplateId,
+    corrugated,
     dxfFileName: rows.map((r) => r.dxfFileName).filter((x) => x && x !== "—").join(" · ") || "—",
     excelRowRef: rows.map((r) => r.excelRowRef).filter(Boolean).join(" · ") || "—",
     notes: [...new Set(rows.map((r) => r.notes).filter(Boolean))].join(" · "),

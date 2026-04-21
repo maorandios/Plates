@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { OptimisticCheckbox } from "@/components/ui/optimistic-checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -41,6 +42,7 @@ import type { MaterialType } from "@/types/materials";
 import { finalizePlateTypeLabel } from "../lib/finalizePlateTypeLabel";
 import {
   finalizeDraftLineToQuotePart,
+  isFinalizeBendPlateRowShape,
   recalcFinalizeLineMetrics,
   type FinalizeDraftLineItem,
 } from "../lib/finalizeLineRecalc";
@@ -72,7 +74,7 @@ const MOD = "quote.dxfPhase.partPreviewModal" as const;
 /** Finalize “הצעת מחיר” matches Phase 6 material pricing (Israeli new shekel). */
 const FINALIZE_PRICE_CURRENCY = "ILS" as const;
 
-const N_PLATE_TABLE_COLS = 13;
+const N_PLATE_TABLE_COLS = 14;
 
 function equalColumnWidthsPct(n: number): number[] {
   if (n <= 0) return [];
@@ -826,7 +828,7 @@ export function QuoteFinalizeExportStep({
                     containerClassName="overflow-visible"
                     className={cn(
                       "table-fixed border-separate border-spacing-0 text-start",
-                      "min-w-[1100px] w-full",
+                      "min-w-[1180px] w-full",
                       "[&_th]:text-start [&_td]:text-start"
                     )}
                   >
@@ -835,7 +837,7 @@ export function QuoteFinalizeExportStep({
                         <col key={i} style={{ width: `${pct}%` }} />
                       ))}
                     </colgroup>
-                    <TableHeader className="relative z-30 border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+                    <TableHeader className="relative z-30 border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_tr]:border-b-0">
                       <TableRow className="border-b-0 hover:bg-transparent">
                         <TableHead scope="col" className={headStart}>
                           {t(`${FP}.colDescription`)}
@@ -866,6 +868,12 @@ export function QuoteFinalizeExportStep({
                         </TableHead>
                         <TableHead scope="col" className={headStart}>
                           {t(`${FP}.colFinish`)}
+                        </TableHead>
+                        <TableHead
+                          scope="col"
+                          className={cn(headBase, "min-w-[3.5rem] text-center")}
+                        >
+                          {t(`${FP}.colCorrugated`)}
                         </TableHead>
                         <TableHead scope="col" className={headNum}>
                           {t(`${FP}.colPrice`)}
@@ -1025,6 +1033,25 @@ export function QuoteFinalizeExportStep({
                                 applyPartRowPatch(i, { finish: e.target.value }, true)
                               }
                             />
+                          </TableCell>
+                          <TableCell
+                            className={cn(cellBase, "border-e border-border text-center")}
+                          >
+                            {isFinalizeBendPlateRowShape(row.plate_shape) ? (
+                              <div className="flex justify-center py-1">
+                                <OptimisticCheckbox
+                                  checked={row.corrugated === true}
+                                  aria-label={t(`${FP}.ariaCorrugatedRow`, {
+                                    name: row.part_number || String(i + 1),
+                                  })}
+                                  onCheckedChange={(v) =>
+                                    applyPartRowPatch(i, { corrugated: v }, false)
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell
                             className={cn(

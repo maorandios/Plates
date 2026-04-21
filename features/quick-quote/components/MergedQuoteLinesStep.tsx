@@ -73,7 +73,7 @@ export function MergedQuoteLinesStep({
       dir="rtl"
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <div className="shrink-0 ds-surface-header">
+        <div className="shrink-0 bg-background px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1 text-right">
               <h2 className="text-base font-semibold text-foreground">

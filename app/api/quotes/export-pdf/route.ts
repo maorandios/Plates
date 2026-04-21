@@ -51,6 +51,7 @@ const itemSchema = z.object({
   plate_shape: z.string().optional(),
   description: z.string().optional(),
   source_row_id: z.string().optional(),
+  corrugated: z.boolean().optional(),
 });
 
 const pricingSchema = z.object({

@@ -37,7 +37,14 @@ import {
 
 const I18N_ED = "quote.bendPlatePhase.editor";
 
-/** Orthographic-style views: profile lies in XY; +Z is plate-width / “top” of strip (matches 2D plan). */
+/**
+ * Orthographic-style views (ISO-style, matching the 2D editor):
+ * - Profile / slab lies mainly in XY; strip width is along world ±Z.
+ * - Top / Bottom: look along ∓Z → see the XY plan (same plane as the 2D canvas).
+ * - Front / Back: look along ∓Y → see XZ elevations (חזית / אחורה).
+ * - Left / Right: look along ∓X → see YZ.
+ * Front/back must use an `up` vector not parallel to the view axis (see applyView).
+ */
 export type Preview3DViewId =
   | "top"
   | "bottom"
@@ -935,29 +942,42 @@ export const ProfilePreview3D = forwardRef<
 
     function applyView(view: Preview3DViewId) {
       const d = Math.max(meshExtent * 1.2, 0.01);
+      const tx = meshCx;
+      const ty = meshCy;
+      const tz = meshCz;
+      /** World +Y must not be used as camera.up when the eye lies on ±Y (parallel to view dir). */
       switch (view) {
         case "top":
-          camera.position.set(meshCx, meshCy, meshCz + d);
+          /** TOP VIEW: look along −Z onto XY (plan view, same as 2D). */
+          camera.position.set(tx, ty, tz + d);
+          camera.up.set(0, 1, 0);
           break;
         case "bottom":
-          camera.position.set(meshCx, meshCy, meshCz - d);
+          /** BOTTOM VIEW: look along +Z onto XY. */
+          camera.position.set(tx, ty, tz - d);
+          camera.up.set(0, 1, 0);
           break;
         case "right":
-          camera.position.set(meshCx + d, meshCy, meshCz);
+          camera.position.set(tx + d, ty, tz);
+          camera.up.set(0, 1, 0);
           break;
         case "left":
-          camera.position.set(meshCx - d, meshCy, meshCz);
+          camera.position.set(tx - d, ty, tz);
+          camera.up.set(0, 1, 0);
           break;
         case "front":
-          camera.position.set(meshCx, meshCy + d, meshCz);
+          /** FRONT VIEW: look along −Y onto XZ (חזית). */
+          camera.position.set(tx, ty + d, tz);
+          camera.up.set(0, 0, 1);
           break;
         case "back":
-          camera.position.set(meshCx, meshCy - d, meshCz);
+          /** BACK VIEW: look along +Y onto XZ (אחורה). */
+          camera.position.set(tx, ty - d, tz);
+          camera.up.set(0, 0, 1);
           break;
       }
-      camera.up.set(0, 1, 0);
-      controls.target.set(meshCx, meshCy, meshCz);
-      camera.lookAt(meshCx, meshCy, meshCz);
+      controls.target.set(tx, ty, tz);
+      camera.lookAt(tx, ty, tz);
       controls.update();
     }
     viewerRef.current = { applyView };

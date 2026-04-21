@@ -99,6 +99,8 @@ export interface ExcelRow {
   length?: number;   // mm
   /** Surface finish label or value from BOM (e.g. Carbon, Galvanized). */
   finish?: string;
+  /** פח מרוג (checkered plate) — set in review UI or optional BOM column. */
+  corrugated?: boolean;
   area?: number;     // m²
   weight?: number;   // kg (unit weight)
   totalWeight?: number; // kg (weight × qty)
@@ -179,6 +181,8 @@ export interface DxfPartGeometry {
   reviewFinish?: string;
   /** Quick Quote DXF review step: plate thickness (mm); merged from Excel BOM when mapped. */
   reviewThicknessMm?: number;
+  /** Quick Quote DXF review step: פח מרוג (default false when omitted). */
+  reviewCorrugated?: boolean;
 }
 
 // ─── Match Status ─────────────────────────────────────────────────────────────

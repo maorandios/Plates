@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { OptimisticCheckbox } from "@/components/ui/optimistic-checkbox";
 import {
   Table,
   TableBody,
@@ -251,6 +252,8 @@ interface DxfFileUpload {
   materialGrade: string;
   /** Review table: גימור (settings labels). */
   finish: string;
+  /** Review table: פח מרוג (default unchecked). */
+  corrugated: boolean;
 }
 
 /**
@@ -280,6 +283,7 @@ function restoredGeometriesToUploads(
       thicknessMm: clampPositiveThicknessMm(g.reviewThicknessMm),
       materialGrade: g.materialGrade?.trim() || defaultMaterialGradeForFamily(materialType),
       finish,
+      corrugated: g.reviewCorrugated === true,
     };
   });
 }
@@ -356,18 +360,6 @@ export type DxfUploadStepHandle = {
   /** Download Excel vs DXF validation spreadsheet when review data exists. */
   exportExcelDxfCompareXlsx: () => void;
 };
-
-const NO_EXCEL_DEFAULTS_BANNER_STORAGE_KEY =
-  "dxf-review-no-excel-defaults-banner-dismissed";
-
-function readNoExcelDefaultsBannerDismissed(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    return sessionStorage.getItem(NO_EXCEL_DEFAULTS_BANNER_STORAGE_KEY) === "1";
-  } catch {
-    return true;
-  }
-}
 
 export type DxfUploadNavState = {
   subStep: DxfUploadSubStep;
@@ -485,8 +477,10 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     ro.observe(el);
     previewCanvasResizeObserverRef.current = ro;
   }, []);
+  /** In-memory only: survives SPA navigation, resets on full reload (unlike sessionStorage, which survives hard refresh). */
   const [noExcelDefaultsBannerDismissed, setNoExcelDefaultsBannerDismissed] =
-    useState(true);
+    useState(false);
+  const prevHadExcelRowsForBannerRef = useRef(false);
 
   const excelRestoreAppliedRef = useRef(false);
 
@@ -513,11 +507,18 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     }
   }, [restoredExcelBundle, restoredGeometries, materialType]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (subStep !== 3) return;
-    if (mappedExcelRows?.length) return;
-    setNoExcelDefaultsBannerDismissed(readNoExcelDefaultsBannerDismissed());
-  }, [subStep, mappedExcelRows?.length]);
+    const hasExcelRows =
+      (mappedExcelRows?.length ?? 0) > 0 ||
+      (restoredExcelBundle?.rows?.length ?? 0) > 0;
+    if (hasExcelRows) {
+      setNoExcelDefaultsBannerDismissed(true);
+    } else if (prevHadExcelRowsForBannerRef.current) {
+      setNoExcelDefaultsBannerDismissed(false);
+    }
+    prevHadExcelRowsForBannerRef.current = hasExcelRows;
+  }, [subStep, mappedExcelRows?.length, restoredExcelBundle?.rows?.length]);
 
   /** After removing the last review row, return to upload so the UI is not stuck on an empty step 3. */
   useEffect(() => {
@@ -532,11 +533,6 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
   }, [subStep, uploadedFiles.length, mappedExcelRows?.length]);
 
   const dismissNoExcelDefaultsBanner = useCallback(() => {
-    try {
-      sessionStorage.setItem(NO_EXCEL_DEFAULTS_BANNER_STORAGE_KEY, "1");
-    } catch {
-      /* ignore */
-    }
     setNoExcelDefaultsBannerDismissed(true);
   }, []);
 
@@ -633,6 +629,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
             thicknessMm: DXF_QUOTE_DEFAULT_THICKNESS_MM,
             materialGrade: "",
             finish: phase2DefaultFinish(materialType),
+            corrugated: false,
           };
         })
       );
@@ -854,7 +851,10 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     (
       index: number,
       patch: Partial<
-        Pick<DxfFileUpload, "quantity" | "thicknessMm" | "materialGrade" | "finish">
+        Pick<
+          DxfFileUpload,
+          "quantity" | "thicknessMm" | "materialGrade" | "finish" | "corrugated"
+        >
       >
     ) => {
       setUploadedFiles((prev) =>
@@ -885,6 +885,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
         reviewQuantity: qty,
         reviewFinish: u.finish,
         reviewThicknessMm: clampPositiveThicknessMm(u.thicknessMm),
+        reviewCorrugated: u.corrugated === true,
       };
     });
 
@@ -1631,19 +1632,19 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                 <div
                   role="status"
                   className={cn(
-                    "mb-4 flex gap-3 rounded-lg border-2 !border-[#FF8C00] bg-[#1A120B] p-3 text-start shadow-sm",
+                    "mb-4 flex gap-3 rounded-lg border-2 border-[#FF6B01] bg-[#FFE8D2] p-3 text-start text-[#FF4C00] shadow-sm",
                     "animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-300"
                   )}
                 >
                   <Info
-                    className="h-5 w-5 shrink-0 text-[#FF8C00]"
+                    className="h-5 w-5 shrink-0 text-[#FF4C00]"
                     aria-hidden
                   />
                   <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-sm font-semibold text-[#FF8C00]">
+                    <p className="text-sm font-semibold text-[#FF4C00]">
                       {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerTitle")}
                     </p>
-                    <p className="text-xs leading-relaxed text-[#FF8C00]/85">
+                    <p className="text-xs leading-relaxed text-[#FF4C00]">
                       {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerBody")}
                     </p>
                   </div>
@@ -1651,7 +1652,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="shrink-0 self-start border-2 !border-[#FF8C00] bg-transparent text-[#FF8C00] hover:!border-[#FF8C00] hover:bg-[#FF8C00]/15 hover:text-[#FF8C00] focus-visible:!border-[#FF8C00] focus-visible:ring-[#FF8C00]/40"
+                    className="shrink-0 self-start border-[#FF6B01] bg-background/80 text-[#FF4C00] hover:bg-[#FF4C00]/10 hover:text-[#FF4C00]"
                     onClick={dismissNoExcelDefaultsBanner}
                   >
                     {t("quote.dxfPhase.dxfReviewTable.firstVisitNoExcelBannerDismiss")}
@@ -1664,7 +1665,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                     className="border-separate border-spacing-0"
                     containerClassName="overflow-visible"
                   >
-                    <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_th:first-child]:rounded-ss-md [&_th:last-child]:rounded-se-md [&_tr]:border-b-0">
+                    <TableHeader className="sticky top-0 z-30 isolate border-b border-border bg-card shadow-[0_1px_0_0_hsl(var(--border))] [&_th]:bg-card [&_tr]:border-b-0">
                       <TableRow className="border-b-0 hover:bg-transparent">
                         <TableHead className="min-w-[120px]">
                           {t("quote.dxfPhase.dxfReviewTable.colPartNumber")}
@@ -1709,6 +1710,9 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                         </TableHead>
                         <TableHead className="min-w-[140px]">
                           {t("quote.dxfPhase.dxfReviewTable.colFinish")}
+                        </TableHead>
+                        <TableHead className="min-w-[5rem] text-center">
+                          {t("quote.dxfPhase.dxfReviewTable.colCorrugated")}
                         </TableHead>
                         <TableHead className="w-[72px]">
                           {t("quote.dxfPhase.dxfReviewTable.colPreview")}
@@ -1878,6 +1882,22 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
                                 ))}
                               </SelectContent>
                             </Select>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center py-1">
+                              <OptimisticCheckbox
+                                checked={upload.corrugated === true}
+                                aria-label={t(
+                                  "quote.dxfPhase.dxfReviewTable.ariaCorrugatedRow",
+                                  { name: partLabel }
+                                )}
+                                onCheckedChange={(v) =>
+                                  updateUploadRow(index, {
+                                    corrugated: v,
+                                  })
+                                }
+                              />
+                            </div>
                           </TableCell>
                           <TableCell>
                             <button

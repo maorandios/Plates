@@ -86,6 +86,7 @@ import {
   manualQuoteRowsToRestoredExcelRows,
 } from "../lib/manualQuoteParts";
 import { QuotePartGeometryPreview } from "./QuotePartGeometryPreview";
+import { OptimisticCheckbox } from "@/components/ui/optimistic-checkbox";
 
 const NONE = "__none__";
 
@@ -496,6 +497,7 @@ export function ExcelUploadStep({
         rowsWithIds = rowsWithIds.map((r) => ({
           ...r,
           material: (r.material ?? "").trim() || dm,
+          corrugated: r.corrugated === true,
         }));
       }
 
@@ -1223,7 +1225,7 @@ export function ExcelUploadStep({
                     <TableRow className="border-b-0 hover:bg-transparent">
                       <TableHead
                         className={cn(
-                          "min-w-[120px] sticky top-0 right-0 z-40 bg-card py-2 pe-3 ps-3 shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]"
+                          "min-w-[120px] sticky top-0 right-0 z-40 bg-card py-2 pe-3 ps-3 border-e border-border"
                         )}
                       >
                         {t(`${EI}.colPartNumber`)}
@@ -1251,6 +1253,9 @@ export function ExcelUploadStep({
                       </TableHead>
                       <TableHead className="min-w-[140px] py-2 pe-3 ps-3">
                         {t(`${DXF_RV}.colFinish`)}
+                      </TableHead>
+                      <TableHead className="w-[88px] py-2 pe-3 ps-3 text-center">
+                        {t(`${DXF_RV}.colCorrugated`)}
                       </TableHead>
                       <TableHead className="w-[72px] py-2 pe-3 ps-3">
                         {t(`${DXF_RV}.colPreview`)}
@@ -1287,7 +1292,7 @@ export function ExcelUploadStep({
                         <TableRow key={row.id} className="group/row">
                           <TableCell
                             className={cn(
-                              "sticky right-0 z-20 bg-card py-2 pe-3 ps-3 font-medium shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.25)]",
+                              "sticky right-0 z-20 bg-card py-2 pe-3 ps-3 font-medium border-e border-border",
                               "group-hover/row:bg-white/[0.04]"
                             )}
                           >
@@ -1421,6 +1426,19 @@ export function ExcelUploadStep({
                                 }
                               />
                             )}
+                          </TableCell>
+                          <TableCell className="py-2 pe-3 ps-3 text-center">
+                            <div className="flex justify-center py-1">
+                              <OptimisticCheckbox
+                                checked={row.corrugated === true}
+                                aria-label={t(`${DXF_RV}.ariaCorrugatedRow`, {
+                                  name: (row.partName ?? "").trim() || "—",
+                                })}
+                                onCheckedChange={(v) =>
+                                  patchParsedRow(row.id, { corrugated: v })
+                                }
+                              />
+                            </div>
                           </TableCell>
                           <TableCell className="py-2 pe-3 ps-3">
                             <button

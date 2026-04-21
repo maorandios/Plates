@@ -32,6 +32,8 @@ export interface ManualQuotePartRow {
   material: string;
   /** גימור label from Settings (e.g. ללא, גלוון חם). */
   finish: string;
+  /** פח מרוג — Excel list import / manual plate rows (same as DXF review). */
+  corrugated?: boolean;
   /**
    * Which quote method created this row — used when merging several methods into one BOM.
    */
@@ -155,6 +157,8 @@ export interface QuotePartRow {
   estimatedLineCost: number;
   /** Set for bend-plate lines — used for finalize / PDF plate-type icons. */
   bendTemplateId?: BendTemplateId;
+  /** Bend plate only — פח מרוג. */
+  corrugated?: boolean;
   dxfFileName: string;
   excelRowRef: string;
   notes: string;

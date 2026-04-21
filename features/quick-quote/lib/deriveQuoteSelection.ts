@@ -237,6 +237,52 @@ function formatStockSummary(rows: ThicknessStockInput[], pricePerKg: number): st
 }
 
 /**
+ * Stable key for nesting / rect-pack: dimensions + qty only (e.g. toggling פח מרוג
+ * does not change geometry — avoids re-running {@link rectPackEstimate} on every click).
+ */
+export function nestingGeometrySignatureForParts(parts: QuotePartRow[]): string {
+  return parts
+    .map((p) =>
+      [p.id, p.thicknessMm, p.widthMm, p.lengthMm, p.qty].join(":")
+    )
+    .join("|");
+}
+
+function stockConfigSignature(stockRows: ThicknessStockInput[]): string {
+  return stockRows
+    .map((r) =>
+      [
+        r.thicknessMm,
+        ...r.sheets.map((s) => `${s.sheetLengthMm}x${s.sheetWidthMm}`),
+      ].join(":")
+    )
+    .join("|");
+}
+
+let lastRectPackCacheKey: string | null = null;
+let lastRectPackMetrics: Pick<
+  ManufacturingParameters,
+  "totalSheetAreaM2" | "estimatedSheetCount" | "utilizationPct" | "wasteAreaM2"
+> | null = null;
+
+function estimateSheetUsageFromStockMemoized(
+  parts: QuotePartRow[],
+  stockRows: ThicknessStockInput[]
+): Pick<
+  ManufacturingParameters,
+  "totalSheetAreaM2" | "estimatedSheetCount" | "utilizationPct" | "wasteAreaM2"
+> {
+  const key = `${nestingGeometrySignatureForParts(parts)}|${stockConfigSignature(stockRows)}`;
+  if (key === lastRectPackCacheKey && lastRectPackMetrics != null) {
+    return lastRectPackMetrics;
+  }
+  const metrics = estimateSheetUsageFromStock(parts, stockRows);
+  lastRectPackCacheKey = key;
+  lastRectPackMetrics = metrics;
+  return metrics;
+}
+
+/**
  * Runs a shelf/row rect-pack simulation to estimate sheet count, gross area,
  * and true waste for the given parts against the configured stock sheet sizes.
  *
@@ -382,7 +428,7 @@ export function buildSelectionBundle(
     Number.isFinite(materialPricePerKg)
   ) {
     const stock = stockMapFromRows(stockByThickness);
-    const sheetMetrics = estimateSheetUsageFromStock(parts, stockByThickness);
+    const sheetMetrics = estimateSheetUsageFromStockMemoized(parts, stockByThickness);
     mfg = {
       ...mfg,
       ...sheetMetrics,
@@ -465,7 +511,7 @@ export function buildSelectionBundleFromParts(
     Number.isFinite(materialPricePerKg)
   ) {
     const stock = stockMapFromRows(stockByThickness);
-    const sheetMetrics = estimateSheetUsageFromStock(parts, stockByThickness);
+    const sheetMetrics = estimateSheetUsageFromStockMemoized(parts, stockByThickness);
     mfg = {
       ...mfg,
       ...sheetMetrics,

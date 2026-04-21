@@ -136,6 +136,14 @@ function migrateCustomIncludedAnglesToPathTurns(
   return { ...custom, anglesDeg };
 }
 
+function plateCorrugatedFromRaw(r: unknown): boolean {
+  return (
+    typeof r === "object" &&
+    r !== null &&
+    (r as { corrugated?: boolean }).corrugated === true
+  );
+}
+
 /** Legacy `plate` rows: four sides / old fields → rectangle length × width. */
 function migratePlateParams(
   raw: unknown,
@@ -178,7 +186,10 @@ function migratePlateParams(
     const il = Math.max(0, r.innerLengthMm);
     const iw = Math.max(0, Number(r.innerWidthMm) || 0);
     const S = il > 0 && iw > 0 ? (il + iw) / 2 : fallback.lengthMm;
-    return { lengthMm: S, widthMm: S };
+    return {
+      lengthMm: S,
+      widthMm: S,
+    };
   }
   return { ...fallback };
 }
@@ -192,6 +203,7 @@ export function createDefaultBendPlateFormState(): BendPlateFormState {
       thicknessMm: 0,
       plateWidthMm: 0,
       quantity: 0,
+      corrugated: false,
     },
     l: { aMm: 100, bMm: 80, angleDeg: 90 },
     u: { aMm: 40, bMm: 50, cMm: 40, angle1Deg: 90, angle2Deg: 90 },
@@ -279,11 +291,18 @@ export function formStateFromQuoteItem(
     customBlock = migrateCustomIncludedAnglesToPathTurns(customBlock);
   }
 
+  const g0 = item.global as BendPlateFormState["global"] & { corrugated?: boolean };
+  const corrugatedResolved =
+    typeof g0.corrugated === "boolean"
+      ? g0.corrugated
+      : plateCorrugatedFromRaw(ext.plate);
+
   const base: BendPlateFormState = {
     template: item.template,
     global: {
       ...item.global,
       finish: normalizeStoredReviewFinish(item.global.finish, materialType),
+      corrugated: corrugatedResolved,
     },
     l: { ...item.l },
     u: { ...item.u },

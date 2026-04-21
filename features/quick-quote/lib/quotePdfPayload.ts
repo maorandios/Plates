@@ -122,6 +122,8 @@ export interface QuotePdfRequestBody {
     description?: string;
     /** Optional: stable id from merged quote row (client-only; PDF may ignore). */
     source_row_id?: string;
+    /** Bend / shaped plate — פח מרוג. */
+    corrugated?: boolean;
   }>;
   /** Finalize-step pricing: total before VAT, optional discount, VAT rate, total incl. VAT. */
   pricing: {
@@ -258,6 +260,7 @@ export function buildQuotePdfRequestBody(
       plate_shape: p.bendTemplateId ?? "flat",
       description: (p.notes ?? "").trim(),
       source_row_id: p.id,
+      corrugated: p.bendTemplateId != null ? p.corrugated === true : undefined,
     };
   });
 

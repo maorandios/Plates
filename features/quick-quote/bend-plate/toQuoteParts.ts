@@ -27,6 +27,7 @@ export function bendPlateQuoteItemsToQuoteParts(
       validationStatus: "valid",
       estimatedLineCost: 0,
       bendTemplateId: item.template,
+      corrugated: item.global.corrugated,
       dxfFileName: "—",
       excelRowRef: "—",
       notes: "",

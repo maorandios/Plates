@@ -68,6 +68,7 @@ export function dxfGeometriesToQuoteParts(
         pierceCount,
         validationStatus,
         estimatedLineCost: 0,
+        corrugated: g.reviewCorrugated === true,
         dxfFileName: `${partName}.dxf`,
         excelRowRef: partName,
         notes: "Source: DXF import",

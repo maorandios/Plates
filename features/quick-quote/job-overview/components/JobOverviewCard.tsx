@@ -7,7 +7,7 @@ interface JobOverviewCardProps {
   title: string;
   value: ReactNode;
   subtext?: string;
-  /** Analysis row: neon green / neon pink on dark (matches DXF–Excel validation banners). */
+  /** Analysis row: light cards (ניצול = mint, גריעה = pink) — colors in globals.css */
   highlight?: "emerald" | "rose";
 }
 
@@ -56,7 +56,7 @@ export function JobOverviewCard({
           <p
             className={cn(
               "max-w-[22rem] text-xs leading-snug",
-              isNeon ? "text-current/85" : "text-muted-foreground"
+              isNeon ? "text-current" : "text-muted-foreground"
             )}
           >
             {subtext}

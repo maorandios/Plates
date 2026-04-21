@@ -100,9 +100,17 @@ export function BendTemplatePickerGrid({
                   : "bg-muted text-foreground group-hover:bg-muted/90"
               )}
             >
+              {/*
+                Selected: tile uses solid primary — force glyph stroke to primary-foreground
+                so the purple brand stroke from BendTemplateShapeGlyph does not cover the fill.
+              */}
               <BendTemplatePickerGlyph
                 id={id}
-                className={cn("shrink-0", isTall ? "h-8 w-[3.25rem]" : "h-6 w-[2.75rem]")}
+                className={cn(
+                  "shrink-0",
+                  isTall ? "h-8 w-[3.25rem]" : "h-6 w-[2.75rem]",
+                  hasData && "!text-primary-foreground"
+                )}
               />
             </div>
             <div

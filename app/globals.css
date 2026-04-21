@@ -310,14 +310,14 @@ button.excel-dxf-mismatch-banner:focus-visible {
   box-shadow: 0 0 0 2px rgb(247 35 120 / 0.45) !important;
 }
 
-/* Quantity analysis metrics — same neon-on-dark language as Excel–DXF mismatch (green pair). */
-div.job-overview-analysis-card--rose {
-  background-color: #1c0004 !important;
-  border-color: #ff007b !important;
-  color: #ff006f !important;
-}
+/* Quantity analysis — ניצול חומר / גריעת חומר (phase 5) */
 div.job-overview-analysis-card--emerald {
-  background-color: #160822 !important;
-  border-color: #6a23f7 !important;
-  color: #d4c4fd !important;
+  background-color: #d2ffee !important;
+  border-color: #00c7a5 !important;
+  color: #14765f !important;
+}
+div.job-overview-analysis-card--rose {
+  background-color: #ffd8e6 !important;
+  border-color: #f72378 !important;
+  color: #87003c !important;
 }

@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { t } from "@/lib/i18n";
 import type { QuotePartRow } from "../types/quickQuote";
+import { UNIFIED_SOURCE_REF } from "./mergeAllQuoteMethods";
 import { splitMaterialGradeAndFinish } from "./plateFields";
 import { formatUnifiedSourceForRow } from "./unifiedSourceColumnLabel";
 
@@ -75,12 +76,13 @@ function styleBodyNumberCell(cell: ExcelJS.Cell, numFmt: string) {
   setBottomRuleOnly(cell);
 }
 
-function buildColumnWidths(showRef: boolean): number[] {
+function buildColumnWidths(showRef: boolean, showCorrugated: boolean): number[] {
   const rest = [10, 12, 14, 14, 14, 14, 16, 14];
+  const withCorrugated = showCorrugated ? [...rest, 12] : rest;
   if (showRef) {
-    return [22, MAIN_COL_WIDTH, ...rest];
+    return [22, MAIN_COL_WIDTH, ...withCorrugated];
   }
-  return [MAIN_COL_WIDTH, ...rest];
+  return [MAIN_COL_WIDTH, ...withCorrugated];
 }
 
 /**
@@ -96,6 +98,14 @@ export async function buildUnifiedSummaryBomXlsxBuffer(parts: QuotePartRow[]): P
   });
 
   const showRef = parts.some((p) => Boolean(p.sourceRef?.trim()));
+  const showCorrugated =
+    parts.some((p) => p.bendTemplateId != null) ||
+    parts.some((p) =>
+      (p.sourceRef ?? "")
+        .split("·")
+        .map((s) => s.trim())
+        .includes(UNIFIED_SOURCE_REF.dxf)
+    );
   const headers: string[] = [];
   if (showRef) headers.push(t(`${PP}.colReference`));
   headers.push(
@@ -109,8 +119,9 @@ export async function buildUnifiedSummaryBomXlsxBuffer(parts: QuotePartRow[]): P
     t(`${PP}.colMaterialGrade`),
     t(`${PP}.colFinish`)
   );
+  if (showCorrugated) headers.push(t(`${PP}.colCorrugated`));
 
-  const widths = buildColumnWidths(showRef);
+  const widths = buildColumnWidths(showRef, showCorrugated);
   widths.forEach((w, i) => {
     sheet.getColumn(i + 1).width = w;
   });
@@ -141,6 +152,19 @@ export async function buildUnifiedSummaryBomXlsxBuffer(parts: QuotePartRow[]): P
       grade,
       finishLabel(finish)
     );
+    if (showCorrugated) {
+      const isDxf = (p.sourceRef ?? "")
+        .split("·")
+        .map((s) => s.trim())
+        .includes(UNIFIED_SOURCE_REF.dxf);
+      const corLabel =
+        p.bendTemplateId != null || isDxf
+          ? p.corrugated === true
+            ? t("quote.bendPlatePhase.plateCorrugatedYes")
+            : t("quote.bendPlatePhase.plateCorrugatedNo")
+          : "";
+      values.push(corLabel);
+    }
 
     const excelRow = sheet.addRow(values);
     let i = 1;
@@ -165,6 +189,10 @@ export async function buildUnifiedSummaryBomXlsxBuffer(parts: QuotePartRow[]): P
     styleBodyTextCell(excelRow.getCell(i));
     i++;
     styleBodyTextCell(excelRow.getCell(i));
+    if (showCorrugated) {
+      i++;
+      styleBodyTextCell(excelRow.getCell(i));
+    }
   }
 
   const buf = await workbook.xlsx.writeBuffer();
