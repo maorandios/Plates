@@ -31,7 +31,7 @@ export type FinalizeDraftLineItem = {
   source_row_id?: string;
   /** Free-text description (maps to part notes). */
   description?: string;
-  /** Bend / shaped plate rows only — פח מרוג. */
+  /** פח מרוג (flat or bent stock). */
   corrugated?: boolean;
 };
 
@@ -87,6 +87,7 @@ export function recalcFinalizeLineMetrics(
     pierceCount: 0,
     validationStatus: "valid",
     estimatedLineCost: 0,
+    corrugated: row.corrugated === true,
     dxfFileName: "—",
     excelRowRef: "—",
     notes: "",
@@ -185,7 +186,7 @@ export function finalizeDraftItemsFromQuoteParts(
       plate_shape: p.bendTemplateId ?? "flat",
       description: (p.notes ?? "").trim(),
       source_row_id: p.id,
-      corrugated: p.bendTemplateId != null ? p.corrugated : undefined,
+      corrugated: p.corrugated === true,
     };
   });
 }

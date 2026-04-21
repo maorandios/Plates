@@ -42,7 +42,6 @@ import type { MaterialType } from "@/types/materials";
 import { finalizePlateTypeLabel } from "../lib/finalizePlateTypeLabel";
 import {
   finalizeDraftLineToQuotePart,
-  isFinalizeBendPlateRowShape,
   recalcFinalizeLineMetrics,
   type FinalizeDraftLineItem,
 } from "../lib/finalizeLineRecalc";
@@ -588,11 +587,18 @@ export function QuoteFinalizeExportStep({
         </div>
 
         <div className="space-y-5 p-4 sm:p-6">
-          <Card className="border-border bg-card/40 text-start shadow-none" dir="rtl">
+          <div
+            dir="rtl"
+            className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-8"
+          >
+            <Card
+              className="w-full border-border bg-card/40 text-start shadow-none lg:max-w-md lg:shrink-0"
+              dir="rtl"
+            >
             <CardHeader className="space-y-0 pb-2 pt-4">
               <CardTitle className="text-sm font-semibold">{t(`${FP}.quoteDetailsTitle`)}</CardTitle>
             </CardHeader>
-            <CardContent className="max-w-md space-y-3 px-4 pb-5 pt-0">
+            <CardContent className="max-w-md space-y-3 px-4 pb-5 pt-0 lg:max-w-none">
               <div className="space-y-1">
                 <p className="text-[11px] font-medium text-muted-foreground">
                   {t(`${FP}.quoteNumber`)}
@@ -717,20 +723,34 @@ export function QuoteFinalizeExportStep({
             </CardContent>
           </Card>
 
-          {/* Export above metrics; button on visual left (RTL: justify-end). */}
-          <div dir="rtl" className="space-y-3 text-start">
-            <div className="flex w-full justify-end">
+            {/*
+              RTL row: pack toward main-end = physical left. Square height matches quote card (`items-stretch` on parent).
+            */}
+            <div className="flex w-full flex-1 min-w-0 justify-end self-stretch lg:min-h-0">
               <Button
                 type="button"
-                size="default"
-                className="min-w-[10rem] gap-1"
+                variant="ghost"
                 disabled={exportPdfDisabled}
                 onClick={() => void handleExportPdf()}
+                className={cn(
+                  "flex aspect-square w-[min(100%,18rem)] max-w-full shrink-0 flex-col items-center justify-center gap-3 rounded-[2.5rem] border-2 border-[#00C7A5] bg-[#D2FFEE] px-3 py-4 text-[#14765F] shadow-md transition-colors sm:rounded-[2.75rem]",
+                  "hover:bg-[#c5f5e8] hover:border-[#00b396]",
+                  "focus-visible:ring-2 focus-visible:ring-[#00C7A5]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  "disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-60 disabled:shadow-none disabled:hover:bg-muted",
+                  "sm:w-[min(100%,20rem)] sm:gap-4 sm:px-4 sm:py-5",
+                  "lg:h-full lg:max-h-[min(100%,26rem)] lg:w-auto lg:self-start",
+                  "whitespace-normal [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:!h-10 [&_svg]:!w-10 sm:[&_svg]:!h-11 sm:[&_svg]:!w-11 lg:[&_svg]:!h-12 lg:[&_svg]:!w-12"
+                )}
               >
-                {exporting ? t(`${FP}.exporting`) : t(`${FP}.exportQuoteProduce`)}
-                <FileDown className="ms-1.5 h-4 w-4 shrink-0" aria-hidden />
+                <FileDown className="stroke-[1.65]" aria-hidden />
+                <span className="max-w-[11rem] text-center text-sm font-semibold leading-snug sm:max-w-[13rem] sm:text-base lg:max-w-[14rem] lg:text-[1.05rem] lg:leading-snug">
+                  {exporting ? t(`${FP}.exporting`) : t(`${FP}.exportQuoteProduce`)}
+                </span>
               </Button>
             </div>
+          </div>
+
+          <div dir="rtl" className="space-y-3 text-start">
             <div className="overflow-hidden rounded-md border border-border bg-white/[0.08]">
               <div className="grid grid-cols-2 gap-px sm:grid-cols-3 lg:grid-cols-5">
                 <div className="bg-card">
@@ -1037,21 +1057,17 @@ export function QuoteFinalizeExportStep({
                           <TableCell
                             className={cn(cellBase, "border-e border-border text-center")}
                           >
-                            {isFinalizeBendPlateRowShape(row.plate_shape) ? (
-                              <div className="flex justify-center py-1">
-                                <OptimisticCheckbox
-                                  checked={row.corrugated === true}
-                                  aria-label={t(`${FP}.ariaCorrugatedRow`, {
-                                    name: row.part_number || String(i + 1),
-                                  })}
-                                  onCheckedChange={(v) =>
-                                    applyPartRowPatch(i, { corrugated: v }, false)
-                                  }
-                                />
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                            <div className="flex justify-center py-1">
+                              <OptimisticCheckbox
+                                checked={row.corrugated === true}
+                                aria-label={t(`${FP}.ariaCorrugatedRow`, {
+                                  name: row.part_number || String(i + 1),
+                                })}
+                                onCheckedChange={(v) =>
+                                  applyPartRowPatch(i, { corrugated: v }, true)
+                                }
+                              />
+                            </div>
                           </TableCell>
                           <TableCell
                             className={cn(
@@ -1310,8 +1326,8 @@ export function QuoteFinalizeExportStep({
                     id="pr-disc"
                     inputMode="decimal"
                     placeholder="—"
-                    className="tabular-nums text-start"
-                    dir="ltr"
+                    className="h-9 w-full tabular-nums text-start"
+                    dir="rtl"
                     value={draft.pricing.discount ?? ""}
                     onChange={(e) => {
                       const raw = e.target.value.trim();

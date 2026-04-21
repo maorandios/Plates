@@ -1,15 +1,91 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { rectPackWithPlacements } from "@/lib/quotes/rectPackNesting";
-import type { SheetLayout } from "@/lib/quotes/rectPackNesting";
+import { useEffect, useMemo, useState } from "react";
+import { Eye } from "lucide-react";
+import {
+  compareRectPackGroupKeys,
+  rectPackWithPlacements,
+} from "@/lib/quotes/rectPackNesting";
+import type {
+  RectPackResult,
+  SheetLayout,
+} from "@/lib/quotes/rectPackNesting";
 import { t } from "@/lib/i18n";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { QuotePartRow, ThicknessStockInput } from "../../types/quickQuote";
 
 const QA = "quote.quantityAnalysis" as const;
+
+/** # and צפיה stay narrow; remaining columns share the rest evenly. */
+const NESTING_TABLE_COL_WIDTHS_PCT = (() => {
+  const indexAndViewPct = 3 + 3.5;
+  const mid = (100 - indexAndViewPct) / 7;
+  return [3, mid, mid, mid, mid, mid, mid, mid, 3.5] as const;
+})();
+
+function partsInNestingGroup(
+  parts: QuotePartRow[],
+  thicknessMm: number,
+  corrugated: boolean
+): QuotePartRow[] {
+  return parts.filter(
+    (p) =>
+      p.thicknessMm === thicknessMm &&
+      (p.corrugated === true) === corrugated
+  );
+}
+
+/** Steel grade codes only (e.g. S235, S355JR) — strips finish text like "ללא", coatings, etc. */
+function steelClassificationsFromMaterial(raw: string): string[] {
+  const m = raw.match(/\bS\d{3}[A-Za-z0-9+]*\b/g);
+  if (!m?.length) return [];
+  return [...new Set(m.map((x) => x.toUpperCase()))];
+}
+
+function steelGradeLabel(groupParts: QuotePartRow[]): string {
+  const all = new Set<string>();
+  for (const p of groupParts) {
+    for (const code of steelClassificationsFromMaterial(p.material || "")) {
+      all.add(code);
+    }
+  }
+  const sorted = [...all].sort();
+  if (sorted.length === 0) return "—";
+  return sorted.join(" · ");
+}
+
+function thicknessResultForGroup(
+  summary: RectPackResult,
+  thicknessMm: number,
+  corrugated: boolean
+) {
+  return summary.perThickness.find(
+    (r) => r.thicknessMm === thicknessMm && r.corrugated === corrugated
+  );
+}
 
 interface NestingPreviewSectionProps {
   parts: QuotePartRow[];
@@ -83,6 +159,9 @@ function SheetCard({
     (layout.sheetWidthMm * layout.sheetLengthMm) / 1_000_000;
   const wasteM2 = Math.max(0, grossM2 - layout.netAreaM2);
   const plateCount = layout.placements.length;
+  const utilPctSheet = layout.utilizationPct;
+  const wastePctSheet =
+    grossM2 > 0 ? Math.round((wasteM2 / grossM2) * 1000) / 10 : 0;
 
   const title =
     t(`${QA}.nestingSheet`, { n: layout.sheetIndex + 1 }) +
@@ -98,7 +177,7 @@ function SheetCard({
       className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card/60 shadow-sm"
       dir="rtl"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border px-3 pb-2.5 pt-3">
+      <div className="flex flex-wrap items-start gap-2 border-b border-border px-3 pb-2.5 pt-3">
         <div className="min-w-0 space-y-0.5 text-start">
           <p className="text-sm font-semibold leading-tight text-foreground">
             {title}
@@ -109,18 +188,6 @@ function SheetCard({
             </p>
           )}
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-md bg-black/20 px-2 py-0.5 text-sm font-mono font-bold tabular-nums",
-            layout.utilizationPct >= 68
-              ? "text-primary"
-              : layout.utilizationPct >= 48
-                ? "text-yellow-400"
-                : "text-red-400"
-          )}
-        >
-          {layout.utilizationPct.toFixed(1)}%
-        </span>
       </div>
 
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-3 pt-2.5 pb-2">
@@ -137,28 +204,37 @@ function SheetCard({
         >
           <div className="min-w-0 flex-1 px-4 py-3.5 text-center sm:px-5">
             <span className="font-medium text-foreground/90">
-              {t(`${QA}.nestingMetaDims`)}{" "}
-            </span>
-            {Math.round(layout.sheetWidthMm)} × {Math.round(layout.sheetLengthMm)}{" "}
-            {t(`${QA}.unitMm`)}
-          </div>
-          <div className="min-w-0 flex-1 px-4 py-3.5 text-center sm:px-5">
-            <span className="font-medium text-foreground/90">
               {t(`${QA}.nestingSheetCardPlates`)}{" "}
             </span>
             {plateCount}
           </div>
-          <div className="min-w-0 flex-1 px-4 py-3.5 text-center sm:px-5">
+          <div className="min-w-0 flex-1 px-3 py-3.5 text-center sm:px-4">
             <span className="font-medium text-foreground/90">
               {t(`${QA}.nestingSheetCardUsage`)}{" "}
             </span>
-            {layout.netAreaM2.toFixed(2)} {t(`${QA}.unitM2`)}
+            {layout.netAreaM2.toFixed(2)} {t(`${QA}.unitM2`)}{" "}
+            <span
+              className={cn(
+                "ms-1 inline-flex align-middle rounded-full border border-emerald-500/35 bg-emerald-500/12 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#14765F]",
+                "dark:border-emerald-500/30 dark:bg-emerald-500/20 dark:text-[#14765F]"
+              )}
+            >
+              {utilPctSheet.toFixed(1)}%
+            </span>
           </div>
-          <div className="min-w-0 flex-1 px-4 py-3.5 text-center sm:px-5">
+          <div className="min-w-0 flex-1 px-3 py-3.5 text-center sm:px-4">
             <span className="font-medium text-foreground/90">
               {t(`${QA}.nestingSheetCardWaste`)}{" "}
             </span>
-            {wasteM2.toFixed(2)} {t(`${QA}.unitM2`)}
+            {wasteM2.toFixed(2)} {t(`${QA}.unitM2`)}{" "}
+            <span
+              className={cn(
+                "ms-1 inline-flex align-middle rounded-full border border-orange-500/40 bg-orange-500/12 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#FF4C00]",
+                "dark:border-orange-500/35 dark:bg-orange-500/18 dark:text-[#FF4C00]"
+              )}
+            >
+              {wastePctSheet.toFixed(1)}%
+            </span>
           </div>
         </div>
       </div>
@@ -219,26 +295,34 @@ function GridCellView({
   return null;
 }
 
-/** All sheets in two columns, new rows as needed — no horizontal scroll. */
+/** Sheets grid: two columns on wide screens by default; modal uses one column full width. */
 function SheetsTwoColumnGrid({
   layouts,
   showThickness,
+  singleColumnFullWidth = false,
 }: {
   layouts: SheetLayout[];
   showThickness: boolean;
+  /** When true (e.g. modal), each sheet preview spans the full container width. */
+  singleColumnFullWidth?: boolean;
 }) {
   const cells = useMemo(() => buildGridCells(layouts), [layouts]);
 
   return (
     <div
-      className="grid w-full grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5"
+      className={cn(
+        "grid w-full min-w-0 items-stretch gap-4",
+        singleColumnFullWidth
+          ? "grid-cols-1"
+          : "grid-cols-1 sm:grid-cols-2 sm:gap-5"
+      )}
       dir="rtl"
     >
       {cells.map((cell, i) => (
         <GridCellView
           key={
             cell.kind === "sheet"
-              ? `${cell.layout.thicknessMm}-${cell.layout.sheetIndex}-${i}`
+              ? `${cell.layout.thicknessMm}-${cell.layout.corrugated ? "c" : "p"}-${cell.layout.sheetIndex}-${i}`
               : `more-${i}`
           }
           cell={cell}
@@ -248,6 +332,8 @@ function SheetsTwoColumnGrid({
     </div>
   );
 }
+
+type NestingGroup = { key: string; layouts: SheetLayout[] };
 
 export function NestingPreviewSection({
   parts,
@@ -283,29 +369,133 @@ export function NestingPreviewSection({
       lengthMm: p.lengthMm,
       areaM2: p.areaM2,
       qty: p.qty,
+      corrugated: p.corrugated === true,
     }));
 
     return rectPackWithPlacements(packParts, stockLines, 0, 3);
   }, [parts, thicknessStock]);
 
-  const [expandedByTh, setExpandedByTh] = useState<Record<number, boolean>>({});
+  const [modalGroupKey, setModalGroupKey] = useState<string | null>(null);
+  const [filterSheetSize, setFilterSheetSize] = useState("all");
+  const [filterThickness, setFilterThickness] = useState("all");
+  const [filterSteel, setFilterSteel] = useState("all");
+  const [filterCorrugated, setFilterCorrugated] = useState("all");
+
+  const groups: NestingGroup[] = useMemo(() => {
+    if (!result?.layouts.length) return [];
+    const m = new Map<string, SheetLayout[]>();
+    for (const layout of result.layouts) {
+      const gk = `${layout.thicknessMm}\u0000${layout.corrugated ? "1" : "0"}`;
+      const existing = m.get(gk);
+      if (existing) existing.push(layout);
+      else m.set(gk, [layout]);
+    }
+    return [...m.entries()]
+      .sort(([a], [b]) => compareRectPackGroupKeys(a, b))
+      .map(([key, layouts]) => ({ key, layouts }));
+  }, [result]);
+
+  const nestingFilterOptions = useMemo(() => {
+    const sizes: { key: string; label: string }[] = [];
+    const sizeSeen = new Set<string>();
+    const thicknessSet = new Set<string>();
+    const steelSet = new Set<string>();
+    for (const g of groups) {
+      const f = g.layouts[0];
+      const w = Math.round(f.sheetWidthMm);
+      const l = Math.round(f.sheetLengthMm);
+      const sk = `${w}x${l}`;
+      if (!sizeSeen.has(sk)) {
+        sizeSeen.add(sk);
+        sizes.push({
+          key: sk,
+          label: `${w} × ${l} ${t(`${QA}.unitMm`)}`,
+        });
+      }
+      thicknessSet.add(String(Math.round(f.thicknessMm * 100) / 100));
+      const gp = partsInNestingGroup(parts, f.thicknessMm, f.corrugated);
+      for (const p of gp) {
+        for (const c of steelClassificationsFromMaterial(p.material || "")) {
+          steelSet.add(c);
+        }
+      }
+    }
+    sizes.sort((a, b) => {
+      const [aw, al] = a.key.split("x").map(Number);
+      const [bw, bl] = b.key.split("x").map(Number);
+      return bw * bl - aw * al;
+    });
+    const thicknesses = [...thicknessSet].sort(
+      (a, b) => Number(a) - Number(b)
+    );
+    const steels = [...steelSet].sort();
+    return { sizes, thicknesses, steels };
+  }, [groups, parts]);
+
+  const filteredGroups = useMemo(() => {
+    return groups.filter((g) => {
+      const f = g.layouts[0];
+      const w = Math.round(f.sheetWidthMm);
+      const l = Math.round(f.sheetLengthMm);
+      if (filterSheetSize !== "all" && `${w}x${l}` !== filterSheetSize) {
+        return false;
+      }
+      const mmRounded = Math.round(f.thicknessMm * 100) / 100;
+      if (filterThickness !== "all" && String(mmRounded) !== filterThickness) {
+        return false;
+      }
+      if (filterCorrugated === "yes" && !f.corrugated) return false;
+      if (filterCorrugated === "no" && f.corrugated) return false;
+      if (filterSteel !== "all") {
+        const gp = partsInNestingGroup(parts, f.thicknessMm, f.corrugated);
+        const codes = new Set<string>();
+        for (const p of gp) {
+          for (const c of steelClassificationsFromMaterial(p.material || "")) {
+            codes.add(c);
+          }
+        }
+        if (!codes.has(filterSteel)) return false;
+      }
+      return true;
+    });
+  }, [
+    groups,
+    parts,
+    filterSheetSize,
+    filterThickness,
+    filterSteel,
+    filterCorrugated,
+  ]);
+
+  const modalGroup = modalGroupKey
+    ? filteredGroups.find((g) => g.key === modalGroupKey) ?? null
+    : null;
+
+  const modalSubtitle =
+    modalGroup != null
+      ? t(
+          modalGroup.layouts[0].corrugated
+            ? `${QA}.nestingModalSubtitleCheckered`
+            : `${QA}.nestingModalSubtitle`,
+          {
+            mm: Math.round(modalGroup.layouts[0].thicknessMm * 100) / 100,
+            width: Math.round(modalGroup.layouts[0].sheetWidthMm),
+            length: Math.round(modalGroup.layouts[0].sheetLengthMm),
+          }
+        )
+      : "";
+
+  useEffect(() => {
+    if (!modalGroupKey) return;
+    if (!filteredGroups.some((g) => g.key === modalGroupKey)) {
+      setModalGroupKey(null);
+    }
+  }, [filteredGroups, modalGroupKey]);
 
   if (!result || result.layouts.length === 0) return null;
 
   const multipleThicknesses =
     new Set(result.layouts.map((l) => l.thicknessMm)).size > 1;
-
-  const grouped = new Map<number, SheetLayout[]>();
-  for (const layout of result.layouts) {
-    const th = layout.thicknessMm;
-    const existing = grouped.get(th);
-    if (existing) existing.push(layout);
-    else grouped.set(th, [layout]);
-  }
-
-  const thicknessEntries = [...grouped.entries()].sort(([a], [b]) => a - b);
-
-  const isOpen = (th: number) => Boolean(expandedByTh[th]);
 
   return (
     <section className="space-y-4" dir="rtl">
@@ -318,60 +508,248 @@ export function NestingPreviewSection({
         </p>
       </div>
 
-      <div className="space-y-3">
-        {thicknessEntries.map(([thicknessMm, layouts]) => {
-          const open = isOpen(thicknessMm);
-          return (
-            <Card
-              key={thicknessMm}
-              className={cn(
-                "overflow-hidden border bg-card/80 shadow-sm transition-colors",
-                "border-border",
-                open && "border-primary/25 bg-primary/[0.04]"
-              )}
-            >
-              <CardHeader className="cursor-pointer select-none space-y-0 p-4 pb-3 sm:p-5">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 text-start"
-                  onClick={() =>
-                    setExpandedByTh((prev) => ({
-                      ...prev,
-                      [thicknessMm]: !isOpen(thicknessMm),
-                    }))
-                  }
-                  aria-expanded={open}
-                >
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
-                      open ? "rotate-0" : "-rotate-90"
-                    )}
-                    aria-hidden
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-foreground">
-                      {t(`${QA}.nestingThicknessLine`, {
-                        mm: thicknessMm,
-                        sheets: layouts[0].totalSheetsForThickness,
-                      })}
-                    </p>
-                  </div>
-                </button>
-              </CardHeader>
-
-              {open && (
-                <CardContent className="border-t border-border bg-card/40 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4">
-                  <SheetsTwoColumnGrid
-                    layouts={layouts}
-                    showThickness={!multipleThicknesses}
-                  />
-                </CardContent>
-              )}
-            </Card>
-          );
-        })}
+      <div
+        className="grid w-full grid-cols-1 gap-3 rounded-xl border border-border bg-card/40 p-4 sm:grid-cols-2 lg:grid-cols-4"
+        role="search"
+        aria-label={t(`${QA}.nestingFilterSectionAria`)}
+      >
+        <div className="flex min-w-0 flex-col gap-2">
+          <Label htmlFor="nesting-filter-sheet" className="text-muted-foreground">
+            {t(`${QA}.nestingFilterSheetSizeLabel`)}
+          </Label>
+          <Select value={filterSheetSize} onValueChange={setFilterSheetSize}>
+            <SelectTrigger id="nesting-filter-sheet" className="w-full">
+              <SelectValue placeholder={t(`${QA}.nestingFilterAll`)} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t(`${QA}.nestingFilterAll`)}</SelectItem>
+              {nestingFilterOptions.sizes.map(({ key, label }) => (
+                <SelectItem key={key} value={key}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2">
+          <Label htmlFor="nesting-filter-thickness" className="text-muted-foreground">
+            {t(`${QA}.nestingFilterThicknessLabel`)}
+          </Label>
+          <Select value={filterThickness} onValueChange={setFilterThickness}>
+            <SelectTrigger id="nesting-filter-thickness" className="w-full">
+              <SelectValue placeholder={t(`${QA}.nestingFilterAll`)} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t(`${QA}.nestingFilterAll`)}</SelectItem>
+              {nestingFilterOptions.thicknesses.map((th) => (
+                <SelectItem key={th} value={th}>
+                  {t(`${QA}.nestingSummaryValueThicknessMm`, {
+                    mm: Number(th),
+                  })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2">
+          <Label htmlFor="nesting-filter-steel" className="text-muted-foreground">
+            {t(`${QA}.nestingFilterSteelLabel`)}
+          </Label>
+          <Select value={filterSteel} onValueChange={setFilterSteel}>
+            <SelectTrigger id="nesting-filter-steel" className="w-full">
+              <SelectValue placeholder={t(`${QA}.nestingFilterAll`)} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t(`${QA}.nestingFilterAll`)}</SelectItem>
+              {nestingFilterOptions.steels.map((grade) => (
+                <SelectItem key={grade} value={grade}>
+                  {grade}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2">
+          <Label htmlFor="nesting-filter-corrugated" className="text-muted-foreground">
+            {t(`${QA}.nestingFilterCorrugatedLabel`)}
+          </Label>
+          <Select value={filterCorrugated} onValueChange={setFilterCorrugated}>
+            <SelectTrigger id="nesting-filter-corrugated" className="w-full">
+              <SelectValue placeholder={t(`${QA}.nestingFilterAll`)} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t(`${QA}.nestingFilterAll`)}</SelectItem>
+              <SelectItem value="yes">{t("common.yes")}</SelectItem>
+              <SelectItem value="no">{t("common.no")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      <div className="w-full min-w-0 max-w-full rounded-xl border border-border bg-card/50 shadow-sm">
+        <Table
+          className="table-fixed w-full min-w-0"
+          containerClassName="w-full min-w-0 overflow-x-auto"
+        >
+          <colgroup>
+            {NESTING_TABLE_COL_WIDTHS_PCT.map((pct, i) => (
+              <col key={i} style={{ width: `${pct.toFixed(4)}%` }} />
+            ))}
+          </colgroup>
+          <TableHeader className="border-b border-border bg-muted/20 [&_tr]:border-b-0">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="h-auto px-1 py-3 text-center text-sm font-medium whitespace-normal">
+                {t(`${QA}.nestingTableColNum`)}
+              </TableHead>
+              <TableHead className="h-auto px-2 py-3 text-sm whitespace-normal">
+                {t(`${QA}.nestingTableColSheetSize`)}
+              </TableHead>
+              <TableHead className="h-auto px-2 py-3 text-sm whitespace-normal">
+                {t(`${QA}.nestingTableColThickness`)}
+              </TableHead>
+              <TableHead className="h-auto px-2 py-3 text-sm whitespace-normal">
+                {t(`${QA}.nestingTableColStockQty`)}
+              </TableHead>
+              <TableHead className="h-auto px-2 py-3 text-sm whitespace-normal">
+                {t(`${QA}.nestingTableColSteelGrade`)}
+              </TableHead>
+              <TableHead className="h-auto px-2 py-3 text-sm whitespace-normal">
+                {t(`${QA}.nestingTableColCorrugated`)}
+              </TableHead>
+              <TableHead className="h-auto px-2 py-3 text-sm tabular-nums whitespace-normal">
+                {t(`${QA}.nestingTableColUtilization`)}
+              </TableHead>
+              <TableHead className="h-auto px-2 py-3 text-sm tabular-nums whitespace-normal">
+                {t(`${QA}.nestingTableColWaste`)}
+              </TableHead>
+              <TableHead className="h-auto px-1 py-3 text-center text-sm whitespace-normal">
+                {t(`${QA}.nestingTableColView`)}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredGroups.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={9}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
+                  {t(`${QA}.nestingFilterEmpty`)}
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {filteredGroups.map(({ key, layouts }, index) => {
+              const first = layouts[0];
+              const thicknessMm = first.thicknessMm;
+              const isCorrugated = first.corrugated;
+              const groupParts = partsInNestingGroup(
+                parts,
+                thicknessMm,
+                isCorrugated
+              );
+              const thResult = thicknessResultForGroup(
+                result.summary,
+                thicknessMm,
+                isCorrugated
+              );
+              const grossM2 =
+                thResult != null
+                  ? thResult.sheetCount * thResult.sheetAreaM2
+                  : 0;
+              const utilPct = thResult?.utilizationPct ?? 0;
+              const wastePct =
+                grossM2 > 0 && thResult != null
+                  ? (thResult.wasteAreaM2 / grossM2) * 100
+                  : 0;
+              const w = Math.round(first.sheetWidthMm);
+              const l = Math.round(first.sheetLengthMm);
+              const mmRounded = Math.round(thicknessMm * 100) / 100;
+
+              return (
+                <TableRow key={key}>
+                  <TableCell className="min-w-0 px-1 py-2.5 align-middle text-center text-sm tabular-nums text-muted-foreground">
+                    {index + 1}
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 py-2.5 align-middle text-sm font-medium leading-snug whitespace-normal break-words">
+                    {w} × {l} {t(`${QA}.unitMm`)}
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 py-2.5 align-middle text-sm tabular-nums leading-snug whitespace-normal">
+                    {t(`${QA}.nestingSummaryValueThicknessMm`, {
+                      mm: mmRounded,
+                    })}
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 py-2.5 align-middle text-sm tabular-nums">
+                    {first.totalSheetsForThickness}
+                  </TableCell>
+                  <TableCell className="min-w-0 overflow-hidden px-2 py-2.5 align-middle text-start text-sm leading-snug">
+                    <span
+                      className="block truncate"
+                      title={steelGradeLabel(groupParts)}
+                    >
+                      {steelGradeLabel(groupParts)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 py-2.5 align-middle text-sm">
+                    {isCorrugated ? t("common.yes") : t("common.no")}
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 py-2.5 align-middle text-sm tabular-nums text-foreground">
+                    {utilPct.toFixed(1)}%
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 py-2.5 align-middle text-sm tabular-nums text-foreground">
+                    {wastePct.toFixed(1)}%
+                  </TableCell>
+                  <TableCell className="min-w-0 px-0.5 py-2 align-middle">
+                    <div className="flex w-full justify-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-primary hover:bg-primary/10 hover:text-primary"
+                        onClick={() => setModalGroupKey(key)}
+                        aria-pressed={modalGroupKey === key}
+                        aria-label={t(`${QA}.nestingTableViewAria`)}
+                      >
+                        <Eye className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Dialog
+        open={modalGroupKey !== null}
+        onOpenChange={(open) => {
+          if (!open) setModalGroupKey(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="flex max-h-[min(90vh,900px)] w-[min(100vw-1.5rem,56rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[56rem]"
+          dir="rtl"
+        >
+          {modalGroup && (
+            <>
+              <DialogHeader className="shrink-0 space-y-1 border-b border-border px-5 pb-4 pt-5 text-start sm:px-6 sm:pt-6">
+                <DialogTitle className="text-base font-semibold">
+                  {t(`${QA}.nestingModalTitle`)}
+                </DialogTitle>
+                <p className="text-sm text-muted-foreground">{modalSubtitle}</p>
+              </DialogHeader>
+              <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-4 sm:px-6">
+                <SheetsTwoColumnGrid
+                  layouts={modalGroup.layouts}
+                  showThickness={!multipleThicknesses}
+                  singleColumnFullWidth
+                />
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

@@ -251,10 +251,24 @@ select:-webkit-autofill:focus {
   .ds-empty-state {
     @apply rounded-xl border-0 bg-white/[0.03] px-6 py-12;
   }
+
+  /**
+   * Quick quote sticky glass — low-opacity fill + blur so content shows through.
+   * `bg-background/70` reads as solid gray because --background matches the page.
+   */
+  .qq-glass {
+    -webkit-backdrop-filter: blur(24px) saturate(1.45);
+    backdrop-filter: blur(24px) saturate(1.45);
+    background-color: hsl(var(--background) / 0.22);
+  }
 }
 
 html.light .ds-empty-state {
   background-color: hsl(var(--muted) / 0.55);
+}
+
+html.light .qq-glass {
+  background-color: rgb(255 255 255 / 0.38);
 }
 
 /* Bottom loading pill — three-dot bounce wave (see BottomLoadingIndicator) */

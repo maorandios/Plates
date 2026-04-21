@@ -20,15 +20,18 @@ export function materialPricingRowKey(
   const { grade, finish } = splitMaterialGradeAndFinish(part.material);
   const g = grade.trim() || "—";
   const f = finish.trim() || "—";
-  return `${materialType}|${thicknessGroupKey(part.thicknessMm)}|${g.toLowerCase()}|${f.toLowerCase()}`;
+  const corrugated = part.corrugated === true ? "1" : "0";
+  return `${materialType}|${thicknessGroupKey(part.thicknessMm)}|${g.toLowerCase()}|${f.toLowerCase()}|${corrugated}`;
 }
 
 export interface MaterialPricingLine {
-  /** Stable key for inputs / React (family + thickness + grade + finish). */
+  /** Stable key for inputs / React (family + thickness + grade + finish + plain|פח מרוג). */
   rowKey: string;
   steelFamily: MaterialType;
   steelFamilyLabel: string;
   thicknessMm: number;
+  /** פח מרוג — separate pricing bucket from plain at the same thickness. */
+  corrugated: boolean;
   grade: string;
   finish: string;
   /** Total net weight for this combination (all parts × qty). */
@@ -47,7 +50,13 @@ export function buildMaterialPricingLines(
 
   const map = new Map<
     string,
-    { thicknessMm: number; grade: string; finish: string; weightKg: number }
+    {
+      thicknessMm: number;
+      corrugated: boolean;
+      grade: string;
+      finish: string;
+      weightKg: number;
+    }
   >();
 
   for (const p of parts) {
@@ -55,6 +64,7 @@ export function buildMaterialPricingLines(
     const { grade, finish } = splitMaterialGradeAndFinish(p.material);
     const g = grade.trim() || "—";
     const f = finish.trim() || "—";
+    const corrugated = p.corrugated === true;
     const qty = Math.max(0, Math.round(p.qty));
     const lineKg = Math.max(0, p.weightKg) * qty;
 
@@ -64,6 +74,7 @@ export function buildMaterialPricingLines(
     } else {
       map.set(rowKey, {
         thicknessMm: p.thicknessMm,
+        corrugated,
         grade: g,
         finish: f,
         weightKg: lineKg,
@@ -78,6 +89,7 @@ export function buildMaterialPricingLines(
       steelFamily: materialType,
       steelFamilyLabel: MATERIAL_TYPE_LABELS[materialType],
       thicknessMm: Math.round(v.thicknessMm * 100) / 100,
+      corrugated: v.corrugated,
       grade: v.grade,
       finish: v.finish,
       totalWeightKg: v.weightKg,
@@ -87,6 +99,7 @@ export function buildMaterialPricingLines(
   out.sort((a, b) => {
     const d = a.thicknessMm - b.thicknessMm;
     if (d !== 0) return d;
+    if (a.corrugated !== b.corrugated) return a.corrugated ? 1 : -1;
     const g = a.grade.localeCompare(b.grade, undefined, { sensitivity: "base" });
     if (g !== 0) return g;
     return a.finish.localeCompare(b.finish, undefined, { sensitivity: "base" });

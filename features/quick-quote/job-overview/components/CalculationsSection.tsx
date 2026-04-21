@@ -78,7 +78,7 @@ export function CalculationsSection({
         <Table
           dir="rtl"
           containerClassName="overflow-visible"
-          className="min-w-[48rem] text-start [&_th]:text-start [&_td]:text-start"
+          className="min-w-[54rem] text-start [&_th]:text-start [&_td]:text-start"
         >
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -90,6 +90,9 @@ export function CalculationsSection({
               </TableHead>
               <TableHead className="min-w-[6rem] font-medium">{t(`${PF}.colSteelGrade`)}</TableHead>
               <TableHead className="min-w-[5rem] font-medium">{t(`${PF}.colFinish`)}</TableHead>
+              <TableHead className="min-w-[5rem] whitespace-nowrap font-medium">
+                {t(`${PF}.colCorrugated`)}
+              </TableHead>
               <TableHead className="min-w-[6rem] tabular-nums font-medium">
                 {t(`${PF}.colWeightKg`)}
               </TableHead>
@@ -110,6 +113,9 @@ export function CalculationsSection({
                 </TableCell>
                 <TableCell className="text-muted-foreground">{line.grade}</TableCell>
                 <TableCell className="text-muted-foreground">{line.finish}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {line.corrugated ? t("common.yes") : t("common.no")}
+                </TableCell>
                 <TableCell className="tabular-nums text-muted-foreground">
                   {formatDecimal(line.totalWeightKg, 2)}
                 </TableCell>
@@ -132,6 +138,7 @@ export function CalculationsSection({
                       family: line.steelFamilyLabel,
                       thickness: formatDecimal(line.thicknessMm, 1),
                       grade: line.grade,
+                      corrugated: line.corrugated ? t("common.yes") : t("common.no"),
                     })}
                   />
                 </TableCell>
@@ -141,15 +148,15 @@ export function CalculationsSection({
               </TableRow>
             ))}
           </TableBody>
-          <TableFooter className="border-t border-border bg-muted/35 p-0 [&>tr]:border-b-0">
+          <TableFooter className="border-t border-border bg-transparent p-0 [&>tr]:border-b-0">
             <TableRow className="border-0 bg-transparent hover:bg-transparent data-[state=selected]:bg-transparent">
-              <TableCell colSpan={5} className="bg-inherit py-3.5" />
-              <TableCell className="bg-black/[0.22] py-3.5 text-start align-middle dark:bg-black/35">
+              <TableCell colSpan={6} className="bg-transparent py-3.5" />
+              <TableCell className="bg-transparent py-3.5 text-start align-middle">
                 <span className="text-sm font-medium text-muted-foreground">
                   {t(`${PF}.footerTotalForBilling`)}
                 </span>
               </TableCell>
-              <TableCell className="bg-black/[0.22] py-3.5 text-start align-middle tabular-nums text-base font-semibold text-foreground dark:bg-black/35">
+              <TableCell className="bg-transparent py-3.5 text-start align-middle tabular-nums text-base font-semibold text-foreground">
                 {formatQuickQuoteCurrency(grandTotal, currencyCode)}
               </TableCell>
             </TableRow>

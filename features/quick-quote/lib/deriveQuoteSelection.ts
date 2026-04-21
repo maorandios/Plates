@@ -237,13 +237,15 @@ function formatStockSummary(rows: ThicknessStockInput[], pricePerKg: number): st
 }
 
 /**
- * Stable key for nesting / rect-pack: dimensions + qty only (e.g. toggling פח מרוג
- * does not change geometry — avoids re-running {@link rectPackEstimate} on every click).
+ * Stable key for nesting / rect-pack cache: geometry, qty, and plain vs פח מרוג
+ * (separate sheet runs — affects sheet count and waste).
  */
 export function nestingGeometrySignatureForParts(parts: QuotePartRow[]): string {
   return parts
     .map((p) =>
-      [p.id, p.thicknessMm, p.widthMm, p.lengthMm, p.qty].join(":")
+      [p.id, p.thicknessMm, p.widthMm, p.lengthMm, p.qty, p.corrugated ? 1 : 0].join(
+        ":"
+      )
     )
     .join("|");
 }
@@ -286,8 +288,8 @@ function estimateSheetUsageFromStockMemoized(
  * Runs a shelf/row rect-pack simulation to estimate sheet count, gross area,
  * and true waste for the given parts against the configured stock sheet sizes.
  *
- * Each thickness in `stockRows` shares the same candidate sheet sizes (we pick
- * whichever size minimises the sheet count for that thickness's parts).
+ * Stock candidate sizes are shared per thickness; פח מרוג lines are nested on
+ * separate sheets from plain plate at the same thickness (two rect-pack runs).
  */
 function estimateSheetUsageFromStock(
   parts: QuotePartRow[],
@@ -325,6 +327,7 @@ function estimateSheetUsageFromStock(
     lengthMm: p.lengthMm,
     areaM2: p.areaM2,
     qty: p.qty,
+    corrugated: p.corrugated === true,
   }));
 
   const result = rectPackEstimate(packParts, stockLines);

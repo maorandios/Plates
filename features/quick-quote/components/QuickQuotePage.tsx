@@ -120,6 +120,7 @@ export function QuickQuotePage() {
   const [pdfExportDraft, setPdfExportDraft] = useState<QuotePdfFullPayload | null>(null);
   const stableSetFinalizeDraft = useCallback(
     (action: React.SetStateAction<QuotePdfFullPayload>) => {
+      setQuoteSavedToList(false);
       setPdfExportDraft((prev) => {
         if (prev === null) return prev;
         return typeof action === "function" ? action(prev) : action;
@@ -340,6 +341,7 @@ export function QuickQuotePage() {
   );
 
   const handleContinueToFinalize = useCallback(() => {
+    setQuoteSavedToList(false);
     setPdfExportDraft(buildFinalizeDraft());
     advanceTo(7);
   }, [advanceTo, buildFinalizeDraft]);

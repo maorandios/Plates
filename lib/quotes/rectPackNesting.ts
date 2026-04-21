@@ -3,7 +3,8 @@
  *
  * Algorithm: Maximal Rectangles (MaxRects) with multi-heuristic search.
  *
- * For each thickness the packer automatically tries 6 combinations of:
+ * For each thickness × stock type (plain vs פח מרוג — never mixed on one sheet)
+ * the packer automatically tries 6 combinations of:
  *   Sort order  × Scoring heuristic:
  *     - area   × BSSF  (Best Short Side Fit)
  *     - area   × BAF   (Best Area Fit)
@@ -34,6 +35,11 @@ export interface RectPackPart {
   lengthMm: number;
   areaM2: number;
   qty: number;
+  /**
+   * Checkered / "פח מרוג" — must not share sheets with plain plate at the same thickness.
+   * Omitted/false = standard stock.
+   */
+  corrugated?: boolean;
 }
 
 export interface RectPackStockLine {
@@ -43,6 +49,8 @@ export interface RectPackStockLine {
 
 export interface RectPackThicknessResult {
   thicknessMm: number;
+  /** True when this run is for פח מרוג stock only (separate nesting from plain). */
+  corrugated: boolean;
   sheetCount: number;
   sheetWidthMm: number;
   sheetLengthMm: number;
@@ -71,6 +79,7 @@ export interface PlacedRect {
 
 export interface SheetLayout {
   thicknessMm: number;
+  corrugated: boolean;
   sheetWidthMm: number;
   sheetLengthMm: number;
   sheetIndex: number;
@@ -83,6 +92,24 @@ export interface SheetLayout {
 export interface RectPackWithPlacementsResult {
   summary: RectPackResult;
   layouts: SheetLayout[];
+}
+
+// ---------------------------------------------------------------------------
+// Stock grouping (plain vs פח מרוג at same thickness)
+// ---------------------------------------------------------------------------
+
+function rectPackGroupKey(p: RectPackPart): string {
+  const c = p.corrugated === true;
+  return `${p.thicknessMm}\u0000${c ? "1" : "0"}`;
+}
+
+/** Sort groups: ascending thickness, plain before corrugated at same thickness. */
+export function compareRectPackGroupKeys(a: string, b: string): number {
+  const [ta, ca] = a.split("\u0000");
+  const [tb, cb] = b.split("\u0000");
+  const d = Number(ta) - Number(tb);
+  if (d !== 0) return d;
+  return ca.localeCompare(cb);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,6 +462,7 @@ function buildBaseInstances(parts: RectPackPart[]): Instance[] {
 
 function estimateForThickness(
   thicknessMm: number,
+  corrugated: boolean,
   parts: RectPackPart[],
   stockLines: RectPackStockLine[],
   spacing: number
@@ -465,6 +493,7 @@ function estimateForThickness(
 
     const candidate: RectPackThicknessResult = {
       thicknessMm,
+      corrugated,
       sheetCount: pack.sheetCount,
       sheetWidthMm,
       sheetLengthMm,
@@ -497,15 +526,29 @@ export function rectPackEstimate(
   stockLines: RectPackStockLine[],
   spacingMm = DEFAULT_SPACING_MM
 ): RectPackResult {
-  const byThickness = new Map<number, RectPackPart[]>();
+  const byGroup = new Map<string, RectPackPart[]>();
   for (const p of parts) {
-    const ex = byThickness.get(p.thicknessMm);
-    if (ex) ex.push(p); else byThickness.set(p.thicknessMm, [p]);
+    const key = rectPackGroupKey(p);
+    const ex = byGroup.get(key);
+    if (ex) ex.push(p);
+    else byGroup.set(key, [p]);
   }
 
+  const sortedKeys = [...byGroup.keys()].sort(compareRectPackGroupKeys);
+
   const perThickness: RectPackThicknessResult[] = [];
-  for (const [thicknessMm, thParts] of byThickness) {
-    const r = estimateForThickness(thicknessMm, thParts, stockLines, spacingMm);
+  for (const key of sortedKeys) {
+    const thParts = byGroup.get(key);
+    if (!thParts?.length) continue;
+    const thicknessMm = thParts[0].thicknessMm;
+    const corrugated = thParts[0].corrugated === true;
+    const r = estimateForThickness(
+      thicknessMm,
+      corrugated,
+      thParts,
+      stockLines,
+      spacingMm
+    );
     if (r) perThickness.push(r);
   }
 
@@ -534,6 +577,7 @@ export function rectPackEstimate(
 
 function layoutForThickness(
   thicknessMm: number,
+  corrugated: boolean,
   parts: RectPackPart[],
   bestLine: RectPackStockLine,
   spacing: number,
@@ -565,6 +609,7 @@ function layoutForThickness(
 
     layouts.push({
       thicknessMm,
+      corrugated,
       sheetWidthMm: binW,
       sheetLengthMm: binH,
       sheetIndex,
@@ -589,19 +634,23 @@ export function rectPackWithPlacements(
 ): RectPackWithPlacementsResult {
   const summary = rectPackEstimate(parts, stockLines, spacingMm);
 
-  const byThickness = new Map<number, RectPackPart[]>();
+  const byGroup = new Map<string, RectPackPart[]>();
   for (const p of parts) {
-    const ex = byThickness.get(p.thicknessMm);
-    if (ex) ex.push(p); else byThickness.set(p.thicknessMm, [p]);
+    const key = rectPackGroupKey(p);
+    const ex = byGroup.get(key);
+    if (ex) ex.push(p);
+    else byGroup.set(key, [p]);
   }
 
   const layouts: SheetLayout[] = [];
   for (const th of summary.perThickness) {
-    const thParts = byThickness.get(th.thicknessMm);
+    const key = `${th.thicknessMm}\u0000${th.corrugated ? "1" : "0"}`;
+    const thParts = byGroup.get(key);
     if (!thParts) continue;
     layouts.push(
       ...layoutForThickness(
         th.thicknessMm,
+        th.corrugated,
         thParts,
         { sheetWidthMm: th.sheetWidthMm, sheetLengthMm: th.sheetLengthMm },
         spacingMm,

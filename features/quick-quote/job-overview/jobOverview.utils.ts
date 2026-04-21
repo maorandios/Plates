@@ -100,23 +100,31 @@ export function estimateSheetsForNetArea(
 
   // Use rect-pack when part-level data is available
   if (parts && parts.length > 0) {
-    const packParts = parts.map((p) => ({
+    const packParts: RectPackPart[] = parts.map((p) => ({
       thicknessMm: p.thicknessMm,
       widthMm: p.widthMm,
       lengthMm: p.lengthMm,
       areaM2: p.areaM2,
       qty: p.qty,
+      corrugated: p.corrugated === true,
     }));
     const result = rectPackEstimate(packParts, stockLines);
 
-    // Find which sheet size was picked most (best result)
     if (result.perThickness.length > 0) {
-      // Return the single thickness result (this fn is called per-thickness)
-      const th = result.perThickness[0];
+      const totalSheets = result.perThickness.reduce((s, r) => s + r.sheetCount, 0);
+      let best = result.perThickness[0];
+      let maxGross = 0;
+      for (const th of result.perThickness) {
+        const gross = th.sheetCount * th.sheetAreaM2;
+        if (gross > maxGross) {
+          maxGross = gross;
+          best = th;
+        }
+      }
       return {
-        sheetCount: th.sheetCount,
-        lengthMm: th.sheetLengthMm,
-        widthMm: th.sheetWidthMm,
+        sheetCount: totalSheets,
+        lengthMm: best.sheetLengthMm,
+        widthMm: best.sheetWidthMm,
       };
     }
   }
@@ -265,7 +273,8 @@ export function buildStockSheetSizeBreakdown(
   for (const p of parts) {
     const mat = (p.material || "—").trim() || "—";
     const tk = thicknessGroupKey(p.thicknessMm);
-    const key = `${mat}\u0000${tk}`;
+    const corrugated = p.corrugated === true ? "1" : "0";
+    const key = `${mat}\u0000${tk}\u0000${corrugated}`;
     const list = byMatTh.get(key);
     if (list) list.push(p);
     else byMatTh.set(key, [p]);
@@ -277,6 +286,7 @@ export function buildStockSheetSizeBreakdown(
     const first = groupParts[0];
     const material = (first.material || "—").trim() || "—";
     const thicknessMm = safeFinite(first.thicknessMm);
+    const isCorrugated = first.corrugated === true;
 
     const packParts: RectPackPart[] = groupParts.map((p) => ({
       thicknessMm: p.thicknessMm,
@@ -284,6 +294,7 @@ export function buildStockSheetSizeBreakdown(
       lengthMm: p.lengthMm,
       areaM2: p.areaM2,
       qty: p.qty,
+      corrugated: p.corrugated === true,
     }));
 
     const result = rectPackEstimate(packParts, stockLines, 0);
@@ -297,9 +308,10 @@ export function buildStockSheetSizeBreakdown(
     const w = Math.round(safeFinite(th.sheetWidthMm));
     const l = Math.round(safeFinite(th.sheetLengthMm));
     const thRounded = Math.round(thicknessMm * 100) / 100;
+    const corrugatedTag = isCorrugated ? " · פח מרוג" : "";
 
     rows.push({
-      label: `${material} · ${thRounded} mm · ${w.toLocaleString()} × ${l.toLocaleString()} mm`,
+      label: `${material} · ${thRounded} mm${corrugatedTag} · ${w.toLocaleString()} × ${l.toLocaleString()} mm`,
       material,
       thicknessMm: thRounded,
       sheetWidthMm: th.sheetWidthMm,

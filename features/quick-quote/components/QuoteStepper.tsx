@@ -35,7 +35,12 @@ export function QuoteStepper({
   );
 
   return (
-    <div className="sticky top-0 z-40 w-full bg-background">
+    <div
+      className={cn(
+        "sticky top-0 z-40 w-full",
+        "qq-glass border-b border-border/25 shadow-none"
+      )}
+    >
       <div className="px-4 py-4 sm:px-6 lg:px-8">
         {/* overflow-y-visible: avoid clipping phase digits / rings; horizontal scroll only */}
         <div className="flex w-full min-w-0 items-start justify-between gap-2 overflow-x-auto overflow-y-visible pb-1 pt-0.5 [scrollbar-width:thin]">
@@ -112,7 +117,7 @@ export function QuoteStepper({
         </div>
       </div>
       {/* Thin purple progress — width grows with current step (RTL: expands toward the left) */}
-      <div className="h-[3px] w-full bg-muted/50">
+      <div className="h-[3px] w-full bg-border/35">
         <div
           className="h-full bg-primary transition-[width] duration-500 ease-out"
           style={{ width: `${overallProgressPct}%` }}

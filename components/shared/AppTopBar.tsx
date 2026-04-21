@@ -65,9 +65,18 @@ export function AppTopBar() {
   const pathname = usePathname();
   const settingsActive = pathname.startsWith("/settings");
   const { theme, setTheme, mounted: themeMounted } = usePlateTheme();
+  const quickQuoteGlass =
+    pathname === "/quick-quote" || pathname.startsWith("/quick-quote/");
 
   return (
-    <header className="sticky top-0 z-50 w-full shrink-0 bg-transparent">
+    <header
+      className={cn(
+        "sticky top-0 z-50 w-full shrink-0",
+        quickQuoteGlass
+          ? "qq-glass border-b-0 shadow-none"
+          : "bg-transparent"
+      )}
+    >
       <div className="flex min-h-14 w-full max-w-none flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5 lg:px-6">
         {/* RTL: first cluster → inline-end (right); logo + primary nav */}
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 sm:gap-4">
