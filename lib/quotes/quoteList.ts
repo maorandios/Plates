@@ -202,6 +202,11 @@ export function patchQuoteSession(
   save(list);
 }
 
+/**
+ * After “Save to list” in step 7: sync step and timestamps only.
+ * Does **not** set approval — new quotes stay {@link QuoteListStatus} `in_progress` (לא אושרה) until
+ * the user changes status in the list or preview ({@link setQuoteApprovalStatus}).
+ */
 export function markQuoteComplete(id: string): void {
   const list = load();
   const i = list.findIndex((q) => q.id === id);
@@ -209,7 +214,6 @@ export function markQuoteComplete(id: string): void {
   const now = new Date().toISOString();
   list[i] = {
     ...list[i],
-    status: "complete",
     currentStep: 7,
     wizardSchema: 2,
     updatedAt: now,

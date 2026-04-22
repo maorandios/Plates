@@ -364,6 +364,33 @@ export function QuickQuotePage() {
             materialType,
             materialPricePerKgByRow
           );
+    /** Must write here — the debounced snapshot effect is cancelled on unmount, so fast navigation left preview with no data. */
+    const partsForSnapshot = mergeAllQuoteMethodParts(
+      materialType,
+      manualQuoteRows,
+      excelImportQuoteRows,
+      dxfMethodGeometries,
+      bendPlateQuoteItems
+    );
+    try {
+      const draftPayload = pdfExportDraft ?? buildFinalizeDraft();
+      const ok = saveQuoteSnapshot(qid, {
+        draft: draftPayload,
+        materialType,
+        materialPricePerKgByRow,
+        mergedParts: partsForSnapshot,
+        dxfMethodGeometries,
+        bendPlateQuoteItems,
+        generalNotes: jobDetails.notes?.trim() ?? "",
+      });
+      if (!ok) {
+        console.error(
+          "[PLATE] saveQuoteSnapshot could not persist (storage full after retries). Preview may be empty for this id."
+        );
+      }
+    } catch (e) {
+      console.error("[PLATE] saveQuoteSnapshot on save to list failed", e);
+    }
     upsertQuoteInProgress({
       id: qid,
       referenceNumber: jobDetails.referenceNumber,
@@ -390,11 +417,17 @@ export function QuickQuotePage() {
     jobDetails.customerName,
     jobDetails.projectName,
     jobDetails.customerClientId,
+    jobDetails.notes,
     selection.jobSummary,
     selection.parts,
     materialType,
     materialPricePerKgByRow,
     pdfExportDraft,
+    buildFinalizeDraft,
+    manualQuoteRows,
+    excelImportQuoteRows,
+    dxfMethodGeometries,
+    bendPlateQuoteItems,
   ]);
 
   const handleBackFromFinalize = useCallback(() => {

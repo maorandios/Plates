@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { t } from "@/lib/i18n";
+import { listFilterStatusSelectClassName } from "@/lib/listScreenApprovalSelectStyles";
 import type { ListStatusFilter } from "@/lib/listScreenFilters";
 
 export interface ListScreenFilterBarProps {
@@ -87,7 +88,9 @@ export function ListScreenFilterBar({
           value={status}
           onValueChange={(v) => onStatusChange(v as ListStatusFilter)}
         >
-          <SelectTrigger className="h-10 w-full min-w-[9rem] sm:w-[11rem]">
+          <SelectTrigger
+            className={listFilterStatusSelectClassName(status)}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

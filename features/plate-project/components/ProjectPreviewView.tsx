@@ -1,11 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
-  ArrowLeft,
   Eye,
-  FileText,
   Hash,
   Layers,
   LayoutGrid,
@@ -40,22 +37,13 @@ import {
   subscribePlateProjectsListChanged,
 } from "@/lib/projects/plateProjectList";
 import { exportPartsPackage } from "@/lib/quotes/exportPartsPackage";
-import { MATERIAL_TYPE_LABELS } from "@/types/materials";
-import { exportQuotePdfFromDraft } from "@/features/quick-quote/lib/exportQuotePdfFromDraft";
 import { finalizePlateTypeLabel } from "@/features/quick-quote/lib/finalizePlateTypeLabel";
 import {
   finalizeDraftItemsFromQuoteParts,
   finalizeDraftLineToQuotePart,
-  isFinalizeBendPlateRowShape,
   type FinalizeDraftLineItem,
 } from "@/features/quick-quote/lib/finalizeLineRecalc";
 import { mergeAllQuoteMethodParts } from "@/features/quick-quote/lib/mergeAllQuoteMethods";
-import { jobSummaryFromParts } from "@/features/quick-quote/lib/deriveQuoteSelection";
-import { buildQuotePdfFullPayload } from "@/features/quick-quote/lib/quotePdfPayload";
-import {
-  MOCK_MFG_PARAMETERS,
-  MOCK_PRICING_SUMMARY,
-} from "@/features/quick-quote/mock/quickQuoteMockData";
 import type { QuotePartRow } from "@/features/quick-quote/types/quickQuote";
 import { QuotePartGeometryPreview } from "@/features/quick-quote/components/QuotePartGeometryPreview";
 import {
@@ -75,7 +63,7 @@ const MOD = "quote.dxfPhase.partPreviewModal" as const;
 const PRJ = "projectPreview" as const;
 const PRICE_CCY = "ILS" as const;
 
-const N_COLS = 13;
+const N_COLS = 12;
 
 function equalColumnWidthsPct(n: number): number[] {
   if (n <= 0) return [];
@@ -90,6 +78,24 @@ const METRIC_VALUE_ROW =
   "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#6A23F7] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
 const METRIC_UNIT_CLASS =
   "font-semibold tabular-nums text-muted-foreground text-[0.72em] leading-none";
+
+/** Same package tile as {@link QuotePreviewView} (gray). */
+const PREVIEW_EXPORT_TILE_BASE = cn(
+  "flex h-auto min-h-[10.5rem] w-[8.25rem] max-w-full shrink-0 flex-col items-center justify-center gap-2.5 border-2 px-2.5 py-3.5 shadow-md transition-colors sm:min-h-[11.5rem] sm:w-[9.5rem] sm:gap-3 sm:px-3 sm:py-4 md:w-44",
+  "rounded-2xl sm:rounded-[1.25rem]",
+  "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  "disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-60 disabled:shadow-none disabled:hover:bg-muted",
+  "whitespace-normal text-center [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:!h-8 [&_svg]:!w-8 sm:[&_svg]:!h-10 sm:[&_svg]:!w-10"
+);
+const PREVIEW_EXPORT_TILE_PACKAGE_CLASS = cn(
+  PREVIEW_EXPORT_TILE_BASE,
+  "border-zinc-400 bg-zinc-200 text-zinc-800",
+  "hover:bg-zinc-300 hover:border-zinc-500",
+  "focus-visible:ring-zinc-500/40",
+  "[&_svg]:stroke-zinc-800"
+);
+const PREVIEW_EXPORT_TILE_TEXT_CLASS =
+  "max-w-[9rem] text-center text-xs font-semibold leading-snug sm:max-w-[10rem] sm:text-sm sm:leading-snug";
 
 function PreviewMetricCard({
   icon: Icon,
@@ -133,10 +139,12 @@ function roundDisplay(n: number, dp: number): string {
 
 function formatCreated(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("he-IL", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
   } catch {
     return iso;
   }
@@ -172,7 +180,6 @@ export function ProjectPreviewView({
 
   const [listMeta, setListMeta] = useState<ProjectPreviewListMeta>(listMetaProp);
   const [packageExporting, setPackageExporting] = useState(false);
-  const [pdfExporting, setPdfExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [previewPart, setPreviewPart] = useState<QuotePartRow | null>(null);
 
@@ -201,19 +208,6 @@ export function ProjectPreviewView({
     () => finalizeDraftItemsFromQuoteParts(mergedParts, materialType, materialPricePerKgByRow),
     [mergedParts, materialType, materialPricePerKgByRow]
   );
-
-  const pdfDraft = useMemo(() => {
-    if (mergedParts.length === 0) return null;
-    return buildQuotePdfFullPayload(
-      jobDetails,
-      jobSummaryFromParts(mergedParts),
-      mergedParts,
-      MOCK_MFG_PARAMETERS,
-      MOCK_PRICING_SUMMARY,
-      materialType,
-      materialPricePerKgByRow
-    );
-  }, [jobDetails, mergedParts, materialType, materialPricePerKgByRow]);
 
   const syncFromList = useCallback(() => {
     const row = getPlateProjectsList().find((p) => p.id === projectId);
@@ -293,20 +287,6 @@ export function ProjectPreviewView({
     return [{ title: t(`${PRJ}.notesGeneral`), body: g }];
   }, [jobDetails.notes]);
 
-  const handleExportPdf = async () => {
-    if (!pdfDraft || pdfExporting) return;
-    setExportError(null);
-    setPdfExporting(true);
-    try {
-      await exportQuotePdfFromDraft(pdfDraft, MATERIAL_TYPE_LABELS[materialType]);
-    } catch (err) {
-      console.error(err);
-      alert(err instanceof Error ? err.message : t("quote.finalizePhase.exportFailed"));
-    } finally {
-      setPdfExporting(false);
-    }
-  };
-
   const handleExportPackage = async () => {
     if (mergedParts.length === 0 || packageExporting) return;
     setExportError(null);
@@ -330,50 +310,88 @@ export function ProjectPreviewView({
 
   return (
     <div className="space-y-8 pb-12 pt-6 lg:pt-8" dir="rtl">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 text-start">
-          <div className="grid max-w-xl grid-cols-2 gap-x-3 gap-y-4 text-sm sm:max-w-2xl sm:gap-x-4">
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/85">
-                {t("quotes.colClient")}
-              </span>
-              <span className="text-muted-foreground">
-                {listMeta.customerName.trim() || "—"}
-              </span>
-            </div>
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/85">
-                {t("quotes.colProject")}
-              </span>
-              <span className="text-muted-foreground">
-                {listMeta.projectName.trim() || "—"}
-              </span>
-            </div>
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/85">
-                {t("quotes.colReference")}
-              </span>
-              <span className="min-w-0 text-start text-muted-foreground">
-                <bdi className="tabular-nums">{listMeta.referenceNumber.trim() || "—"}</bdi>
-              </span>
-            </div>
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/85">
-                {t("quotes.colCreated")}
-              </span>
-              <span className="tabular-nums text-muted-foreground">
-                {formatCreated(listMeta.createdAtIso)}
-              </span>
+      <div
+        className="flex w-full flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-6"
+        dir="ltr"
+      >
+        <div className="flex max-w-full shrink-0 flex-nowrap items-start justify-start gap-3 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:overflow-visible sm:self-stretch [&::-webkit-scrollbar]:hidden">
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={mergedParts.length === 0 || packageExporting}
+            onClick={() => void handleExportPackage()}
+            className={PREVIEW_EXPORT_TILE_PACKAGE_CLASS}
+          >
+            <Package className="stroke-[1.65]" aria-hidden />
+            <span className={PREVIEW_EXPORT_TILE_TEXT_CLASS}>
+              {packageExporting
+                ? t("quotePreview.exportBuilding")
+                : t("quotePreview.exportExecutionPackage")}
+            </span>
+          </Button>
+        </div>
+
+        <div
+          className="flex min-h-0 min-w-0 w-full flex-1 flex-col justify-center sm:min-h-[11.5rem]"
+          dir="rtl"
+        >
+          <div className="flex w-full min-w-0 justify-start">
+            <div
+              className={cn(
+                "grid w-max max-w-full grid-cols-2 grid-rows-2",
+                "gap-x-2 gap-y-3 sm:gap-x-3 sm:gap-y-4 md:gap-x-4"
+              )}
+            >
+              {[
+                {
+                  label: t("quotes.colClient"),
+                  value: listMeta.customerName.trim() || "—",
+                  valueClass: "text-base font-semibold leading-snug sm:text-lg",
+                },
+                {
+                  label: t("quotes.colProject"),
+                  value: listMeta.projectName.trim() || "—",
+                  valueClass: "text-sm font-medium leading-relaxed sm:text-base",
+                },
+                {
+                  label: t("quotes.colReference"),
+                  value: listMeta.referenceNumber.trim() || "—",
+                  valueClass:
+                    "break-words font-mono text-sm font-medium tabular-nums sm:text-base",
+                },
+                {
+                  label: t("quotes.colCreated"),
+                  value: formatCreated(listMeta.createdAtIso),
+                  valueClass: "text-sm font-medium leading-relaxed sm:text-base",
+                },
+              ].map((field) => (
+                <div
+                  key={field.label}
+                  className="flex max-w-[min(100%,20rem)] min-w-0 flex-col items-start justify-center gap-1 text-start"
+                >
+                  <span className="w-full text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:text-[11px]">
+                    {field.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "w-full min-w-0 text-balance text-foreground",
+                      field.valueClass
+                    )}
+                  >
+                    {field.value}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/projects" className="inline-flex items-center gap-2">
-            <span>{t(`${PRJ}.backToList`)}</span>
-            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-          </Link>
-        </Button>
       </div>
+
+      {exportError ? (
+        <p className="text-sm text-destructive" dir="rtl">
+          {exportError}
+        </p>
+      ) : null}
 
       <div className="ds-surface text-start">
         <div className="space-y-5 p-4 sm:p-6">
@@ -450,48 +468,9 @@ export function ProjectPreviewView({
 
           <Card dir="rtl" className="border-border bg-card/40 text-start shadow-none">
             <CardHeader className="space-y-0 pb-3">
-              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <CardTitle className="text-base leading-tight">
-                  {t(`${PRJ}.plateDetailTableTitle`)}
-                </CardTitle>
-                <div className="flex min-w-0 flex-col items-stretch gap-2 sm:items-end">
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={
-                        draftItems.length === 0 ||
-                        pdfExporting ||
-                        packageExporting
-                      }
-                      onClick={() => void handleExportPdf()}
-                      className="gap-2"
-                    >
-                      <FileText className="h-4 w-4 shrink-0" aria-hidden />
-                      {pdfExporting
-                        ? t(`quotePreview.exportPdfBuilding`)
-                        : t(`quotePreview.exportPdfQuote`)}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={
-                        mergedParts.length === 0 || packageExporting || pdfExporting
-                      }
-                      onClick={() => void handleExportPackage()}
-                      className="gap-2"
-                    >
-                      <Package className="h-4 w-4 shrink-0" aria-hidden />
-                      {packageExporting
-                        ? t(`quotePreview.exportBuilding`)
-                        : t(`quotePreview.exportExecutionPackage`)}
-                    </Button>
-                  </div>
-                  {exportError ? (
-                    <p className="max-w-full text-sm text-destructive">{exportError}</p>
-                  ) : null}
-                </div>
-              </div>
+              <CardTitle className="text-base leading-tight">
+                {t(`${PRJ}.plateDetailTableTitle`)}
+              </CardTitle>
             </CardHeader>
             <CardContent className="px-0 sm:px-0">
               <div className="px-4 pb-4 sm:px-6">
@@ -501,7 +480,7 @@ export function ProjectPreviewView({
                     containerClassName="overflow-visible"
                     className={cn(
                       "table-fixed border-collapse text-start",
-                      "min-w-[1060px] w-full",
+                      "min-w-[1000px] w-full",
                       "[&_th]:text-start [&_td]:text-start"
                     )}
                   >
@@ -547,9 +526,6 @@ export function ProjectPreviewView({
                           className={cn(headBase, "min-w-[3.25rem] text-center")}
                         >
                           {t(`${FP}.colCorrugated`)}
-                        </TableHead>
-                        <TableHead scope="col" className={headNum}>
-                          {t(`${FP}.colPrice`)}
                         </TableHead>
                         <TableHead scope="col" className={cn(stickyViewHead, "min-w-[4.5rem]")}>
                           {t(`${FP}.colView`)}
@@ -597,27 +573,15 @@ export function ProjectPreviewView({
                           <TableCell
                             className={cn(cellBase, "border-e border-border text-center")}
                           >
-                            {isFinalizeBendPlateRowShape(row.plate_shape) ? (
-                              <div className="flex justify-center py-0.5">
-                                <Checkbox
-                                  checked={row.corrugated === true}
-                                  disabled
-                                  aria-label={t(`${FP}.ariaCorrugatedRow`, {
-                                    name: row.part_number || String(i + 1),
-                                  })}
-                                />
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell
-                            className={cn(
-                              cellNum,
-                              "border-e border-border text-xs font-medium text-foreground"
-                            )}
-                          >
-                            {formatQuickQuoteCurrencyAmount(row.line_total, PRICE_CCY)}
+                            <div className="flex justify-center py-0.5">
+                              <Checkbox
+                                checked={row.corrugated === true}
+                                disabled
+                                aria-label={t(`${FP}.ariaCorrugatedRow`, {
+                                  name: row.part_number || String(i + 1),
+                                })}
+                              />
+                            </div>
                           </TableCell>
                           <TableCell className={cn(stickyViewCell, "text-center")}>
                             <button

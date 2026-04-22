@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Eye, PlusCircle, Trash2 } from "lucide-react";
+import { Eye, FileText, Plus, PlusCircle, Trash2 } from "lucide-react";
 import { ListScreenFilterBar } from "@/components/shared/ListScreenFilterBar";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { EmptyState } from "@/components/shared/EmptyState";
+import { cn } from "@/lib/utils";
 import {
   deleteQuoteFromList,
   getQuotesList,
@@ -47,7 +47,7 @@ import {
   type ListStatusFilter,
 } from "@/lib/listScreenFilters";
 import { formatDecimal } from "@/lib/formatNumbers";
-import { cn } from "@/lib/utils";
+import { listRowApprovalSelectClassName } from "@/lib/listScreenApprovalSelectStyles";
 
 /** DD/MM/YYYY only (no time), local calendar date. */
 function formatCreated(iso: string): string {
@@ -63,9 +63,14 @@ function formatCreated(iso: string): string {
   }
 }
 
+function createdAtSortKey(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
 /** Matches {@link ClientsTable}: fixed #; text columns; numeric pairs; VAT; status; icon columns. */
 const GRID_COLS =
-  "2.75rem minmax(140px, 1.15fr) minmax(120px, 1fr) minmax(110px, 1fr) minmax(150px, 1.1fr) minmax(92px, 0.85fr) minmax(92px, 0.85fr) minmax(108px, 1fr) minmax(128px, 1fr) 3.25rem 3.25rem" as const;
+  "2.75rem minmax(140px, 1.15fr) minmax(120px, 1fr) minmax(110px, 1fr) minmax(150px, 1.1fr) minmax(92px, 0.85fr) minmax(92px, 0.85fr) minmax(108px, 1fr) minmax(7.25rem, 0.7fr) 3.25rem 3.25rem" as const;
 
 export default function QuotesPage() {
   const [tick, setTick] = useState(0);
@@ -83,7 +88,7 @@ export default function QuotesPage() {
   const rows = useMemo(() => getQuotesList(), [tick]);
 
   const filteredRows = useMemo(() => {
-    return rows.filter((q) => {
+    const filtered = rows.filter((q) => {
       if (
         !textMatchesListQuery(
           [q.customerName, q.projectName, q.referenceNumber],
@@ -96,6 +101,10 @@ export default function QuotesPage() {
       if (!sameLocalDateAsYmd(q.createdAt, dateYmd)) return false;
       return true;
     });
+    // Newest first (תאריך יצירה — אחרון למעלה)
+    return filtered.sort(
+      (a, b) => createdAtSortKey(b.createdAt) - createdAtSortKey(a.createdAt)
+    );
   }, [rows, search, dateYmd, statusFilter]);
 
   const hasActiveFilters = useMemo(
@@ -122,32 +131,55 @@ export default function QuotesPage() {
   return (
     <PageContainer>
       <PageHeader
+        titleIcon={FileText}
         title={t("quotes.title")}
         description={t("quotes.description")}
         actions={
-          <Button asChild>
-            <Link href="/quick-quote" className="gap-2 inline-flex items-center">
-              <PlusCircle className="h-4 w-4" />
-              {t("quotes.newQuote")}
-            </Link>
-          </Button>
-        }
-      />
-
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={PlusCircle}
-          title={t("quotes.emptyTitle")}
-          description={t("quotes.emptyDescription")}
-          action={
+          rows.length > 0 ? (
             <Button asChild>
-              <Link href="/quick-quote" className="gap-2 inline-flex items-center">
+              <Link href="/quick-quote" className="inline-flex items-center gap-2">
                 <PlusCircle className="h-4 w-4" />
                 {t("quotes.newQuote")}
               </Link>
             </Button>
-          }
-        />
+          ) : undefined
+        }
+      />
+
+      {rows.length === 0 ? (
+        <div
+          className="flex min-h-[min(50vh,28rem)] flex-1 flex-col items-center justify-center px-2 py-6 sm:px-4"
+          dir="rtl"
+        >
+          <Link
+            href="/quick-quote"
+            aria-label={t("quotes.newQuote")}
+            className={cn(
+              "group flex min-h-[min(20rem,55vh)] w-full max-w-md flex-col items-center justify-center gap-0 rounded-2xl border-2 border-dashed border-border bg-muted/25 p-8 text-center shadow-sm transition-all",
+              "hover:border-primary/45 hover:bg-primary/[0.05]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            )}
+          >
+            <div
+              className="mb-5 flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/[0.16]"
+              aria-hidden
+            >
+              <Plus className="h-8 w-8" strokeWidth={2.25} />
+            </div>
+            <h2 className="w-full text-balance text-center text-lg font-semibold text-foreground sm:text-xl">
+              {t("quotes.emptyTitle")}
+            </h2>
+            <p className="mt-2 w-full text-pretty text-center text-sm text-muted-foreground sm:text-base">
+              {t("quotes.emptyDescription")}
+            </p>
+            <div className="mt-6 flex w-full items-center justify-center">
+              <span className="pointer-events-none inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm">
+                <PlusCircle className="h-4 w-4 shrink-0" aria-hidden />
+                {t("quotes.newQuote")}
+              </span>
+            </div>
+          </Link>
+        </div>
       ) : (
         <>
           <ListScreenFilterBar
@@ -169,7 +201,7 @@ export default function QuotesPage() {
             </div>
           ) : (
         <div className="rounded-xl border border-border overflow-x-auto" dir="rtl">
-          <div className="min-w-[1140px] px-3 sm:px-5">
+          <div className="min-w-[1100px] px-3 sm:px-5">
           <Table
             className="grid w-full border-collapse border-spacing-0 [&_thead]:contents [&_tbody]:contents [&_tr]:contents"
             style={{ gridTemplateColumns: GRID_COLS }}
@@ -256,14 +288,7 @@ export default function QuotesPage() {
                         }
                       >
                         <SelectTrigger
-                          className={cn(
-                            "h-7 min-h-7 w-[9rem] min-w-[9rem] max-w-[9rem] shrink-0 gap-0.5 rounded-full border px-1.5 text-[11px] font-medium leading-none shadow-none focus-visible:ring-1 focus-visible:ring-offset-0 [&_svg]:h-3 [&_svg]:w-3 [&_svg]:shrink-0 [&_svg]:opacity-70",
-                            /* אושרה — border/text #6A23F7, bg #160822 */
-                            q.status === "complete"
-                              ? "!border-[#6A23F7] !bg-[#160822] !text-[#6A23F7] hover:!bg-[#160822] focus-visible:!ring-[#6A23F7]/45"
-                              : /* לא אושרה — border/text #ff9100, bg #291600 */
-                                "!border-[#ff9100] !bg-[#291600] !text-[#ff9100] hover:!bg-[#291600] focus-visible:!ring-[#ff9100]/45"
-                          )}
+                          className={listRowApprovalSelectClassName(q.status)}
                           aria-label={t("quotes.statusSelectAria", {
                             ref: q.referenceNumber,
                           })}

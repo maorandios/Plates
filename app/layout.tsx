@@ -34,7 +34,7 @@ export default function RootLayout({
           id="plate-theme-init"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k=${JSON.stringify(PLATE_THEME_STORAGE_KEY)};if(localStorage.getItem(k)==="light")document.documentElement.classList.add("light");}catch(e){}})();`,
+            __html: `(function(){try{var k=${JSON.stringify(PLATE_THEME_STORAGE_KEY)};var v=localStorage.getItem(k);if(v!=="dark")document.documentElement.classList.add("light");}catch(e){}})();`,
           }}
         />
         <ThemeProvider>

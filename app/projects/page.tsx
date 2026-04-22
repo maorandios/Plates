@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Eye, PlusCircle, Trash2 } from "lucide-react";
+import { Eye, Layers, Plus, PlusCircle, Trash2 } from "lucide-react";
 import { ListScreenFilterBar } from "@/components/shared/ListScreenFilterBar";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { EmptyState } from "@/components/shared/EmptyState";
+import { cn } from "@/lib/utils";
 import {
   deletePlateProjectFromList,
   getPlateProjectsList,
@@ -41,7 +41,7 @@ import {
 } from "@/lib/projects/plateProjectList";
 import { t } from "@/lib/i18n";
 import { formatDecimal } from "@/lib/formatNumbers";
-import { cn } from "@/lib/utils";
+import { listRowApprovalSelectClassName } from "@/lib/listScreenApprovalSelectStyles";
 import { MATERIAL_TYPE_LABELS } from "@/types/materials";
 import {
   sameLocalDateAsYmd,
@@ -52,7 +52,12 @@ import {
 
 /** Matches {@link QuotesPage}: fixed #; text columns; numeric pairs; material; status; icon columns. */
 const GRID_COLS =
-  "2.75rem minmax(140px, 1.15fr) minmax(120px, 1fr) minmax(110px, 1fr) minmax(150px, 1.1fr) minmax(96px, 0.9fr) minmax(92px, 0.85fr) minmax(92px, 0.85fr) minmax(128px, 1fr) 3.25rem 3.25rem" as const;
+  "2.75rem minmax(140px, 1.15fr) minmax(120px, 1fr) minmax(110px, 1fr) minmax(150px, 1.1fr) minmax(96px, 0.9fr) minmax(92px, 0.85fr) minmax(92px, 0.85fr) minmax(7.25rem, 0.7fr) 3.25rem 3.25rem" as const;
+
+function createdAtSortKey(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
 
 function formatCreated(iso: string): string {
   try {
@@ -82,7 +87,7 @@ export default function ProjectsPage() {
   const rows = useMemo(() => getPlateProjectsList(), [tick]);
 
   const filteredRows = useMemo(() => {
-    return rows.filter((p) => {
+    const filtered = rows.filter((p) => {
       if (
         !textMatchesListQuery(
           [
@@ -100,6 +105,9 @@ export default function ProjectsPage() {
       if (!sameLocalDateAsYmd(p.createdAt, dateYmd)) return false;
       return true;
     });
+    return filtered.sort(
+      (a, b) => createdAtSortKey(b.createdAt) - createdAtSortKey(a.createdAt)
+    );
   }, [rows, search, dateYmd, statusFilter]);
 
   const hasActiveFilters = useMemo(
@@ -126,32 +134,55 @@ export default function ProjectsPage() {
   return (
     <PageContainer>
       <PageHeader
+        titleIcon={Layers}
         title={t("projects.title")}
         description={t("projects.description")}
         actions={
-          <Button asChild>
-            <Link href="/plate-project" className="inline-flex items-center gap-2">
-              <PlusCircle className="h-4 w-4" />
-              {t("projects.newProject")}
-            </Link>
-          </Button>
-        }
-      />
-
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={PlusCircle}
-          title={t("projects.emptyTitle")}
-          description={t("projects.emptyDescription")}
-          action={
+          rows.length > 0 ? (
             <Button asChild>
               <Link href="/plate-project" className="inline-flex items-center gap-2">
                 <PlusCircle className="h-4 w-4" />
                 {t("projects.newProject")}
               </Link>
             </Button>
-          }
-        />
+          ) : undefined
+        }
+      />
+
+      {rows.length === 0 ? (
+        <div
+          className="flex min-h-[min(50vh,28rem)] flex-1 flex-col items-center justify-center px-2 py-6 sm:px-4"
+          dir="rtl"
+        >
+          <Link
+            href="/plate-project"
+            aria-label={t("projects.newProject")}
+            className={cn(
+              "group flex min-h-[min(20rem,55vh)] w-full max-w-md flex-col items-center justify-center gap-0 rounded-2xl border-2 border-dashed border-border bg-muted/25 p-8 text-center shadow-sm transition-all",
+              "hover:border-primary/45 hover:bg-primary/[0.05]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            )}
+          >
+            <div
+              className="mb-5 flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/[0.16]"
+              aria-hidden
+            >
+              <Plus className="h-8 w-8" strokeWidth={2.25} />
+            </div>
+            <h2 className="w-full text-balance text-center text-lg font-semibold text-foreground sm:text-xl">
+              {t("projects.emptyTitle")}
+            </h2>
+            <p className="mt-2 w-full text-pretty text-center text-sm text-muted-foreground sm:text-base">
+              {t("projects.emptyDescription")}
+            </p>
+            <div className="mt-6 flex w-full items-center justify-center">
+              <span className="pointer-events-none inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm">
+                <PlusCircle className="h-4 w-4 shrink-0" aria-hidden />
+                {t("projects.newProject")}
+              </span>
+            </div>
+          </Link>
+        </div>
       ) : (
         <>
           <ListScreenFilterBar
@@ -173,7 +204,7 @@ export default function ProjectsPage() {
             </div>
           ) : (
         <div className="overflow-x-auto rounded-xl border border-border" dir="rtl">
-          <div className="min-w-[1140px] px-3 sm:px-5">
+          <div className="min-w-[1100px] px-3 sm:px-5">
             <Table
               className="grid w-full border-collapse border-spacing-0 [&_thead]:contents [&_tbody]:contents [&_tr]:contents"
               style={{ gridTemplateColumns: GRID_COLS }}
@@ -265,12 +296,7 @@ export default function ProjectsPage() {
                           }
                         >
                           <SelectTrigger
-                            className={cn(
-                              "h-7 min-h-7 w-[9rem] min-w-[9rem] max-w-[9rem] shrink-0 gap-0.5 rounded-full border px-1.5 text-[11px] font-medium leading-none shadow-none focus-visible:ring-1 focus-visible:ring-offset-0 [&_svg]:h-3 [&_svg]:w-3 [&_svg]:shrink-0 [&_svg]:opacity-70",
-                              p.status === "complete"
-                                ? "!border-[#6A23F7] !bg-[#160822] !text-[#6A23F7] hover:!bg-[#160822] focus-visible:!ring-[#6A23F7]/45"
-                                : "!border-[#ff9100] !bg-[#291600] !text-[#ff9100] hover:!bg-[#291600] focus-visible:!ring-[#ff9100]/45"
-                            )}
+                            className={listRowApprovalSelectClassName(p.status)}
                             aria-label={t("projects.statusSelectAria", {
                               ref: p.referenceNumber,
                             })}

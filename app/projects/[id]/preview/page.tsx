@@ -1,9 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FileQuestion } from "lucide-react";
@@ -57,11 +55,6 @@ export default function ProjectPreviewPage() {
             icon={FileQuestion}
             title={t("projectPreview.noSnapshotTitle")}
             description={t("projectPreview.noSnapshotDescription")}
-            action={
-              <Button asChild variant="outline">
-                <Link href="/projects">{t("projectPreview.backToList")}</Link>
-              </Button>
-            }
           />
         </div>
       </PageContainer>

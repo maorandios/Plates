@@ -29,7 +29,7 @@ function applyDomTheme(next: PlateTheme) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<PlateTheme>("dark");
+  const [theme, setThemeState] = useState<PlateTheme>("light");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         return null;
       }
     })();
-    const initial: PlateTheme = stored ?? "dark";
+    const initial: PlateTheme = stored ?? "light";
     setThemeState(initial);
     applyDomTheme(initial);
     setMounted(true);

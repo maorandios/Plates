@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
-import Link from "next/link";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FileQuestion } from "lucide-react";
 import { QuotePreviewView } from "@/features/quotes/components/QuotePreviewView";
-import { getQuoteSnapshot } from "@/lib/quotes/quoteSnapshot";
+import {
+  getQuoteSnapshot,
+  type QuoteSessionSnapshot,
+} from "@/lib/quotes/quoteSnapshot";
 import { getQuotesList } from "@/lib/quotes/quoteList";
 import type { QuotePreviewListMeta } from "@/features/quotes/components/QuotePreviewView";
 import { t } from "@/lib/i18n";
@@ -16,11 +17,15 @@ import { t } from "@/lib/i18n";
 export default function QuotePreviewPage() {
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : "";
+  const [snapshot, setSnapshot] = useState<QuoteSessionSnapshot | null>(null);
 
-  const snapshot = useMemo(
-    () => (typeof window === "undefined" ? null : getQuoteSnapshot(id)),
-    [id]
-  );
+  useLayoutEffect(() => {
+    if (!id) {
+      setSnapshot(null);
+      return;
+    }
+    setSnapshot(getQuoteSnapshot(id));
+  }, [id]);
 
   const listMeta = useMemo((): QuotePreviewListMeta => {
     if (!snapshot) {
@@ -31,8 +36,7 @@ export default function QuotePreviewPage() {
         createdAtIso: new Date().toISOString(),
       };
     }
-    const row =
-      typeof window === "undefined" ? undefined : getQuotesList().find((q) => q.id === id);
+    const row = getQuotesList().find((q) => q.id === id);
     const q = snapshot.draft.quote;
     return {
       customerName:
@@ -55,11 +59,6 @@ export default function QuotePreviewPage() {
             icon={FileQuestion}
             title={t("quotePreview.noSnapshotTitle")}
             description={t("quotePreview.noSnapshotDescription")}
-            action={
-              <Button asChild variant="outline">
-                <Link href="/quotes">{t("quotePreview.backToList")}</Link>
-              </Button>
-            }
           />
         </div>
       </PageContainer>

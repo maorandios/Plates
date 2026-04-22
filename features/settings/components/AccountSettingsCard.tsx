@@ -8,9 +8,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { getAppPreferences } from "@/lib/settings/appPreferences";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { AppPreferences } from "@/types/settings";
 
 const SA = "pages.settingsAccount" as const;
+
+const fieldClass =
+  "w-full border-border bg-background text-start text-foreground shadow-none " +
+  "placeholder:text-muted-foreground focus-visible:ring-primary/30";
+
+const labelClass = "block w-full text-start text-sm font-semibold text-foreground";
 
 export function AccountSettingsCard() {
   const { preferences, setPreferences } = useAppPreferences();
@@ -48,10 +55,18 @@ export function AccountSettingsCard() {
   );
 
   return (
-    <Card className="shadow-none text-start" dir="rtl">
-      <CardContent className="max-w-lg space-y-4 pt-6">
-        <div className="space-y-2">
-          <Label htmlFor="settings-company-name">{t(`${SA}.companyNameLabel`)}</Label>
+    <Card
+      className="border border-border bg-card shadow-sm"
+      dir="rtl"
+    >
+      <CardContent className="space-y-5 p-6 sm:p-8">
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="settings-company-name"
+            className={labelClass}
+          >
+            {t(`${SA}.companyNameLabel`)}
+          </Label>
           <Input
             id="settings-company-name"
             value={name}
@@ -60,11 +75,14 @@ export function AccountSettingsCard() {
             placeholder={t(`${SA}.companyNamePlaceholder`)}
             autoComplete="organization"
             dir="rtl"
-            className="text-start"
+            className={cn(fieldClass, "h-10")}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="settings-company-registration">
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="settings-company-registration"
+            className={labelClass}
+          >
             {t(`${SA}.companyRegistrationLabel`)}
           </Label>
           <Input
@@ -76,12 +94,17 @@ export function AccountSettingsCard() {
             }
             placeholder={t(`${SA}.companyRegistrationPlaceholder`)}
             inputMode="numeric"
-            dir="ltr"
-            className="text-start"
+            dir="rtl"
+            className={cn(fieldClass, "h-10")}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="settings-company-address">{t(`${SA}.addressLabel`)}</Label>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="settings-company-address"
+            className={labelClass}
+          >
+            {t(`${SA}.addressLabel`)}
+          </Label>
           <Textarea
             id="settings-company-address"
             value={address}
@@ -91,16 +114,27 @@ export function AccountSettingsCard() {
             }
             placeholder={t(`${SA}.addressPlaceholder`)}
             rows={3}
-            className="min-h-[80px] resize-y text-start"
+            className={cn(
+              fieldClass,
+              "min-h-[88px] resize-y"
+            )}
             autoComplete="street-address"
             dir="rtl"
           />
-          <p className="text-[11px] text-muted-foreground">
+          <p
+            className="text-pretty text-[11px] leading-relaxed text-muted-foreground"
+            dir="rtl"
+          >
             {t(`${SA}.addressHint`)}
           </p>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="settings-company-email">{t(`${SA}.emailLabel`)}</Label>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="settings-company-email"
+            className={labelClass}
+          >
+            {t(`${SA}.emailLabel`)}
+          </Label>
           <Input
             id="settings-company-email"
             type="email"
@@ -110,11 +144,16 @@ export function AccountSettingsCard() {
             placeholder={t(`${SA}.emailPlaceholder`)}
             autoComplete="email"
             dir="rtl"
-            className="text-start"
+            className={cn(fieldClass, "h-10")}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="settings-company-phone">{t(`${SA}.phoneLabel`)}</Label>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="settings-company-phone"
+            className={labelClass}
+          >
+            {t(`${SA}.phoneLabel`)}
+          </Label>
           <Input
             id="settings-company-phone"
             type="tel"
@@ -124,11 +163,16 @@ export function AccountSettingsCard() {
             placeholder={t(`${SA}.phonePlaceholder`)}
             autoComplete="tel"
             dir="rtl"
-            className="text-start"
+            className={cn(fieldClass, "h-10")}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="settings-company-website">{t(`${SA}.websiteLabel`)}</Label>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="settings-company-website"
+            className={labelClass}
+          >
+            {t(`${SA}.websiteLabel`)}
+          </Label>
           <Input
             id="settings-company-website"
             type="url"
@@ -138,7 +182,7 @@ export function AccountSettingsCard() {
             placeholder={t(`${SA}.websitePlaceholder`)}
             autoComplete="url"
             dir="rtl"
-            className="text-start"
+            className={cn(fieldClass, "h-10")}
           />
         </div>
       </CardContent>
