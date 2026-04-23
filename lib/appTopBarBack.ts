@@ -11,10 +11,20 @@ export function getAppTopBarBack(
         | "projectPreview.backToList"
         | "clientDetail.back"
         | "common.back";
+      /** Quick exit to edit this quote (phase 3). Only on quote preview. */
+      editQuoteHref?: string;
+      editQuoteLabelKey?: "quotePreview.editQuote";
     }
   | null {
-  if (/^\/quotes\/[^/]+\/preview$/.test(pathname)) {
-    return { href: "/quotes", labelKey: "quotePreview.backToList" };
+  const quotePreviewMatch = pathname.match(/^\/quotes\/([^/]+)\/preview$/);
+  if (quotePreviewMatch?.[1]) {
+    const id = quotePreviewMatch[1];
+    return {
+      href: "/quotes",
+      labelKey: "quotePreview.backToList",
+      editQuoteHref: `/quick-quote?edit=${encodeURIComponent(id)}&step=3`,
+      editQuoteLabelKey: "quotePreview.editQuote",
+    };
   }
   if (/^\/projects\/[^/]+\/preview$/.test(pathname)) {
     return { href: "/projects", labelKey: "projectPreview.backToList" };

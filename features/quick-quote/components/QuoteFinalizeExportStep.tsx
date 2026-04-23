@@ -55,6 +55,7 @@ import {
 } from "./partPreviewModalShared";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { formatQuickQuoteCurrencyAmount } from "../lib/quickQuoteCurrencies";
+import { exportQuotePdfFromDraft } from "../lib/exportQuotePdfFromDraft";
 import {
   computeNetBeforeVat,
   computeQuoteTotalInclVat,
@@ -443,71 +444,22 @@ export function QuoteFinalizeExportStep({
       const validUntilIso =
         parseDdMmYyyyToIso(validUntilDisplay) ?? draft.quote.valid_until;
 
-      const subtotal = draft.pricing.total_price;
-      const totalInclVat = computeQuoteTotalInclVat(
-        subtotal,
-        draft.pricing.discount,
-        draft.pricing.vat_rate
-      );
-      const jobTotals = summarizeJobFromItems(draft.items);
-      const body: QuotePdfFullPayload = {
+      /**
+       * Same code path as quote preview / {@link exportQuotePdfFromDraft} so the
+       * Python template receives an identical JSON shape and rounding.
+       * Dates: apply UI (dd/mm) values before build so the export matches preview
+       * when the user changed dates only in the form.
+       */
+      const draftForExport: QuotePdfFullPayload = {
         ...draft,
         quote: {
           ...draft.quote,
           quote_date: quoteDateIso,
           valid_until: validUntilIso,
-          notes: draft.quote.notes.map((s) => s.trim()).filter(Boolean),
-          terms: [],
         },
-        summary: { ...draft.summary, ...jobTotals },
-        pricing: {
-          ...draft.pricing,
-          total_price: subtotal,
-          total_incl_vat: totalInclVat,
-        },
-        items: draft.items.map((it) => ({
-          ...it,
-          material_type: materialFamilyLabel,
-          plate_shape: it.plate_shape ?? "flat",
-          description: finalizePlateTypeLabel(it.plate_shape),
-          thickness_mm: roundToMaxDecimals(it.thickness_mm, 3),
-          width_mm: roundToMaxDecimals(it.width_mm, 3),
-          length_mm: roundToMaxDecimals(it.length_mm, 3),
-          area_m2: roundToMaxDecimals(it.area_m2, 3),
-          weight_kg: roundToMaxDecimals(it.weight_kg, 3),
-          line_total: roundToMaxDecimals(it.line_total, 3),
-        })),
       };
-      const res = await fetch("/api/quotes/export-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        let msg = res.statusText;
-        try {
-          const j = (await res.json()) as { error?: string; hint?: string };
-          if (j.error) msg = j.error;
-          if (j.hint) msg = `${msg}\n${j.hint}`;
-        } catch {
-          try {
-            msg = await res.text();
-          } catch {
-            /* keep */
-          }
-        }
-        throw new Error(msg);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `quotation-${draft.quote.quote_number.replace(/[^a-zA-Z0-9-_]+/g, "_")}.pdf`;
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+
+      await exportQuotePdfFromDraft(draftForExport, materialFamilyLabel);
 
       setDraft((d) => ({
         ...d,

@@ -1203,6 +1203,7 @@
   "quotePreview": {
     "title": "תצוגת הצעה — {{ref}}",
     "backToList": "חזרה להצעות",
+    "editQuote": "ערוך הצעה",
     "notesTitle": "הערות",
     "notesGeneral": "הערות כלליות",
     "notesQuote": "הערות להצעה",

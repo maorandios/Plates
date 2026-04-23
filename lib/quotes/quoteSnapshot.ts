@@ -5,7 +5,10 @@
 
 import type { BendPlateQuoteItem } from "@/features/quick-quote/bend-plate/types";
 import type { QuotePdfFullPayload } from "@/features/quick-quote/lib/quotePdfPayload";
-import type { QuotePartRow } from "@/features/quick-quote/types/quickQuote";
+import type {
+  ManualQuotePartRow,
+  QuotePartRow,
+} from "@/features/quick-quote/types/quickQuote";
 import type { MaterialType } from "@/types/materials";
 import type { DxfPartGeometry } from "@/types";
 import { slimDxfGeometryForQuoteSnapshot } from "@/lib/store";
@@ -21,6 +24,9 @@ export interface QuoteSessionSnapshot {
   mergedParts: QuotePartRow[];
   dxfMethodGeometries: DxfPartGeometry[];
   bendPlateQuoteItems: BendPlateQuoteItem[];
+  /** Re-open wizard / edit: manual + Excel BOM rows (optional on older saves). */
+  manualQuoteRows?: ManualQuotePartRow[];
+  excelImportQuoteRows?: ManualQuotePartRow[];
   /** General step notes (free text). */
   generalNotes: string;
 }

@@ -1125,6 +1125,71 @@ function drawTitleBlock(
   const matTypeHe = MATERIAL_TYPE_LABELS[materialType];
   const clientDisplay = customerName?.trim() || "—";
   const referenceDisplay = quoteReference.trim() || partName;
+  const HEBREWS = /[\u0590-\u05FF]/;
+  const valueRightX = TB_R - pad;
+  const clientColL = TB_C1 + pad;
+  const clientColW = valueRightX - clientColL;
+  /**
+   * Client name in the right column: end-aligned in [clientColL, valueRightX].
+   * Do not use `align: "right"` with `heb()` on Identity-H — jsPDF can mis-compute
+   * line width and only one glyph is visible. Same pattern as `valBLheb`: `heb(s)` + left edge
+   * at `valueRightX - getTextWidth(...)`, and wrap with `splitTextToSize` when needed.
+   */
+  function valClientNameValue(y: number, s: string): void {
+    const t = s.trim();
+    if (!t) {
+      setLatFont(doc, fsVal);
+      doc.setTextColor(0);
+      doc.text("—", valueRightX, y, { align: "right", baseline: "middle" });
+      return;
+    }
+    if (HEBREWS.test(t)) {
+      setHebFont(doc, fsVal);
+      doc.setTextColor(0);
+      const vis = heb(t);
+      drawHebrewClientNameLines(vis, y);
+    } else {
+      setLatFont(doc, fsVal);
+      doc.setTextColor(0);
+      drawLatinClientNameLines(t, y);
+    }
+  }
+  function drawHebrewClientNameLines(vis: string, y: number): void {
+    const w = doc.getTextWidth(vis);
+    if (w <= clientColW) {
+      doc.text(vis, valueRightX - w, y, { baseline: "middle" });
+      return;
+    }
+    const lines = doc.splitTextToSize(vis, clientColW);
+    const n = lines.length;
+    const lineStep = Math.min(fsVal * 0.42, (rh - 3.5) / Math.max(n, 1));
+    const startY = y - ((n - 1) * lineStep) / 2;
+    for (let i = 0; i < n; i++) {
+      const line = lines[i];
+      const lw = doc.getTextWidth(line);
+      doc.text(line, valueRightX - Math.min(lw, clientColW), startY + i * lineStep, {
+        baseline: "middle",
+      });
+    }
+  }
+  function drawLatinClientNameLines(t: string, y: number): void {
+    const w = doc.getTextWidth(t);
+    if (w <= clientColW) {
+      doc.text(t, valueRightX - w, y, { baseline: "middle" });
+      return;
+    }
+    const lines = doc.splitTextToSize(t, clientColW);
+    const n = lines.length;
+    const lineStep = Math.min(fsVal * 0.42, (rh - 3.5) / Math.max(n, 1));
+    const startY = y - ((n - 1) * lineStep) / 2;
+    for (let i = 0; i < n; i++) {
+      const line = lines[i];
+      const lw = doc.getTextWidth(line);
+      doc.text(line, valueRightX - Math.min(lw, clientColW), startY + i * lineStep, {
+        baseline: "middle",
+      });
+    }
+  }
 
   doc.setLineWidth(TB_GRID_LINE_MM);
   doc.setDrawColor(0);
@@ -1200,7 +1265,7 @@ function drawTitleBlock(
     lblTR(TB_C1 - pad, yL, "סוג חומר");
     valBLheb(TB_L + pad, yV, matTypeHe);
     lblTR(TB_R - pad, yL, "שם הלקוח");
-    valBL(TB_C1 + pad, yV, clientDisplay);
+    valClientNameValue(yV, clientDisplay);
   }
 
   // Row 1 — left: סיווג חומר; right: מספר חלק

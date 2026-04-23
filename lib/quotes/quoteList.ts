@@ -207,6 +207,30 @@ export function patchQuoteSession(
  * Does **not** set approval — new quotes stay {@link QuoteListStatus} `in_progress` (לא אושרה) until
  * the user changes status in the list or preview ({@link setQuoteApprovalStatus}).
  */
+/**
+ * User opened a saved (even completed) quote for editing in the Quick Quote wizard.
+ * Sets status to in_progress and updates current step.
+ */
+export function reopenQuoteForEditing(
+  id: string,
+  currentStep: number
+): void {
+  const list = load();
+  const i = list.findIndex((q) => q.id === id);
+  if (i < 0) return;
+  const now = new Date().toISOString();
+  const c = currentStep;
+  const stepClamped = c < 1 ? 1 : c > 7 ? 7 : Math.floor(c);
+  list[i] = {
+    ...list[i],
+    currentStep: stepClamped,
+    status: "in_progress",
+    wizardSchema: 2,
+    updatedAt: now,
+  };
+  save(list);
+}
+
 export function markQuoteComplete(id: string): void {
   const list = load();
   const i = list.findIndex((q) => q.id === id);

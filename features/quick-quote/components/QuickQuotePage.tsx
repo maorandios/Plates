@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,11 +64,17 @@ import type { DxfPartGeometry } from "@/types";
 import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
 import { getPurchasedSheetSizes } from "@/lib/store";
 import {
+  getQuotesList,
   markQuoteComplete,
   patchQuoteSession,
+  reopenQuoteForEditing,
   upsertQuoteInProgress,
 } from "@/lib/quotes/quoteList";
-import { saveQuoteSnapshot } from "@/lib/quotes/quoteSnapshot";
+import { getQuoteSnapshot, saveQuoteSnapshot } from "@/lib/quotes/quoteSnapshot";
+import {
+  needsMergedPartsFallback,
+  quotePartsToFallbackManualRows,
+} from "../lib/quoteSessionRehydrate";
 import { nanoid } from "@/lib/utils/nanoid";
 import { t } from "@/lib/i18n";
 
@@ -84,6 +90,10 @@ type QuoteMethodSubView = "picker" | "methodSetup";
 
 export function QuickQuotePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editParam = searchParams.get("edit");
+  /** One-shot lock so React StrictMode does not double-hydrate `?edit=` into state. */
+  const editHydrationLockRef = useRef(false);
   /** Stable id for this browser session — ties wizard progress to the Quotes list. */
   const quoteListSessionIdRef = useRef<string | null>(null);
   /** After user clicks "Save to list" on step 7, the quote exists in the quotes list; until then, no list row. */
@@ -180,6 +190,78 @@ export function QuickQuotePage() {
     },
     [highestStepReached]
   );
+
+  /** Re-open a saved quote from the preview "ערוך הצעה" control — jump to a chosen step (default 3 = BOM). */
+  useEffect(() => {
+    if (!editParam) {
+      editHydrationLockRef.current = false;
+      return;
+    }
+    if (editHydrationLockRef.current) return;
+    editHydrationLockRef.current = true;
+
+    const snap = getQuoteSnapshot(editParam);
+    if (!snap) {
+      editHydrationLockRef.current = false;
+      router.replace("/quotes");
+      return;
+    }
+
+    const stepRaw = searchParams.get("step");
+    const parsed = parseInt(stepRaw || "3", 10);
+    const targetStep = (
+      Number.isFinite(parsed) && parsed >= 1 && parsed <= 7 ? parsed : 3
+    ) as QuickQuoteStep;
+
+    const listRow = getQuotesList().find((r) => r.id === editParam);
+    const qz = snap.draft.quote;
+
+    quoteListSessionIdRef.current = editParam;
+
+    setJobDetails({
+      referenceNumber:
+        (qz.reference_number ?? "").trim() || listRow?.referenceNumber?.trim() || "",
+      projectName: (qz.project_name ?? "").trim() || listRow?.projectName?.trim() || "",
+      customerName: (qz.customer_name ?? "").trim() || listRow?.customerName?.trim() || "",
+      currency: (qz.currency ?? "ILS").trim() || "ILS",
+      notes: snap.generalNotes?.trim() ?? "",
+      customerClientId: listRow?.customerClientId,
+      quoteCreationMethod: undefined,
+    });
+
+    setMaterialType(snap.materialType);
+    setMaterialPricePerKgByRow({ ...snap.materialPricePerKgByRow });
+    setDxfMethodGeometries(snap.dxfMethodGeometries.map((g) => ({ ...g })));
+    setBendPlateQuoteItems(snap.bendPlateQuoteItems.map((b) => ({ ...b })));
+
+    let manual = snap.manualQuoteRows ?? [];
+    let excel = snap.excelImportQuoteRows ?? [];
+
+    if (
+      needsMergedPartsFallback(
+        snap.materialType,
+        manual,
+        excel,
+        snap.dxfMethodGeometries,
+        snap.bendPlateQuoteItems,
+        snap.mergedParts
+      )
+    ) {
+      manual = quotePartsToFallbackManualRows(snap.mergedParts);
+    }
+
+    setManualQuoteRows(manual);
+    setExcelImportQuoteRows(excel);
+
+    setPdfExportDraft(snap.draft);
+    setQuoteSavedToList(true);
+    setStep(targetStep);
+    setHighestStepReached(7);
+    setQuoteMethodSubView("picker");
+
+    reopenQuoteForEditing(editParam, targetStep);
+    router.replace("/quick-quote", { scroll: false });
+  }, [editParam, router, searchParams]);
 
   const stockPricingReady = useMemo(() => {
     if (thicknessStock.length === 0) return false;
@@ -381,6 +463,8 @@ export function QuickQuotePage() {
         mergedParts: partsForSnapshot,
         dxfMethodGeometries,
         bendPlateQuoteItems,
+        manualQuoteRows: manualQuoteRows,
+        excelImportQuoteRows: excelImportQuoteRows,
         generalNotes: jobDetails.notes?.trim() ?? "",
       });
       if (!ok) {
@@ -537,6 +621,8 @@ export function QuickQuotePage() {
         mergedParts: mergedQuotePartsList,
         dxfMethodGeometries,
         bendPlateQuoteItems,
+        manualQuoteRows,
+        excelImportQuoteRows,
         generalNotes: jobDetails.notes?.trim() ?? "",
       });
     }, 500);

@@ -65,6 +65,8 @@ export function AppTopBar() {
   const quickQuoteGlass =
     pathname === "/quick-quote" || pathname.startsWith("/quick-quote/");
   const topBarBack = getAppTopBarBack(pathname);
+  const editQuoteHref = topBarBack?.editQuoteHref;
+  const editQuoteLabelKey = topBarBack?.editQuoteLabelKey;
 
   return (
     <header
@@ -163,7 +165,25 @@ export function AppTopBar() {
 
         {/* RTL: second cluster → inline-start (left); back to parent list when applicable */}
         {topBarBack ? (
-          <div className="flex shrink-0 items-center">
+          <div className="flex shrink-0 items-center gap-2">
+            {editQuoteHref && editQuoteLabelKey ? (
+              <Button
+                size="sm"
+                asChild
+                variant="secondary"
+                className="h-9 max-w-[min(100%,14rem)] border border-border bg-card px-3 text-foreground shadow-sm hover:bg-muted sm:max-w-none"
+              >
+                <Link
+                  href={editQuoteHref}
+                  className="gap-1.5"
+                  aria-label={t(editQuoteLabelKey)}
+                >
+                  <span className="min-w-0 truncate text-xs font-medium sm:text-sm">
+                    {t(editQuoteLabelKey)}
+                  </span>
+                </Link>
+              </Button>
+            ) : null}
             <Button
               size="sm"
               asChild
