@@ -15,6 +15,7 @@ import base64
 import json
 import mimetypes
 import sys
+from io import BytesIO
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -42,6 +43,37 @@ DIR = Path(__file__).resolve().parent
 
 # Legacy UI default — never show on PDF letterhead
 _PLACEHOLDER_COMPANY = "fabrication partner"
+
+# Playwright print footer (Hebrew + LTR page numbers). Uses Chromium classes pageNumber / totalPages.
+# Match table L/R: @page 17.78mm (quote_template.css) + .page side padding 2.8mm (same as table area).
+# Playwright’s footer is full paper width, so we inset by the full 20.58mm. If a build only uses
+# the content box width, set this to 2.8.
+_FOOTER_INSET_H_MM = 17.78 + 2.8
+# Was 8.5pt; ÷1.25 per layout request
+_FOOTER_FONT_PT = round(8.5 / 1.25, 2)  # 6.8 (was 8.5pt)
+# quote_template.css --muted / --muted-deep; footer uses softer body text
+_FOOTER_MUTED = "#6b6b6b"
+_PDF_FOOTER_TEMPLATE = (
+    "<div style=\"box-sizing:border-box;width:100%;margin:0;padding:0;\">"
+    f"<div style=\"margin:0;padding:0 {_FOOTER_INSET_H_MM}mm;box-sizing:border-box;\">"
+    "<div style=\""
+    "box-sizing:border-box;width:100%;margin:0;padding:0;border-top:1.5px solid #c9c9c9;"
+    f"padding-top:2.5mm;font:500 {_FOOTER_FONT_PT}pt/1.3 'Segoe UI','Noto Sans Hebrew',"
+    "'Noto Sans',Tahoma,Arial,sans-serif;"
+    f"color:{_FOOTER_MUTED};"
+    "display:flex;flex-direction:row;justify-content:space-between;align-items:center;"
+    "\">"
+    "<div style=\"flex:0 0 auto;direction:ltr;text-align:left;white-space:nowrap;"
+    "unicode-bidi:isolate;\">"
+    "עמוד <span class=\"pageNumber\"></span> מתוך <span class=\"totalPages\"></span>"
+    "</div>"
+    "<div style=\"flex:0 1 auto;text-align:right;direction:rtl;min-width:0;"
+    "padding-inline-start:2mm;\">"
+    "הצעת המחיר הזו הופקה באמצעות מערכת אומגות · "
+    "<span style=\"unicode-bidi:isolate\" dir=\"ltr\">www.Omegot.com</span>"
+    "</div>"
+    "</div></div></div>"
+)
 
 
 def _sanitize_letterhead_company_name(name: str | None) -> str:
@@ -156,6 +188,8 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
 
     raw_notes = list(q.notes) if q.notes else []
     notes_lines = [str(x).strip() for x in raw_notes if str(x).strip()]
+    # PDF always shows the היערות block; if the user left none, show a single bullet "ללא".
+    notes_for_pdf = notes_lines if notes_lines else ["ללא"]
     raw_terms = list(q.terms) if q.terms else []
     terms_lines = [str(x).strip() for x in raw_terms if str(x).strip()]
 
@@ -197,7 +231,7 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
         "pricing_vat_amount": format_currency(vat_amount, cur),
         "pricing_total_incl_vat": format_currency(pr.total_incl_vat, cur),
         "has_discount": pr.discount is not None and float(pr.discount) > 0,
-        "notes_lines": notes_lines,
+        "notes_lines": notes_for_pdf,
         "terms_lines": terms_lines,
         "footer_generated": "מסמך הופק אלקטרונית · ללא חתימה ידנית.",
         # Summary metrics strip (matches finalize / PartBreakdown styling)
@@ -226,20 +260,90 @@ async def html_to_pdf_bytes(html: str) -> bytes:
         browser = await p.chromium.launch(headless=True)
         try:
             page = await browser.new_page()
+            # Apply before set_content so % min-heights resolve against print, not screen
+            # (avoids an extra blank last page with only the PDF footer in some Chromium builds).
+            await page.emulate_media(media="print")
             await page.set_content(html, wait_until="networkidle", timeout=60_000)
+            # prefer_css_page_size True → use @page in quote_template.css for content box; do not pass margin here.
             pdf = await page.pdf(
                 format="A4",
                 landscape=False,
                 print_background=True,
-                # Honor the CSS `@page` margins in quote_template.css. This is reliable across Chromium builds;
-                # passing a separate `margin` kwarg here can be ignored or
-                # collapsed by some versions, which caused the "content flush
-                # to paper edge" bug previously.
+                display_header_footer=True,
+                header_template=(
+                    "<div style=\"height:0;max-height:0;margin:0;padding:0;overflow:hidden;"
+                    "line-height:0;font-size:0\"></div>"
+                ),
+                footer_template=_PDF_FOOTER_TEMPLATE,
                 prefer_css_page_size=True,
             )
-            return pdf
+            return _postprocess_pdf_remove_trailing_blank_page(pdf)
         finally:
             await browser.close()
+
+
+def _text_suggests_plate_table_present(t: str) -> bool:
+    """Hebrew plate list has this column header; real data pages include it (repeating thead)."""
+    return "חומר" in (t or "") or (
+        "רשימת" in (t or "") and "פלטות" in (t or "")
+    )
+
+
+# Section <h2> in quote_template.html — must not be treated as a blank trailing page.
+_QUOTE_NOTES_SECTION_TITLE = "היערות"
+
+
+def _text_suggests_quote_notes_section_present(t: str) -> bool:
+    """Notes block after the plate table; short page can look 'blank' to old heuristics."""
+    return _QUOTE_NOTES_SECTION_TITLE in (t or "")
+
+
+def _should_drop_trailing_page_by_text(t: str) -> bool:
+    """
+    Last page is a Chromium artifact: no table body, only the synthetic print footer in the margin.
+    pypdf usually still extracts the footer strings when they are part of the content stream.
+
+    Important: a real last page that only contains the post-table היערות block and print footer
+    used to be dropped (short text + עמוד/מתוך), which removed the notes and left a wrong page count
+    on the previous page. Never drop if the notes section title appears in the extracted text.
+    """
+    t = (t or "").strip()
+    if not t:
+        return True
+    if _text_suggests_plate_table_present(t):
+        return False
+    if _text_suggests_quote_notes_section_present(t):
+        return False
+    if "עמוד" in t and "מתוך" in t and len(t) < 2500:
+        return True
+    return False
+
+
+def _postprocess_pdf_remove_trailing_blank_page(pdf_bytes: bytes) -> bytes:
+    """Drop a final empty page (footer-only) when Chromium + min-height bugs add one."""
+    try:
+        from pypdf import PdfReader, PdfWriter
+    except ImportError:
+        return pdf_bytes
+    try:
+        reader = PdfReader(BytesIO(pdf_bytes))
+    except Exception:
+        return pdf_bytes
+    if len(reader.pages) < 2:
+        return pdf_bytes
+    last_text = ""
+    try:
+        last_text = reader.pages[-1].extract_text() or ""
+    except Exception:
+        return pdf_bytes
+    if not _should_drop_trailing_page_by_text(last_text):
+        return pdf_bytes
+    writer = PdfWriter()
+    for p in reader.pages[:-1]:
+        writer.add_page(p)
+    out = BytesIO()
+    writer.write(out)
+    return out.getvalue()
 
 
 def render_pdf_bytes(payload: QuotePdfPayload) -> bytes:
@@ -271,7 +375,10 @@ def sample_payload() -> QuotePdfPayload:
             "project_name": "Platform deck plates",
             "reference_number": "REF-NW-1042",
             "scope_text": "",
-            "notes": [],
+            "notes": [
+                "מסירה עד 14 ימי עבודה ממועד אישור.",
+                "המחירים כוללים חיתוך בלבד, ללא התקנה.",
+            ],
             "terms": [],
         },
         summary={

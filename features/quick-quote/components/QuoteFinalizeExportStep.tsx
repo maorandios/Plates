@@ -54,10 +54,7 @@ import {
   StatValueUnitLeft,
 } from "./partPreviewModalShared";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
-import {
-  formatQuickQuoteCurrencyAmount,
-  quickQuoteCurrencySymbol,
-} from "../lib/quickQuoteCurrencies";
+import { formatQuickQuoteCurrencyAmount } from "../lib/quickQuoteCurrencies";
 import {
   computeNetBeforeVat,
   computeQuoteTotalInclVat,
@@ -100,8 +97,6 @@ function finishLabelFromCode(code: string): string {
 /** Matches PartBreakdownTable summary metrics. */
 const METRIC_VALUE_ROW =
   "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#6A23F7] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
-const METRIC_UNIT_CLASS =
-  "font-semibold tabular-nums text-muted-foreground text-[0.72em] leading-none";
 
 function FinalizeSummaryMetricCard({
   icon: Icon,
@@ -772,12 +767,7 @@ export function QuoteFinalizeExportStep({
                     icon={LayoutGrid}
                     title={t(`${PP}.cardAreaLabel`)}
                     valueLine={
-                      <>
-                        <span>{formatDecimal(finalizeStripMetrics.totalAreaM2, 2)}</span>
-                        <span className={METRIC_UNIT_CLASS}>
-                          {t("methodMetrics.unitM2")}
-                        </span>
-                      </>
+                      <span>{formatDecimal(finalizeStripMetrics.totalAreaM2, 2)}</span>
                     }
                   />
                 </div>
@@ -786,38 +776,21 @@ export function QuoteFinalizeExportStep({
                     icon={Weight}
                     title={t(`${PP}.cardWeightLabel`)}
                     valueLine={
-                      <>
-                        <span>{formatDecimal(finalizeStripMetrics.totalWeightKg, 1)}</span>
-                        <span className={METRIC_UNIT_CLASS}>
-                          {t("methodMetrics.unitKg")}
-                        </span>
-                      </>
+                      <span>{formatDecimal(finalizeStripMetrics.totalWeightKg, 1)}</span>
                     }
                   />
                 </div>
                 <div className="bg-card">
                   <FinalizeSummaryMetricCard
-                    glyph={
-                      <span
-                        className="flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center text-[1.2rem] font-semibold leading-none text-muted-foreground/70 sm:h-6 sm:text-[1.35rem]"
-                        aria-hidden
-                      >
-                        ₪
-                      </span>
-                    }
+                    icon={Tag}
                     title={t(`${FP}.cardQuotePriceLabel`)}
                     valueLine={
-                      <>
-                        <span>
-                          {formatQuickQuoteCurrencyAmount(
-                            draft.pricing.total_price,
-                            FINALIZE_PRICE_CURRENCY
-                          )}
-                        </span>
-                        <span className={METRIC_UNIT_CLASS}>
-                          {quickQuoteCurrencySymbol(FINALIZE_PRICE_CURRENCY)}
-                        </span>
-                      </>
+                      <span>
+                        {formatQuickQuoteCurrencyAmount(
+                          draft.pricing.total_price,
+                          FINALIZE_PRICE_CURRENCY
+                        )}
+                      </span>
                     }
                   />
                 </div>

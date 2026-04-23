@@ -107,9 +107,6 @@ function rowShowsCorrugatedIndicator(row: QuotePartRow): boolean {
 const METRIC_VALUE_ROW =
   "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#6A23F7] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
 
-const METRIC_UNIT_CLASS =
-  "font-semibold tabular-nums text-muted-foreground text-[0.72em] leading-none";
-
 /** Matches manual phase preview control accent. */
 const PREVIEW_ICON_CLASS = "text-[#6A23F7]";
 const PREVIEW_STROKE = "#6A23F7";
@@ -660,20 +657,14 @@ export function PartBreakdownTable({
             icon={LayoutGrid}
             title={t(`${PP}.cardAreaLabel`)}
             valueLine={
-              <>
-                <span>{formatDecimal(breakdownMetrics.totalPlateAreaM2, 2)}</span>
-                <span className={METRIC_UNIT_CLASS}>{t("methodMetrics.unitM2")}</span>
-              </>
+              <span>{formatDecimal(breakdownMetrics.totalPlateAreaM2, 2)}</span>
             }
           />
           <SummaryMetricCard
             icon={Weight}
             title={t(`${PP}.cardWeightLabel`)}
             valueLine={
-              <>
-                <span>{formatDecimal(breakdownMetrics.totalEstWeightKg, 1)}</span>
-                <span className={METRIC_UNIT_CLASS}>{t("methodMetrics.unitKg")}</span>
-              </>
+              <span>{formatDecimal(breakdownMetrics.totalEstWeightKg, 1)}</span>
             }
           />
         </div>

@@ -51,10 +51,7 @@ import {
   PreviewStatCell,
   StatValueUnitLeft,
 } from "@/features/quick-quote/components/partPreviewModalShared";
-import {
-  formatQuickQuoteCurrencyAmount,
-  quickQuoteCurrencySymbol,
-} from "@/features/quick-quote/lib/quickQuoteCurrencies";
+import { formatQuickQuoteCurrencyAmount } from "@/features/quick-quote/lib/quickQuoteCurrencies";
 import { splitMaterialGradeAndFinish } from "@/features/quick-quote/lib/plateFields";
 
 const PP = "quote.partsPhase" as const;
@@ -76,8 +73,6 @@ function equalColumnWidthsPct(n: number): number[] {
 
 const METRIC_VALUE_ROW =
   "inline-flex flex-wrap items-baseline justify-center gap-x-1 font-semibold tabular-nums text-[#6A23F7] text-[1.875rem] leading-none tracking-tight sm:text-[2.0625rem]";
-const METRIC_UNIT_CLASS =
-  "font-semibold tabular-nums text-muted-foreground text-[0.72em] leading-none";
 
 /** Same package tile as {@link QuotePreviewView} (gray). */
 const PREVIEW_EXPORT_TILE_BASE = cn(
@@ -417,10 +412,7 @@ export function ProjectPreviewView({
                     icon={LayoutGrid}
                     title={t(`${PP}.cardAreaLabel`)}
                     valueLine={
-                      <>
-                        <span>{formatDecimal(finalizeStripMetrics.totalAreaM2, 2)}</span>
-                        <span className={METRIC_UNIT_CLASS}>{t("methodMetrics.unitM2")}</span>
-                      </>
+                      <span>{formatDecimal(finalizeStripMetrics.totalAreaM2, 2)}</span>
                     }
                   />
                 </div>
@@ -429,36 +421,21 @@ export function ProjectPreviewView({
                     icon={Weight}
                     title={t(`${PP}.cardWeightLabel`)}
                     valueLine={
-                      <>
-                        <span>{formatDecimal(finalizeStripMetrics.totalWeightKg, 1)}</span>
-                        <span className={METRIC_UNIT_CLASS}>{t("methodMetrics.unitKg")}</span>
-                      </>
+                      <span>{formatDecimal(finalizeStripMetrics.totalWeightKg, 1)}</span>
                     }
                   />
                 </div>
                 <div className="bg-card">
                   <PreviewMetricCard
-                    glyph={
-                      <span
-                        className="flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center text-[1.2rem] font-semibold leading-none text-muted-foreground/70 sm:h-6 sm:text-[1.35rem]"
-                        aria-hidden
-                      >
-                        ₪
-                      </span>
-                    }
-                    title={t(`quote.finalizePhase.cardQuotePriceLabel`)}
+                    icon={Tag}
+                    title={t(`${FP}.cardQuotePriceLabel`)}
                     valueLine={
-                      <>
-                        <span>
-                          {formatQuickQuoteCurrencyAmount(
-                            finalizeStripMetrics.totalPrice,
-                            PRICE_CCY
-                          )}
-                        </span>
-                        <span className={METRIC_UNIT_CLASS}>
-                          {quickQuoteCurrencySymbol(PRICE_CCY)}
-                        </span>
-                      </>
+                      <span>
+                        {formatQuickQuoteCurrencyAmount(
+                          finalizeStripMetrics.totalPrice,
+                          PRICE_CCY
+                        )}
+                      </span>
                     }
                   />
                 </div>

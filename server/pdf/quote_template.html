@@ -124,6 +124,20 @@
       </div>
     </section>
 
+    <!-- SECTION 2b — Customer & project (between metrics and plate list) -->
+    <section class="quote-customer-project" aria-label="שם לקוח ושם פרויקט">
+      <dl class="quote-customer-project__list">
+        <div class="quote-customer-project__row">
+          <dt class="quote-customer-project__label">שם הלקוח:</dt>
+          <dd class="quote-customer-project__value">{{ customer_name or "—" }}</dd>
+        </div>
+        <div class="quote-customer-project__row">
+          <dt class="quote-customer-project__label">שם הפרויקט:</dt>
+          <dd class="quote-customer-project__value">{{ project_name or "—" }}</dd>
+        </div>
+      </dl>
+    </section>
+
     <!-- SECTION 3 — Unified plate table (same columns as PartBreakdown / finalize) -->
     <section class="plate-table-section" aria-label="רשימת פלטות">
       <h2 class="plate-table__title">רשימת פלטות</h2>
@@ -165,6 +179,15 @@
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section class="quote-notes-section" aria-label="היערות">
+      <h2 class="quote-notes__title">היערות</h2>
+      <ul class="quote-notes__list">
+        {% for line in notes_lines %}
+        <li class="quote-notes__item">{{ line }}</li>
+        {% endfor %}
+      </ul>
     </section>
   </div>
 </body>

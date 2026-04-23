@@ -1,15 +1,14 @@
 /* =====================================================================
  * Hebrew RTL quotation — A4 portrait
  * Fresh template. Grayscale-only. Modern typography, generous whitespace.
- * Page margins are applied via the CSS `@page` rule below (reliable
- * across all Chromium builds) — Playwright `margin: 0` in render script
- * simply lets CSS own the layout.
+ * Print/PDF: content box + bottom band for Playwright’s print footer.
+ * If bottom is too small, the footer draws on top of the table.
  * ===================================================================== */
 
 @page {
   size: A4;
-  /* top | right | bottom | left — left/right 30% narrower than 25.4mm for wider content */
-  margin: 12.7mm 17.78mm 25.4mm 17.78mm;
+  /* top | right | bottom | left — large bottom for Hebrew footer (Playwright) */
+  margin: 12.7mm 17.78mm 36mm 17.78mm;
 }
 
 * {
@@ -60,10 +59,58 @@ body {
 }
 
 /* Inner safety inset; horizontal padding 30% less than 4mm for more content width. */
+/* Do NOT set min-height:100% here — Chromium + Playwright can emit a trailing blank page
+   (body empty, print footer only). Use screen-only min-height for browser preview. */
 .page {
   background: var(--paper);
-  min-height: 100%;
   padding: 3mm 2.8mm 6mm 2.8mm;
+}
+
+@media screen {
+  .page {
+    min-height: 100%;
+  }
+}
+
+/* Chromium PDF: keep height/width tied to real content, not forced page fills. */
+@media print {
+  html {
+    height: auto !important;
+  }
+
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .page {
+    min-height: auto !important;
+    height: auto !important;
+    /* extra bottom on .page can add phantom height in some print runs */
+    padding-bottom: 0 !important;
+  }
+
+  .quote,
+  .brand {
+    min-height: 0 !important;
+  }
+
+  .plate-table {
+    page-break-inside: auto;
+  }
+
+  .plate-table tr {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  .plate-table-section {
+    page-break-after: auto;
+  }
+
+  .quote-notes-section {
+    page-break-inside: auto;
+  }
 }
 
 /* =====================================================================
@@ -351,6 +398,54 @@ body {
   color: inherit;
 }
 
+/* ——————————————————————————————————————————————————————————
+   Customer & project (between metrics and plate table)
+   ————————————————————————————————————————————————————————— */
+.quote-customer-project {
+  margin: 0 0 1.1rem 0;
+  padding: 0.65rem 0 0.85rem 0;
+}
+
+.quote-customer-project__list {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  direction: rtl;
+  text-align: right;
+}
+
+.quote-customer-project__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.5rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  direction: rtl;
+}
+
+.quote-customer-project__label {
+  margin: 0;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.quote-customer-project__value {
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
 /* =====================================================================
  * SECTION 3 — Unified plate table
  * ===================================================================== */
@@ -470,3 +565,45 @@ body {
   font-weight: 600;
 }
 
+/* =====================================================================
+ * SECTION 4 — Quote notes (היערות) after plate list
+ * ===================================================================== */
+.quote-notes-section {
+  margin: 0;
+  margin-top: 1.15rem;
+  padding-top: 0.35rem;
+}
+
+.quote-notes__title {
+  margin: 0 0 0.55rem 0;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.quote-notes__list {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 1.15rem;
+  list-style-type: disc;
+  list-style-position: outside;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: right;
+}
+
+.quote-notes__item {
+  margin: 0.3rem 0;
+  padding: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: none;
+}
+
+.quote-notes__item::marker {
+  color: var(--muted-deep);
+}
