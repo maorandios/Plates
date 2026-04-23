@@ -74,6 +74,7 @@ function TagEditorSection({
 
   return (
     <section
+      dir="rtl"
       className="rounded-lg border border-border/50 bg-card/30 p-4 shadow-sm"
       aria-labelledby={titleId}
     >
@@ -82,7 +83,7 @@ function TagEditorSection({
       </h3>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {values.map((value) => (
-          <span key={value} dir="ltr" className={tagChipClass}>
+          <span key={value} dir="rtl" className={tagChipClass}>
             <span dir={valueDir} className={tagChipTextClass}>
               {value}
             </span>
@@ -112,7 +113,7 @@ function TagEditorSection({
           </button>
         ) : (
           <span
-            dir="ltr"
+            dir="rtl"
             className={cn(
               tagChipClass,
               "ring-offset-background focus-within:border-border focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
@@ -197,8 +198,8 @@ export function MaterialPricingCard({ config, onUpdate }: MaterialPricingCardPro
   const finishTitleId = `${config.materialType}-finishes-heading`;
 
   return (
-    <Card className="shadow-none">
-      <CardHeader className="text-start space-y-1.5">
+    <Card dir="rtl" className="shadow-none">
+      <CardHeader className="space-y-1.5 text-start">
         <CardTitle className="text-base">{t(`${SK}.basicsTitle`)}</CardTitle>
         <CardDescription className="leading-relaxed">
           {t(`${SK}.basicsDescription`, { material: materialLabel })}

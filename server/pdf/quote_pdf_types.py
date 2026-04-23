@@ -72,6 +72,10 @@ class LineItem(BaseModel):
         default="",
         description="Hebrew plate-type label (finalize תיאור), e.g. סטנדרט / זוית.",
     )
+    corrugated: bool = Field(
+        default=False,
+        description="פח מרוג — matches quick-quote `corrugated` (DXF/Excel).",
+    )
 
 
 class PricingBlock(BaseModel):

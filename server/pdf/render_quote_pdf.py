@@ -22,13 +22,19 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from quote_pdf_formatters import (
     format_currency,
+    format_currency_amount_ceil_int,
+    format_currency_amount_only,
     format_date_il,
-    format_int_space,
+    format_int_comma,
     format_kg,
+    format_kg_table_cell,
+    format_metric_kg_one_decimal,
+    format_metric_m2_two_decimals,
     format_m2,
     format_mm_one_he,
     format_qty,
     format_thickness_mm_he,
+    format_thickness_mm_table_cell,
 )
 from quote_pdf_types import QuotePdfPayload
 
@@ -69,7 +75,7 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
     area_sum_lines = sum(float(it.area_m2) for it in payload.items)
 
     kpi_cards = [
-        {"label": "סוגי פלטות", "value": format_int_space(payload.summary.total_parts)},
+        {"label": "סוגי פלטות", "value": format_int_comma(payload.summary.total_parts)},
         {"label": "כמות פלטות", "value": format_qty(payload.summary.total_quantity)},
         {"label": "שטח (מ״ר)", "value": format_m2(area_sum_lines)},
         {"label": "משקל (ק״ג)", "value": format_kg(payload.summary.total_weight_kg)},
@@ -87,7 +93,7 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
         technical_rows.append(
             {
                 "label": "מספר לוחות משוער",
-                "value": format_int_space(int(payload.summary.estimated_sheet_count)),
+                "value": format_int_comma(int(payload.summary.estimated_sheet_count)),
             }
         )
 
@@ -95,22 +101,49 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
     scope_has = bool(scope_text)
 
     item_rows = []
-    for it in payload.items:
+    unified_plate_rows = []
+    for idx, it in enumerate(payload.items, start=1):
         desc = (it.description or "").strip() or "—"
+        mtype = (it.material_type or "").strip() or "—"
+        mgrade = (it.material_grade or "").strip() or "—"
+        fin = (it.finish or "").strip() or "—"
+        w_kg = float(it.weight_kg)
+        if w_kg > 0:
+            price_per_kg = format_currency_amount_only(
+                float(it.line_total) / w_kg, cur
+            )
+        else:
+            price_per_kg = "—"
         item_rows.append(
             {
                 "description": desc,
                 "part_number": it.part_number,
                 "qty": format_qty(it.qty),
                 "thickness": format_thickness_mm_he(it.thickness_mm) if it.thickness_mm else "—",
-                "material_type": (it.material_type or "").strip() or "—",
-                "material_grade": (it.material_grade or "").strip() or "—",
-                "finish": (it.finish or "").strip() or "—",
+                "material_type": mtype,
+                "material_grade": mgrade,
+                "finish": fin,
                 "width_mm": format_mm_one_he(it.width_mm) if it.width_mm else "—",
                 "length_mm": format_mm_one_he(it.length_mm) if it.length_mm else "—",
                 "area_m2": format_m2(it.area_m2) if it.area_m2 else "—",
                 "weight": format_kg(it.weight_kg),
                 "line_total": format_currency(it.line_total, cur),
+            }
+        )
+        unified_plate_rows.append(
+            {
+                "index": str(idx),
+                "material": mtype,
+                "description": desc,
+                "part_number": it.part_number,
+                "qty": format_qty(it.qty),
+                "thickness": format_thickness_mm_table_cell(it.thickness_mm),
+                "weight": format_kg_table_cell(it.weight_kg),
+                "material_grade": mgrade,
+                "finish": fin,
+                "corrugated": "כן" if it.corrugated else "לא",
+                "price_per_kg": price_per_kg,
+                "line_total": format_currency_amount_only(it.line_total, cur),
             }
         )
 
@@ -131,6 +164,8 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
     addr_raw = (cc.address or "").strip()
     company_address_lines = [x.strip() for x in addr_raw.splitlines() if x.strip()]
 
+    sm = payload.summary
+    prc = pr.total_price
     return {
         "css_text": css_text,
         "logo_data_uri": _logo_data_uri(cc.logo_path),
@@ -154,6 +189,7 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
         "scope_has": scope_has,
         "scope_text": scope_text,
         "item_rows": item_rows,
+        "unified_plate_rows": unified_plate_rows,
         "pricing_subtotal": format_currency(pr.total_price, cur),
         "pricing_discount": discount_fmt,
         "pricing_net_after_discount": format_currency(net, cur),
@@ -164,6 +200,12 @@ def build_template_context(payload: QuotePdfPayload) -> dict:
         "notes_lines": notes_lines,
         "terms_lines": terms_lines,
         "footer_generated": "מסמך הופק אלקטרונית · ללא חתימה ידנית.",
+        # Summary metrics strip (matches finalize / PartBreakdown styling)
+        "metric_plate_types": format_int_comma(int(sm.total_parts)),
+        "metric_plate_qty": format_int_comma(int(sm.total_quantity)),
+        "metric_area": format_metric_m2_two_decimals(sm.net_plate_area_m2),
+        "metric_weight": format_metric_kg_one_decimal(sm.total_weight_kg),
+        "metric_price_num": format_currency_amount_ceil_int(prc),
     }
 
 
@@ -189,8 +231,7 @@ async def html_to_pdf_bytes(html: str) -> bytes:
                 format="A4",
                 landscape=False,
                 print_background=True,
-                # Honor the CSS `@page { margin: 25.4mm }` rule inside
-                # quote_template.css. This is reliable across Chromium builds;
+                # Honor the CSS `@page` margins in quote_template.css. This is reliable across Chromium builds;
                 # passing a separate `margin` kwarg here can be ignored or
                 # collapsed by some versions, which caused the "content flush
                 # to paper edge" bug previously.
@@ -255,6 +296,8 @@ def sample_payload() -> QuotePdfPayload:
                 "weight_kg": 543.6,
                 "line_total": 4200.0,
                 "plate_shape": "flat",
+                "description": "לוח סטנדרטי",
+                "corrugated": True,
             },
             {
                 "part_number": "PL-002-B",
@@ -269,6 +312,8 @@ def sample_payload() -> QuotePdfPayload:
                 "weight_kg": 490.2,
                 "line_total": 3100.0,
                 "plate_shape": "flat",
+                "description": "",
+                "corrugated": False,
             },
             {
                 "part_number": "PL-003-C",
@@ -283,6 +328,8 @@ def sample_payload() -> QuotePdfPayload:
                 "weight_kg": 120.0,
                 "line_total": 980.5,
                 "plate_shape": "flat",
+                "description": "מנתח משני",
+                "corrugated": False,
             },
         ],
         pricing={

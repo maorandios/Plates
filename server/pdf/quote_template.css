@@ -8,9 +8,8 @@
 
 @page {
   size: A4;
-  /* Microsoft Word "Normal" A4 margins: 2.54 cm top/bottom, 2.54 cm left/right.
-     Applied by Chromium's print renderer. */
-  margin: 25.4mm;
+  /* top | right | bottom | left — left/right 30% narrower than 25.4mm for wider content */
+  margin: 12.7mm 17.78mm 25.4mm 17.78mm;
 }
 
 * {
@@ -60,18 +59,17 @@ body {
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
-/* Inner safety inset — belt & suspenders in case `@page` margin is
-   clipped by any viewer (some PDF readers render full-bleed). */
+/* Inner safety inset; horizontal padding 30% less than 4mm for more content width. */
 .page {
   background: var(--paper);
   min-height: 100%;
-  padding: 6mm 4mm;
+  padding: 3mm 2.8mm 6mm 2.8mm;
 }
 
 /* =====================================================================
  * SECTION 1 — Letterhead
- *   grid col 1 (DOM first) = visual RIGHT in RTL → company
- *   grid col 2 (DOM second) = visual LEFT in RTL → quote
+ *   grid col 1 (DOM first) = visual RIGHT in RTL → quote title + meta
+ *   grid col 2 (DOM second) = visual LEFT in RTL → company
  * ===================================================================== */
 .letterhead {
   padding-bottom: 2.2rem;
@@ -82,19 +80,24 @@ body {
 .letterhead__grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: start;
+  align-items: stretch;         /* same column height: quote + company */
   gap: 0 3.5rem;
   width: 100%;
 }
 
 /* ——————————————————————————————————————————————————————————
-   Right column — BRAND / COMPANY (app / sender details)
+   Left column (2nd grid cell) — BRAND / COMPANY (app / sender details)
    2×2 labeled grid: שם החברה · מספר ח.פ
                     כתובת     · דוא"ל
    ————————————————————————————————————————————————————————— */
 .brand {
-  justify-self: start;          /* inline-start (RTL) = visual right */
+  justify-self: end;            /* inline-end (RTL) = visual left */
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;     /* when quote column is taller, center company vertically */
   min-width: 0;
+  min-height: 100%;
   max-width: 100%;
   text-align: right;
   direction: rtl;
@@ -109,16 +112,16 @@ body {
   margin-bottom: 0.9rem;
 }
 
-/* 2×2 company card — bounded width so it never bleeds past the page
-   margin and its visual footprint roughly matches the left quote card. */
+/* 2×2 company card — a bit wider than before so long name/email fit on one line
+   with smaller type (see .brand__cell-value). */
 .brand__grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 1.4rem;
-  row-gap: 0.7rem;
+  row-gap: 0.6rem;
   direction: rtl;
   width: 100%;
-  max-width: 22rem;             /* ≈ 70mm @ 12px root */
+  max-width: 27.5rem;
 }
 
 .brand__cell {
@@ -126,9 +129,9 @@ body {
 }
 
 .brand__cell-label {
-  margin: 0 0 0.15rem 0;
+  margin: 0 0 0.1rem 0;
   padding: 0;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   font-weight: 500;
   color: var(--muted);
   line-height: 1.2;
@@ -137,28 +140,33 @@ body {
 .brand__cell-value {
   margin: 0;
   padding: 0;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--ink);
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  line-height: 1.3;
+  /* Prefer whole words; avoid "anywhere" breaks that split emails (e.g. before .com) */
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
 }
 
 /* ——————————————————————————————————————————————————————————
-   Left column — QUOTE title + meta
-   Column is pinned to inline-end of the grid (visual LEFT in RTL).
+   Right column (1st grid cell) — QUOTE title + meta
+   Column is pinned to inline-start of the grid (visual RIGHT in RTL).
    Contents flow naturally RTL so Hebrew reads right-to-left and the
-   number sits on the visual left of the title.
+   number sits on the visual left of the title span.
    ————————————————————————————————————————————————————————— */
 .quote {
-  justify-self: end;            /* inline-end (RTL) = visual left */
+  justify-self: start;          /* inline-start (RTL) = visual right */
+  align-self: stretch;
   min-width: 0;
+  min-height: 100%;
   direction: rtl;
   text-align: right;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;        /* pin meta rows to same edge as title (visual left) */
+  align-items: flex-start;      /* pin meta rows to same edge as title (visual right) */
+  justify-content: flex-start;
 }
 
 /* Quote card typography is scaled 1 / 1.25 ≈ 0.8 vs the company card,
@@ -189,9 +197,8 @@ body {
   color: var(--muted);
 }
 
-/* Meta: each row = one line — value on the LEFT, label on the RIGHT (Hebrew),
-   with a small gap only between them (like your first request). DOM order is
-   still dt then dd; `row-reverse` places dd visually left, dt visually right. */
+/* Meta: label column (right) + fixed-width value column (left) so all values
+   share one vertical edge (professional alignment). */
 .quote__meta {
   display: flex;
   flex-direction: column;
@@ -203,11 +210,11 @@ body {
 }
 
 .quote__meta-row {
-  display: inline-flex;
-  flex-direction: row-reverse;
+  display: grid;
+  grid-template-columns: auto 13.5ch;
+  column-gap: 0.4rem;
+  direction: rtl;
   align-items: baseline;
-  gap: 0.4rem;
-  direction: ltr;
   margin: 0;
   padding: 0;
 }
@@ -227,16 +234,239 @@ body {
   text-align: right;
 }
 
-/* Fixed-width value “cell” so every line lines up on the same left edge
-   (green boxes): text is left-flush inside the cell like rows 2–3 in your markup. */
+/* Value column: fixed width; LTR + start align → same vertical line for all rows */
 .quote__meta-value {
-  display: inline-block;
+  display: block;
   box-sizing: border-box;
-  width: 10ch;
+  min-width: 0;
+  width: 100%;
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--ink);
   white-space: nowrap;
   direction: ltr;
-  text-align: left;
+  text-align: start;
+  unicode-bidi: isolate;
 }
+
+/* =====================================================================
+ * SECTION 2 — Summary metrics: dot separators, dark gray values, no card borders
+ * ===================================================================== */
+.metric-strip {
+  margin: 0 0 1.8rem 0;
+}
+
+/* Equal-width metric columns + fixed dot columns → symmetric L/R page margins, no flex drift. */
+.metric-strip__inner {
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  direction: rtl;
+  grid-template-columns:
+    minmax(0, 1fr) auto
+    minmax(0, 1fr) auto
+    minmax(0, 1fr) auto
+    minmax(0, 1fr) auto
+    minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+}
+
+.metric-strip__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 5.5rem;
+  padding: 0.5rem 0.25rem 0.65rem;
+  text-align: center;
+  background: transparent;
+  direction: rtl;
+}
+
+.metric-strip__sep {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  padding: 0 0.1rem;
+  color: var(--muted);
+  font-size: 1.65rem;         /* 1.1rem × 1.5 */
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.metric-strip__icon {
+  display: block;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.metric-strip__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.metric-strip__label {
+  margin: 0;
+  padding: 0;
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.metric-strip__value {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  font-size: 2.109375rem;     /* 1.6875rem × 1.25 */
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--ink-soft);
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  white-space: nowrap;
+}
+
+.metric-strip__num {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+
+/* =====================================================================
+ * SECTION 3 — Unified plate table
+ * ===================================================================== */
+.plate-table-section {
+  margin: 0;
+  padding-top: 0.25rem;
+}
+
+.plate-table__title {
+  margin: 0 0 0.55rem 0;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.plate-table__wrap {
+  width: 100%;
+  overflow: visible;
+}
+
+.plate-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border-top: 1px solid var(--line-strong);
+  font-size: 0.58rem;
+  line-height: 1.35;
+  /* 1.25× row padding vs former 0.3 / 0.38 vertical */
+  --plate-td-pad-y: 0.375rem;
+  --plate-td-pad-x: 0.275rem;
+  --plate-th-pad-y: 0.475rem;
+}
+
+.plate-table__th,
+.plate-table__td {
+  /* Horizontal rules only — no column dividers */
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  padding: var(--plate-td-pad-y) var(--plate-td-pad-x);
+  vertical-align: middle;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: none;
+}
+
+.plate-table thead .plate-table__th {
+  background: #f0f0f0;
+  color: var(--ink-soft);
+  font-weight: 700;
+  text-align: right;
+  padding: var(--plate-th-pad-y) var(--plate-td-pad-x);
+  line-height: 1.2;
+}
+
+.plate-table tbody .plate-table__td {
+  text-align: right;
+  color: var(--ink);
+  font-weight: 500;
+  background: var(--paper);
+}
+
+.plate-table tbody tr:nth-child(even) .plate-table__td {
+  background: #fafafa;
+}
+
+.plate-table__th--idx {
+  width: 3.5%;
+}
+
+/* Default numeric / narrow cols — last two money cols overridden below */
+.plate-table__th--num {
+  width: 6.25%;
+}
+
+/* Wider last columns so מחיר לק״ג (₪) / סה״כ מחיר (₪) stay on one line */
+.plate-table__th--ppk {
+  width: 10.5%;
+  min-width: 6.5rem;
+  white-space: nowrap;
+}
+
+.plate-table__th--line-total {
+  width: 11.5%;
+  min-width: 6.75rem;
+  white-space: nowrap;
+}
+
+.plate-table__td--ppk,
+.plate-table__td--line-total {
+  min-width: 0;
+}
+
+.plate-table__th--center {
+  text-align: center;
+}
+
+.plate-table__td--idx {
+  text-align: center;
+  font-weight: 600;
+}
+
+.plate-table__td--part {
+  font-weight: 600;
+}
+
+.plate-table__td--num {
+  text-align: start;
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+.plate-table__td--center {
+  text-align: center;
+  font-weight: 600;
+}
+

@@ -15,13 +15,32 @@
 <body>
   <div class="page">
     <!-- ==============================================================
-         SECTION 1 — Letterhead
-         Right: company (logo/name · address · ח.פ · phone)
-         Left:  quote title + meta
+         SECTION 1 — Letterhead (RTL grid)
+         Column 1 (DOM first) = visual RIGHT → quote title + meta
+         Column 2 (DOM second) = visual LEFT → company (logo / 2×2 grid)
          ============================================================== -->
     <header class="letterhead">
       <div class="letterhead__grid">
-        <!-- DOM col 1 · visual RIGHT (RTL): company info (app / sender)
+        <!-- DOM col 1 · visual RIGHT (RTL): quote headline + meta -->
+        <section class="quote" aria-label="פרטי הצעה">
+          <h1 class="quote__title">
+            <span class="quote__title-word">הצעת מחיר</span>
+            <span class="quote__title-num num" dir="ltr">{{ quote_number }}</span>
+          </h1>
+
+          <dl class="quote__meta">
+            <div class="quote__meta-row">
+              <dt class="quote__meta-label">תאריך הנפקה</dt>
+              <dd class="quote__meta-value num" dir="ltr">{{ quote_date }}</dd>
+            </div>
+            <div class="quote__meta-row">
+              <dt class="quote__meta-label">בתוקף עד</dt>
+              <dd class="quote__meta-value num" dir="ltr">{{ valid_until }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <!-- DOM col 2 · visual LEFT (RTL): company info (app / sender)
              2×2 labeled grid: company name · registration ח.פ
                                 address      · email -->
         <section class="brand" aria-label="פרטי חברה">
@@ -46,37 +65,107 @@
             </div>
             <div class="brand__cell">
               <p class="brand__cell-label">דוא&quot;ל</p>
-              <p class="brand__cell-value">{{ company_email or "—" }}</p>
+              <p class="brand__cell-value num" dir="ltr">{{ company_email or "—" }}</p>
             </div>
           </div>
-        </section>
-
-        <!-- DOM col 2 · visual LEFT (RTL): quote headline + meta -->
-        <section class="quote" aria-label="פרטי הצעה">
-          <h1 class="quote__title">
-            <span class="quote__title-word">הצעת מחיר</span>
-            <span class="quote__title-num num" dir="ltr">{{ quote_number }}</span>
-          </h1>
-
-          <dl class="quote__meta">
-            <div class="quote__meta-row">
-              <dt class="quote__meta-label">מספר הצעה</dt>
-              <dd class="quote__meta-value num" dir="ltr">{{ quote_number }}</dd>
-            </div>
-            <div class="quote__meta-row">
-              <dt class="quote__meta-label">תאריך הנפקה</dt>
-              <dd class="quote__meta-value num" dir="ltr">{{ quote_date }}</dd>
-            </div>
-            <div class="quote__meta-row">
-              <dt class="quote__meta-label">בתוקף עד</dt>
-              <dd class="quote__meta-value num" dir="ltr">{{ valid_until }}</dd>
-            </div>
-          </dl>
         </section>
       </div>
     </header>
 
-    <!-- Additional sections (client · metrics+table · pricing) will be added here -->
+    <!-- SECTION 2 — Summary metrics: dot separators, units before numbers (LTR) -->
+    <section class="metric-strip" aria-label="סיכומי הצעה">
+      <div class="metric-strip__inner">
+        <div class="metric-strip__cell">
+          <svg class="metric-strip__icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
+            <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+            <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+          </svg>
+          <p class="metric-strip__label">סוגי פלטות</p>
+          <p class="metric-strip__value num" dir="ltr">{{ metric_plate_types }}</p>
+        </div>
+        <span class="metric-strip__sep" aria-hidden="true">·</span>
+        <div class="metric-strip__cell">
+          <svg class="metric-strip__icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
+            <path d="M12 22V12" />
+            <polyline points="3.29 7 12 12 20.71 7" />
+            <path d="m7.5 4.27 9 5.15" />
+          </svg>
+          <p class="metric-strip__label">כמות פלטות</p>
+          <p class="metric-strip__value num" dir="ltr">{{ metric_plate_qty }}</p>
+        </div>
+        <span class="metric-strip__sep" aria-hidden="true">·</span>
+        <div class="metric-strip__cell">
+          <svg class="metric-strip__icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect width="7" height="7" x="3" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="14" rx="1" />
+            <rect width="7" height="7" x="3" y="14" rx="1" />
+          </svg>
+          <p class="metric-strip__label">שטח (מ״ר)</p>
+          <p class="metric-strip__value num" dir="ltr"><span class="metric-strip__num">{{ metric_area }}</span></p>
+        </div>
+        <span class="metric-strip__sep" aria-hidden="true">·</span>
+        <div class="metric-strip__cell">
+          <svg class="metric-strip__icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="5" r="3" />
+            <path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z" />
+          </svg>
+          <p class="metric-strip__label">משקל (ק״ג)</p>
+          <p class="metric-strip__value num" dir="ltr"><span class="metric-strip__num">{{ metric_weight }}</span></p>
+        </div>
+        <span class="metric-strip__sep" aria-hidden="true">·</span>
+        <div class="metric-strip__cell">
+          <span class="metric-strip__glyph" aria-hidden="true">₪</span>
+          <p class="metric-strip__label">הצעת מחיר לפני מע״מ</p>
+          <p class="metric-strip__value num" dir="ltr"><span class="metric-strip__num">{{ metric_price_num }}</span></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3 — Unified plate table (same columns as PartBreakdown / finalize) -->
+    <section class="plate-table-section" aria-label="רשימת פלטות">
+      <h2 class="plate-table__title">רשימת פלטות</h2>
+      <div class="plate-table__wrap">
+        <table class="plate-table">
+          <thead>
+            <tr>
+              <th scope="col" class="plate-table__th plate-table__th--idx">#</th>
+              <th scope="col" class="plate-table__th">חומר</th>
+              <th scope="col" class="plate-table__th">תיאור</th>
+              <th scope="col" class="plate-table__th">מספר חלק</th>
+              <th scope="col" class="plate-table__th plate-table__th--num">כמות</th>
+              <th scope="col" class="plate-table__th plate-table__th--num">עובי (מ״מ)</th>
+              <th scope="col" class="plate-table__th plate-table__th--num">משקל (ק״ג)</th>
+              <th scope="col" class="plate-table__th">סיווג חומר</th>
+              <th scope="col" class="plate-table__th">גימור</th>
+              <th scope="col" class="plate-table__th plate-table__th--center">פח מרוג</th>
+              <th scope="col" class="plate-table__th plate-table__th--num plate-table__th--ppk">מחיר לק״ג (₪)</th>
+              <th scope="col" class="plate-table__th plate-table__th--num plate-table__th--line-total">סה״כ מחיר (₪)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in unified_plate_rows %}
+            <tr>
+              <td class="plate-table__td plate-table__td--idx num" dir="ltr">{{ row.index }}</td>
+              <td class="plate-table__td">{{ row.material }}</td>
+              <td class="plate-table__td">{{ row.description }}</td>
+              <td class="plate-table__td plate-table__td--part num" dir="ltr">{{ row.part_number }}</td>
+              <td class="plate-table__td plate-table__td--num num" dir="ltr">{{ row.qty }}</td>
+              <td class="plate-table__td plate-table__td--num num" dir="ltr">{{ row.thickness }}</td>
+              <td class="plate-table__td plate-table__td--num num" dir="ltr">{{ row.weight }}</td>
+              <td class="plate-table__td">{{ row.material_grade }}</td>
+              <td class="plate-table__td">{{ row.finish }}</td>
+              <td class="plate-table__td plate-table__td--center">{{ row.corrugated }}</td>
+              <td class="plate-table__td plate-table__td--num plate-table__td--ppk num" dir="ltr">{{ row.price_per_kg }}</td>
+              <td class="plate-table__td plate-table__td--num plate-table__td--line-total num" dir="ltr">{{ row.line_total }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </body>
 </html>

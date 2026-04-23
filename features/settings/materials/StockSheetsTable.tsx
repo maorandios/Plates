@@ -19,10 +19,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import { t } from "@/lib/i18n";
 import type { MaterialConfig, MaterialStockSheet } from "@/types/materials";
-import { StockSheetForm } from "./StockSheetForm";
 import { nanoid } from "@/lib/utils/nanoid";
 
 const SK = "settings.materials" as const;
@@ -51,86 +58,107 @@ interface StockSheetsTableProps {
   onUpdate: (patch: Partial<MaterialConfig>) => void;
 }
 
-interface DraftRowState {
+/** Inline create (new row at bottom) or edit (replace the row in place). */
+interface InlineEditState {
   id: string;
   width: string;
   length: string;
+  mode: "create" | "edit";
 }
+
+type StockSheetsDialogState =
+  | null
+  | { type: "alert"; message: string; titleKey: string }
+  | { type: "delete"; sheetId: string };
 
 export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
   const { formatLengthValue, formatAreaValue, parseLengthInputToMm } = useAppPreferences();
-  const [editingSheet, setEditingSheet] = useState<MaterialStockSheet | null>(null);
-  const [draftRow, setDraftRow] = useState<DraftRowState | null>(null);
+  const [inlineEdit, setInlineEdit] = useState<InlineEditState | null>(null);
+  const [dialog, setDialog] = useState<StockSheetsDialogState>(null);
 
-  const tableBusy = !!editingSheet || !!draftRow;
-
-  function handleSaveForm(sheet: MaterialStockSheet) {
-    if (
-      hasDuplicateDims(config.stockSheets, sheet.widthMm, sheet.lengthMm, sheet.id)
-    ) {
-      window.alert(t(`${SK}.duplicateSheetDims`));
-      return;
-    }
-    onUpdate({
-      stockSheets: config.stockSheets.map((s) => (s.id === sheet.id ? sheet : s)),
-    });
-    setEditingSheet(null);
-  }
-
-  function handleCancelForm() {
-    setEditingSheet(null);
-  }
+  const tableBusy = !!inlineEdit;
 
   function handleStartAdd() {
-    setEditingSheet(null);
-    setDraftRow({ id: nanoid(), width: "", length: "" });
+    setInlineEdit({ id: nanoid(), width: "", length: "", mode: "create" });
   }
 
-  function handleCancelDraft() {
-    setDraftRow(null);
+  function handleCancelInline() {
+    setInlineEdit(null);
   }
 
-  function handleCommitDraft() {
-    if (!draftRow) return;
-    const widthMm = parseLengthInputToMm(draftRow.width);
-    const lengthMm = parseLengthInputToMm(draftRow.length);
+  function openAlert(message: string, titleKey: string = `${SK}.alertDialogTitle`) {
+    setDialog({ type: "alert", message, titleKey });
+  }
+
+  function handleCommitInline() {
+    if (!inlineEdit) return;
+    const widthMm = parseLengthInputToMm(inlineEdit.width);
+    const lengthMm = parseLengthInputToMm(inlineEdit.length);
 
     if (widthMm == null || !Number.isFinite(widthMm) || widthMm <= 0) {
-      window.alert(t(`${SK}.widthInvalid`));
+      openAlert(t(`${SK}.widthInvalid`));
       return;
     }
     if (lengthMm == null || !Number.isFinite(lengthMm) || lengthMm <= 0) {
-      window.alert(t(`${SK}.lengthInvalid`));
+      openAlert(t(`${SK}.lengthInvalid`));
       return;
     }
 
-    if (hasDuplicateDims(config.stockSheets, widthMm, lengthMm)) {
-      window.alert(t(`${SK}.duplicateSheetDims`));
-      return;
+    if (inlineEdit.mode === "create") {
+      if (hasDuplicateDims(config.stockSheets, widthMm, lengthMm)) {
+        openAlert(t(`${SK}.duplicateSheetDims`), `${SK}.duplicateStockDialogTitle`);
+        return;
+      }
+      const now = new Date().toISOString();
+      const newSheet: MaterialStockSheet = {
+        id: inlineEdit.id,
+        widthMm,
+        lengthMm,
+        enabled: true,
+        updatedAt: now,
+      };
+      onUpdate({ stockSheets: [...config.stockSheets, newSheet] });
+    } else {
+      if (hasDuplicateDims(config.stockSheets, widthMm, lengthMm, inlineEdit.id)) {
+        openAlert(t(`${SK}.duplicateSheetDims`), `${SK}.duplicateStockDialogTitle`);
+        return;
+      }
+      onUpdate({
+        stockSheets: config.stockSheets.map((s) =>
+          s.id === inlineEdit.id
+            ? {
+                ...s,
+                widthMm,
+                lengthMm,
+                updatedAt: new Date().toISOString(),
+              }
+            : s
+        ),
+      });
     }
-
-    const now = new Date().toISOString();
-    const newSheet: MaterialStockSheet = {
-      id: draftRow.id,
-      widthMm,
-      lengthMm,
-      enabled: true,
-      updatedAt: now,
-    };
-    onUpdate({ stockSheets: [...config.stockSheets, newSheet] });
-    setDraftRow(null);
+    setInlineEdit(null);
   }
 
   function handleEdit(sheet: MaterialStockSheet) {
-    setDraftRow(null);
-    setEditingSheet(sheet);
+    setInlineEdit({
+      id: sheet.id,
+      width: formatLengthValue(sheet.widthMm),
+      length: formatLengthValue(sheet.lengthMm),
+      mode: "edit",
+    });
   }
 
   function handleDelete(sheetId: string) {
-    if (!confirm(t(`${SK}.deleteSheetConfirm`))) return;
+    setDialog({ type: "delete", sheetId });
+  }
+
+  function handleConfirmDelete() {
+    if (dialog?.type !== "delete") return;
+    const sheetId = dialog.sheetId;
     onUpdate({
       stockSheets: config.stockSheets.filter((s) => s.id !== sheetId),
     });
+    setDialog(null);
   }
 
   const sorted = [...config.stockSheets].sort((a, b) => {
@@ -139,22 +167,83 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
     return areaB - areaA;
   });
 
-  const draftPreviewArea = (() => {
-    if (!draftRow) return null;
-    const w = parseLengthInputToMm(draftRow.width);
-    const l = parseLengthInputToMm(draftRow.length);
+  const inlinePreviewArea = (() => {
+    if (!inlineEdit) return "—";
+    const w = parseLengthInputToMm(inlineEdit.width);
+    const l = parseLengthInputToMm(inlineEdit.length);
     if (w != null && l != null && Number.isFinite(w) && Number.isFinite(l) && w > 0 && l > 0) {
       return formatAreaValue((w * l) / 1_000_000);
     }
     return "—";
   })();
 
-  const showEmptyMessage = sorted.length === 0 && !draftRow;
+  const showEmptyMessage = sorted.length === 0 && !inlineEdit;
+
+  function renderInlineSheetRowCells(autoFocusWidth: boolean) {
+    if (!inlineEdit) return null;
+    return (
+      <>
+        <TableCell className="align-middle">
+          <Input
+            value={inlineEdit.width}
+            onChange={(e) =>
+              setInlineEdit((d) => (d ? { ...d, width: e.target.value } : d))
+            }
+            dir="ltr"
+            className="h-9 text-end tabular-nums"
+            aria-label={t(`${SK}.colWidth`)}
+            autoFocus={autoFocusWidth}
+          />
+        </TableCell>
+        <TableCell className="align-middle">
+          <Input
+            value={inlineEdit.length}
+            onChange={(e) =>
+              setInlineEdit((d) => (d ? { ...d, length: e.target.value } : d))
+            }
+            dir="ltr"
+            className="h-9 text-end tabular-nums"
+            aria-label={t(`${SK}.colLength`)}
+          />
+        </TableCell>
+        <TableCell
+          className="whitespace-nowrap text-right text-sm tabular-nums text-muted-foreground"
+          dir="ltr"
+        >
+          {inlinePreviewArea}
+        </TableCell>
+        <TableCell className="text-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleCommitInline}
+            className="h-8 w-8 p-0 text-primary"
+            aria-label={t(`${SK}.save`)}
+          >
+            <Check className="h-4 w-4" />
+          </Button>
+        </TableCell>
+        <TableCell className="text-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleCancelInline}
+            className="h-8 w-8 p-0"
+            aria-label={t(`${SK}.cancel`)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </>
+    );
+  }
 
   return (
     <>
-      <Card className="shadow-none">
-        <CardHeader className="text-start space-y-0">
+      <Card dir="rtl" className="shadow-none">
+        <CardHeader className="space-y-0 text-start">
           <div className="space-y-1.5">
             <CardTitle className="text-base">{t(`${SK}.stockSheetsTitle`)}</CardTitle>
             <CardDescription className="leading-relaxed">
@@ -196,13 +285,27 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
                   </TableRow>
                 )}
                 {sorted.map((sheet) => {
+                  if (inlineEdit?.mode === "edit" && inlineEdit.id === sheet.id) {
+                    return (
+                      <TableRow key={sheet.id}>
+                        {renderInlineSheetRowCells(true)}
+                      </TableRow>
+                    );
+                  }
+
                   const areaM2 = (sheet.widthMm * sheet.lengthMm) / 1_000_000;
                   return (
                     <TableRow key={sheet.id}>
-                      <TableCell className="whitespace-nowrap text-right font-medium tabular-nums" dir="ltr">
+                      <TableCell
+                        className="whitespace-nowrap text-right font-medium tabular-nums"
+                        dir="ltr"
+                      >
                         {formatLengthValue(sheet.widthMm)}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-right font-medium tabular-nums" dir="ltr">
+                      <TableCell
+                        className="whitespace-nowrap text-right font-medium tabular-nums"
+                        dir="ltr"
+                      >
                         {formatLengthValue(sheet.lengthMm)}
                       </TableCell>
                       <TableCell
@@ -240,61 +343,9 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
                     </TableRow>
                   );
                 })}
-                {draftRow && (
-                  <TableRow>
-                    <TableCell className="align-middle">
-                      <Input
-                        value={draftRow.width}
-                        onChange={(e) =>
-                          setDraftRow((d) => (d ? { ...d, width: e.target.value } : d))
-                        }
-                        dir="ltr"
-                        className="h-9 text-end tabular-nums"
-                        aria-label={t(`${SK}.colWidth`)}
-                        autoFocus
-                      />
-                    </TableCell>
-                    <TableCell className="align-middle">
-                      <Input
-                        value={draftRow.length}
-                        onChange={(e) =>
-                          setDraftRow((d) => (d ? { ...d, length: e.target.value } : d))
-                        }
-                        dir="ltr"
-                        className="h-9 text-end tabular-nums"
-                        aria-label={t(`${SK}.colLength`)}
-                      />
-                    </TableCell>
-                    <TableCell
-                      className="whitespace-nowrap text-right text-sm tabular-nums text-muted-foreground"
-                      dir="ltr"
-                    >
-                      {draftPreviewArea}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCommitDraft}
-                        className="h-8 w-8 p-0 text-primary"
-                        aria-label={t(`${SK}.save`)}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCancelDraft}
-                        className="h-8 w-8 p-0"
-                        aria-label={t(`${SK}.cancel`)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+                {inlineEdit?.mode === "create" && (
+                  <TableRow key={inlineEdit.id}>
+                    {renderInlineSheetRowCells(true)}
                   </TableRow>
                 )}
               </TableBody>
@@ -317,15 +368,52 @@ export function StockSheetsTable({ config, onUpdate }: StockSheetsTableProps) {
         </CardContent>
       </Card>
 
-      {editingSheet && (
-        <StockSheetForm
-          sheet={editingSheet}
-          isNew={false}
-          materialType={config.materialType}
-          onSave={handleSaveForm}
-          onCancel={handleCancelForm}
-        />
-      )}
+      <Dialog
+        open={dialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setDialog(null);
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          showCloseButton={false}
+          className="max-w-md border-border text-start sm:text-start"
+        >
+          {dialog?.type === "alert" && (
+            <>
+              <DialogHeader className="text-start sm:text-start">
+                <DialogTitle>{t(dialog.titleKey)}</DialogTitle>
+                <DialogDescription className="text-start text-sm leading-relaxed">
+                  {dialog.message}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:justify-start">
+                <Button type="button" onClick={() => setDialog(null)}>
+                  {t(`${SK}.alertDialogOk`)}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+          {dialog?.type === "delete" && (
+            <>
+              <DialogHeader className="text-start sm:text-start">
+                <DialogTitle>{t(`${SK}.deleteSheetDialogTitle`)}</DialogTitle>
+                <DialogDescription className="text-start text-sm leading-relaxed">
+                  {t(`${SK}.deleteSheetConfirm`)}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex w-full flex-row flex-wrap items-center gap-2">
+                <Button type="button" variant="destructive" onClick={handleConfirmDelete}>
+                  {t(`${SK}.deleteSheetDialogDelete`)}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setDialog(null)}>
+                  {t("common.cancel")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

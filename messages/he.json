@@ -1377,6 +1377,7 @@
   },
   "settings": {
     "materials": {
+      "tabListAria": "בחירת סוג חומר גלם",
       "columnHeading": "{{material}}",
       "basicsTitle": "פרמטרים בסיסיים",
       "basicsDescription": "צפיפות, סיווג וגזירת אפשרויות גימור ל{{material}}.",
@@ -1386,7 +1387,7 @@
       "gradeLabel": "סיווג",
       "finishLabel": "גימור",
       "gradeSectionTitle": "סיווג",
-      "finishSectionTitle": "גימור",
+      "finishSectionTitle": "סיווג חומר",
       "gradeAddButtonAria": "הוספת סיווג",
       "finishAddButtonAria": "הוספת גימור",
       "tagRemoveAria": "הסרת {{value}}",
@@ -1409,6 +1410,9 @@
       "deleteSheetDialogTitle": "מחיקת פלטת מלאי",
       "deleteSheetDialogDelete": "מחק",
       "deleteSheetConfirm": "האם למחוק את הפלטה הזו מהמלאי?",
+      "alertDialogTitle": "הודעה",
+      "duplicateStockDialogTitle": "מלאי קיים",
+      "alertDialogOk": "אישור",
       "formAddTitle": "הוספת לוח למלאי",
       "formEditTitle": "עריכת לוח",
       "formDescription": "גודל הלוח במלאי. חל על כל עובי בשלב חומר גלם בהצעה.",
