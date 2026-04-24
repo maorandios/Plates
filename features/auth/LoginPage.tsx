@@ -4,6 +4,8 @@ import { useId, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { setOnboardingPending } from "@/lib/onboardingLocal";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,11 +62,20 @@ export function LoginPage() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const emailId = useId();
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const emailReady = isValidEmail(email);
   const magicLinkDisabledHint = t("auth.magicLinkDisabledHint");
+  const useSupabase = isSupabaseConfigured();
 
-  const afterMagicOrGoogle = () => {
+  const redirectTo = () => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}/auth/callback?next=/`;
+  };
+
+  const afterMagicOrGoogleLocal = () => {
     if (mode === "signup") {
       setOnboardingPending();
       router.push("/onboarding");
@@ -73,16 +84,85 @@ export function LoginPage() {
     router.push("/");
   };
 
+  const signInWithEmail = async () => {
+    if (!emailReady || !useSupabase) return;
+    setBusy(true);
+    setError(null);
+    setSent(false);
+    try {
+      const supabase = createClient();
+      const { error: err } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: redirectTo() },
+      });
+      if (err) {
+        setError(t("auth.authGenericError"));
+        return;
+      }
+      setSent(true);
+    } catch {
+      setError(t("auth.authGenericError"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    if (!useSupabase) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: redirectTo() },
+      });
+      if (err) {
+        setError(t("auth.authGenericError"));
+      }
+    } catch {
+      setError(t("auth.authGenericError"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onMagicClick = () => {
+    if (useSupabase) {
+      void signInWithEmail();
+      return;
+    }
+    afterMagicOrGoogleLocal();
+  };
+
+  const onGoogleClick = () => {
+    if (useSupabase) {
+      void signInWithGoogle();
+      return;
+    }
+    afterMagicOrGoogleLocal();
+  };
+
   const authBlocks = (
     <>
+      {error ? (
+        <p className="text-center text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {sent && useSupabase ? (
+        <p className="text-center text-sm text-muted-foreground" role="status">
+          {t("auth.magicLinkSent")}
+        </p>
+      ) : null}
       <div className="space-y-1.5">
         <Button
           type="button"
-          disabled={!emailReady}
+          disabled={!emailReady || busy}
           title={!emailReady ? magicLinkDisabledHint : undefined}
           className="w-full text-sm font-semibold enabled:shadow-sm disabled:pointer-events-none disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none disabled:hover:bg-muted"
           size="lg"
-          onClick={afterMagicOrGoogle}
+          onClick={onMagicClick}
         >
           {mode === "login"
             ? t("auth.magicLinkLoginButton")
@@ -100,9 +180,10 @@ export function LoginPage() {
       <Button
         type="button"
         variant="outline"
+        disabled={busy}
         className="w-full gap-2 border-border bg-card text-foreground shadow-sm hover:bg-muted/50"
         size="lg"
-        onClick={afterMagicOrGoogle}
+        onClick={onGoogleClick}
       >
         <GoogleMark className="size-5 shrink-0" />
         <span className="text-sm font-medium">
@@ -147,7 +228,11 @@ export function LoginPage() {
                 autoComplete="email"
                 placeholder={t("auth.emailPlaceholder")}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setSent(false);
+                  setError(null);
+                }}
               />
             </div>
             {authBlocks}

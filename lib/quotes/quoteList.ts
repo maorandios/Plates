@@ -29,7 +29,8 @@ export interface QuoteListRecord {
   totalInclVat?: number;
 }
 
-const STORAGE_KEY = "plate_quotes_list_v1";
+export const QUOTES_LIST_STORAGE_KEY = "plate_quotes_list_v1";
+const STORAGE_KEY = QUOTES_LIST_STORAGE_KEY;
 const CHANGED_EVENT = "plate-quotes-list-changed";
 const MAX_QUOTES_LIST_SIZE = 200;
 
@@ -104,12 +105,24 @@ function save(list: QuoteListRecord[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(capped));
     window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+    if (typeof window !== "undefined") {
+      void import("@/lib/supabase/entityTableSyncBrowser").then(
+        ({ syncQuotesToSupabase }) => {
+          void syncQuotesToSupabase(capped);
+        }
+      );
+    }
   } catch (e) {
     if (e instanceof DOMException && e.name === "QuotaExceededError") {
       const pruned = capped.filter((q) => q.status !== "complete").slice(0, 50);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
         window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+        void import("@/lib/supabase/entityTableSyncBrowser").then(
+          ({ syncQuotesToSupabase }) => {
+            void syncQuotesToSupabase(pruned);
+          }
+        );
         return;
       } catch {
         /* still over quota — fall through */

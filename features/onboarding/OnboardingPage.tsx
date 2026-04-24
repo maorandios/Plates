@@ -11,6 +11,9 @@ import {
   saveAppPreferences,
 } from "@/lib/settings/appPreferences";
 import { markOnboardingComplete, isOnboardingComplete } from "@/lib/onboardingLocal";
+import { completeOnboarding } from "@/app/actions/organization";
+import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
+import { useOrgBootstrap } from "@/components/providers/OrgBootstrapProvider";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +59,7 @@ function stepCanProceed(
 
 export function OnboardingPage() {
   const router = useRouter();
+  const { loading: orgLoading, session, refresh } = useOrgBootstrap();
   const singleFieldTitleId = useId();
   const [step, setStep] = useState<Step>(0);
   const [companyName, setCompanyName] = useState("");
@@ -85,10 +89,17 @@ export function OnboardingPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (orgLoading) return;
+    if (isSupabaseConfigured()) {
+      if (session?.ok && session.onboardingCompleted) {
+        router.replace("/");
+      }
+      return;
+    }
     if (isOnboardingComplete()) {
       router.replace("/");
     }
-  }, [router]);
+  }, [router, orgLoading, session]);
 
   const goNext = useCallback(() => {
     if (!canNext) return;
@@ -101,7 +112,7 @@ export function OnboardingPage() {
     }
   }, [step]);
 
-  const finish = useCallback(() => {
+  const finish = useCallback(async () => {
     const base = getAppPreferences();
     const addr = [data.address.trim(), data.city.trim()]
       .filter(Boolean)
@@ -114,9 +125,23 @@ export function OnboardingPage() {
       companyPhoneSecondary: data.phone2.trim() || undefined,
       companyAddress: addr || undefined,
     });
+    if (isSupabaseConfigured()) {
+      const res = await completeOnboarding({
+        companyName: data.companyName.trim(),
+        registration: data.registration.trim(),
+        phone1: data.phone1.trim(),
+        address: data.address.trim(),
+        city: data.city.trim(),
+        phone2: data.phone2.trim(),
+      });
+      if (!res.ok) {
+        return;
+      }
+      refresh();
+    }
     markOnboardingComplete();
     router.push("/");
-  }, [data, router]);
+  }, [data, router, refresh]);
 
   const dataIndexOnScreen = step >= 1 && step <= 5 ? step : 0;
 
