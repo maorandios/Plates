@@ -91,6 +91,7 @@ import { ExcelColumnMappingModal } from "./ExcelColumnMappingModal";
 import { DxfExcelCompareScreen } from "./DxfExcelCompareScreen";
 import { DxfFileBadgeIcon } from "./icons/DxfFileBadgeIcon";
 import { t } from "@/lib/i18n";
+import { PLATE_LOCAL_PERSISTED_EVENT } from "@/lib/plateEvents";
 
 export type DxfUploadSubStep = 1 | 2 | 3;
 type DxfSubStep = DxfUploadSubStep;
@@ -892,15 +893,22 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     if (validGeometries.length > 0) {
       // Persist raw DXF text keyed by geometry ID so the export package can
       // include the original file as-is (preserving holes and all entities).
+      let wroteDxfRaw = false;
       validUploads.forEach((u) => {
         if (u.parsed?.id && u.content) {
           try {
             localStorage.setItem(`dxf_raw_${u.parsed.id}`, u.content);
+            wroteDxfRaw = true;
           } catch {
             // localStorage full — export will fall back to generated DXF
           }
         }
       });
+      if (wroteDxfRaw) {
+        window.dispatchEvent(
+          new CustomEvent(PLATE_LOCAL_PERSISTED_EVENT, { detail: { key: "dxf_raw" } })
+        );
+      }
       onDataApproved(validGeometries);
     }
   }, [uploadedFiles, onDataApproved]);

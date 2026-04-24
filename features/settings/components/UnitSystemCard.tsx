@@ -24,7 +24,7 @@ const OPTIONS: { value: UnitSystem; label: string; hint: string }[] = [
 ];
 
 export function UnitSystemCard() {
-  const { preferences, setUnitSystem } = useAppPreferences();
+  const { unitSystem, setUnitSystem } = useAppPreferences();
 
   return (
     <Card className="shadow-none">
@@ -38,7 +38,7 @@ export function UnitSystemCard() {
       <CardContent className="space-y-2 max-w-md">
         <Label htmlFor="unit-system">Display units</Label>
         <Select
-          value={preferences.unitSystem}
+          value={unitSystem}
           onValueChange={(v) => setUnitSystem(v as UnitSystem)}
         >
           <SelectTrigger id="unit-system" className="w-full">

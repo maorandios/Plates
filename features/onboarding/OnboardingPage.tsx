@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   getAppPreferences,
   saveAppPreferences,
@@ -17,13 +16,14 @@ import { useOrgBootstrap } from "@/components/providers/OrgBootstrapProvider";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const DATA_STEPS = 5;
+/** Data-collection screens before the final “done” step. */
+const DATA_STEPS = 4;
 const SK = "onboarding" as const;
 
 const fieldClass =
   "h-14 rounded-[10px] border border-border bg-input px-4 text-start text-base md:text-sm";
 
-const VALID_STEPS = [0, 1, 2, 3, 4, 5, 6] as const;
+const VALID_STEPS = [0, 1, 2, 3, 4, 5] as const;
 type Step = (typeof VALID_STEPS)[number];
 
 function stepCanProceed(
@@ -33,14 +33,12 @@ function stepCanProceed(
     registration: string;
     phone1: string;
     address: string;
-    city: string;
-    phone2: string;
   }
 ): boolean {
   const tr = (v: string) => v.trim();
   switch (s) {
     case 0:
-    case 6:
+    case 5:
       return true;
     case 1:
       return tr(data.companyName).length > 0;
@@ -49,9 +47,7 @@ function stepCanProceed(
     case 3:
       return tr(data.phone1).length > 0;
     case 4:
-      return tr(data.address).length > 0 && tr(data.city).length > 0;
-    case 5:
-      return tr(data.phone2).length > 0;
+      return tr(data.address).length > 0;
     default:
       return false;
   }
@@ -66,23 +62,17 @@ export function OnboardingPage() {
   const [registration, setRegistration] = useState("");
   const [phone1, setPhone1] = useState("");
   const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [phone2, setPhone2] = useState("");
 
   const nameId = useId();
   const regId = useId();
   const phone1Id = useId();
   const addressId = useId();
-  const cityId = useId();
-  const phone2Id = useId();
 
   const data = {
     companyName,
     registration,
     phone1,
     address,
-    city,
-    phone2,
   };
 
   const canNext = stepCanProceed(step, data);
@@ -103,26 +93,23 @@ export function OnboardingPage() {
 
   const goNext = useCallback(() => {
     if (!canNext) return;
-    setStep((s) => (s < 6 ? (s + 1) as Step : s));
+    setStep((s) => (s < 5 ? (s + 1) as Step : s));
   }, [canNext]);
 
   const goBack = useCallback(() => {
-    if (step > 0 && step < 6) {
+    if (step > 0 && step < 5) {
       setStep((s) => (s - 1) as Step);
     }
   }, [step]);
 
   const finish = useCallback(async () => {
     const base = getAppPreferences();
-    const addr = [data.address.trim(), data.city.trim()]
-      .filter(Boolean)
-      .join("\n");
+    const addr = data.address.trim();
     saveAppPreferences({
       ...base,
       companyName: data.companyName.trim() || undefined,
       companyRegistration: data.registration.trim() || undefined,
       companyPhone: data.phone1.trim() || undefined,
-      companyPhoneSecondary: data.phone2.trim() || undefined,
       companyAddress: addr || undefined,
     });
     if (isSupabaseConfigured()) {
@@ -130,9 +117,7 @@ export function OnboardingPage() {
         companyName: data.companyName.trim(),
         registration: data.registration.trim(),
         phone1: data.phone1.trim(),
-        address: data.address.trim(),
-        city: data.city.trim(),
-        phone2: data.phone2.trim(),
+        address: addr,
       });
       if (!res.ok) {
         return;
@@ -143,7 +128,7 @@ export function OnboardingPage() {
     router.push("/");
   }, [data, router, refresh]);
 
-  const dataIndexOnScreen = step >= 1 && step <= 5 ? step : 0;
+  const dataIndexOnScreen = step >= 1 && step <= 4 ? step : 0;
 
   return (
     <div
@@ -161,7 +146,7 @@ export function OnboardingPage() {
           />
         </div>
 
-        {step > 0 && step < 6 && (
+        {step > 0 && step < 5 && (
           <p className="text-center text-sm text-muted-foreground">
             {t(`${SK}.progress`, {
               current: String(dataIndexOnScreen),
@@ -283,69 +268,20 @@ export function OnboardingPage() {
             nextLabel={t(`${SK}.next`)}
             backLabel={t(`${SK}.back`)}
           >
-            <h2 className="text-xl font-bold text-foreground sm:text-2xl">
-              {t(`${SK}.addressScreenTitle`)}
-            </h2>
-            <div className="space-y-4 text-start">
-              <div className="space-y-2">
-                <Label
-                  htmlFor={addressId}
-                  className="text-sm font-semibold text-foreground"
-                >
-                  {t(`${SK}.fieldAddress`)}
-                </Label>
-                <Input
-                  id={addressId}
-                  name="address"
-                  autoComplete="street-address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className={cn(fieldClass)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label
-                  htmlFor={cityId}
-                  className="text-sm font-semibold text-foreground"
-                >
-                  {t(`${SK}.fieldCity`)}
-                </Label>
-                <Input
-                  id={cityId}
-                  name="city"
-                  autoComplete="address-level2"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className={cn(fieldClass)}
-                />
-              </div>
-            </div>
-          </DataStepLayout>
-        )}
-
-        {step === 5 && (
-          <DataStepLayout
-            onBack={goBack}
-            onNext={goNext}
-            canNext={canNext}
-            nextLabel={t(`${SK}.next`)}
-            backLabel={t(`${SK}.back`)}
-          >
             <h2
               id={singleFieldTitleId}
               className="text-xl font-bold text-foreground sm:text-2xl"
             >
-              {t(`${SK}.fieldPhone`)}
+              {t(`${SK}.addressScreenTitle`)}
             </h2>
             <div className="pt-1">
               <Input
-                id={phone2Id}
-                name="phone2"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                value={phone2}
-                onChange={(e) => setPhone2(e.target.value)}
+                id={addressId}
+                name="address"
+                autoComplete="street-address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder={t(`${SK}.fieldFullAddressPlaceholder`)}
                 className={cn(fieldClass)}
                 aria-labelledby={singleFieldTitleId}
               />
@@ -353,7 +289,7 @@ export function OnboardingPage() {
           </DataStepLayout>
         )}
 
-        {step === 6 && (
+        {step === 5 && (
           <div className="space-y-5 text-center">
             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               {t(`${SK}.doneTitle`)}

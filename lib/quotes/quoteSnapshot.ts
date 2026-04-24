@@ -12,8 +12,11 @@ import type {
 import type { MaterialType } from "@/types/materials";
 import type { DxfPartGeometry } from "@/types";
 import { slimDxfGeometryForQuoteSnapshot } from "@/lib/store";
+import { PLATE_LOCAL_PERSISTED_EVENT } from "@/lib/plateEvents";
 
-const STORAGE_KEY = "plate_quote_snapshots_v1";
+export const QUOTE_SNAPSHOTS_STORAGE_KEY = "plate_quote_snapshots_v1";
+
+const STORAGE_KEY = QUOTE_SNAPSHOTS_STORAGE_KEY;
 
 export interface QuoteSessionSnapshot {
   version: 1;
@@ -48,6 +51,9 @@ function saveMap(map: Record<string, QuoteSessionSnapshot>): boolean {
   if (typeof window === "undefined") return false;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    window.dispatchEvent(
+      new CustomEvent(PLATE_LOCAL_PERSISTED_EVENT, { detail: { key: STORAGE_KEY } })
+    );
     return true;
   } catch (e) {
     console.warn("[PLATE] Failed to save quote snapshots", e);
@@ -130,7 +136,19 @@ export function saveQuoteSnapshot(
     slimDxfGeometryForQuoteSnapshot(g)
   );
   const entrySlim = buildSnapshotEntry(payload, slimGeoms);
-  if (persistWithPruning(id, entrySlim)) return true;
+  const okSlim = persistWithPruning(id, entrySlim);
+  if (okSlim) {
+    void import("@/lib/quotes/quoteList").then(({ getQuotesList }) => {
+      const list = getQuotesList();
+      if (!list.some((q) => q.id === id)) return;
+      void import("@/lib/supabase/entityTableSyncBrowser").then(
+        ({ syncQuotesToSupabase }) => {
+          void syncQuotesToSupabase(list);
+        }
+      );
+    });
+    return true;
+  }
 
   const ultraGeoms = payload.dxfMethodGeometries.map(ultraSlimDxfForQuoteSnapshot);
   const entryUltra = buildSnapshotEntry(payload, ultraGeoms);
@@ -138,9 +156,35 @@ export function saveQuoteSnapshot(
     console.warn(
       "[PLATE] Quote snapshot stored with minimal DXF data (storage quota). Part geometry previews may be empty."
     );
+    void import("@/lib/quotes/quoteList").then(({ getQuotesList }) => {
+      const list = getQuotesList();
+      if (!list.some((q) => q.id === id)) return;
+      void import("@/lib/supabase/entityTableSyncBrowser").then(
+        ({ syncQuotesToSupabase }) => {
+          void syncQuotesToSupabase(list);
+        }
+      );
+    });
     return true;
   }
   return false;
+}
+
+/**
+ * Apply `public.quotes.session_payload` (or legacy org sync) into the local snapshot map.
+ */
+export function applyQuoteSessionPayloadFromServer(
+  id: string,
+  raw: unknown
+): boolean {
+  if (typeof window === "undefined" || !id || raw == null || typeof raw !== "object") {
+    return false;
+  }
+  const o = raw as Record<string, unknown>;
+  if (o.version !== 1 || o.draft == null) return false;
+  const map = loadMap();
+  map[id] = o as unknown as QuoteSessionSnapshot;
+  return saveMap(map);
 }
 
 export function removeQuoteSnapshot(id: string): void {

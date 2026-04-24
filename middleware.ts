@@ -18,6 +18,16 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // In `next dev`, do not send everyone to /login (local-first UX; no cloud user yet).
+  // Set PLATE_REQUIRE_AUTH_IN_DEV=1 in .env.local to test the real auth wall locally.
+  // `next start` / production: always enforce auth.
+  const devBypass =
+    process.env.NODE_ENV === "development" &&
+    process.env.PLATE_REQUIRE_AUTH_IN_DEV !== "1";
+  if (devBypass) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll() {

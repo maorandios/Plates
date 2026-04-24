@@ -10,6 +10,7 @@ import {
   getQuoteSnapshot,
   type QuoteSessionSnapshot,
 } from "@/lib/quotes/quoteSnapshot";
+import { loadEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
 import { getQuotesList } from "@/lib/quotes/quoteList";
 import type { QuotePreviewListMeta } from "@/features/quotes/components/QuotePreviewView";
 import { t } from "@/lib/i18n";
@@ -24,7 +25,20 @@ export default function QuotePreviewPage() {
       setSnapshot(null);
       return;
     }
-    setSnapshot(getQuoteSnapshot(id));
+    let cancelled = false;
+    void (async () => {
+      let s = getQuoteSnapshot(id);
+      if (!s) {
+        const data = await loadEntityTablesForOrg();
+        if (!cancelled && !("error" in data)) {
+          s = getQuoteSnapshot(id);
+        }
+      }
+      if (!cancelled) setSnapshot(s);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const listMeta = useMemo((): QuotePreviewListMeta => {

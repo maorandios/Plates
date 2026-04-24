@@ -32,7 +32,7 @@ export function SheetViewerPageInner() {
   const sheetId = useSheetIdParam();
   const searchParams = useSearchParams();
   const runIdParam = searchParams.get("run");
-  const { preferences } = useAppPreferences();
+  const { unitSystem } = useAppPreferences();
 
   const [resolved, setResolved] = useState<{
     run: NestingRun;
@@ -99,7 +99,7 @@ export function SheetViewerPageInner() {
         batchId={batchId}
         run={resolved.run}
         sheet={resolved.sheet}
-        unitSystem={preferences.unitSystem}
+        unitSystem={unitSystem}
       />
     </PageContainer>
   );

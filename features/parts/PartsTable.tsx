@@ -122,11 +122,11 @@ const COL_COUNT = 15;
 export function PartsTable({ parts, onRemoveParts }: PartsTableProps) {
   const {
     preferences,
+    unitSystem,
     formatLengthValue,
     formatAreaValue,
     formatWeightValue,
   } = useAppPreferences();
-  const unitSystem = preferences.unitSystem;
 
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [previewPart, setPreviewPart] = useState<Part | null>(null);

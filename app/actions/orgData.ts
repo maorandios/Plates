@@ -3,8 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/supabase";
 
-export type OrgSettingsRow = {
+export type UserWorkspaceRow = {
   org_id: string;
+  email: string | null;
   app_preferences: Json;
   material_config: Json | null;
   cutting_profiles: Json | null;
@@ -15,7 +16,7 @@ export type OrgSettingsRow = {
  * Read org settings + all domain snapshot rows (used after login to hydrate the client).
  */
 export async function loadRemoteOrgData(orgId: string): Promise<{
-  settings: OrgSettingsRow | null;
+  settings: UserWorkspaceRow | null;
   snapshots: { data_key: string; payload: Json; updated_at: string }[];
 } | "forbidden" | "no_session"> {
   const supabase = await createClient();
@@ -35,8 +36,8 @@ export async function loadRemoteOrgData(orgId: string): Promise<{
     return "forbidden";
   }
   const { data: settings } = await supabase
-    .from("org_settings")
-    .select("org_id, app_preferences, material_config, cutting_profiles, updated_at")
+    .from("users")
+    .select("org_id, email, app_preferences, material_config, cutting_profiles, updated_at")
     .eq("org_id", orgId)
     .maybeSingle();
   const { data: snapshots } = await supabase
@@ -47,6 +48,7 @@ export async function loadRemoteOrgData(orgId: string): Promise<{
     settings: settings
       ? {
           org_id: settings.org_id,
+          email: settings.email,
           app_preferences: settings.app_preferences,
           material_config: settings.material_config,
           cutting_profiles: settings.cutting_profiles,
@@ -58,7 +60,7 @@ export async function loadRemoteOrgData(orgId: string): Promise<{
 }
 
 /**
- * Partial upsert of org_settings (only provided keys are sent).
+ * Partial upsert of public.users (only provided keys are sent).
  */
 export async function patchOrgSettings(
   orgId: string,
@@ -85,12 +87,13 @@ export async function patchOrgSettings(
     return { ok: false, error: "forbidden" };
   }
   const { data: cur } = await supabase
-    .from("org_settings")
-    .select("app_preferences, material_config, cutting_profiles")
+    .from("users")
+    .select("app_preferences, material_config, cutting_profiles, email")
     .eq("org_id", orgId)
     .maybeSingle();
   const next = {
     org_id: orgId,
+    email: user.email ?? cur?.email ?? null,
     app_preferences: patch.app_preferences ?? cur?.app_preferences ?? null,
     material_config:
       patch.material_config !== undefined ? patch.material_config : cur?.material_config ?? null,
@@ -98,7 +101,7 @@ export async function patchOrgSettings(
       patch.cutting_profiles !== undefined ? patch.cutting_profiles : cur?.cutting_profiles ?? null,
     updated_at: new Date().toISOString(),
   };
-  const { error } = await supabase.from("org_settings").upsert(next, {
+  const { error } = await supabase.from("users").upsert(next, {
     onConflict: "org_id",
   });
   if (error) {

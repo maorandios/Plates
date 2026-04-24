@@ -72,9 +72,10 @@ export interface Database {
         };
         Relationships: [];
       };
-      org_settings: {
+      users: {
         Row: {
           org_id: string;
+          email: string | null;
           app_preferences: Json | null;
           material_config: Json | null;
           cutting_profiles: Json | null;
@@ -82,6 +83,7 @@ export interface Database {
         };
         Insert: {
           org_id: string;
+          email?: string | null;
           app_preferences?: Json | null;
           material_config?: Json | null;
           cutting_profiles?: Json | null;
@@ -89,6 +91,7 @@ export interface Database {
         };
         Update: {
           org_id?: string;
+          email?: string | null;
           app_preferences?: Json | null;
           material_config?: Json | null;
           cutting_profiles?: Json | null;
@@ -185,6 +188,7 @@ export interface Database {
           total_area_m2: number | null;
           total_item_qty: number | null;
           total_incl_vat: number | null;
+          session_payload: Json | null;
         };
         Insert: {
           id: string;
@@ -202,6 +206,7 @@ export interface Database {
           total_area_m2?: number | null;
           total_item_qty?: number | null;
           total_incl_vat?: number | null;
+          session_payload?: Json | null;
         };
         Update: {
           id?: string;
@@ -219,6 +224,7 @@ export interface Database {
           total_area_m2?: number | null;
           total_item_qty?: number | null;
           total_incl_vat?: number | null;
+          session_payload?: Json | null;
         };
         Relationships: [];
       };

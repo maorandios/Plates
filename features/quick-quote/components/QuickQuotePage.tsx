@@ -71,7 +71,11 @@ import {
   reopenQuoteForEditing,
   upsertQuoteInProgress,
 } from "@/lib/quotes/quoteList";
-import { getQuoteSnapshot, saveQuoteSnapshot } from "@/lib/quotes/quoteSnapshot";
+import {
+  getQuoteSnapshot,
+  saveQuoteSnapshot,
+} from "@/lib/quotes/quoteSnapshot";
+import { loadEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
 import {
   needsMergedPartsFallback,
   quotePartsToFallbackManualRows,
@@ -200,13 +204,22 @@ export function QuickQuotePage() {
     }
     if (editHydrationLockRef.current) return;
     editHydrationLockRef.current = true;
-
-    const snap = getQuoteSnapshot(editParam);
-    if (!snap) {
-      editHydrationLockRef.current = false;
-      router.replace("/quotes");
-      return;
-    }
+    let cancelled = false;
+    void (async () => {
+      let snap = getQuoteSnapshot(editParam);
+      if (!snap) {
+        const data = await loadEntityTablesForOrg();
+        if (cancelled) return;
+        if (!("error" in data)) {
+          snap = getQuoteSnapshot(editParam);
+        }
+      }
+      if (cancelled) return;
+      if (!snap) {
+        editHydrationLockRef.current = false;
+        router.replace("/quotes");
+        return;
+      }
 
     const stepRaw = searchParams.get("step");
     const parsed = parseInt(stepRaw || "3", 10);
@@ -262,6 +275,10 @@ export function QuickQuotePage() {
 
     reopenQuoteForEditing(editParam, targetStep);
     router.replace("/quick-quote", { scroll: false });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [editParam, router, searchParams]);
 
   const stockPricingReady = useMemo(() => {
@@ -312,10 +329,7 @@ export function QuickQuotePage() {
   }, []);
 
   const handleContinueFromGeneral = () => {
-    if (!quoteListSessionIdRef.current) {
-      quoteListSessionIdRef.current = nanoid();
-    }
-    /** List row is created only on explicit Save in phase 7 ({@link handleSaveQuoteToList}). */
+    /** List row and session id are created only on "שמור לרשימת הצעות" in phase 7 ({@link handleSaveQuoteToList}). */
     advanceTo(2);
   };
 
@@ -604,10 +618,11 @@ export function QuickQuotePage() {
     ]
   );
 
-  /** Persist a read-only snapshot for `/quotes/[id]/preview` (debounced). */
+  /** Persist a read-only snapshot for `/quotes/[id]/preview` (debounced). Only after list id exists (שמור לרשימת הצעות) or re-opened edit. */
   useEffect(() => {
     const qid = quoteListSessionIdRef.current;
     if (!qid || mergedQuotePartsList.length === 0) return;
+    if (!quoteSavedToList && !editParam) return;
     let draftPayload: QuotePdfFullPayload;
     try {
       draftPayload = pdfExportDraft ?? buildFinalizeDraft();
@@ -629,6 +644,8 @@ export function QuickQuotePage() {
     }, 500);
     return () => window.clearTimeout(tmr);
   }, [
+    quoteSavedToList,
+    editParam,
     mergedQuotePartsList,
     materialType,
     materialPricePerKgByRow,

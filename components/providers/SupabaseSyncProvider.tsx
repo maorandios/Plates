@@ -8,7 +8,15 @@ import {
 } from "@/app/actions/orgData";
 import { syncSteelTypesFromMaterialConfigs } from "@/lib/supabase/entityTableSyncBrowser";
 import { applyRemoteDataToLocalStorage } from "@/lib/supabase/hydrateClient";
-import { ALL_DOMAIN_SNAPSHOT_KEYS } from "@/lib/supabase/domainKeys";
+import {
+  ALL_DOMAIN_SNAPSHOT_KEYS,
+  DXF_RAW_BUNDLE_KEY,
+  FILE_DATA_BUNDLE_KEY,
+} from "@/lib/supabase/domainKeys";
+import {
+  collectDxfRawBundleForSync,
+  collectFileDataBundleForSync,
+} from "@/lib/supabase/storageBundles";
 import { QUOTES_LIST_STORAGE_KEY } from "@/lib/quotes/quoteList";
 import { PLATE_PROJECTS_LIST_STORAGE_KEY } from "@/lib/projects/plateProjectList";
 import { getAppPreferences } from "@/lib/settings/appPreferences";
@@ -55,7 +63,7 @@ function cuttingToJson(): Json {
 }
 
 /**
- * Pulls org_settings + domain snapshots after login, pushes changes on a debounce when local settings/lists change.
+ * Pulls public.users + domain snapshots after login, pushes changes on a debounce when local settings/lists change.
  */
 export function SupabaseSyncProvider({ children }: { children: React.ReactNode }) {
   const { loading, session } = useOrgBootstrap();
@@ -73,7 +81,7 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
         cutting_profiles: cut,
       });
       if (!patch.ok) {
-        console.warn("[PLATE] Supabase org_settings sync failed:", patch.error);
+        console.warn("[PLATE] Supabase users row sync failed:", patch.error);
       }
       const steel = await syncSteelTypesFromMaterialConfigs(getAllMaterialConfigs());
       if (!steel.ok) {
@@ -93,6 +101,23 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
           }
         } catch (e) {
           console.warn("[PLATE] snapshot skip/parse error:", dataKey, e);
+        }
+      }
+      for (const [bundleKey, collect] of [
+        [FILE_DATA_BUNDLE_KEY, collectFileDataBundleForSync] as const,
+        [DXF_RAW_BUNDLE_KEY, collectDxfRawBundleForSync] as const,
+      ]) {
+        try {
+          const payload = collect() as Json;
+          const up = await upsertDomainSnapshot(oid, bundleKey, payload);
+          if (!up.ok) {
+            console.warn(
+              `[PLATE] Supabase bundle sync failed (${bundleKey}):`,
+              up.error
+            );
+          }
+        } catch (e) {
+          console.warn("[PLATE] bundle sync error:", bundleKey, e);
         }
       }
     } catch (e) {

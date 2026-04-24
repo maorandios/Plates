@@ -18,6 +18,11 @@ import type { Client } from "@/types/clients";
 import type { QuoteListRecord } from "@/lib/quotes/quoteList";
 import type { PlateProjectListRecord } from "@/lib/projects/plateProjectList";
 import type { MaterialConfig } from "@/types/materials";
+import type { Json } from "@/types/supabase";
+import {
+  applyQuoteSessionPayloadFromServer,
+  getQuoteSnapshot,
+} from "@/lib/quotes/quoteSnapshot";
 
 async function getBrowserOrgId(): Promise<string | null> {
   if (!isSupabaseConfigured() || typeof window === "undefined") {
@@ -127,9 +132,15 @@ export async function syncQuotesToSupabase(
   if (quotes.length === 0) {
     return { ok: true };
   }
-  const { error } = await supabase
-    .from("quotes")
-    .upsert(quotes.map((q) => quoteToRow(orgId, q)), { onConflict: "id" });
+  const rows = quotes.map((q) => {
+    const base = quoteToRow(orgId, q);
+    const snap = getQuoteSnapshot(q.id);
+    return {
+      ...base,
+      session_payload: (snap ?? null) as unknown as Json,
+    };
+  });
+  const { error } = await supabase.from("quotes").upsert(rows, { onConflict: "id" });
   if (error) {
     return { ok: false, error: error.message };
   }
@@ -256,6 +267,12 @@ export async function loadEntityTablesForOrg(): Promise<
   }
   if (pRes.error) {
     return { error: pRes.error.message };
+  }
+  for (const r of qRes.data ?? []) {
+    const row = r as { id: string; session_payload?: unknown };
+    if (row.session_payload != null) {
+      applyQuoteSessionPayloadFromServer(row.id, row.session_payload);
+    }
   }
   return {
     clients: (cRes.data ?? []).map((r) => rowToClient(r as never)),

@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { createClient } from "@/lib/supabase/client";
 import { getAppPreferences } from "@/lib/settings/appPreferences";
+import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -21,28 +22,55 @@ const labelClass = "block w-full text-start text-sm font-semibold text-foregroun
 
 export function AccountSettingsCard() {
   const { preferences, setPreferences } = useAppPreferences();
+  const [signInEmail, setSignInEmail] = useState<string | null>(null);
+  const seededCompanyEmail = useRef(false);
+
   const [name, setName] = useState(preferences.companyName ?? "");
   const [registration, setRegistration] = useState(
     preferences.companyRegistration ?? ""
   );
-  const [email, setEmail] = useState(preferences.companyEmail ?? "");
   const [phone, setPhone] = useState(preferences.companyPhone ?? "");
-  const [website, setWebsite] = useState(preferences.companyWebsite ?? "");
   const [address, setAddress] = useState(preferences.companyAddress ?? "");
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setSignInEmail(null);
+      return;
+    }
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      setSignInEmail(user?.email ?? null);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignInEmail(session?.user?.email ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  /** Keep letterhead/PDF default email aligned with sign-in when nothing was set yet. */
+  useEffect(() => {
+    if (!signInEmail || seededCompanyEmail.current) return;
+    const cur = getAppPreferences();
+    if (cur.companyEmail?.trim()) {
+      seededCompanyEmail.current = true;
+      return;
+    }
+    seededCompanyEmail.current = true;
+    const base = getAppPreferences();
+    setPreferences({ ...base, companyEmail: signInEmail });
+  }, [signInEmail, setPreferences]);
 
   useEffect(() => {
     setName(preferences.companyName ?? "");
     setRegistration(preferences.companyRegistration ?? "");
-    setEmail(preferences.companyEmail ?? "");
     setPhone(preferences.companyPhone ?? "");
-    setWebsite(preferences.companyWebsite ?? "");
     setAddress(preferences.companyAddress ?? "");
   }, [
     preferences.companyName,
     preferences.companyRegistration,
-    preferences.companyEmail,
     preferences.companyPhone,
-    preferences.companyWebsite,
     preferences.companyAddress,
   ]);
 
@@ -105,7 +133,7 @@ export function AccountSettingsCard() {
           >
             {t(`${SA}.addressLabel`)}
           </Label>
-          <Textarea
+          <Input
             id="settings-company-address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -113,13 +141,9 @@ export function AccountSettingsCard() {
               persist({ companyAddress: address.trim() || undefined })
             }
             placeholder={t(`${SA}.addressPlaceholder`)}
-            rows={3}
-            className={cn(
-              fieldClass,
-              "min-h-[88px] resize-y"
-            )}
             autoComplete="street-address"
             dir="rtl"
+            className={cn(fieldClass, "h-10")}
           />
           <p
             className="text-pretty text-[11px] leading-relaxed text-muted-foreground"
@@ -130,22 +154,39 @@ export function AccountSettingsCard() {
         </div>
         <div className="space-y-1.5">
           <Label
-            htmlFor="settings-company-email"
+            htmlFor="settings-account-signin-email"
             className={labelClass}
           >
-            {t(`${SA}.emailLabel`)}
+            {t(`${SA}.accountEmailLabel`)}
           </Label>
           <Input
-            id="settings-company-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => persist({ companyEmail: email.trim() || undefined })}
-            placeholder={t(`${SA}.emailPlaceholder`)}
-            autoComplete="email"
+            id="settings-account-signin-email"
+            type="text"
+            readOnly
+            inputMode="email"
+            aria-readonly="true"
+            value={signInEmail ?? ""}
+            placeholder={
+              !isSupabaseConfigured()
+                ? t(`${SA}.accountEmailNotConnected`)
+                : signInEmail
+                  ? ""
+                  : "—"
+            }
+            autoComplete="off"
             dir="rtl"
-            className={cn(fieldClass, "h-10")}
+            className={cn(
+              fieldClass,
+              "h-10 cursor-default border-dashed bg-muted/40 text-muted-foreground",
+              !signInEmail && "text-muted-foreground/80"
+            )}
           />
+          <p
+            className="text-pretty text-[11px] leading-relaxed text-muted-foreground"
+            dir="rtl"
+          >
+            {t(`${SA}.accountEmailHint`)}
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label
@@ -162,25 +203,6 @@ export function AccountSettingsCard() {
             onBlur={() => persist({ companyPhone: phone.trim() || undefined })}
             placeholder={t(`${SA}.phonePlaceholder`)}
             autoComplete="tel"
-            dir="rtl"
-            className={cn(fieldClass, "h-10")}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="settings-company-website"
-            className={labelClass}
-          >
-            {t(`${SA}.websiteLabel`)}
-          </Label>
-          <Input
-            id="settings-company-website"
-            type="url"
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            onBlur={() => persist({ companyWebsite: website.trim() || undefined })}
-            placeholder={t(`${SA}.websitePlaceholder`)}
-            autoComplete="url"
             dir="rtl"
             className={cn(fieldClass, "h-10")}
           />

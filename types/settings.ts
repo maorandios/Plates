@@ -4,24 +4,23 @@
 
 export type UnitSystem = "metric" | "imperial";
 
+/**
+ * Company + letterhead fields synced in `public.users` (and localStorage).
+ * Unit system is stored separately (device-only, see `unitPreferenceStorage`).
+ */
 export interface AppPreferences {
-  unitSystem: UnitSystem;
   /** Letterhead defaults for quotations (overrides env when set in Settings). */
   companyName?: string;
   /** Company registration number (ח.פ) — shown on PDF letterhead when set. */
   companyRegistration?: string;
   companyEmail?: string;
   companyPhone?: string;
-  /** Second phone (e.g. additional line); optional. */
-  companyPhoneSecondary?: string;
   companyWebsite?: string;
   /** Multi-line allowed; shown on PDF letterhead when set. */
   companyAddress?: string;
 }
 
-export const DEFAULT_APP_PREFERENCES: AppPreferences = {
-  unitSystem: "metric",
-};
+export const DEFAULT_APP_PREFERENCES: AppPreferences = {};
 
 /**
  * Purchased sheet inventory template (global). Used when configuring stock per batch

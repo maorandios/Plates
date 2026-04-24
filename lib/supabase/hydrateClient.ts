@@ -8,9 +8,16 @@ import type { CuttingProfileRange } from "@/types/production";
 import type { AppPreferences } from "@/types/settings";
 import { DEFAULT_APP_PREFERENCES } from "@/types/settings";
 import type { Json } from "@/types/supabase";
+import {
+  applyDxfRawBundleFromRemote,
+  applyFileDataBundleFromRemote,
+  DXF_RAW_BUNDLE_KEY,
+  FILE_DATA_BUNDLE_KEY,
+} from "@/lib/supabase/storageBundles";
 
-export type OrgSettingsHydration = {
+export type UserWorkspaceHydration = {
   org_id: string;
+  email: string | null;
   app_preferences: Json;
   material_config: Json | null;
   cutting_profiles: Json | null;
@@ -22,30 +29,23 @@ const MATERIAL_TYPES: MaterialType[] = ["carbonSteel", "stainlessSteel", "alumin
 function parseAppPreferences(raw: unknown): AppPreferences {
   if (!raw || typeof raw !== "object") return DEFAULT_APP_PREFERENCES;
   const o = raw as Record<string, unknown>;
-  const unitSystem =
-    o.unitSystem === "imperial" || o.unitSystem === "metric"
-      ? o.unitSystem
-      : DEFAULT_APP_PREFERENCES.unitSystem;
   return {
     ...DEFAULT_APP_PREFERENCES,
-    unitSystem,
     companyName: typeof o.companyName === "string" ? o.companyName : undefined,
     companyRegistration:
       typeof o.companyRegistration === "string" ? o.companyRegistration : undefined,
     companyEmail: typeof o.companyEmail === "string" ? o.companyEmail : undefined,
     companyPhone: typeof o.companyPhone === "string" ? o.companyPhone : undefined,
-    companyPhoneSecondary:
-      typeof o.companyPhoneSecondary === "string" ? o.companyPhoneSecondary : undefined,
     companyWebsite: typeof o.companyWebsite === "string" ? o.companyWebsite : undefined,
     companyAddress: typeof o.companyAddress === "string" ? o.companyAddress : undefined,
   };
 }
 
 /**
- * Apply server org_settings + snapshot rows to localStorage so existing modules keep working.
+ * Apply server public.users + snapshot rows to localStorage so existing modules keep working.
  */
 export function applyRemoteDataToLocalStorage(
-  settings: OrgSettingsHydration | null,
+  settings: UserWorkspaceHydration | null,
   snapshots: { data_key: string; payload: Json }[]
 ): void {
   if (typeof window === "undefined") return;
@@ -72,11 +72,33 @@ export function applyRemoteDataToLocalStorage(
     }
   }
 
+  const structured: { data_key: string; payload: Json }[] = [];
+  const bundleRows: { data_key: string; payload: Json }[] = [];
   for (const row of snapshots) {
+    if (row.data_key === FILE_DATA_BUNDLE_KEY || row.data_key === DXF_RAW_BUNDLE_KEY) {
+      bundleRows.push(row);
+    } else {
+      structured.push(row);
+    }
+  }
+  for (const row of structured) {
     try {
       localStorage.setItem(row.data_key, JSON.stringify(row.payload));
     } catch (e) {
       console.warn("[PLATE] Failed to apply snapshot", row.data_key, e);
+    }
+  }
+  for (const row of bundleRows) {
+    try {
+      if (row.data_key === FILE_DATA_BUNDLE_KEY) {
+        applyFileDataBundleFromRemote(row.payload);
+        continue;
+      }
+      if (row.data_key === DXF_RAW_BUNDLE_KEY) {
+        applyDxfRawBundleFromRemote(row.payload);
+      }
+    } catch (e) {
+      console.warn("[PLATE] Failed to apply bundle snapshot", row.data_key, e);
     }
   }
 }

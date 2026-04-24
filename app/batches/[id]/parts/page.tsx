@@ -61,8 +61,7 @@ function useBatchIdParam(): string {
 export default function PartsReviewPage() {
   const batchId = useBatchIdParam();
   const router = useRouter();
-  const { preferences } = useAppPreferences();
-  const unitSystem = preferences.unitSystem;
+  const { preferences, unitSystem } = useAppPreferences();
 
   const [batch, setBatch] = useState<Batch | null>(null);
   const [parts, setParts] = useState<Part[]>([]);

@@ -44,8 +44,7 @@ function hasDebugDrawable(c: CleanedGeometryResult): boolean {
 }
 
 export function PartPreviewModal({ part, open, onClose }: PartPreviewModalProps) {
-  const { preferences } = useAppPreferences();
-  const unitSystem = preferences.unitSystem;
+  const { preferences, unitSystem } = useAppPreferences();
 
   const [measureMode, setMeasureMode] = useState(false);
   const [clearMeasurementKey, setClearMeasurementKey] = useState(0);

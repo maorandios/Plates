@@ -17,7 +17,7 @@ import { CUTTING_METHOD_OPTIONS } from "@/types/production";
 import { CuttingMethodProfileSection } from "./CuttingMethodProfileSection";
 
 export function CuttingProfilesSettings() {
-  const { preferences } = useAppPreferences();
+  const { preferences, unitSystem } = useAppPreferences();
   const [tick, setTick] = useState(0);
 
   const byMethod = useMemo(() => {
@@ -50,7 +50,7 @@ export function CuttingProfilesSettings() {
             key={method}
             method={method}
             ranges={ranges}
-            unitSystem={preferences.unitSystem}
+            unitSystem={unitSystem}
             onRangesChange={() => setTick((t) => t + 1)}
           />
         ))}

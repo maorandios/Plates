@@ -8,14 +8,20 @@ function loadRaw(): AppPreferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_APP_PREFERENCES;
-    const parsed = JSON.parse(raw) as Partial<AppPreferences>;
+    const rawParsed = JSON.parse(raw) as Record<string, unknown> & Partial<AppPreferences>;
+    const cleaned = { ...rawParsed };
+    delete cleaned.unitSystem;
+    delete cleaned.companyPhoneSecondary;
+    if ("unitSystem" in rawParsed || "companyPhoneSecondary" in rawParsed) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+      } catch {
+        // ignore
+      }
+    }
+    const parsed = cleaned;
     return {
       ...DEFAULT_APP_PREFERENCES,
-      ...parsed,
-      unitSystem:
-        parsed.unitSystem === "imperial" || parsed.unitSystem === "metric"
-          ? parsed.unitSystem
-          : DEFAULT_APP_PREFERENCES.unitSystem,
       companyName:
         typeof parsed.companyName === "string" ? parsed.companyName : undefined,
       companyRegistration:
@@ -26,10 +32,6 @@ function loadRaw(): AppPreferences {
         typeof parsed.companyEmail === "string" ? parsed.companyEmail : undefined,
       companyPhone:
         typeof parsed.companyPhone === "string" ? parsed.companyPhone : undefined,
-      companyPhoneSecondary:
-        typeof parsed.companyPhoneSecondary === "string"
-          ? parsed.companyPhoneSecondary
-          : undefined,
       companyWebsite:
         typeof parsed.companyWebsite === "string"
           ? parsed.companyWebsite

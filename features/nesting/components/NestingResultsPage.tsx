@@ -48,8 +48,7 @@ export function NestingResultsPage() {
   const searchParams = useSearchParams();
   const runIdParam = searchParams.get("run");
   const querySignature = searchParams.toString();
-  const { preferences } = useAppPreferences();
-  const unitSystem = preferences.unitSystem;
+  const { preferences, unitSystem } = useAppPreferences();
 
   const [run, setRun] = useState<NestingRun | null>(null);
 

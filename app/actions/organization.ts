@@ -18,20 +18,13 @@ export type BootstrapSessionResult =
 function parseAppPreferences(raw: unknown): AppPreferences {
   if (!raw || typeof raw !== "object") return DEFAULT_APP_PREFERENCES;
   const o = raw as Record<string, unknown>;
-  const unitSystem =
-    o.unitSystem === "imperial" || o.unitSystem === "metric"
-      ? o.unitSystem
-      : DEFAULT_APP_PREFERENCES.unitSystem;
   return {
     ...DEFAULT_APP_PREFERENCES,
-    unitSystem,
     companyName: typeof o.companyName === "string" ? o.companyName : undefined,
     companyRegistration:
       typeof o.companyRegistration === "string" ? o.companyRegistration : undefined,
     companyEmail: typeof o.companyEmail === "string" ? o.companyEmail : undefined,
     companyPhone: typeof o.companyPhone === "string" ? o.companyPhone : undefined,
-    companyPhoneSecondary:
-      typeof o.companyPhoneSecondary === "string" ? o.companyPhoneSecondary : undefined,
     companyWebsite: typeof o.companyWebsite === "string" ? o.companyWebsite : undefined,
     companyAddress: typeof o.companyAddress === "string" ? o.companyAddress : undefined,
   };
@@ -103,8 +96,9 @@ export async function bootstrapSession(): Promise<BootstrapSessionResult> {
     return { ok: false, reason: "no_session" };
   }
 
-  const { error: stErr } = await supabase.from("org_settings").insert({
+  const { error: stErr } = await supabase.from("users").insert({
     org_id: org.id,
+    email: user.email ?? null,
     app_preferences: DEFAULT_APP_PREFERENCES as unknown as Json,
   });
   if (stErr) {
@@ -124,13 +118,12 @@ export type CompleteOnboardingInput = {
   companyName: string;
   registration: string;
   phone1: string;
+  /** Single full address line (street, city, etc.). */
   address: string;
-  city: string;
-  phone2: string;
 };
 
 /**
- * Mark onboarding done and save company + preferences to org + org_settings.
+ * Mark onboarding done and save company + preferences to org + public.users.
  */
 export async function completeOnboarding(
   input: CompleteOnboardingInput
@@ -155,7 +148,7 @@ export async function completeOnboarding(
   const orgId = m.org_id;
 
   const name = input.companyName.trim() || "Workspace";
-  const addr = [input.address.trim(), input.city.trim()].filter(Boolean).join("\n");
+  const addr = input.address.trim() || undefined;
   const { error: oErr } = await supabase
     .from("organizations")
     .update({
@@ -169,7 +162,7 @@ export async function completeOnboarding(
   }
 
   const { data: existingSet } = await supabase
-    .from("org_settings")
+    .from("users")
     .select("app_preferences")
     .eq("org_id", orgId)
     .maybeSingle();
@@ -179,14 +172,14 @@ export async function completeOnboarding(
     companyName: name,
     companyRegistration: input.registration.trim() || undefined,
     companyPhone: input.phone1.trim() || undefined,
-    companyPhoneSecondary: input.phone2.trim() || undefined,
     companyAddress: addr || undefined,
   };
   const { error: sErr } = await supabase
-    .from("org_settings")
+    .from("users")
     .upsert(
       {
         org_id: orgId,
+        email: user.email ?? null,
         app_preferences: merged as unknown as Json,
         updated_at: new Date().toISOString(),
       },

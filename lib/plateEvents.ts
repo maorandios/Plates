@@ -1,5 +1,5 @@
 /**
- * Fired after the main store writes JSON arrays to localStorage
- * (clients, batches, quotes list keys, etc.). Supabase sync listens to push org_domain_snapshots.
+ * Fired after the main store (or quote/project snapshots, file data, dxf raw) writes to
+ * localStorage. SupabaseSyncProvider listens to push `org_domain_snapshots` + file/dxf bundles.
  */
 export const PLATE_LOCAL_PERSISTED_EVENT = "plate-local-persisted";

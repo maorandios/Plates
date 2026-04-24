@@ -1,13 +1,13 @@
 import type { UnitSystem } from "@/types/settings";
-import { getAppPreferences } from "@/lib/settings/appPreferences";
+import { getStoredUnitSystem } from "@/lib/settings/unitPreferenceStorage";
 import { formatDecimal } from "@/lib/formatNumbers";
 
 const MM_PER_IN = 25.4;
 const MM_PER_FT = 304.8;
 
-/** Current global unit system (read synchronously from persisted preferences). */
+/** Device-only unit system (not synced to Supabase; see `unitPreferenceStorage`). */
 export function getUnitSystem(): UnitSystem {
-  return getAppPreferences().unitSystem;
+  return getStoredUnitSystem();
 }
 
 /** Linear value in mm → display string with unit (tooltips, modals, validation text). */

@@ -34,8 +34,7 @@ function useBatchIdParam(): string {
 export default function StockConfigurationPage() {
   const batchId = useBatchIdParam();
   const router = useRouter();
-  const { preferences } = useAppPreferences();
-  const unitSystem = preferences.unitSystem;
+  const { preferences, unitSystem } = useAppPreferences();
 
   const [rows, setRows] = useState<StockSheetEntry[]>([]);
   const [cuttingOverridesRefreshKey, setCuttingOverridesRefreshKey] = useState(0);

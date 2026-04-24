@@ -547,6 +547,11 @@ export function deleteFile(id: string): void {
   if (file?.dataKey && typeof window !== "undefined") {
     try {
       localStorage.removeItem(`${STORAGE_KEYS.fileData}_${file.dataKey}`);
+      window.dispatchEvent(
+        new CustomEvent(PLATE_LOCAL_PERSISTED_EVENT, {
+          detail: { key: `${STORAGE_KEYS.fileData}_${file.dataKey}` },
+        })
+      );
     } catch {
       /* ignore */
     }
@@ -571,6 +576,11 @@ export function saveFileData(dataKey: string, content: string): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(`${STORAGE_KEYS.fileData}_${dataKey}`, content);
+    window.dispatchEvent(
+      new CustomEvent(PLATE_LOCAL_PERSISTED_EVENT, {
+        detail: { key: `${STORAGE_KEYS.fileData}_${dataKey}` },
+      })
+    );
   } catch {
     // Storage quota exceeded — log but don't crash
     console.warn("File data storage failed (quota exceeded?)");

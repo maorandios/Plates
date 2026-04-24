@@ -12,8 +12,11 @@ import type { DxfPartGeometry } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import { slimDxfGeometryForQuoteSnapshot } from "@/lib/store";
 import type { PlateProjectStep } from "@/features/plate-project/types/plateProject";
+import { PLATE_LOCAL_PERSISTED_EVENT } from "@/lib/plateEvents";
 
-const STORAGE_KEY = "plate_project_snapshots_v1";
+export const PLATE_PROJECT_SNAPSHOTS_STORAGE_KEY = "plate_project_snapshots_v1";
+
+const STORAGE_KEY = PLATE_PROJECT_SNAPSHOTS_STORAGE_KEY;
 
 export type PlateProjectPhase2Mode = "drawingPicker" | "bendWorkspace";
 
@@ -48,6 +51,9 @@ function saveMap(map: Record<string, PlateProjectSessionSnapshot>): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    window.dispatchEvent(
+      new CustomEvent(PLATE_LOCAL_PERSISTED_EVENT, { detail: { key: STORAGE_KEY } })
+    );
   } catch (e) {
     console.warn("[PLATE] Failed to save plate project snapshots", e);
   }
