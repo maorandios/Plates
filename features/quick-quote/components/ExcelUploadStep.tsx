@@ -59,6 +59,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogFooterActionsStartClassName,
 } from "@/components/ui/dialog";
 import type { MaterialType } from "@/types/materials";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
@@ -1747,12 +1748,12 @@ export function ExcelUploadStep({
             <DialogTitle>{t(`${EI}.confirmBackTitle`)}</DialogTitle>
             <DialogDescription>{t(`${EI}.confirmBackDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={() => setPhaseBackConfirmOpen(false)}>
-              {t("common.cancel")}
-            </Button>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" onClick={confirmQuotePhaseBack}>
               {t(`${EI}.confirmBackAction`)}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setPhaseBackConfirmOpen(false)}>
+              {t("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1764,12 +1765,12 @@ export function ExcelUploadStep({
             <DialogTitle>{t(`${EI}.confirmResetTitle`)}</DialogTitle>
             <DialogDescription>{t(`${EI}.confirmResetDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={() => setPhaseResetConfirmOpen(false)}>
-              {t("common.cancel")}
-            </Button>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" onClick={confirmExcelReset}>
               {t(`${EI}.confirmResetAction`)}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setPhaseResetConfirmOpen(false)}>
+              {t("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1960,7 +1961,7 @@ export function ExcelUploadStep({
               <li key={i}>{line}</li>
             ))}
           </ul>
-          <DialogFooter className="sm:justify-start">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" onClick={() => setPhaseCompleteDialogOpen(false)}>
               {t(`${EI}.validationDialogOk`)}
             </Button>

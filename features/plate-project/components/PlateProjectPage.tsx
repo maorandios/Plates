@@ -19,6 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogFooterActionsStartClassName,
 } from "@/components/ui/dialog";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -643,7 +644,7 @@ export function PlateProjectPage() {
               {t("plateProject.leaveWizardConfirm")}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-row flex-wrap gap-2">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" variant="destructive" onClick={handleLeaveWizardConfirm}>
               {t("plateProject.leaveWizardLeave")}
             </Button>
@@ -667,12 +668,12 @@ export function PlateProjectPage() {
               {t("plateProject.drawingPhase.confirmResetDescription")}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={() => setPhase2ResetDialogOpen(false)}>
-              {t("common.cancel")}
-            </Button>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" onClick={confirmPhase2Reset}>
               {t("plateProject.drawingPhase.confirmResetAction")}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setPhase2ResetDialogOpen(false)}>
+              {t("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>

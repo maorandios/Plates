@@ -989,7 +989,7 @@ export function QuoteFinalizeExportStep({
                                   name: row.part_number || String(i + 1),
                                 })}
                                 onCheckedChange={(v) =>
-                                  applyPartRowPatch(i, { corrugated: v }, true)
+                                  applyPartRowPatch(i, { corrugated: v }, false)
                                 }
                               />
                             </div>

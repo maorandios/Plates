@@ -22,25 +22,26 @@ interface JobOverviewSectionProps {
   thicknessStock?: ThicknessStockInput[] | null;
 }
 
-function formatWeightHe(kg: number): string {
+/** Value only — unit is shown in the card title (Phase 5 metric strips). */
+function formatWeightValueOnly(kg: number): string {
   const k = Math.max(0, Number.isFinite(kg) ? kg : 0);
-  return `${k.toLocaleString("he-IL", { maximumFractionDigits: 0 })} ${t(`${QA}.unitKg`)}`;
+  return k.toLocaleString("he-IL", { maximumFractionDigits: 0 });
 }
 
-function formatAreaHe(m2: number, fractionDigits = 2): string {
+function formatAreaValueOnly(m2: number, fractionDigits = 2): string {
   const a = Math.max(0, Number.isFinite(m2) ? m2 : 0);
-  return `${a.toLocaleString("he-IL", {
+  return a.toLocaleString("he-IL", {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
-  })} ${t(`${QA}.unitM2`)}`;
+  });
 }
 
-function formatCutLengthHe(mm: number): string {
+function formatCutLengthValueOnly(mm: number): string {
   const m = Math.max(0, Number.isFinite(mm) ? mm : 0) / 1000;
-  return `${m.toLocaleString("he-IL", {
+  return m.toLocaleString("he-IL", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })} ${t(`${QA}.unitCutLengthLaser`)}`;
+  });
 }
 
 export function JobOverviewSection({
@@ -87,12 +88,12 @@ export function JobOverviewSection({
       },
       {
         title: t(`${QA}.metricDemandArea`),
-        value: formatAreaHe(model.netPlateAreaM2),
+        value: formatAreaValueOnly(model.netPlateAreaM2),
         subtext: t(`${QA}.metricDemandAreaSub`),
       },
       {
         title: t(`${QA}.metricDemandWeight`),
-        value: formatWeightHe(model.totalWeightKg),
+        value: formatWeightValueOnly(model.totalWeightKg),
         subtext: t(`${QA}.metricDemandWeightSub`),
       },
     ],
@@ -103,12 +104,12 @@ export function JobOverviewSection({
     () => [
       {
         title: t(`${QA}.metricStockArea`),
-        value: formatAreaHe(model.grossMaterialAreaM2),
+        value: formatAreaValueOnly(model.grossMaterialAreaM2),
         subtext: t(`${QA}.metricStockAreaSub`),
       },
       {
         title: t(`${QA}.metricStockWeight`),
-        value: formatWeightHe(stockWeightKg),
+        value: formatWeightValueOnly(stockWeightKg),
         subtext: t(`${QA}.metricStockWeightSub`),
       },
       {
@@ -118,7 +119,7 @@ export function JobOverviewSection({
       },
       {
         title: t(`${QA}.metricCutLengthReq`),
-        value: formatCutLengthHe(model.totalCutLengthMm),
+        value: formatCutLengthValueOnly(model.totalCutLengthMm),
         subtext: t(`${QA}.metricCutLengthReqSub`),
       },
     ],

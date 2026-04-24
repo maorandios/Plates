@@ -18,6 +18,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogFooterActionsStartClassName,
 } from "@/components/ui/dialog";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -995,7 +996,7 @@ export function QuickQuotePage() {
               {t("quickQuotePage.leaveWizardConfirm")}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-row flex-wrap gap-2">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" variant="destructive" onClick={handleLeaveWizardConfirm}>
               {t("quickQuotePage.leaveWizardLeave")}
             </Button>

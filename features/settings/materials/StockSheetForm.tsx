@@ -10,10 +10,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  dialogFooterActionsStartClassName,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAppPreferences } from "@/features/settings/useAppPreferences";
 import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { MaterialStockSheet, MaterialType } from "@/types/materials";
 
 const SK = "settings.materials" as const;
@@ -36,6 +46,7 @@ export function StockSheetForm({
   const { parseLengthInputToMm, formatLengthValue, formatAreaValue } = useAppPreferences();
   const [width, setWidth] = useState(formatLengthValue(sheet.widthMm));
   const [length, setLength] = useState(formatLengthValue(sheet.lengthMm));
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
   const idPrefix = `${materialType}-${sheet.id}`;
 
@@ -49,11 +60,11 @@ export function StockSheetForm({
     const lengthMm = parseLengthInputToMm(length);
 
     if (widthMm == null || !Number.isFinite(widthMm) || widthMm <= 0) {
-      alert(t(`${SK}.widthInvalid`));
+      setValidationMessage(t(`${SK}.widthInvalid`));
       return;
     }
     if (lengthMm == null || !Number.isFinite(lengthMm) || lengthMm <= 0) {
-      alert(t(`${SK}.lengthInvalid`));
+      setValidationMessage(t(`${SK}.lengthInvalid`));
       return;
     }
 
@@ -131,6 +142,27 @@ export function StockSheetForm({
           </Button>
         </div>
       </CardContent>
+
+      <Dialog
+        open={validationMessage != null}
+        onOpenChange={(open) => {
+          if (!open) setValidationMessage(null);
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-md" dir="rtl">
+          <DialogHeader className="text-start sm:text-start">
+            <DialogTitle>{t(`${SK}.alertDialogTitle`)}</DialogTitle>
+            <DialogDescription className="text-start text-sm leading-relaxed">
+              {validationMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
+            <Button type="button" onClick={() => setValidationMessage(null)}>
+              {t(`${SK}.alertDialogOk`)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -38,6 +38,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogFooterActionsStartClassName,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -657,7 +658,7 @@ function BendPlateHub({
             <DialogTitle>{t(`${BP}.hubValidationTitle`)}</DialogTitle>
             <DialogDescription>{t(`${BP}.hubValidationDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:justify-start">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" onClick={() => setHubValidationOpen(false)}>
               {t(`${BP}.hubValidationOk`)}
             </Button>
@@ -671,12 +672,12 @@ function BendPlateHub({
             <DialogTitle>{t(`${BP}.confirmResetTitle`)}</DialogTitle>
             <DialogDescription>{t(`${BP}.confirmResetDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={() => setResetConfirmOpen(false)}>
-              {t(`${BP}.cancel`)}
-            </Button>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" onClick={confirmResetSession}>
               {t(`${BP}.confirmResetAction`)}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setResetConfirmOpen(false)}>
+              {t(`${BP}.cancel`)}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1926,7 +1927,9 @@ function BendPlateShapeEditor({
                 className="px-4 py-2.5 sm:px-6"
                 onSelect={(id) => preview3dRef.current?.applyView(id)}
               />
-              <DialogFooter className="border-0 bg-transparent px-4 py-3 sm:justify-start sm:px-6">
+              <DialogFooter
+                className={cn("border-0 bg-transparent px-4 py-3 sm:px-6", dialogFooterActionsStartClassName)}
+              >
                 <Button type="button" variant="outline" onClick={() => setPreview3dOpen(false)}>
                   {t(`${ED}.close`)}
                 </Button>
@@ -1947,7 +1950,7 @@ function BendPlateShapeEditor({
               <li key={i}>{line}</li>
             ))}
           </ul>
-          <DialogFooter className="sm:justify-start">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" onClick={() => setSaveValidationOpen(false)}>
               {t(`${BP}.hubValidationOk`)}
             </Button>
@@ -1966,12 +1969,12 @@ function BendPlateShapeEditor({
             <DialogTitle>{t(`${ED}.holesResetConfirmTitle`)}</DialogTitle>
             <DialogDescription>{t(`${ED}.holesResetConfirmDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={cancelHolesResetDialog}>
-              {t(`${ED}.holesResetCancelAction`)}
-            </Button>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" variant="default" onClick={confirmHolesResetDialog}>
               {t(`${ED}.holesResetConfirmAction`)}
+            </Button>
+            <Button type="button" variant="outline" onClick={cancelHolesResetDialog}>
+              {t(`${ED}.holesResetCancelAction`)}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1983,12 +1986,12 @@ function BendPlateShapeEditor({
             <DialogTitle>{t(`${ED}.editorBackTitle`)}</DialogTitle>
             <DialogDescription>{t(`${ED}.editorBackDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={() => setBackConfirmOpen(false)}>
-              {t(`${ED}.cancel`)}
-            </Button>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" variant="default" onClick={confirmBackDiscard}>
               {t(`${ED}.discardBack`)}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setBackConfirmOpen(false)}>
+              {t(`${ED}.cancel`)}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -42,8 +42,12 @@ export function QuoteStepper({
       )}
     >
       <div className="px-4 py-4 sm:px-6 lg:px-8">
-        {/* overflow-y-visible: avoid clipping phase digits / rings; horizontal scroll only */}
-        <div className="flex w-full min-w-0 items-start justify-between gap-2 overflow-x-auto overflow-y-visible pb-1 pt-0.5 [scrollbar-width:thin]">
+        {/*
+          Each step and connector in its own flex-1 column (same as PlateProjectStepper).
+          Avoids justify-between + last:flex-none, which left uneven margins in RTL
+          (wide gap on the inline-start / visual right vs narrow on the other side).
+        */}
+        <div className="flex w-full min-w-0 items-start gap-2 overflow-x-auto overflow-y-visible pb-1 pt-0.5 [scrollbar-width:thin]">
           {STEP_KEYS.map((labelKey, index) => {
             const step = (index + 1) as QuickQuoteStep;
             const label = t(labelKey);
@@ -53,63 +57,68 @@ export function QuoteStepper({
             const clickable = isReachable && step !== currentStep;
 
             return (
-              <div
-                key={step}
-                className="flex min-w-0 flex-1 items-start last:flex-none"
-              >
-                <button
-                  type="button"
-                  disabled={!clickable}
-                  onClick={() => clickable && onStepSelect(step)}
-                  className={cn(
-                    "group flex min-w-0 flex-1 flex-col items-center gap-2",
-                    clickable && "cursor-pointer",
-                    !clickable && "cursor-default"
-                  )}
-                >
-                  <span
+              <div key={step} className="contents">
+                <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!clickable}
+                    onClick={() => clickable && onStepSelect(step)}
                     className={cn(
-                      "flex size-10 shrink-0 items-center justify-center overflow-visible rounded-full border-2 text-sm font-semibold tabular-nums leading-none transition-all duration-150",
-                      isComplete &&
-                        "border-primary/70 bg-primary/15 text-primary",
-                      isCurrent &&
-                        !isComplete &&
-                        "border-primary bg-primary text-primary-foreground ring-2 ring-primary/30",
-                      !isCurrent &&
-                        !isComplete &&
-                        (isReachable
-                          ? "border-border bg-card text-muted-foreground"
-                          : "border-border/60 bg-muted/40 text-muted-foreground/45")
+                      "group flex max-w-full min-w-0 flex-col items-center gap-2",
+                      clickable && "cursor-pointer",
+                      !clickable && "cursor-default"
                     )}
                   >
-                    {isComplete ? (
-                      <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} />
-                    ) : (
-                      <span className="flex size-full items-center justify-center px-0.5 pt-[1px] leading-none">
-                        {step}
-                      </span>
-                    )}
-                  </span>
-                  <span
-                    className={cn(
-                      "w-full truncate px-1 text-center text-xs font-medium leading-snug transition-colors duration-150",
-                      isCurrent && "font-semibold text-foreground",
-                      !isCurrent && isReachable && "text-muted-foreground",
-                      !isReachable && "text-muted-foreground/40"
-                    )}
-                  >
-                    {label}
-                  </span>
-                </button>
+                    <span
+                      className={cn(
+                        "flex size-10 shrink-0 items-center justify-center overflow-visible rounded-full border-2 text-sm font-semibold tabular-nums leading-none transition-all duration-150",
+                        isComplete &&
+                          "border-primary/70 bg-primary/15 text-primary",
+                        isCurrent &&
+                          !isComplete &&
+                          "border-primary bg-primary text-primary-foreground ring-2 ring-primary/30",
+                        !isCurrent &&
+                          !isComplete &&
+                          (isReachable
+                            ? "border-border bg-card text-muted-foreground"
+                            : "border-border/60 bg-muted/40 text-muted-foreground/45")
+                      )}
+                    >
+                      {isComplete ? (
+                        <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                      ) : (
+                        <span className="flex size-full items-center justify-center px-0.5 pt-[1px] leading-none">
+                          {step}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "w-full truncate px-1 text-center text-xs font-medium leading-snug transition-colors duration-150",
+                        isCurrent && "font-semibold text-foreground",
+                        !isCurrent && isReachable && "text-muted-foreground",
+                        !isReachable && "text-muted-foreground/40"
+                      )}
+                    >
+                      {label}
+                    </span>
+                  </button>
+                </div>
                 {index < STEP_KEYS.length - 1 && (
                   <div
                     className={cn(
-                      /* align connector with vertical center of the 40px circle */
-                      "mx-1 mt-5 h-0.5 min-w-[12px] flex-1 shrink rounded-full transition-colors duration-150",
-                      step < currentStep ? "bg-primary/45" : "bg-border/80"
+                      "flex min-w-0 flex-1 shrink-0 items-start pt-5",
+                      "min-w-[12px]"
                     )}
                     aria-hidden
-                  />
+                  >
+                    <div
+                      className={cn(
+                        "h-0.5 w-full rounded-full transition-colors duration-150",
+                        step < currentStep ? "bg-primary/45" : "bg-border/80"
+                      )}
+                    />
+                  </div>
                 )}
               </div>
             );

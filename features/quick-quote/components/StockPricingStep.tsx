@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogFooterActionsStartClassName,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,6 +121,7 @@ function ThicknessSheetsPanel({
   const [draftRow, setDraftRow] = useState<DraftRowState | null>(null);
   const [editingLine, setEditingLine] = useState<QuoteSheetStockLine | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [inputValidationMessage, setInputValidationMessage] = useState<string | null>(null);
 
   const tableBusy = !!draftRow || !!editingLine;
 
@@ -157,16 +159,16 @@ function ThicknessSheetsPanel({
     const w = parseLengthInputToMm(draftRow.width);
     const l = parseLengthInputToMm(draftRow.length);
     if (w == null || !Number.isFinite(w) || w <= 0) {
-      window.alert(t(`${SKM}.widthInvalid`));
+      setInputValidationMessage(t(`${SKM}.widthInvalid`));
       return;
     }
     if (l == null || !Number.isFinite(l) || l <= 0) {
-      window.alert(t(`${SKM}.lengthInvalid`));
+      setInputValidationMessage(t(`${SKM}.lengthInvalid`));
       return;
     }
     const dims = normalizeQuoteSheetDims(w, l);
     if (hasDuplicateFootprintForLines(sheets, w, l)) {
-      window.alert(t(`${SKM}.duplicateSheetDims`));
+      setInputValidationMessage(t(`${SKM}.duplicateSheetDims`));
       return;
     }
     onSheetsChange([
@@ -382,12 +384,33 @@ function ThicknessSheetsPanel({
               {t(`${SKM}.deleteSheetConfirm`)}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" variant="destructive" onClick={confirmDeleteSheet}>
               {t(`${SKM}.deleteSheetDialogDelete`)}
             </Button>
             <Button type="button" variant="outline" onClick={() => setDeleteTargetId(null)}>
               {t("common.cancel")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={inputValidationMessage != null}
+        onOpenChange={(open) => {
+          if (!open) setInputValidationMessage(null);
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-md" dir="rtl">
+          <DialogHeader className="text-start sm:text-start">
+            <DialogTitle>{t(`${SKM}.alertDialogTitle`)}</DialogTitle>
+            <DialogDescription className="text-start text-sm leading-relaxed">
+              {inputValidationMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
+            <Button type="button" onClick={() => setInputValidationMessage(null)}>
+              {t(`${SKM}.alertDialogOk`)}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -408,7 +431,7 @@ function ThicknessSheetsPanel({
                 editingLine.id
               )
             ) {
-              window.alert(t(`${SKM}.duplicateSheetDims`));
+              setInputValidationMessage(t(`${SKM}.duplicateSheetDims`));
               return;
             }
             onSheetsChange(

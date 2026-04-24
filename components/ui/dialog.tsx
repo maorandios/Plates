@@ -92,6 +92,14 @@ const DialogFooter = ({
 )
 DialogFooter.displayName = "DialogFooter"
 
+/**
+ * For confirmation / action rows: list the **primary** (שמור, איפוס, …) button first
+ * in DOM so it appears on the **left**; secondary (ביטול) second. Merges with
+ * {@link DialogFooter} and overrides the default `flex-col-reverse` on all breakpoints.
+ */
+const dialogFooterActionsStartClassName =
+  "flex w-full !flex-row flex-wrap items-center justify-start gap-2 sm:gap-2 sm:space-x-0"
+
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
@@ -130,4 +138,5 @@ export {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  dialogFooterActionsStartClassName,
 }

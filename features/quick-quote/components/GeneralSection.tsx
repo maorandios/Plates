@@ -8,13 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,8 +16,13 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getClients } from "@/lib/store";
-import { MATERIAL_TYPE_LABELS, type MaterialType } from "@/types/materials";
+import {
+  MATERIAL_TYPE_LABELS,
+  MATERIAL_TYPE_OPTIONS,
+  type MaterialType,
+} from "@/types/materials";
 import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type { QuickQuoteJobDetails } from "../types/quickQuote";
 
 interface GeneralSectionProps {
@@ -168,19 +166,38 @@ export function GeneralSection({
         )}
       </div>
 
-      {/* Material type */}
+      {/* Material type — card picker (replaces single dropdown) */}
       <div className="space-y-2">
-        <Label htmlFor="material-type">{t("general.materialType")}</Label>
-        <Select value={materialType} onValueChange={(v) => onMaterialTypeChange(v as MaterialType)}>
-          <SelectTrigger id="material-type">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="carbonSteel">{MATERIAL_TYPE_LABELS.carbonSteel}</SelectItem>
-            <SelectItem value="stainlessSteel">{MATERIAL_TYPE_LABELS.stainlessSteel}</SelectItem>
-            <SelectItem value="aluminum">{MATERIAL_TYPE_LABELS.aluminum}</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label id="material-type-label" className="block">
+          {t("general.materialType")}
+        </Label>
+        <div
+          role="radiogroup"
+          aria-labelledby="material-type-label"
+          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+        >
+          {MATERIAL_TYPE_OPTIONS.map((mt) => {
+            const selected = materialType === mt;
+            return (
+              <button
+                key={mt}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => onMaterialTypeChange(mt)}
+                className={cn(
+                  "flex min-h-[2.75rem] w-full items-center justify-center rounded-md border border-input bg-background px-3 py-3 text-sm font-medium text-foreground shadow-sm transition-[color,box-shadow,border-color,background] outline-none",
+                  "hover:border-primary/50 hover:bg-muted/30",
+                  "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
+                  selected &&
+                    "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
+                )}
+              >
+                {MATERIAL_TYPE_LABELS[mt]}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Client picker dialog */}

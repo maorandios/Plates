@@ -29,6 +29,20 @@ import {
 import { bendPlateHolePolygonsOnFlatBlankMm } from "@/features/quick-quote/bend-plate/bendPlateHoleFlatBlank";
 import { splitMaterialGradeAndFinish } from "@/features/quick-quote/lib/plateFields";
 
+/**
+ * Finish label from a full `grade · finish` line. When the line is grade-only,
+ * `splitMaterialGradeAndFinish` yields finish "—" (still truthy) — treat as missing
+ * and use `fallback` (e.g. bend `global.finish` when `global.material` is grade-only).
+ */
+function finishForDrawingTitle(
+  materialLine: string,
+  fallbackFinish?: string
+): string {
+  const { finish } = splitMaterialGradeAndFinish(materialLine);
+  if (finish && finish !== "—") return finish;
+  return (fallbackFinish ?? "").trim();
+}
+
 // ---------------------------------------------------------------------------
 // Page constants (mm) — A4 landscape
 // ---------------------------------------------------------------------------
@@ -239,6 +253,27 @@ function heb(s: string): string {
   return s.split("").reverse().join("");
 }
 
+/**
+ * ASCII / typographic quotes are often missing as glyphs in the Noto Sans Hebrew
+ * subset used with Identity-H. jsPDF’s pdfEscape16 aborts the whole Tj on glyph id 0,
+ * so a single `"` (especially at the start) can blank the entire client name. Map to
+ * Hebrew gershayim/geresh so every code point is representable in the same font.
+ */
+function sanitizeClientNameForHebrewIdentityPdf(s: string): string {
+  return s
+    .replace(
+      /[\u0022\u201C\u201D\u201E\u00AB\u00BB\uFF02]/g,
+      "\u05F4" /* gershayim */
+    )
+    .replace(
+      /[\u0027\u2018\u2019\u201A\u201B\u00B4]/g,
+      "\u05F3" /* geresh */
+    );
+}
+
+/** Shown in title block with גימור when stock is checkered; matches BOM column `פח מרוג`. */
+const TITLE_BLOCK_PACH_MAROG = "פח מרוג";
+
 function setHebFont(doc: jsPDF, size: number, _bold = false): void {
   try {
     doc.setFont(SHEET_FONT_HEBREW, "normal");
@@ -255,6 +290,30 @@ function setLatFont(doc: jsPDF, size: number, _bold = false): void {
     doc.setFont("helvetica", "normal");
   }
   doc.setFontSize(size);
+}
+
+/**
+ * jsPDF's getTextWidth for long Identity-H / Hebrew lines can be far too
+ * small (same root cause as align:right quirks). We take the max of: whole string,
+ * logical Hebrew (when different from vis), and sum of per-codepoint widths, which
+ * matches what is actually painted and avoids a huge negative x-offset that clips to
+ * a single visible glyph.
+ */
+function robustPdfTextLineWidthMm(
+  doc: jsPDF,
+  vis: string,
+  logicalHebrew?: string
+): number {
+  const wWhole = doc.getTextWidth(vis);
+  let wSum = 0;
+  for (const ch of Array.from(vis)) {
+    wSum += doc.getTextWidth(ch);
+  }
+  const wLog =
+    logicalHebrew && logicalHebrew !== vis
+      ? doc.getTextWidth(logicalHebrew)
+      : 0;
+  return Math.max(wWhole, wSum, wLog);
 }
 
 // ---------------------------------------------------------------------------
@@ -1100,6 +1159,8 @@ function drawTitleBlock(
   weightKg: number,
   quantity: number,
   finish: string,
+  /** From part / bend global — `true` when stock is checkered; shows `גימור . פח מרוג` in the PDF. */
+  corrugated: boolean,
   materialType: MaterialType,
   areaM2: number,
   geometryLabel: string,
@@ -1120,8 +1181,6 @@ function drawTitleBlock(
     const [, y, mo, d] = m;
     return `${d}/${mo}/${y}`;
   })();
-  const finishDisplay =
-    finish && finish !== "ללא" ? finish : "-";
   const matTypeHe = MATERIAL_TYPE_LABELS[materialType];
   const clientDisplay = customerName?.trim() || "—";
   const referenceDisplay = quoteReference.trim() || partName;
@@ -1130,62 +1189,105 @@ function drawTitleBlock(
   const clientColL = TB_C1 + pad;
   const clientColW = valueRightX - clientColL;
   /**
-   * Client name in the right column: end-aligned in [clientColL, valueRightX].
-   * Do not use `align: "right"` with `heb()` on Identity-H — jsPDF can mis-compute
-   * line width and only one glyph is visible. Same pattern as `valBLheb`: `heb(s)` + left edge
-   * at `valueRightX - getTextWidth(...)`, and wrap with `splitTextToSize` when needed.
+   * Client name in the right column: left-aligned at `clientColL` (same as מספר חלק, עובי, …).
+   * Do not use `align: "right"` with `heb()` on Identity-H — mis-sized width. Use
+   * {@link robustPdfTextLineWidthMm}; cap width to `clientColW`.
+   * Long text: scale font, then multi-line (greedy by measured width, not
+   * `splitTextToSize` — unreliable for Hebrew).
    */
+  const fsClientMin = 3.8;
   function valClientNameValue(y: number, s: string): void {
     const t = s.trim();
     if (!t) {
       setLatFont(doc, fsVal);
       doc.setTextColor(0);
-      doc.text("—", valueRightX, y, { align: "right", baseline: "middle" });
+      doc.text("—", clientColL, y, { baseline: "middle" });
       return;
     }
     if (HEBREWS.test(t)) {
+      const tHeb = sanitizeClientNameForHebrewIdentityPdf(t);
       setHebFont(doc, fsVal);
       doc.setTextColor(0);
-      const vis = heb(t);
-      drawHebrewClientNameLines(vis, y);
+      drawClientNameCellText(heb(tHeb), tHeb, y, "heb");
     } else {
       setLatFont(doc, fsVal);
       doc.setTextColor(0);
-      drawLatinClientNameLines(t, y);
+      drawClientNameCellText(t, undefined, y, "lat");
     }
   }
-  function drawHebrewClientNameLines(vis: string, y: number): void {
-    const w = doc.getTextWidth(vis);
+  /** Visually reversed (`heb` output) for Hebrew; `logicalHeb` is the original for width cross-check. */
+  function drawClientNameCellText(
+    text: string,
+    logicalHeb: string | undefined,
+    y: number,
+    mode: "heb" | "lat"
+  ): void {
+    const setF = (fs: number) =>
+      mode === "heb" ? setHebFont(doc, fs) : setLatFont(doc, fs);
+    const widthMm = (s: string) =>
+      mode === "heb"
+        ? robustPdfTextLineWidthMm(doc, s, logicalHeb)
+        : robustPdfTextLineWidthMm(doc, s);
+    function splitToLinesGreedy(vis: string, maxW: number, fs: number): string[] {
+      setF(fs);
+      if (!vis) return [""];
+      if (widthMm(vis) <= maxW) return [vis];
+      const cps = Array.from(vis);
+      const out: string[] = [];
+      let i = 0;
+      while (i < cps.length) {
+        let end = i;
+        while (end < cps.length) {
+          const part = cps.slice(i, end + 1).join("");
+          if (widthMm(part) > maxW) break;
+          end++;
+        }
+        if (end === i) end = i + 1;
+        out.push(cps.slice(i, end).join(""));
+        i = end;
+      }
+      return out;
+    }
+    setF(fsVal);
+    let w = widthMm(text);
     if (w <= clientColW) {
-      doc.text(vis, valueRightX - w, y, { baseline: "middle" });
+      doc.text(text, clientColL, y, { baseline: "middle" });
       return;
     }
-    const lines = doc.splitTextToSize(vis, clientColW);
-    const n = lines.length;
-    const lineStep = Math.min(fsVal * 0.42, (rh - 3.5) / Math.max(n, 1));
-    const startY = y - ((n - 1) * lineStep) / 2;
-    for (let i = 0; i < n; i++) {
-      const line = lines[i];
-      const lw = doc.getTextWidth(line);
-      doc.text(line, valueRightX - Math.min(lw, clientColW), startY + i * lineStep, {
-        baseline: "middle",
-      });
+    // Linear scale: width is proportional to font size (same string + font family).
+    let fs = Math.min(
+      fsVal,
+      Math.max(fsClientMin, (fsVal * clientColW) / w)
+    );
+    setF(fs);
+    w = widthMm(text);
+    while (w > clientColW && fs > fsClientMin + 0.05) {
+      fs = Math.max(fsClientMin, fs * 0.97);
+      setF(fs);
+      w = widthMm(text);
     }
-  }
-  function drawLatinClientNameLines(t: string, y: number): void {
-    const w = doc.getTextWidth(t);
     if (w <= clientColW) {
-      doc.text(t, valueRightX - w, y, { baseline: "middle" });
+      doc.text(text, clientColL, y, { baseline: "middle" });
       return;
     }
-    const lines = doc.splitTextToSize(t, clientColW);
+    setF(fsClientMin);
+    w = widthMm(text);
+    if (w <= clientColW) {
+      doc.text(text, clientColL, y, { baseline: "middle" });
+      return;
+    }
+    const lines = splitToLinesGreedy(text, clientColW, fsClientMin);
     const n = lines.length;
-    const lineStep = Math.min(fsVal * 0.42, (rh - 3.5) / Math.max(n, 1));
+    const lineStep = Math.min(
+      fsClientMin * 0.45,
+      (rh - 3.1) / Math.max(n, 1)
+    );
     const startY = y - ((n - 1) * lineStep) / 2;
-    for (let i = 0; i < n; i++) {
-      const line = lines[i];
-      const lw = doc.getTextWidth(line);
-      doc.text(line, valueRightX - Math.min(lw, clientColW), startY + i * lineStep, {
+    for (let k = 0; k < n; k++) {
+      const line = lines[k] ?? "";
+      if (!line) continue;
+      setF(fsClientMin);
+      doc.text(line, clientColL, startY + k * lineStep, {
         baseline: "middle",
       });
     }
@@ -1258,6 +1360,34 @@ function drawTitleBlock(
     return { yL: top + 2.5, yV: top + rh - 3.35 };
   }
 
+  /**
+   * גימור from the BOM: always show the finish label (`ללא` when empty/—/ללא in data).
+   * When `corrugated` is set, also append ` . פח מרוג` in separate `doc.text` calls.
+   */
+  function valFinishGimur(left: number, y: number): void {
+    const f = (finish || "").trim();
+    const isNo = !f || f === "—" || f === "ללא";
+    const base = isNo ? "ללא" : f;
+    const baseSafe = sanitizeClientNameForHebrewIdentityPdf(base);
+    if (!corrugated) {
+      valBLheb(left, y, baseSafe);
+      return;
+    }
+    setHebFont(doc, fsVal);
+    doc.setTextColor(0);
+    const v1 = heb(baseSafe);
+    doc.text(v1, left, y, { baseline: "middle" });
+    const w1 = doc.getTextWidth(v1);
+    setLatFont(doc, fsVal);
+    const sep = " . ";
+    doc.text(sep, left + w1, y, { baseline: "middle" });
+    const wSep = doc.getTextWidth(sep);
+    setHebFont(doc, fsVal);
+    const v2 = heb(TITLE_BLOCK_PACH_MAROG);
+    doc.text(v2, left + w1 + wSep, y, { baseline: "middle" });
+    doc.setTextColor(0);
+  }
+
   // Row 0 — left: סוג חומר; right: שם הלקוח
   {
     const top = TB_T;
@@ -1283,8 +1413,7 @@ function drawTitleBlock(
     const top = TB_T + rh * 2;
     const { yL, yV } = rowY(top);
     lblTR(TB_C1 - pad, yL, "גימור");
-    if (finishDisplay === "-") valBL(TB_L + pad, yV, "-");
-    else valBLheb(TB_L + pad, yV, finishDisplay);
+    valFinishGimur(TB_L + pad, yV);
     lblTR(TB_R - pad, yL, "עובי");
     valMm(TB_C1 + pad, yV, thicknessMm);
   }
@@ -1449,8 +1578,10 @@ export async function generatePlateDrawingPdf(
         );
       }
 
-      const { grade, finish } = splitMaterialGradeAndFinish(
-        bendItem.global.material
+      const { grade } = splitMaterialGradeAndFinish(part.material);
+      const finish = finishForDrawingTitle(
+        part.material,
+        bendItem.global.finish
       );
 
       const geometryLabel = titleGeometryLabel(part, bendItem);
@@ -1470,7 +1601,8 @@ export async function generatePlateDrawingPdf(
         bendItem.global.plateWidthMm,
         unitWeightKg,
         bendItem.global.quantity,
-        finish || bendItem.global.finish || "",
+        finish,
+        !!bendItem.global.corrugated,
         materialType,
         part.areaM2,
         geometryLabel,
@@ -1493,7 +1625,8 @@ export async function generatePlateDrawingPdf(
         null
       );
 
-      const { grade, finish } = splitMaterialGradeAndFinish(part.material);
+      const { grade } = splitMaterialGradeAndFinish(part.material);
+      const finish = finishForDrawingTitle(part.material);
       const geometryLabel = titleGeometryLabel(part, null);
       const quoteRef =
         exportMeta?.quoteReference?.trim() || part.partName;
@@ -1506,6 +1639,7 @@ export async function generatePlateDrawingPdf(
         part.weightKg,
         part.qty,
         finish,
+        !!part.corrugated,
         materialType,
         part.areaM2,
         geometryLabel,

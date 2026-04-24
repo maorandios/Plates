@@ -18,6 +18,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogFooterActionsStartClassName,
 } from "@/components/ui/dialog";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
@@ -290,7 +291,7 @@ export function DxfQuotePhase({
               <li key={i}>{line}</li>
             ))}
           </ul>
-          <DialogFooter className="sm:justify-start">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" onClick={() => setValidationDialogOpen(false)}>
               {t("quote.dxfPhase.validationDialogOk")}
             </Button>
@@ -304,7 +305,7 @@ export function DxfQuotePhase({
             <DialogTitle>{t("quote.dxfPhase.confirmResetTitle")}</DialogTitle>
             <DialogDescription>{t("quote.dxfPhase.confirmResetDescription")}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" variant="destructive" onClick={confirmResetSession}>
               {t("quote.dxfPhase.confirmResetAction")}
             </Button>
@@ -321,12 +322,12 @@ export function DxfQuotePhase({
             <DialogTitle>{t("quote.dxfPhase.confirmBackTitle")}</DialogTitle>
             <DialogDescription>{t("quote.dxfPhase.confirmBackDescription")}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-start sm:gap-2 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={() => setBackConfirmOpen(false)}>
-              {t("common.cancel")}
-            </Button>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button type="button" variant="default" onClick={confirmBack}>
               {t("quote.dxfPhase.confirmBackAction")}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setBackConfirmOpen(false)}>
+              {t("common.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>

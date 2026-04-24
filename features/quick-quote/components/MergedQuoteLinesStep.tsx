@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogFooterActionsStartClassName,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
@@ -135,7 +136,7 @@ export function MergedQuoteLinesStep({
             <DialogTitle>{t(`${PP}.confirmResetTitle`)}</DialogTitle>
             <DialogDescription>{t(`${PP}.confirmResetDescription`)}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2 sm:space-x-0">
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
             <Button
               type="button"
               variant="destructive"
