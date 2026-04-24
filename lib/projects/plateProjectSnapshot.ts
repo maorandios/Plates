@@ -13,6 +13,7 @@ import type { MaterialType } from "@/types/materials";
 import { slimDxfGeometryForQuoteSnapshot } from "@/lib/store";
 import type { PlateProjectStep } from "@/features/plate-project/types/plateProject";
 import { PLATE_LOCAL_PERSISTED_EVENT } from "@/lib/plateEvents";
+import { getOrgIdFromWindow } from "@/lib/supabase/runtimePublicEnv";
 
 export const PLATE_PROJECT_SNAPSHOTS_STORAGE_KEY = "plate_project_snapshots_v1";
 
@@ -82,6 +83,42 @@ export function savePlateProjectSnapshot(
     dxfMethodGeometries: slimGeoms,
   };
   saveMap(map);
+  const orgForSync = getOrgIdFromWindow() ?? undefined;
+  void import("@/lib/projects/plateProjectList").then(({ getPlateProjectsList }) => {
+    const list = getPlateProjectsList();
+    if (!list.some((p) => p.id === id)) return;
+    void import("@/lib/supabase/entityTableSyncBrowser").then(
+      ({ syncProjectsToSupabase }) => {
+        void syncProjectsToSupabase(list, orgForSync);
+      }
+    );
+  });
+}
+
+/**
+ * Apply `public.projects.session_payload` (or legacy org sync) into the local project snapshot map.
+ */
+export function applyPlateProjectSessionPayloadFromServer(
+  id: string,
+  raw: unknown
+): boolean {
+  if (typeof window === "undefined" || !id || raw == null || typeof raw !== "object") {
+    return false;
+  }
+  const o = raw as Record<string, unknown>;
+  if (o.version !== 1 || o.jobDetails == null) return false;
+  const map = loadMap();
+  map[id] = o as unknown as PlateProjectSessionSnapshot;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    window.dispatchEvent(
+      new CustomEvent(PLATE_LOCAL_PERSISTED_EVENT, { detail: { key: STORAGE_KEY } })
+    );
+    return true;
+  } catch (e) {
+    console.warn("[PLATE] Failed to apply project session from server", e);
+    return false;
+  }
 }
 
 export function removePlateProjectSnapshot(id: string): void {

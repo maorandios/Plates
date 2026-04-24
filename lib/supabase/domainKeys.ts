@@ -23,16 +23,19 @@ export const DOMAIN_SNAPSHOT_KEYS = {
   nestingRuns: "plate_nesting_runs",
 } as const;
 
+const DOMAIN_EXCLUDED_FROM_ORG_TABLE_SYNC: ReadonlySet<string> = new Set<string>([
+  QUOTE_SNAPSHOTS_STORAGE_KEY,
+  PLATE_PROJECT_SNAPSHOTS_STORAGE_KEY,
+]);
+
 /**
  * One JSON blob per key, same string as `localStorage` (except file/dxf bundles — built in sync).
- * Clients, quotes, projects *lists* are in relational tables; these snapshots hold the heavy data.
- *
- * Quote wizard payloads are **not** synced here — they live in `public.quotes.session_payload`
- * (see {@link syncQuotesToSupabase}). `plate_quote_snapshots_v1` remains a local cache.
+ * Relational `quotes` / `projects` list rows + `session_payload` hold wizard bodies; this list
+ * omits the full quote/project snapshot keys to avoid duplicating them in `org_domain_snapshots`.
  */
 export const ALL_DOMAIN_SNAPSHOT_KEYS: string[] = [
   ...Object.values(DOMAIN_SNAPSHOT_KEYS).filter(
-    (k) => k !== QUOTE_SNAPSHOTS_STORAGE_KEY
+    (k) => !DOMAIN_EXCLUDED_FROM_ORG_TABLE_SYNC.has(k)
   ),
 ];
 

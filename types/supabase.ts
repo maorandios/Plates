@@ -243,6 +243,7 @@ export interface Database {
           total_item_qty: number | null;
           total_weight_kg: number | null;
           total_area_m2: number | null;
+          session_payload: Json | null;
         };
         Insert: {
           id: string;
@@ -258,6 +259,7 @@ export interface Database {
           total_item_qty?: number | null;
           total_weight_kg?: number | null;
           total_area_m2?: number | null;
+          session_payload?: Json | null;
         };
         Update: {
           id?: string;
@@ -273,6 +275,7 @@ export interface Database {
           total_item_qty?: number | null;
           total_weight_kg?: number | null;
           total_area_m2?: number | null;
+          session_payload?: Json | null;
         };
         Relationships: [];
       };

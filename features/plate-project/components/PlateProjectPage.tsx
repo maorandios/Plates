@@ -43,7 +43,9 @@ import {
   getPlateProjectSnapshot,
   savePlateProjectSnapshot,
   type PlateProjectPhase2Mode,
+  type PlateProjectSessionSnapshot,
 } from "@/lib/projects/plateProjectSnapshot";
+import { loadEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
 import {
   getPlateProjectsList,
   patchPlateProjectListRecord,
@@ -141,24 +143,54 @@ export function PlateProjectPage() {
     }
   }, [urlId]);
 
+  const applyProjectSnapshot = useCallback((snap: PlateProjectSessionSnapshot) => {
+    setJobDetails(snap.jobDetails);
+    setMaterialType(snap.materialType);
+    setManualQuoteRows(snap.manualQuoteRows);
+    setExcelImportQuoteRows(snap.excelImportQuoteRows);
+    setDxfMethodGeometries(snap.dxfMethodGeometries);
+    setBendPlateQuoteItems(snap.bendPlateQuoteItems);
+    setStep(snap.step);
+    setHighestStepReached(snap.highestStepReached);
+    setPhase2Mode(snap.phase2Mode);
+    setBendBuilderKey((k) => k + 1);
+  }, []);
+
   useLayoutEffect(() => {
     if (!urlId) return;
     if (hydratedUrlRef.current === urlId) return;
     const snap = getPlateProjectSnapshot(urlId);
     if (snap) {
-      setJobDetails(snap.jobDetails);
-      setMaterialType(snap.materialType);
-      setManualQuoteRows(snap.manualQuoteRows);
-      setExcelImportQuoteRows(snap.excelImportQuoteRows);
-      setDxfMethodGeometries(snap.dxfMethodGeometries);
-      setBendPlateQuoteItems(snap.bendPlateQuoteItems);
-      setStep(snap.step);
-      setHighestStepReached(snap.highestStepReached);
-      setPhase2Mode(snap.phase2Mode);
-      setBendBuilderKey((k) => k + 1);
+      applyProjectSnapshot(snap);
+      hydratedUrlRef.current = urlId;
     }
-    hydratedUrlRef.current = urlId;
-  }, [urlId]);
+  }, [urlId, applyProjectSnapshot]);
+
+  useEffect(() => {
+    if (!urlId) return;
+    if (hydratedUrlRef.current === urlId) return;
+    if (getPlateProjectSnapshot(urlId)) {
+      hydratedUrlRef.current = urlId;
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const data = await loadEntityTablesForOrg();
+      if (cancelled) return;
+      if ("error" in data) {
+        hydratedUrlRef.current = urlId;
+        return;
+      }
+      const snap = getPlateProjectSnapshot(urlId);
+      if (snap) {
+        applyProjectSnapshot(snap);
+      }
+      hydratedUrlRef.current = urlId;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [urlId, applyProjectSnapshot]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -348,6 +380,18 @@ export function PlateProjectPage() {
   }, [advanceTo]);
 
   const handleSaveProjectToList = useCallback(() => {
+    /** Synchronous — debounced effect may be cancelled; cloud row must get full `session_payload`. */
+    savePlateProjectSnapshot(projectId, {
+      jobDetails,
+      materialType,
+      manualQuoteRows,
+      excelImportQuoteRows,
+      dxfMethodGeometries,
+      bendPlateQuoteItems,
+      step,
+      highestStepReached,
+      phase2Mode,
+    });
     const js = jobSummaryFromParts(mergedQuotePartsList);
     upsertPlateProjectInProgress({
       id: projectId,
@@ -364,10 +408,15 @@ export function PlateProjectPage() {
   }, [
     mergedQuotePartsList,
     projectId,
-    jobDetails.referenceNumber,
-    jobDetails.customerName,
-    jobDetails.projectName,
+    jobDetails,
     materialType,
+    manualQuoteRows,
+    excelImportQuoteRows,
+    dxfMethodGeometries,
+    bendPlateQuoteItems,
+    step,
+    highestStepReached,
+    phase2Mode,
   ]);
 
   const handleBackFromCreatePlansPicker = useCallback(() => {

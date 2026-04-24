@@ -1,24 +1,45 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { FileQuestion } from "lucide-react";
 import { ProjectPreviewView } from "@/features/plate-project/components/ProjectPreviewView";
-import { getPlateProjectSnapshot } from "@/lib/projects/plateProjectSnapshot";
+import {
+  getPlateProjectSnapshot,
+  type PlateProjectSessionSnapshot,
+} from "@/lib/projects/plateProjectSnapshot";
 import { getPlateProjectsList } from "@/lib/projects/plateProjectList";
 import type { ProjectPreviewListMeta } from "@/features/plate-project/components/ProjectPreviewView";
+import { loadEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
 import { t } from "@/lib/i18n";
 
 export default function ProjectPreviewPage() {
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : "";
+  const [snapshot, setSnapshot] = useState<PlateProjectSessionSnapshot | null>(null);
 
-  const snapshot = useMemo(
-    () => (typeof window === "undefined" ? null : getPlateProjectSnapshot(id)),
-    [id]
-  );
+  useEffect(() => {
+    if (!id) {
+      setSnapshot(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      let s = getPlateProjectSnapshot(id);
+      if (!s) {
+        const data = await loadEntityTablesForOrg();
+        if (!cancelled && !("error" in data)) {
+          s = getPlateProjectSnapshot(id);
+        }
+      }
+      if (!cancelled) setSnapshot(s);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const listMeta = useMemo((): ProjectPreviewListMeta => {
     if (!snapshot) {

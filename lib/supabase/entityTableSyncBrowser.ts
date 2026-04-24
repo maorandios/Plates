@@ -25,6 +25,10 @@ import {
   applyQuoteSessionPayloadFromServer,
   getQuoteSnapshot,
 } from "@/lib/quotes/quoteSnapshot";
+import {
+  applyPlateProjectSessionPayloadFromServer,
+  getPlateProjectSnapshot,
+} from "@/lib/projects/plateProjectSnapshot";
 
 async function getBrowserOrgId(): Promise<string | null> {
   if (!isSupabaseConfigured() || typeof window === "undefined") {
@@ -200,9 +204,15 @@ export async function syncProjectsToSupabase(
   if (projects.length === 0) {
     return { ok: true };
   }
-  const { error } = await supabase
-    .from("projects")
-    .upsert(projects.map((p) => projectToRow(orgId, p)), { onConflict: "id" });
+  const pRows = projects.map((p) => {
+    const base = projectToRow(orgId, p);
+    const snap = getPlateProjectSnapshot(p.id);
+    return {
+      ...base,
+      session_payload: (snap ?? null) as unknown as Json,
+    };
+  });
+  const { error } = await supabase.from("projects").upsert(pRows, { onConflict: "id" });
   if (error) {
     return { ok: false, error: error.message };
   }
@@ -321,6 +331,12 @@ export async function loadEntityTablesForOrg(): Promise<
     const row = r as { id: string; session_payload?: unknown };
     if (row.session_payload != null) {
       applyQuoteSessionPayloadFromServer(row.id, row.session_payload);
+    }
+  }
+  for (const r of pRes.data ?? []) {
+    const row = r as { id: string; session_payload?: unknown };
+    if (row.session_payload != null) {
+      applyPlateProjectSessionPayloadFromServer(row.id, row.session_payload);
     }
   }
   return {
