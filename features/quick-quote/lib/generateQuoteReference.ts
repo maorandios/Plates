@@ -1,22 +1,31 @@
 /**
- * Short client-side quote reference: `OM-` + 4 digits (0001–9999), unique vs existing list.
+ * Next `OM-` + 4 digits (0001–9999), unique across both quick quotes and plate projects
+ * (so new projects are not re-using the same number as an unsaved/parallel quote, or other projects).
  */
 import { getQuotesList } from "@/lib/quotes/quoteList";
+import { getPlateProjectsList } from "@/lib/projects/plateProjectList";
 
 const PREFIX = "OM-";
+const OM_RE = /^OM-(\d{1,4})$/;
 
-function maxOmSequenceFromList(): number {
-  if (typeof window === "undefined") return 0;
+function maxOmFromRefs(refs: readonly string[]): number {
   let max = 0;
-  for (const q of getQuotesList()) {
-    const ref = q.referenceNumber?.trim() ?? "";
-    const m = /^OM-(\d{1,4})$/.exec(ref);
+  for (const raw of refs) {
+    const ref = raw?.trim() ?? "";
+    const m = OM_RE.exec(ref);
     if (m) {
       const n = parseInt(m[1], 10);
       if (Number.isFinite(n)) max = Math.max(max, n);
     }
   }
   return max;
+}
+
+function maxOmSequenceFromList(): number {
+  if (typeof window === "undefined") return 0;
+  const fromQuotes = maxOmFromRefs(getQuotesList().map((q) => q.referenceNumber));
+  const fromProjects = maxOmFromRefs(getPlateProjectsList().map((p) => p.referenceNumber));
+  return Math.max(fromQuotes, fromProjects);
 }
 
 export function generateQuoteReference(): string {
