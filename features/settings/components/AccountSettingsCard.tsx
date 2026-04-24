@@ -16,7 +16,7 @@ const SA = "pages.settingsAccount" as const;
 
 const fieldClass =
   "w-full border-border bg-background text-start text-foreground shadow-none " +
-  "placeholder:text-muted-foreground focus-visible:ring-primary/30";
+  "placeholder:text-muted-foreground";
 
 const labelClass = "block w-full text-start text-sm font-semibold text-foreground";
 
