@@ -1,5 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  isPublicPath,
+  safeInternalNextPath,
+  safeNextPathParam,
+} from "@/lib/auth/publicPaths";
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -32,7 +37,30 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+
+  if (user && (pathname === "/login" || pathname.startsWith("/login/"))) {
+    const nextParam = safeNextPathParam(
+      request.nextUrl.searchParams.get("next")
+    );
+    return NextResponse.redirect(new URL(nextParam, request.url));
+  }
+
+  if (!user) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isPublicPath(pathname)) {
+      const login = new URL("/login", request.url);
+      const intended = pathname + (request.nextUrl.search || "");
+      login.searchParams.set("next", safeInternalNextPath(intended));
+      return NextResponse.redirect(login);
+    }
+  }
 
   return supabaseResponse;
 }

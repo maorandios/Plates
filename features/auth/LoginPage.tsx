@@ -1,11 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
+import { Suspense, useId, useMemo, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { setOnboardingPending } from "@/lib/onboardingLocal";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
+import { safeInternalNextPath } from "@/lib/auth/publicPaths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,8 +58,17 @@ function OrDivider() {
   );
 }
 
-export function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = useMemo(() => {
+    const raw = searchParams.get("next");
+    if (raw) {
+      return safeInternalNextPath(raw);
+    }
+    return "/";
+  }, [searchParams]);
+
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const emailId = useId();
@@ -70,9 +80,10 @@ export function LoginPage() {
   const magicLinkDisabledHint = t("auth.magicLinkDisabledHint");
   const useSupabase = isSupabaseConfigured();
 
-  const redirectTo = () => {
+  const authCallbackUrl = () => {
     if (typeof window === "undefined") return "";
-    return `${window.location.origin}/auth/callback?next=/`;
+    const enc = encodeURIComponent(nextPath);
+    return `${window.location.origin}/auth/callback?next=${enc}`;
   };
 
   const afterMagicOrGoogleLocal = () => {
@@ -81,7 +92,7 @@ export function LoginPage() {
       router.push("/onboarding");
       return;
     }
-    router.push("/");
+    router.push(nextPath === "/" ? "/" : nextPath);
   };
 
   const signInWithEmail = async () => {
@@ -93,7 +104,7 @@ export function LoginPage() {
       const supabase = createClient();
       const { error: err } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: { emailRedirectTo: redirectTo() },
+        options: { emailRedirectTo: authCallbackUrl() },
       });
       if (err) {
         setError(t("auth.authGenericError"));
@@ -115,7 +126,7 @@ export function LoginPage() {
       const supabase = createClient();
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: redirectTo() },
+        options: { redirectTo: authCallbackUrl() },
       });
       if (err) {
         setError(t("auth.authGenericError"));
@@ -275,5 +286,21 @@ export function LoginPage() {
         aria-hidden
       />
     </div>
+  );
+}
+
+export function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50svh] w-full items-center justify-center bg-background">
+          <span className="text-muted-foreground text-sm" aria-hidden>
+            …
+          </span>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }
