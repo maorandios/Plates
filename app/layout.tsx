@@ -29,11 +29,27 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  const supabasePublicJson =
+    sbUrl && sbKey
+      ? JSON.stringify({ url: sbUrl, key: sbKey })
+      : "";
+
   return (
     <html lang="he" dir="rtl" suppressHydrationWarning>
       <body
         className={`${notoSansHebrew.variable} ${notoSansHebrew.className} antialiased`}
       >
+        {supabasePublicJson ? (
+          <Script
+            id="plate-supabase-public-env"
+            strategy="beforeInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `try{window.__PLATE_PUBLIC_SUPABASE__=${supabasePublicJson};}catch(e){}`,
+            }}
+          />
+        ) : null}
         <Script
           id="plate-theme-init"
           strategy="beforeInteractive"

@@ -1,15 +1,15 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import { getPublicSupabaseConfig } from "@/lib/supabase/runtimePublicEnv";
 import type { Database } from "@/types/supabase";
 
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
+  const cfg = getPublicSupabaseConfig();
+  if (!cfg) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      "Missing Supabase URL/key. In Vercel, set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY and redeploy."
     );
   }
-  return createBrowserClient<Database>(url, key);
+  return createBrowserClient<Database>(cfg.url, cfg.key);
 }

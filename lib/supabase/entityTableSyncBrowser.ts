@@ -4,6 +4,7 @@
  */
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
+import { getOrgIdFromWindow } from "@/lib/supabase/runtimePublicEnv";
 import {
   clientToRow,
   projectToRow,
@@ -22,34 +23,43 @@ async function getBrowserOrgId(): Promise<string | null> {
   if (!isSupabaseConfigured() || typeof window === "undefined") {
     return null;
   }
-  const supabase = createClient();
-  await supabase.auth.getSession();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[PLATE] Supabase entity sync: no auth session");
+  const fromBootstrap = getOrgIdFromWindow();
+  if (fromBootstrap) {
+    return fromBootstrap;
+  }
+  try {
+    const supabase = createClient();
+    await supabase.auth.getSession();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn(
+        "[PLATE] Supabase sync: no session — sign in so data can save to the cloud."
+      );
+      return null;
     }
+    const { data: rows, error } = await supabase
+      .from("organization_members")
+      .select("org_id")
+      .eq("user_id", user.id)
+      .limit(1);
+    if (error) {
+      console.warn("[PLATE] org lookup failed", error.message);
+      return null;
+    }
+    return rows?.[0]?.org_id ?? null;
+  } catch (e) {
+    console.warn("[PLATE] getBrowserOrgId error", e);
     return null;
   }
-  const { data: m, error } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.warn("[PLATE] org lookup failed", error.message);
-  }
-  return m?.org_id ?? null;
 }
 
 export async function syncClientsToSupabase(
   clients: Client[]
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
-    return { ok: true };
+    return { ok: false, error: "supabase_not_configured_in_browser" };
   }
   const orgId = await getBrowserOrgId();
   if (!orgId) {
@@ -90,7 +100,7 @@ export async function syncQuotesToSupabase(
   quotes: QuoteListRecord[]
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
-    return { ok: true };
+    return { ok: false, error: "supabase_not_configured_in_browser" };
   }
   const orgId = await getBrowserOrgId();
   if (!orgId) {
@@ -130,7 +140,7 @@ export async function syncProjectsToSupabase(
   projects: PlateProjectListRecord[]
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
-    return { ok: true };
+    return { ok: false, error: "supabase_not_configured_in_browser" };
   }
   const orgId = await getBrowserOrgId();
   if (!orgId) {
@@ -170,7 +180,7 @@ export async function syncSteelTypesFromMaterialConfigs(
   configs: MaterialConfig[]
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
-    return { ok: true };
+    return { ok: false, error: "supabase_not_configured_in_browser" };
   }
   const orgId = await getBrowserOrgId();
   if (!orgId) {

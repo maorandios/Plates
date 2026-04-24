@@ -41,6 +41,15 @@ export function OrgBootstrapProvider({ children }: { children: React.ReactNode }
     run();
   }, [run]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (session?.ok) {
+      window.__PLATE_ORG_ID__ = session.orgId;
+    } else {
+      delete window.__PLATE_ORG_ID__;
+    }
+  }, [session]);
+
   const value = useMemo(
     () => ({
       loading,
