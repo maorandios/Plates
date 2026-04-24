@@ -13,6 +13,7 @@ import type { MaterialType } from "@/types/materials";
 import type { DxfPartGeometry } from "@/types";
 import { slimDxfGeometryForQuoteSnapshot } from "@/lib/store";
 import { PLATE_LOCAL_PERSISTED_EVENT } from "@/lib/plateEvents";
+import { getOrgIdFromWindow } from "@/lib/supabase/runtimePublicEnv";
 
 export const QUOTE_SNAPSHOTS_STORAGE_KEY = "plate_quote_snapshots_v1";
 
@@ -138,12 +139,13 @@ export function saveQuoteSnapshot(
   const entrySlim = buildSnapshotEntry(payload, slimGeoms);
   const okSlim = persistWithPruning(id, entrySlim);
   if (okSlim) {
+    const orgForSync = getOrgIdFromWindow() ?? undefined;
     void import("@/lib/quotes/quoteList").then(({ getQuotesList }) => {
       const list = getQuotesList();
       if (!list.some((q) => q.id === id)) return;
       void import("@/lib/supabase/entityTableSyncBrowser").then(
         ({ syncQuotesToSupabase }) => {
-          void syncQuotesToSupabase(list);
+          void syncQuotesToSupabase(list, orgForSync);
         }
       );
     });
@@ -156,12 +158,13 @@ export function saveQuoteSnapshot(
     console.warn(
       "[PLATE] Quote snapshot stored with minimal DXF data (storage quota). Part geometry previews may be empty."
     );
+    const orgForSync = getOrgIdFromWindow() ?? undefined;
     void import("@/lib/quotes/quoteList").then(({ getQuotesList }) => {
       const list = getQuotesList();
       if (!list.some((q) => q.id === id)) return;
       void import("@/lib/supabase/entityTableSyncBrowser").then(
         ({ syncQuotesToSupabase }) => {
-          void syncQuotesToSupabase(list);
+          void syncQuotesToSupabase(list, orgForSync);
         }
       );
     });

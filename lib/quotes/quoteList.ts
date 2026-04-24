@@ -3,6 +3,7 @@
  */
 
 import { removeQuoteSnapshot } from "./quoteSnapshot";
+import { getOrgIdFromWindow } from "@/lib/supabase/runtimePublicEnv";
 
 export type QuoteListStatus = "in_progress" | "complete";
 
@@ -106,9 +107,10 @@ function save(list: QuoteListRecord[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(capped));
     window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
     if (typeof window !== "undefined") {
+      const orgForSync = getOrgIdFromWindow() ?? undefined;
       void import("@/lib/supabase/entityTableSyncBrowser").then(
         ({ syncQuotesToSupabase }) => {
-          void syncQuotesToSupabase(capped);
+          void syncQuotesToSupabase(capped, orgForSync);
         }
       );
     }
@@ -118,9 +120,10 @@ function save(list: QuoteListRecord[]): void {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
         window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+        const orgForSync = getOrgIdFromWindow() ?? undefined;
         void import("@/lib/supabase/entityTableSyncBrowser").then(
           ({ syncQuotesToSupabase }) => {
-            void syncQuotesToSupabase(pruned);
+            void syncQuotesToSupabase(pruned, orgForSync);
           }
         );
         return;

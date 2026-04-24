@@ -6,7 +6,10 @@ import {
   patchOrgSettings,
   upsertDomainSnapshot,
 } from "@/app/actions/orgData";
-import { syncSteelTypesFromMaterialConfigs } from "@/lib/supabase/entityTableSyncBrowser";
+import {
+  syncAllEntityTablesForOrg,
+  syncSteelTypesFromMaterialConfigs,
+} from "@/lib/supabase/entityTableSyncBrowser";
 import { applyRemoteDataToLocalStorage } from "@/lib/supabase/hydrateClient";
 import {
   ALL_DOMAIN_SNAPSHOT_KEYS,
@@ -119,6 +122,10 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
         } catch (e) {
           console.warn("[PLATE] bundle sync error:", bundleKey, e);
         }
+      }
+      const entity = await syncAllEntityTablesForOrg(oid);
+      if (!entity.ok) {
+        console.warn("[PLATE] Supabase entity tables sync failed:", entity.error);
       }
     } catch (e) {
       console.warn("[PLATE] Supabase pushToServer error", e);

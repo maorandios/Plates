@@ -16,7 +16,9 @@ import {
 } from "@/lib/supabase/entityMappers";
 import type { Client } from "@/types/clients";
 import type { QuoteListRecord } from "@/lib/quotes/quoteList";
+import { getQuotesList } from "@/lib/quotes/quoteList";
 import type { PlateProjectListRecord } from "@/lib/projects/plateProjectList";
+import { getPlateProjectsList } from "@/lib/projects/plateProjectList";
 import type { MaterialConfig } from "@/types/materials";
 import type { Json } from "@/types/supabase";
 import {
@@ -60,13 +62,31 @@ async function getBrowserOrgId(): Promise<string | null> {
   }
 }
 
+const PLATE_CLIENTS_LS = "plate_clients";
+
+function readClientsFromLocalStorage(): Client[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PLATE_CLIENTS_LS);
+    if (!raw) return [];
+    return JSON.parse(raw) as Client[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * @param orgIdForSync When set (e.g. org id from session / `pushToServer`), avoids relying on
+ * `window.__PLATE_ORG_ID__` being set before the first sync.
+ */
 export async function syncClientsToSupabase(
-  clients: Client[]
+  clients: Client[],
+  orgIdForSync?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "supabase_not_configured_in_browser" };
   }
-  const orgId = await getBrowserOrgId();
+  const orgId = orgIdForSync ?? (await getBrowserOrgId());
   if (!orgId) {
     return { ok: false, error: "no_org_or_session" };
   }
@@ -102,12 +122,13 @@ export async function syncClientsToSupabase(
 }
 
 export async function syncQuotesToSupabase(
-  quotes: QuoteListRecord[]
+  quotes: QuoteListRecord[],
+  orgIdForSync?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "supabase_not_configured_in_browser" };
   }
-  const orgId = await getBrowserOrgId();
+  const orgId = orgIdForSync ?? (await getBrowserOrgId());
   if (!orgId) {
     return { ok: false, error: "no_org_or_session" };
   }
@@ -148,12 +169,13 @@ export async function syncQuotesToSupabase(
 }
 
 export async function syncProjectsToSupabase(
-  projects: PlateProjectListRecord[]
+  projects: PlateProjectListRecord[],
+  orgIdForSync?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "supabase_not_configured_in_browser" };
   }
-  const orgId = await getBrowserOrgId();
+  const orgId = orgIdForSync ?? (await getBrowserOrgId());
   if (!orgId) {
     return { ok: false, error: "no_org_or_session" };
   }
@@ -183,6 +205,33 @@ export async function syncProjectsToSupabase(
     .upsert(projects.map((p) => projectToRow(orgId, p)), { onConflict: "id" });
   if (error) {
     return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+/**
+ * Pushes `plate_clients`, `plate_quotes_list_v1`, and `plate_projects_list_v1` to Supabase
+ * in one shot. Call with the same `orgId` as `SupabaseSyncProvider` `pushToServer` so
+ * relational tables stay aligned with `org_domain_snapshots` on the live app.
+ */
+export async function syncAllEntityTablesForOrg(
+  orgId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isSupabaseConfigured() || typeof window === "undefined" || !orgId) {
+    return { ok: true };
+  }
+  const clients = readClientsFromLocalStorage();
+  const [c, q, p] = await Promise.all([
+    syncClientsToSupabase(clients, orgId),
+    syncQuotesToSupabase(getQuotesList(), orgId),
+    syncProjectsToSupabase(getPlateProjectsList(), orgId),
+  ]);
+  const errors: string[] = [];
+  if (!c.ok) errors.push(`clients: ${c.error}`);
+  if (!q.ok) errors.push(`quotes: ${q.error}`);
+  if (!p.ok) errors.push(`projects: ${p.error}`);
+  if (errors.length > 0) {
+    return { ok: false, error: errors.join("; ") };
   }
   return { ok: true };
 }

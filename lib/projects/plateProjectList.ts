@@ -3,6 +3,7 @@
  */
 
 import { removePlateProjectSnapshot } from "./plateProjectSnapshot";
+import { getOrgIdFromWindow } from "@/lib/supabase/runtimePublicEnv";
 
 export type PlateProjectListStatus = "in_progress" | "complete";
 
@@ -86,9 +87,10 @@ function save(list: PlateProjectListRecord[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(capped));
     window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+    const orgForSync = getOrgIdFromWindow() ?? undefined;
     void import("@/lib/supabase/entityTableSyncBrowser").then(
       ({ syncProjectsToSupabase }) => {
-        void syncProjectsToSupabase(capped);
+        void syncProjectsToSupabase(capped, orgForSync);
       }
     );
   } catch (e) {

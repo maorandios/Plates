@@ -24,6 +24,7 @@ import { deriveClientCode, generateClientCode, isSafeClientCode } from "@/lib/co
 import { slimNestingRunForStorage } from "@/lib/nesting/slimNestingRunForStorage";
 import { nanoid } from "@/lib/utils/nanoid";
 import { PLATE_LOCAL_PERSISTED_EVENT } from "@/lib/plateEvents";
+import { getOrgIdFromWindow } from "@/lib/supabase/runtimePublicEnv";
 function normalizeBatch(b: Batch): Batch {
   const cm = b.cuttingMethod;
   if (cm === "laser" || cm === "plasma" || cm === "oxy_fuel") {
@@ -86,9 +87,10 @@ function saveToStorage<T>(key: string, data: T[]): void {
 function saveClientsToStorage(clients: Client[]): void {
   saveToStorage(STORAGE_KEYS.clients, clients);
   if (typeof window !== "undefined") {
+    const orgForSync = getOrgIdFromWindow() ?? undefined;
     void import("@/lib/supabase/entityTableSyncBrowser").then(
       ({ syncClientsToSupabase }) => {
-        void syncClientsToSupabase(clients).then((r) => {
+        void syncClientsToSupabase(clients, orgForSync).then((r) => {
           if (!r.ok) {
             console.warn("[PLATE] Supabase clients sync failed:", r.error);
           }
