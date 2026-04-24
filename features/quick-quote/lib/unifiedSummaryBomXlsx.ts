@@ -160,8 +160,8 @@ export async function buildUnifiedSummaryBomXlsxBuffer(parts: QuotePartRow[]): P
       const corLabel =
         p.bendTemplateId != null || isDxf
           ? p.corrugated === true
-            ? t("quote.bendPlatePhase.plateCorrugatedYes")
-            : t("quote.bendPlatePhase.plateCorrugatedNo")
+            ? t("common.yes")
+            : t("common.no")
           : "";
       values.push(corLabel);
     }

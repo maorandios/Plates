@@ -392,8 +392,13 @@ interface PartBreakdownTableProps {
   materialType?: MaterialType;
   materialPricePerKgByRow?: Record<string, string>;
   dxfPartGeometries?: DxfPartGeometry[] | null;
-  /** When set, adds per-row "ייצא קובץ" (DXF + PDF + Excel ZIP). */
+  /**
+   * When set, enables export handlers (per-row and/or full package).
+   * Per-row "ייצא קובץ" column also requires `showPerRowFileExport`.
+   */
   partPackageExport?: PartPackageExportContext | null;
+  /** Per-row "ייצא קובץ" column. Off for quick-quote step 3 unified table; on for e.g. plate project. */
+  showPerRowFileExport?: boolean;
   /**
    * Full-table ZIP ("ייצוא חבילת ביצוע"). Off for quick-quote step 3; on for plate-project summary.
    * When `partPackageExport` is null, this has no effect.
@@ -409,6 +414,7 @@ export function PartBreakdownTable({
   materialPricePerKgByRow,
   dxfPartGeometries,
   partPackageExport = null,
+  showPerRowFileExport = true,
   showFullExecutionPackageButton = true,
 }: PartBreakdownTableProps) {
   const [previewPart, setPreviewPart] = useState<QuotePartRow | null>(null);
@@ -444,7 +450,7 @@ export function PartBreakdownTable({
   );
   const showDelete = Boolean(onDeletePart);
   const showMaterialPricing = Boolean(materialType && materialPricePerKgByRow);
-  const showExportRow = Boolean(partPackageExport);
+  const showExportRow = Boolean(partPackageExport) && showPerRowFileExport;
 
   const columnWidthsPct = useMemo(
     () =>
@@ -457,7 +463,13 @@ export function PartBreakdownTable({
           showCorrugatedColumn
         )
       ),
-    [showRefColumn, showDelete, showMaterialPricing, showExportRow, showCorrugatedColumn]
+    [
+      showRefColumn,
+      showDelete,
+      showMaterialPricing,
+      showExportRow,
+      showCorrugatedColumn,
+    ]
   );
 
   const handleExportRow = useCallback(

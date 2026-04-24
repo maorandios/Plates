@@ -17,7 +17,52 @@
     "settings": "הגדרות",
     "accountSettings": "הגדרות חשבון",
     "materialsConfig": "חומרים ומלאי",
-    "billAndUsage": "חיוב ושימוש"
+    "billAndUsage": "חיוב ושימוש",
+    "logOutFromSystem": "התנתק מהמערכת"
+  },
+  "auth": {
+    "screenAria": "התחברות או יצירת חשבון",
+    "titleLogin": "התחברות",
+    "titleSignup": "הרשמה",
+    "subtitle": "התחברו לחשבון כדי לנהל הצעות מחיר ופרויקטים",
+    "email": "אימייל",
+    "emailPlaceholder": "הקלידו כתובת אימייל",
+    "password": "סיסמה",
+    "passwordPlaceholder": "הקלידו סיסמה",
+    "fullName": "שם מלא",
+    "fullNamePlaceholder": "יוסי כהן",
+    "submitLogin": "התחברות",
+    "submitSignup": "הרשמה",
+    "magicLinkLoginButton": "שליחת קישור התחברות לדוא״ל",
+    "magicLinkDisabledHint": "יש להזין כתובת אימייל תקינה",
+    "magicLinkSignUp": "שליחת קישור הרשמה לדוא״ל",
+    "signUpWithGoogle": "הרשמה באמצעות חשבון GOOGLE",
+    "magicLinkSubtext": "ללא סיסמה — נשלח לכם קישור להתחברות בדוא״ל",
+    "magicLinkSubtextSignUp": "ללא סיסמה — נשלח לכם קישור להרשמה בדוא״ל",
+    "magicLinkDivider": "או",
+    "loginWithGoogle": "התחבר באמצעות חשבון GOOGLE",
+    "footerNoAccount": "אין לכם חשבון?",
+    "footerSignUp": "הרשמה",
+    "footerHasAccount": "כבר יש לכם חשבון?",
+    "footerLogIn": "התחברות",
+    "copyrightFooter": "© כל הזכויות שמורות אומגות"
+  },
+  "onboarding": {
+    "welcomeTitle": "ברוכים הבאים",
+    "welcomeBody": "מערכת אומגות תעזור לכם ליצור הצעות מחיר עבור הלקוחות שלכם בצורה מדויקת, יעילה ומהירה.\nלאחר הזנת פרטי החברה שלכם תועברו ישירות למערכת והתחילו ליצור הצעות מחיר בקליק.",
+    "startCta": "לחץ כאן להתחלה",
+    "progress": "שלב {{current}} מתוך {{total}}",
+    "fieldBusinessName": "הזינו את שם העסק",
+    "fieldRegistration": "הזינו את מספר הח.פ או עוסק מורשה",
+    "fieldPhone": "הזינו מספר טלפון",
+    "addressScreenTitle": "הזינו את כתובת העסק והעיר",
+    "fieldAddress": "כתובת",
+    "fieldCity": "עיר",
+    "next": "המשך",
+    "back": "חזרה",
+    "doneTitle": "תודה רבה",
+    "doneBody": "תהליך הרישום הושלם, התחילו ליצור הצעות מחיר בקליק.",
+    "doneCta": "הושלם"
   },
   "header": {
     "client": "לקוח",
@@ -89,6 +134,11 @@
       "quantityAnalysis": "ניתוח כמויות",
       "pricing": "תמחור",
       "finalize": "סיום"
+    },
+    "exportPackage": {
+      "folderDrawings": "תוכניות ייצור",
+      "folderDxf": "קבצי DXF",
+      "plateListFileName": "{{quoteId}} רשימת פלטות"
     },
     "pricingPhase": {
       "pageTitle": "תמחור חומרים",

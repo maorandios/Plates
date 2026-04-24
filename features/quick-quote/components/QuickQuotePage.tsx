@@ -915,6 +915,7 @@ export function QuickQuotePage() {
               referenceNumber={jobDetails.referenceNumber}
               customerName={jobDetails.customerName}
               showFullExecutionPackageButton={false}
+              showPerRowFileExport={false}
             />
           )}
 

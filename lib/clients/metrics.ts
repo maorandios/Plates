@@ -1,5 +1,6 @@
 import type { ClientMetrics, Part } from "@/types";
 import { getBatches, getParts } from "@/lib/store";
+import { getQuotesForClient } from "@/lib/quotes/quoteList";
 import {
   estimateDxfTotalWeightKg,
   excelReferenceTotalKg,
@@ -27,9 +28,26 @@ function partTotalAreaM2(p: Part): number {
 export function getClientMetrics(clientId: string): ClientMetrics {
   const batches = getBatches().filter((b) => b.clientIds.includes(clientId));
   const parts = getParts().filter((p) => p.clientId === clientId);
-  const totalQuantity = parts.reduce((s, p) => s + (p.quantity ?? 1), 0);
-  const totalWeight = parts.reduce((s, p) => s + partWeightKg(p), 0);
-  const totalAreaM2 = parts.reduce((s, p) => s + partTotalAreaM2(p), 0);
+  const quotes = getQuotesForClient(clientId);
+
+  const fromPartsQuantity = parts.reduce((s, p) => s + (p.quantity ?? 1), 0);
+  const fromQuotesQuantity = quotes.reduce(
+    (s, q) => s + (q.totalItemQty ?? 0),
+    0
+  );
+  const totalQuantity = fromPartsQuantity + fromQuotesQuantity;
+
+  const fromPartsWeight = parts.reduce((s, p) => s + partWeightKg(p), 0);
+  const fromQuotesWeight = quotes.reduce(
+    (s, q) => s + (q.totalWeightKg ?? 0),
+    0
+  );
+  const totalWeight = fromPartsWeight + fromQuotesWeight;
+
+  const fromPartsArea = parts.reduce((s, p) => s + partTotalAreaM2(p), 0);
+  const fromQuotesArea = quotes.reduce((s, q) => s + (q.totalAreaM2 ?? 0), 0);
+  const totalAreaM2 = fromPartsArea + fromQuotesArea;
+
   let lastBatchDate: string | null = null;
   for (const b of batches) {
     if (!lastBatchDate || b.updatedAt > lastBatchDate) {

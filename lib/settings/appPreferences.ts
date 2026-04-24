@@ -26,6 +26,10 @@ function loadRaw(): AppPreferences {
         typeof parsed.companyEmail === "string" ? parsed.companyEmail : undefined,
       companyPhone:
         typeof parsed.companyPhone === "string" ? parsed.companyPhone : undefined,
+      companyPhoneSecondary:
+        typeof parsed.companyPhoneSecondary === "string"
+          ? parsed.companyPhoneSecondary
+          : undefined,
       companyWebsite:
         typeof parsed.companyWebsite === "string"
           ? parsed.companyWebsite

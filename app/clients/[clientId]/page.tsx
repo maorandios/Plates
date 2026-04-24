@@ -13,7 +13,6 @@ import {
   Weight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -26,14 +25,33 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  dialogFooterActionsStartClassName,
+} from "@/components/ui/dialog";
 import { getClientById } from "@/lib/store";
 import {
   deleteQuoteFromList,
   getQuotesForClient,
+  setQuoteApprovalStatus,
   subscribeQuotesListChanged,
   type QuoteListRecord,
   type QuoteListStatus,
 } from "@/lib/quotes/quoteList";
+import { listRowApprovalSelectClassName } from "@/lib/listScreenApprovalSelectStyles";
+import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import type { LucideIcon } from "lucide-react";
 
@@ -41,6 +59,8 @@ export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [listTick, setListTick] = useState(0);
+  const [quotePendingDelete, setQuotePendingDelete] =
+    useState<QuoteListRecord | null>(null);
 
   const clientId =
     typeof params?.clientId === "string"
@@ -77,10 +97,11 @@ export default function ClientDetailPage() {
     };
   }, [projects]);
 
-  const handleDeleteQuote = useCallback((q: QuoteListRecord) => {
-    if (!confirm(t("clientDetail.projectsDeleteConfirm", { ref: q.referenceNumber }))) return;
-    deleteQuoteFromList(q.id);
-  }, []);
+  const confirmDeleteQuote = useCallback(() => {
+    if (!quotePendingDelete) return;
+    deleteQuoteFromList(quotePendingDelete.id);
+    setQuotePendingDelete(null);
+  }, [quotePendingDelete]);
 
   if (!clientId || !client) return null;
 
@@ -92,17 +113,6 @@ export default function ClientDetailPage() {
       const mm = String(d.getMonth() + 1).padStart(2, "0");
       const yyyy = d.getFullYear();
       return `${dd}/${mm}/${yyyy}`;
-    } catch {
-      return iso;
-    }
-  }
-
-  function formatCreated(iso: string): string {
-    try {
-      return new Date(iso).toLocaleString("he-IL", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      });
     } catch {
       return iso;
     }
@@ -254,8 +264,8 @@ export default function ClientDetailPage() {
                     <TableCell className="text-right font-mono text-sm">
                       {q.referenceNumber}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">
-                      {formatCreated(q.createdAt)}
+                    <TableCell className="text-right text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+                      {formatDateDdMmYyyy(q.createdAt)}
                     </TableCell>
                     <TableCell className="text-end tabular-nums">
                       {formatDecimal(q.totalWeightKg ?? 0, 1)}
@@ -266,14 +276,36 @@ export default function ClientDetailPage() {
                     <TableCell className="text-end tabular-nums">
                       {formatInteger(Math.round(q.totalItemQty ?? 0))}
                     </TableCell>
-                    <TableCell className="text-center p-2">
-                      <QuoteStatusBadge status={q.status} />
+                    <TableCell className="flex items-center justify-center p-2">
+                      <Select
+                        value={q.status}
+                        onValueChange={(v) =>
+                          setQuoteApprovalStatus(q.id, v as QuoteListStatus)
+                        }
+                      >
+                        <SelectTrigger
+                          className={listRowApprovalSelectClassName(q.status)}
+                          aria-label={t("quotes.statusSelectAria", {
+                            ref: q.referenceNumber,
+                          })}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="in_progress">
+                            {t("quotes.statusNotApproved")}
+                          </SelectItem>
+                          <SelectItem value="complete">
+                            {t("quotes.statusApproved")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="p-1 text-center">
                       <Button variant="ghost" size="icon" className="h-9 w-9" asChild>
                         <Link
-                          href="/quick-quote"
-                          title={t("clientDetail.table.viewAria")}
+                          href={`/quotes/${q.id}/preview`}
+                          title={t("quotes.viewAria", { ref: q.referenceNumber })}
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
@@ -286,7 +318,7 @@ export default function ClientDetailPage() {
                         size="icon"
                         className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
                         title={t("clientDetail.table.deleteAria")}
-                        onClick={() => handleDeleteQuote(q)}
+                        onClick={() => setQuotePendingDelete(q)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -298,31 +330,45 @@ export default function ClientDetailPage() {
           </div>
         )}
       </section>
-    </PageContainer>
-  );
-}
 
-function QuoteStatusBadge({ status }: { status: QuoteListStatus }) {
-  if (status === "complete") {
-    return (
-      <Badge
-        variant="secondary"
-        className="border font-normal bg-primary/15 text-primary/90 dark:text-primary/80 border-primary/30"
+      <Dialog
+        open={quotePendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setQuotePendingDelete(null);
+        }}
       >
-        {t("clientDetail.table.statusApproved")}
-      </Badge>
-    );
-  }
-  return (
-    <Badge
-      variant="outline"
-      className="font-normal bg-[#2F1F0F] text-[#FF7700]"
-      style={{
-        border: "1px solid #FF9500",
-      }}
-    >
-      {t("clientDetail.table.statusPending")}
-    </Badge>
+        <DialogContent
+          dir="rtl"
+          showCloseButton={false}
+          className="max-w-md border-border text-start sm:text-start"
+        >
+          <DialogHeader className="text-start sm:text-start">
+            <DialogTitle>{t("quotes.removeDialogTitle")}</DialogTitle>
+            <DialogDescription className="text-start text-sm leading-relaxed">
+              {quotePendingDelete
+                ? t("quotes.removeDialogDescription", {
+                    projectName:
+                      quotePendingDelete.projectName?.trim() ||
+                      t("quotes.removeDialogProjectFallback"),
+                  })
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className={cn(dialogFooterActionsStartClassName)}>
+            <Button type="button" variant="destructive" onClick={confirmDeleteQuote}>
+              {t("quotes.removeDialogConfirm")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQuotePendingDelete(null)}
+            >
+              {t("common.cancel")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </PageContainer>
   );
 }
 

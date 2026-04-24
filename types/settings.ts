@@ -12,6 +12,8 @@ export interface AppPreferences {
   companyRegistration?: string;
   companyEmail?: string;
   companyPhone?: string;
+  /** Second phone (e.g. additional line); optional. */
+  companyPhoneSecondary?: string;
   companyWebsite?: string;
   /** Multi-line allowed; shown on PDF letterhead when set. */
   companyAddress?: string;

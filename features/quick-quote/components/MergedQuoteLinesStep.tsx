@@ -39,6 +39,8 @@ interface MergedQuoteLinesStepProps {
   customerName?: string;
   /** Quick quote step 3 hides this; plate-project summary keeps it. */
   showFullExecutionPackageButton?: boolean;
+  /** Quick quote step 3: hide per-row "ייצא קובץ"; plate project shows it. */
+  showPerRowFileExport?: boolean;
 }
 
 export function MergedQuoteLinesStep({
@@ -55,6 +57,7 @@ export function MergedQuoteLinesStep({
   referenceNumber,
   customerName,
   showFullExecutionPackageButton = true,
+  showPerRowFileExport = true,
 }: MergedQuoteLinesStepProps) {
   const [resetOpen, setResetOpen] = useState(false);
 
@@ -120,6 +123,7 @@ export function MergedQuoteLinesStep({
               onDeletePart={onDeletePart}
               dxfPartGeometries={dxfMethodGeometries}
               partPackageExport={partPackageExport}
+              showPerRowFileExport={showPerRowFileExport}
               showFullExecutionPackageButton={showFullExecutionPackageButton}
             />
           )}

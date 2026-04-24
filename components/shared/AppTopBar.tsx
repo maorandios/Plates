@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -86,7 +87,7 @@ export function AppTopBar() {
             aria-label={t("brand.name")}
           >
             <Image
-              src="/mainlogo.svg?v=20260420"
+              src="/icons/MAINLOGOALL.svg?v=1"
               alt=""
               width={1374}
               height={364}
@@ -158,6 +159,18 @@ export function AppTopBar() {
                     </Link>
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuSeparator className="my-1 bg-border" />
+                <DropdownMenuItem
+                  asChild
+                  className="cursor-pointer rounded-lg p-0 text-destructive focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
+                >
+                  <Link
+                    href="/login"
+                    className="block w-full px-3 py-2.5 text-sm font-medium"
+                  >
+                    {t("nav.logOutFromSystem")}
+                  </Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </nav>

@@ -32,9 +32,9 @@ export interface ClientMetrics {
   totalBatches: number;
   totalParts: number;
   totalQuantity: number;
-  /** Sum of part line weights (kg) across batches */
+  /** Sum of weights (kg): batch part lines + quick quotes linked to this client */
   totalWeight: number;
-  /** Sum of part line net areas (m²) across batches */
+  /** Sum of areas (m²): batch part lines + quick quotes linked to this client */
   totalAreaM2: number;
   lastBatchDate: string | null;
 }

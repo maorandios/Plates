@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, PlusCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { ClientsTable } from "@/features/clients/components/ClientsTable";
 import { getClients } from "@/lib/store";
 import { getClientMetrics } from "@/lib/clients/metrics";
+import { subscribeQuotesListChanged } from "@/lib/quotes/quoteList";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Client } from "@/types";
@@ -32,6 +33,11 @@ export default function ClientsPage() {
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
+
+  useEffect(
+    () => subscribeQuotesListChanged(() => setTick((n) => n + 1)),
+    []
+  );
 
   const allClients = useMemo(() => getClients(), [tick]);
   const hasAnyClients = allClients.length > 0;

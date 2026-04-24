@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Noto_Sans_Hebrew } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import { AppTopBar } from "@/components/shared/AppTopBar";
+import { AppShell } from "@/components/shared/AppShell";
+import { OnboardingRouteGuard } from "@/components/shared/OnboardingRouteGuard";
 import { LoadingBadgeProvider } from "@/components/shared/LoadingBadgeProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { PLATE_THEME_STORAGE_KEY } from "@/lib/theme/plateTheme";
@@ -40,13 +41,9 @@ export default function RootLayout({
         <ThemeProvider>
           <LoadingBadgeProvider>
             <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
-              <AppTopBar />
-              <div
-                id="app-shell-scroll"
-                className="flex min-h-0 min-w-0 w-full max-w-none flex-1 flex-col overflow-auto"
-              >
-                {children}
-              </div>
+              <OnboardingRouteGuard>
+                <AppShell>{children}</AppShell>
+              </OnboardingRouteGuard>
             </div>
           </LoadingBadgeProvider>
         </ThemeProvider>

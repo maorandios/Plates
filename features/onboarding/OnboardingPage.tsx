@@ -1,0 +1,392 @@
+"use client";
+
+import { useCallback, useEffect, useId, useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  getAppPreferences,
+  saveAppPreferences,
+} from "@/lib/settings/appPreferences";
+import { markOnboardingComplete, isOnboardingComplete } from "@/lib/onboardingLocal";
+import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+
+const DATA_STEPS = 5;
+const SK = "onboarding" as const;
+
+const fieldClass =
+  "h-14 rounded-[10px] border border-border bg-input px-4 text-start text-base md:text-sm";
+
+const VALID_STEPS = [0, 1, 2, 3, 4, 5, 6] as const;
+type Step = (typeof VALID_STEPS)[number];
+
+function stepCanProceed(
+  s: Step,
+  data: {
+    companyName: string;
+    registration: string;
+    phone1: string;
+    address: string;
+    city: string;
+    phone2: string;
+  }
+): boolean {
+  const tr = (v: string) => v.trim();
+  switch (s) {
+    case 0:
+    case 6:
+      return true;
+    case 1:
+      return tr(data.companyName).length > 0;
+    case 2:
+      return tr(data.registration).length > 0;
+    case 3:
+      return tr(data.phone1).length > 0;
+    case 4:
+      return tr(data.address).length > 0 && tr(data.city).length > 0;
+    case 5:
+      return tr(data.phone2).length > 0;
+    default:
+      return false;
+  }
+}
+
+export function OnboardingPage() {
+  const router = useRouter();
+  const singleFieldTitleId = useId();
+  const [step, setStep] = useState<Step>(0);
+  const [companyName, setCompanyName] = useState("");
+  const [registration, setRegistration] = useState("");
+  const [phone1, setPhone1] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [phone2, setPhone2] = useState("");
+
+  const nameId = useId();
+  const regId = useId();
+  const phone1Id = useId();
+  const addressId = useId();
+  const cityId = useId();
+  const phone2Id = useId();
+
+  const data = {
+    companyName,
+    registration,
+    phone1,
+    address,
+    city,
+    phone2,
+  };
+
+  const canNext = stepCanProceed(step, data);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (isOnboardingComplete()) {
+      router.replace("/");
+    }
+  }, [router]);
+
+  const goNext = useCallback(() => {
+    if (!canNext) return;
+    setStep((s) => (s < 6 ? (s + 1) as Step : s));
+  }, [canNext]);
+
+  const goBack = useCallback(() => {
+    if (step > 0 && step < 6) {
+      setStep((s) => (s - 1) as Step);
+    }
+  }, [step]);
+
+  const finish = useCallback(() => {
+    const base = getAppPreferences();
+    const addr = [data.address.trim(), data.city.trim()]
+      .filter(Boolean)
+      .join("\n");
+    saveAppPreferences({
+      ...base,
+      companyName: data.companyName.trim() || undefined,
+      companyRegistration: data.registration.trim() || undefined,
+      companyPhone: data.phone1.trim() || undefined,
+      companyPhoneSecondary: data.phone2.trim() || undefined,
+      companyAddress: addr || undefined,
+    });
+    markOnboardingComplete();
+    router.push("/");
+  }, [data, router]);
+
+  const dataIndexOnScreen = step >= 1 && step <= 5 ? step : 0;
+
+  return (
+    <div
+      className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center overflow-y-auto bg-background px-4 py-10 sm:px-8"
+      dir="rtl"
+    >
+      <div className="flex w-full max-w-lg flex-col items-stretch gap-8">
+        <div className="text-center">
+          <Image
+            src="/icons/MAINLOGOALL.svg?v=1"
+            alt=""
+            width={1374}
+            height={364}
+            className="mx-auto h-10 w-auto max-w-[12.5rem] object-contain sm:h-[2.8125rem]"
+          />
+        </div>
+
+        {step > 0 && step < 6 && (
+          <p className="text-center text-sm text-muted-foreground">
+            {t(`${SK}.progress`, {
+              current: String(dataIndexOnScreen),
+              total: String(DATA_STEPS),
+            })}
+          </p>
+        )}
+
+        {step === 0 && (
+          <div className="space-y-5 text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t(`${SK}.welcomeTitle`)}
+            </h1>
+            <p className="whitespace-pre-line text-base leading-relaxed text-muted-foreground">
+              {t(`${SK}.welcomeBody`)}
+            </p>
+            <Button
+              type="button"
+              size="lg"
+              className="w-full text-base font-semibold"
+              onClick={() => setStep(1)}
+            >
+              {t(`${SK}.startCta`)}
+            </Button>
+          </div>
+        )}
+
+        {step === 1 && (
+          <DataStepLayout
+            onBack={goBack}
+            onNext={goNext}
+            canNext={canNext}
+            nextLabel={t(`${SK}.next`)}
+            backLabel={t(`${SK}.back`)}
+          >
+            <h2
+              id={singleFieldTitleId}
+              className="text-xl font-bold text-foreground sm:text-2xl"
+            >
+              {t(`${SK}.fieldBusinessName`)}
+            </h2>
+            <div className="pt-1">
+              <Input
+                id={nameId}
+                name="companyName"
+                autoComplete="organization"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className={cn(fieldClass)}
+                aria-labelledby={singleFieldTitleId}
+              />
+            </div>
+          </DataStepLayout>
+        )}
+
+        {step === 2 && (
+          <DataStepLayout
+            onBack={goBack}
+            onNext={goNext}
+            canNext={canNext}
+            nextLabel={t(`${SK}.next`)}
+            backLabel={t(`${SK}.back`)}
+          >
+            <h2
+              id={singleFieldTitleId}
+              className="text-xl font-bold text-foreground sm:text-2xl"
+            >
+              {t(`${SK}.fieldRegistration`)}
+            </h2>
+            <div className="pt-1">
+              <Input
+                id={regId}
+                name="registration"
+                inputMode="text"
+                value={registration}
+                onChange={(e) => setRegistration(e.target.value)}
+                className={cn(fieldClass)}
+                aria-labelledby={singleFieldTitleId}
+              />
+            </div>
+          </DataStepLayout>
+        )}
+
+        {step === 3 && (
+          <DataStepLayout
+            onBack={goBack}
+            onNext={goNext}
+            canNext={canNext}
+            nextLabel={t(`${SK}.next`)}
+            backLabel={t(`${SK}.back`)}
+          >
+            <h2
+              id={singleFieldTitleId}
+              className="text-xl font-bold text-foreground sm:text-2xl"
+            >
+              {t(`${SK}.fieldPhone`)}
+            </h2>
+            <div className="pt-1">
+              <Input
+                id={phone1Id}
+                name="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={phone1}
+                onChange={(e) => setPhone1(e.target.value)}
+                className={cn(fieldClass)}
+                aria-labelledby={singleFieldTitleId}
+              />
+            </div>
+          </DataStepLayout>
+        )}
+
+        {step === 4 && (
+          <DataStepLayout
+            onBack={goBack}
+            onNext={goNext}
+            canNext={canNext}
+            nextLabel={t(`${SK}.next`)}
+            backLabel={t(`${SK}.back`)}
+          >
+            <h2 className="text-xl font-bold text-foreground sm:text-2xl">
+              {t(`${SK}.addressScreenTitle`)}
+            </h2>
+            <div className="space-y-4 text-start">
+              <div className="space-y-2">
+                <Label
+                  htmlFor={addressId}
+                  className="text-sm font-semibold text-foreground"
+                >
+                  {t(`${SK}.fieldAddress`)}
+                </Label>
+                <Input
+                  id={addressId}
+                  name="address"
+                  autoComplete="street-address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className={cn(fieldClass)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor={cityId}
+                  className="text-sm font-semibold text-foreground"
+                >
+                  {t(`${SK}.fieldCity`)}
+                </Label>
+                <Input
+                  id={cityId}
+                  name="city"
+                  autoComplete="address-level2"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className={cn(fieldClass)}
+                />
+              </div>
+            </div>
+          </DataStepLayout>
+        )}
+
+        {step === 5 && (
+          <DataStepLayout
+            onBack={goBack}
+            onNext={goNext}
+            canNext={canNext}
+            nextLabel={t(`${SK}.next`)}
+            backLabel={t(`${SK}.back`)}
+          >
+            <h2
+              id={singleFieldTitleId}
+              className="text-xl font-bold text-foreground sm:text-2xl"
+            >
+              {t(`${SK}.fieldPhone`)}
+            </h2>
+            <div className="pt-1">
+              <Input
+                id={phone2Id}
+                name="phone2"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={phone2}
+                onChange={(e) => setPhone2(e.target.value)}
+                className={cn(fieldClass)}
+                aria-labelledby={singleFieldTitleId}
+              />
+            </div>
+          </DataStepLayout>
+        )}
+
+        {step === 6 && (
+          <div className="space-y-5 text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t(`${SK}.doneTitle`)}
+            </h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              {t(`${SK}.doneBody`)}
+            </p>
+            <Button
+              type="button"
+              size="lg"
+              className="w-full text-base font-semibold"
+              onClick={finish}
+            >
+              {t(`${SK}.doneCta`)}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DataStepLayout({
+  onBack,
+  onNext,
+  canNext,
+  nextLabel,
+  backLabel,
+  children,
+}: {
+  onBack: () => void;
+  onNext: () => void;
+  canNext: boolean;
+  nextLabel: string;
+  backLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-6 text-start">
+      <button
+        type="button"
+        onClick={onBack}
+        className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {backLabel}
+      </button>
+      {children}
+      <div className="pt-1">
+        <Button
+          type="button"
+          size="lg"
+          disabled={!canNext}
+          className="w-full text-base font-semibold disabled:pointer-events-none disabled:opacity-50"
+          onClick={onNext}
+        >
+          {nextLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
