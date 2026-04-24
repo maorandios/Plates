@@ -23,6 +23,7 @@ import type { PurchasedSheetSize } from "@/types/settings";
 import { deriveClientCode, generateClientCode, isSafeClientCode } from "@/lib/codegen/clientCode";
 import { slimNestingRunForStorage } from "@/lib/nesting/slimNestingRunForStorage";
 import { nanoid } from "@/lib/utils/nanoid";
+import { PLATE_LOCAL_PERSISTED_EVENT } from "@/lib/plateEvents";
 function normalizeBatch(b: Batch): Batch {
   const cm = b.cuttingMethod;
   if (cm === "laser" || cm === "plasma" || cm === "oxy_fuel") {
@@ -67,6 +68,9 @@ function saveToStorage<T>(key: string, data: T[]): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, JSON.stringify(data));
+    window.dispatchEvent(
+      new CustomEvent(PLATE_LOCAL_PERSISTED_EVENT, { detail: { key } })
+    );
   } catch (e) {
     const isQuota =
       e instanceof DOMException && e.name === "QuotaExceededError";
@@ -75,6 +79,21 @@ function saveToStorage<T>(key: string, data: T[]): void {
         ? `[PLATE] Browser storage quota exceeded (key: ${key}). Entities are no longer persisted in full — clear site data or remove old batches if this persists.`
         : "[PLATE] Failed to save to localStorage",
       e
+    );
+  }
+}
+
+function saveClientsToStorage(clients: Client[]): void {
+  saveToStorage(STORAGE_KEYS.clients, clients);
+  if (typeof window !== "undefined") {
+    void import("@/lib/supabase/entityTableSyncBrowser").then(
+      ({ syncClientsToSupabase }) => {
+        void syncClientsToSupabase(clients).then((r) => {
+          if (!r.ok) {
+            console.warn("[PLATE] Supabase clients sync failed:", r.error);
+          }
+        });
+      }
     );
   }
 }
@@ -377,7 +396,7 @@ export function saveClient(client: Client): void {
   } else {
     clients.push(client);
   }
-  saveToStorage(STORAGE_KEYS.clients, clients);
+  saveClientsToStorage(clients);
 }
 
 export function linkClientToBatch(batchId: string, clientId: string): void {
@@ -477,10 +496,7 @@ export function deleteGlobalClient(clientId: string): void {
     STORAGE_KEYS.parts,
     getParts().filter((p) => p.clientId !== clientId)
   );
-  saveToStorage(
-    STORAGE_KEYS.clients,
-    getClients().filter((c) => c.id !== clientId)
-  );
+  saveClientsToStorage(getClients().filter((c) => c.id !== clientId));
 }
 
 /** @deprecated Prefer deleteGlobalClient or unlinkClientFromBatch */
@@ -795,6 +811,11 @@ export function saveNestingRun(run: NestingRun): boolean {
     window.dispatchEvent(
       new CustomEvent(PLATE_NESTING_RUN_SAVED_EVENT, {
         detail: { batchId: slim.batchId, runId: slim.id },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent(PLATE_LOCAL_PERSISTED_EVENT, {
+        detail: { key: STORAGE_KEYS.nestingRuns },
       })
     );
     return true;

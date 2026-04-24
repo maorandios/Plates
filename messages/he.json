@@ -45,7 +45,9 @@
     "footerSignUp": "הרשמה",
     "footerHasAccount": "כבר יש לכם חשבון?",
     "footerLogIn": "התחברות",
-    "copyrightFooter": "© כל הזכויות שמורות אומגות"
+    "copyrightFooter": "© כל הזכויות שמורות אומגות",
+    "magicLinkSent": "נשלח קישור לדוא״ל. בדקו את תיבת הדוא״ל כדי להמשיך.",
+    "authGenericError": "לא ניתן להתחבר כרגע. נסו שוב."
   },
   "onboarding": {
     "welcomeTitle": "ברוכים הבאים",

@@ -4,6 +4,9 @@ import Script from "next/script";
 import "./globals.css";
 import { AppShell } from "@/components/shared/AppShell";
 import { OnboardingRouteGuard } from "@/components/shared/OnboardingRouteGuard";
+import { OrgBootstrapProvider } from "@/components/providers/OrgBootstrapProvider";
+import { SupabaseSyncProvider } from "@/components/providers/SupabaseSyncProvider";
+import { EntityTableHydrationProvider } from "@/components/providers/EntityTableHydrationProvider";
 import { LoadingBadgeProvider } from "@/components/shared/LoadingBadgeProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { PLATE_THEME_STORAGE_KEY } from "@/lib/theme/plateTheme";
@@ -41,9 +44,15 @@ export default function RootLayout({
         <ThemeProvider>
           <LoadingBadgeProvider>
             <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
-              <OnboardingRouteGuard>
-                <AppShell>{children}</AppShell>
-              </OnboardingRouteGuard>
+              <OrgBootstrapProvider>
+                <OnboardingRouteGuard>
+                  <EntityTableHydrationProvider>
+                    <SupabaseSyncProvider>
+                      <AppShell>{children}</AppShell>
+                    </SupabaseSyncProvider>
+                  </EntityTableHydrationProvider>
+                </OnboardingRouteGuard>
+              </OrgBootstrapProvider>
             </div>
           </LoadingBadgeProvider>
         </ThemeProvider>

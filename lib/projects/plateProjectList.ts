@@ -24,7 +24,8 @@ export interface PlateProjectListRecord {
   totalAreaM2?: number;
 }
 
-const STORAGE_KEY = "plate_projects_list_v1";
+export const PLATE_PROJECTS_LIST_STORAGE_KEY = "plate_projects_list_v1";
+const STORAGE_KEY = PLATE_PROJECTS_LIST_STORAGE_KEY;
 const CHANGED_EVENT = "plate-projects-list-changed";
 const MAX_LIST_SIZE = 200;
 
@@ -85,6 +86,11 @@ function save(list: PlateProjectListRecord[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(capped));
     window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+    void import("@/lib/supabase/entityTableSyncBrowser").then(
+      ({ syncProjectsToSupabase }) => {
+        void syncProjectsToSupabase(capped);
+      }
+    );
   } catch (e) {
     console.warn("[PLATE] Failed to save projects list", e);
   }
