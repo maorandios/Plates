@@ -6,6 +6,11 @@ import { promisify } from "node:util";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sanitizeLetterheadCompanyName } from "@/features/quick-quote/lib/quotePdfPayload";
+import type { QuotePdfMergedPayload } from "@/lib/server/quotePdf/buildQuoteTemplateContext";
+import {
+  renderQuotePdfToBuffer,
+  shouldUseNodeQuotePdfRenderer,
+} from "@/lib/server/quotePdf/renderQuotePdfNode";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -130,7 +135,8 @@ function safeFilename(ref: string): string {
  * POST /api/quotes/export-pdf
  * Body: quote payload; optional `company` from the finalize step overrides letterhead text.
  * Logo path always comes from env (QUOTE_PDF_LOGO_PATH) when set.
- * Runs `server/pdf/render_quote_pdf.py` (Playwright + Chromium).
+ * Production (Vercel): Nunjucks + Puppeteer + @sparticuz/chromium (no Python).
+ * Local: `server/pdf/render_quote_pdf.py` (Playwright + Chromium) when Python is available.
  */
 export async function POST(req: Request) {
   let parsed: z.infer<typeof clientBodySchema>;
@@ -142,14 +148,41 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  const pdfDir = path.join(process.cwd(), "server", "pdf");
-  const scriptPath = path.resolve(pdfDir, "render_quote_pdf.py");
-
   const { company: clientCompany, ...rest } = parsed;
   const payload = {
     company: mergeCompany(clientCompany, companyFromEnv()),
     ...rest,
-  };
+  } satisfies QuotePdfMergedPayload;
+
+  const name = safeFilename(parsed.quote.quote_number);
+
+  if (shouldUseNodeQuotePdfRenderer()) {
+    try {
+      const pdf = await renderQuotePdfToBuffer(payload);
+      return new NextResponse(new Uint8Array(pdf), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="quotation-${name}.pdf"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "PDF rendering failed (Node/Chromium).";
+      console.error("[export-pdf] node", err);
+      return NextResponse.json(
+        {
+          error: message,
+          hint: "Serverless PDF uses @sparticuz/chromium; check Vercel function logs and bundle size.",
+        },
+        { status: 503 }
+      );
+    }
+  }
+
+  const pdfDir = path.join(process.cwd(), "server", "pdf");
+  const scriptPath = path.resolve(pdfDir, "render_quote_pdf.py");
 
   const tmpRoot = await mkdtemp(path.join(os.tmpdir(), "plate-quote-pdf-"));
   const inputPath = path.join(tmpRoot, "payload.json");
@@ -168,7 +201,6 @@ export async function POST(req: Request) {
     });
 
     const pdf = await readFile(outputPath);
-    const name = safeFilename(parsed.quote.quote_number);
 
     return new NextResponse(new Uint8Array(pdf), {
       status: 200,
