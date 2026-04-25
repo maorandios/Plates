@@ -112,7 +112,7 @@ function LoginPageContent() {
         className="flex h-full min-h-0 w-full min-w-0 flex-col items-center justify-center overflow-y-auto px-4 py-8 sm:px-8 md:w-1/2 md:flex-1"
         aria-label={t("auth.screenAria")}
       >
-        <div className="w-full max-w-md space-y-7 text-start">
+        <div className="w-full max-w-md space-y-7 text-center">
           <div className="text-center">
             <Image
               src="/icons/MAINLOGOALL.svg?v=1"
@@ -133,10 +133,10 @@ function LoginPageContent() {
               </p>
             ) : (
               <>
-                <div className="space-y-2 text-start">
+                <div className="space-y-2 text-center">
                   <Label
                     htmlFor={emailId}
-                    className="text-foreground text-sm font-semibold"
+                    className="block w-full text-center text-foreground text-sm font-semibold"
                   >
                     {t("auth.email")}
                   </Label>
@@ -153,6 +153,7 @@ function LoginPageContent() {
                       setSent(false);
                       setError(null);
                     }}
+                    className="text-center md:text-center"
                   />
                 </div>
                 {authBlocks}

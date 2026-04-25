@@ -22,6 +22,8 @@ const notoSansHebrew = Noto_Sans_Hebrew({
 export const metadata: Metadata = {
   title: messages.meta.title,
   description: messages.meta.description,
+  /** Tells built-in translation not to mark the app — see layout `translate="no"`. */
+  other: { google: "notranslate" },
 };
 
 export default function RootLayout({
@@ -37,9 +39,15 @@ export default function RootLayout({
       : "";
 
   return (
-    <html lang="he" dir="rtl" suppressHydrationWarning>
+    <html
+      lang="he"
+      dir="rtl"
+      translate="no"
+      className="notranslate"
+      suppressHydrationWarning
+    >
       <body
-        className={`${notoSansHebrew.variable} ${notoSansHebrew.className} antialiased`}
+        className={`notranslate ${notoSansHebrew.variable} ${notoSansHebrew.className} antialiased`}
       >
         {supabasePublicJson ? (
           <Script

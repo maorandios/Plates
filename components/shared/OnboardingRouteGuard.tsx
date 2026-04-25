@@ -8,6 +8,7 @@ import {
   onboardingGateShouldRedirect,
 } from "@/lib/onboardingLocal";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
+import { isDevOnboardingPreviewEnabled } from "@/lib/devOnboardingPreview";
 import { useOrgBootstrap } from "@/components/providers/OrgBootstrapProvider";
 
 type OnboardingRouteGuardProps = {
@@ -33,7 +34,10 @@ export function OnboardingRouteGuard({ children }: OnboardingRouteGuardProps) {
         return;
       }
       if (session.onboardingCompleted) {
-        if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
+        if (
+          (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) &&
+          !isDevOnboardingPreviewEnabled()
+        ) {
           router.replace("/");
         }
         return;

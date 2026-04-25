@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
+import { useTrialDaysLeft } from "@/hooks/useTrialDaysLeft";
 
 const MAIN_NAV: {
   labelKey: "nav.dashboard" | "nav.quotes" | "nav.projects" | "nav.clients";
@@ -62,6 +63,7 @@ function NavActiveDot() {
 
 export function AppTopBar() {
   const pathname = usePathname();
+  const trial = useTrialDaysLeft();
   const settingsActive = pathname.startsWith("/settings");
   const quickQuoteGlass =
     pathname === "/quick-quote" || pathname.startsWith("/quick-quote/");
@@ -165,7 +167,7 @@ export function AppTopBar() {
                   className="cursor-pointer rounded-lg p-0 text-destructive focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
                 >
                   <Link
-                    href="/login"
+                    href="/logout"
                     className="block w-full px-3 py-2.5 text-sm font-medium"
                   >
                     {t("nav.logOutFromSystem")}
@@ -173,6 +175,20 @@ export function AppTopBar() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {trial?.kind === "ready" ? (
+              <Link
+                href="/settings/bill-and-usage"
+                className={cn(
+                  "relative z-10 order-last inline-flex min-h-9 min-w-0 max-w-[min(100%,20rem)] shrink-0 items-center justify-center rounded-full border-2 border-orange-600/45 bg-orange-100 px-2.5 py-1.5 text-center text-[10px] font-semibold leading-snug text-orange-950 shadow-sm sm:px-3 sm:text-xs",
+                  "whitespace-nowrap sm:whitespace-normal sm:max-w-xs",
+                  "transition-colors hover:bg-orange-200/90",
+                  "dark:border-orange-500/55 dark:bg-orange-200/15 dark:text-orange-900 dark:hover:bg-orange-200/25"
+                )}
+              >
+                {t("nav.trialCountdown", { days: trial.days })}
+              </Link>
+            ) : null}
           </nav>
         </div>
 
