@@ -109,7 +109,19 @@ body {
   }
 
   .quote-notes-section {
+    /* Own page: avoids a huge gap + clipped-looking tail when the plate table
+       ends just above the print footer; notes continue on the next page. */
+    break-before: page;
+    page-break-before: always;
     page-break-inside: auto;
+    break-inside: auto;
+    /* keep text above the fixed print-footer band; avoids clipping in Chromium */
+    padding-bottom: 12mm;
+  }
+
+  .quote-notes__line {
+    page-break-inside: auto;
+    break-inside: auto;
   }
 }
 
@@ -566,7 +578,8 @@ body {
 }
 
 /* =====================================================================
- * SECTION 4 — Quote notes (היערות) after plate list
+ * SECTION 4 — Quote notes (הערות) after plate list
+ * (paragraphs instead of <ul> so long notes paginate reliably in print PDFs)
  * ===================================================================== */
 .quote-notes-section {
   margin: 0;
@@ -581,29 +594,23 @@ body {
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--ink);
+  page-break-after: avoid;
 }
 
-.quote-notes__list {
+.quote-notes__body {
   margin: 0;
   padding: 0;
-  padding-inline-start: 1.15rem;
-  list-style-type: disc;
-  list-style-position: outside;
   font-size: 0.82rem;
-  line-height: 1.5;
+  line-height: 1.55;
   font-weight: 500;
   color: var(--ink);
   text-align: right;
 }
 
-.quote-notes__item {
-  margin: 0.3rem 0;
+.quote-notes__line {
+  margin: 0.22rem 0;
   padding: 0;
   overflow-wrap: break-word;
   word-break: break-word;
   hyphens: none;
-}
-
-.quote-notes__item::marker {
-  color: var(--muted-deep);
 }

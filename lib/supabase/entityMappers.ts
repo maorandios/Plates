@@ -38,6 +38,7 @@ export function quoteToRow(accountUserId: string, q: QuoteListRecord) {
     total_area_m2: q.totalAreaM2 ?? null,
     total_item_qty: q.totalItemQty ?? null,
     total_incl_vat: q.totalInclVat ?? null,
+    total_net_before_vat: q.totalNetBeforeVat ?? null,
   };
 }
 
@@ -109,6 +110,7 @@ export function rowToQuote(r: {
   total_area_m2: number | null;
   total_item_qty: number | null;
   total_incl_vat: number | null;
+  total_net_before_vat: number | null;
 }): QuoteListRecord {
   return {
     id: r.id,
@@ -125,6 +127,7 @@ export function rowToQuote(r: {
     totalAreaM2: r.total_area_m2 ?? undefined,
     totalItemQty: r.total_item_qty ?? undefined,
     totalInclVat: r.total_incl_vat ?? undefined,
+    totalNetBeforeVat: r.total_net_before_vat ?? undefined,
   };
 }
 

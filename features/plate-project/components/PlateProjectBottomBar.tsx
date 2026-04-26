@@ -22,7 +22,10 @@ export interface PlateProjectBottomBarProps {
     saved: boolean;
     /** False e.g. when there are no parts — button disabled but not in “saved” state. */
     canSave: boolean;
-    onClick: () => void;
+    /** While syncing to Supabase before navigation */
+    saving?: boolean;
+    savingLabel?: string;
+    onClick: () => void | Promise<void>;
   };
 }
 
@@ -77,10 +80,12 @@ export function PlateProjectBottomBar({
               size="default"
               variant={saveProjectToList.saved ? "outline" : "default"}
               className="min-w-[10rem] gap-1"
-              disabled={!saveProjectToList.canSave}
-              onClick={saveProjectToList.onClick}
+              disabled={!saveProjectToList.canSave || saveProjectToList.saving}
+              onClick={() => void saveProjectToList.onClick()}
             >
-              {saveProjectToList.saved ? (
+              {saveProjectToList.saving ? (
+                saveProjectToList.savingLabel ?? saveProjectToList.label
+              ) : saveProjectToList.saved ? (
                 <>
                   <Check className="h-4 w-4 shrink-0" aria-hidden />
                   {saveProjectToList.savedLabel}

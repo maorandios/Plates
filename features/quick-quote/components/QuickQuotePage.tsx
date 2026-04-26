@@ -59,6 +59,7 @@ import { MOCK_MFG_PARAMETERS } from "../mock/quickQuoteMockData";
 import type { QuotePdfFullPayload } from "../lib/quotePdfPayload";
 import {
   buildQuotePdfFullPayload,
+  computeNetBeforeVat,
   computeTotalInclVatFromQuoteParts,
 } from "../lib/quotePdfPayload";
 import type { DxfPartGeometry } from "@/types";
@@ -75,7 +76,12 @@ import {
   getQuoteSnapshot,
   saveQuoteSnapshot,
 } from "@/lib/quotes/quoteSnapshot";
-import { loadEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
+import {
+  loadEntityTablesForOrg,
+  syncAllEntityTablesForOrg,
+} from "@/lib/supabase/entityTableSyncBrowser";
+import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
+import { useOrgBootstrap } from "@/components/providers/OrgBootstrapProvider";
 import {
   needsMergedPartsFallback,
   quotePartsToFallbackManualRows,
@@ -91,10 +97,22 @@ const defaultJobDetails: QuickQuoteJobDetails = {
   notes: "",
 };
 
+/** `generalNotes` in snapshot + Supabase must follow phase-7 `draft.quote.notes`, not only General. */
+function generalNotesForSnapshot(
+  draft: QuotePdfFullPayload | null | undefined,
+  jobNotes: string | undefined
+): string {
+  if (draft?.quote && Array.isArray(draft.quote.notes)) {
+    return draft.quote.notes.join("\n");
+  }
+  return jobNotes?.trim() ?? "";
+}
+
 type QuoteMethodSubView = "picker" | "methodSetup";
 
 export function QuickQuotePage() {
   const router = useRouter();
+  const { session } = useOrgBootstrap();
   const searchParams = useSearchParams();
   const editParam = searchParams.get("edit");
   /** One-shot lock so React StrictMode does not double-hydrate `?edit=` into state. */
@@ -103,6 +121,7 @@ export function QuickQuotePage() {
   const quoteListSessionIdRef = useRef<string | null>(null);
   /** After user clicks "Save to list" on step 7, the quote exists in the quotes list; until then, no list row. */
   const [quoteSavedToList, setQuoteSavedToList] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [leaveWizardDialogOpen, setLeaveWizardDialogOpen] = useState(false);
   /** Target path for in-app navigation after user confirms leaving. */
   const pendingNavigationHrefRef = useRef<string | null>(null);
@@ -229,6 +248,9 @@ export function QuickQuotePage() {
 
     const listRow = getQuotesList().find((r) => r.id === editParam);
     const qz = snap.draft.quote;
+    const notesRehydrated = Array.isArray(qz.notes)
+      ? qz.notes.join("\n")
+      : (snap.generalNotes?.trim() ?? "");
 
     quoteListSessionIdRef.current = editParam;
 
@@ -238,7 +260,7 @@ export function QuickQuotePage() {
       projectName: (qz.project_name ?? "").trim() || listRow?.projectName?.trim() || "",
       customerName: (qz.customer_name ?? "").trim() || listRow?.customerName?.trim() || "",
       currency: (qz.currency ?? "ILS").trim() || "ILS",
-      notes: snap.generalNotes?.trim() ?? "",
+      notes: notesRehydrated,
       customerClientId: listRow?.customerClientId,
       quoteCreationMethod: undefined,
     });
@@ -443,75 +465,108 @@ export function QuickQuotePage() {
     advanceTo(7);
   }, [advanceTo, buildFinalizeDraft]);
 
-  const handleSaveQuoteToList = useCallback(() => {
-    let qid = quoteListSessionIdRef.current;
-    if (!qid) {
-      qid = nanoid();
-      quoteListSessionIdRef.current = qid;
-    }
-    const js = selection.jobSummary;
-    const draftIncl = pdfExportDraft?.pricing?.total_incl_vat;
-    const totalInclVat =
-      pdfExportDraft != null &&
-      typeof draftIncl === "number" &&
-      Number.isFinite(draftIncl)
-        ? draftIncl
-        : computeTotalInclVatFromQuoteParts(
-            selection.parts,
-            materialType,
-            materialPricePerKgByRow
-          );
-    /** Must write here — the debounced snapshot effect is cancelled on unmount, so fast navigation left preview with no data. */
-    const partsForSnapshot = mergeAllQuoteMethodParts(
-      materialType,
-      manualQuoteRows,
-      excelImportQuoteRows,
-      dxfMethodGeometries,
-      bendPlateQuoteItems
-    );
+  const handleSaveQuoteToList = useCallback(async () => {
+    setPublishing(true);
     try {
-      const draftPayload = pdfExportDraft ?? buildFinalizeDraft();
-      const ok = saveQuoteSnapshot(qid, {
-        draft: draftPayload,
-        materialType,
-        materialPricePerKgByRow,
-        mergedParts: partsForSnapshot,
-        dxfMethodGeometries,
-        bendPlateQuoteItems,
-        manualQuoteRows: manualQuoteRows,
-        excelImportQuoteRows: excelImportQuoteRows,
-        generalNotes: jobDetails.notes?.trim() ?? "",
-      });
-      if (!ok) {
-        console.error(
-          "[PLATE] saveQuoteSnapshot could not persist (storage full after retries). Preview may be empty for this id."
-        );
+      let qid = quoteListSessionIdRef.current;
+      if (!qid) {
+        qid = nanoid();
+        quoteListSessionIdRef.current = qid;
       }
-    } catch (e) {
-      console.error("[PLATE] saveQuoteSnapshot on save to list failed", e);
+      const js = selection.jobSummary;
+      const draftIncl = pdfExportDraft?.pricing?.total_incl_vat;
+      const totalInclVat =
+        pdfExportDraft != null &&
+        typeof draftIncl === "number" &&
+        Number.isFinite(draftIncl)
+          ? draftIncl
+          : computeTotalInclVatFromQuoteParts(
+              selection.parts,
+              materialType,
+              materialPricePerKgByRow
+            );
+      /** Must write here — the debounced snapshot effect is cancelled on unmount, so fast navigation left preview with no data. */
+      const partsForSnapshot = mergeAllQuoteMethodParts(
+        materialType,
+        manualQuoteRows,
+        excelImportQuoteRows,
+        dxfMethodGeometries,
+        bendPlateQuoteItems
+      );
+      try {
+        const draftPayload = pdfExportDraft ?? buildFinalizeDraft();
+        const ok = saveQuoteSnapshot(qid, {
+          draft: draftPayload,
+          materialType,
+          materialPricePerKgByRow,
+          mergedParts: partsForSnapshot,
+          dxfMethodGeometries,
+          bendPlateQuoteItems,
+          manualQuoteRows: manualQuoteRows,
+          excelImportQuoteRows: excelImportQuoteRows,
+          generalNotes: generalNotesForSnapshot(
+            draftPayload,
+            jobDetails.notes
+          ),
+        });
+        if (!ok) {
+          console.error(
+            "[PLATE] saveQuoteSnapshot could not persist (storage full after retries). Preview may be empty for this id."
+          );
+        }
+      } catch (e) {
+        console.error("[PLATE] saveQuoteSnapshot on save to list failed", e);
+      }
+      const draftForTotals = (() => {
+        try {
+          return pdfExportDraft ?? buildFinalizeDraft();
+        } catch {
+          return null;
+        }
+      })();
+      const totalNetBeforeVatFromDraft = draftForTotals
+        ? computeNetBeforeVat(
+            draftForTotals.pricing.total_price,
+            draftForTotals.pricing.discount
+          )
+        : undefined;
+      upsertQuoteInProgress({
+        id: qid,
+        referenceNumber: jobDetails.referenceNumber,
+        customerName: jobDetails.customerName.trim(),
+        projectName: jobDetails.projectName.trim(),
+        customerClientId: jobDetails.customerClientId,
+        currentStep: 7,
+      });
+      patchQuoteSession(qid, {
+        currentStep: 7,
+        customerClientId: jobDetails.customerClientId,
+        projectName: jobDetails.projectName.trim(),
+        customerName: jobDetails.customerName.trim(),
+        referenceNumber: jobDetails.referenceNumber,
+        totalWeightKg: js.totalEstWeightKg,
+        totalAreaM2: js.totalPlateAreaM2,
+        totalItemQty: js.totalQty,
+        totalInclVat,
+        totalNetBeforeVat: totalNetBeforeVatFromDraft,
+      });
+      markQuoteComplete(qid);
+      if (isSupabaseConfigured() && session?.ok) {
+        const sync = await syncAllEntityTablesForOrg(session.accountUserId);
+        if (!sync.ok) {
+          console.warn(
+            "[PLATE] post-save entity sync failed (navigating to list anyway):",
+            sync.error
+          );
+        }
+      }
+      router.push("/quotes");
+    } finally {
+      setPublishing(false);
     }
-    upsertQuoteInProgress({
-      id: qid,
-      referenceNumber: jobDetails.referenceNumber,
-      customerName: jobDetails.customerName.trim(),
-      projectName: jobDetails.projectName.trim(),
-      customerClientId: jobDetails.customerClientId,
-      currentStep: 7,
-    });
-    patchQuoteSession(qid, {
-      currentStep: 7,
-      customerClientId: jobDetails.customerClientId,
-      projectName: jobDetails.projectName.trim(),
-      customerName: jobDetails.customerName.trim(),
-      referenceNumber: jobDetails.referenceNumber,
-      totalWeightKg: js.totalEstWeightKg,
-      totalAreaM2: js.totalPlateAreaM2,
-      totalItemQty: js.totalQty,
-      totalInclVat,
-    });
-    markQuoteComplete(qid);
-    setQuoteSavedToList(true);
   }, [
+    session,
+    router,
     jobDetails.referenceNumber,
     jobDetails.customerName,
     jobDetails.projectName,
@@ -539,6 +594,13 @@ export function QuickQuotePage() {
     }
   }, [step, pdfExportDraft, buildFinalizeDraft]);
 
+  /** Keep General `jobDetails.notes` aligned with phase-7 `draft.quote.notes` (export + rebuild step 6→7). */
+  useEffect(() => {
+    if (step !== 7 || !pdfExportDraft?.quote) return;
+    const joined = (pdfExportDraft.quote.notes ?? []).join("\n");
+    setJobDetails((j) => (j.notes === joined ? j : { ...j, notes: joined }));
+  }, [step, pdfExportDraft]);
+
   useEffect(() => {
     if (!quoteSavedToList) return;
     const qid = quoteListSessionIdRef.current;
@@ -555,6 +617,19 @@ export function QuickQuotePage() {
             materialType,
             materialPricePerKgByRow
           );
+    const draftForTotals = (() => {
+      try {
+        return pdfExportDraft ?? buildFinalizeDraft();
+      } catch {
+        return null;
+      }
+    })();
+    const totalNetBeforeVat = draftForTotals
+      ? computeNetBeforeVat(
+          draftForTotals.pricing.total_price,
+          draftForTotals.pricing.discount
+        )
+      : undefined;
     patchQuoteSession(qid, {
       currentStep: step,
       customerClientId: jobDetails.customerClientId,
@@ -565,6 +640,7 @@ export function QuickQuotePage() {
       totalAreaM2: js.totalPlateAreaM2,
       totalItemQty: js.totalQty,
       totalInclVat,
+      totalNetBeforeVat,
     });
   }, [
     quoteSavedToList,
@@ -580,6 +656,7 @@ export function QuickQuotePage() {
     materialType,
     materialPricePerKgByRow,
     pdfExportDraft,
+    buildFinalizeDraft,
   ]);
 
   const setSheetsForThickness = useCallback(
@@ -622,7 +699,8 @@ export function QuickQuotePage() {
   useEffect(() => {
     const qid = quoteListSessionIdRef.current;
     if (!qid || mergedQuotePartsList.length === 0) return;
-    if (!quoteSavedToList && !editParam) return;
+    const onList = getQuotesList().some((q) => q.id === qid);
+    if (!quoteSavedToList && !editParam && !onList) return;
     let draftPayload: QuotePdfFullPayload;
     try {
       draftPayload = pdfExportDraft ?? buildFinalizeDraft();
@@ -639,7 +717,10 @@ export function QuickQuotePage() {
         bendPlateQuoteItems,
         manualQuoteRows,
         excelImportQuoteRows,
-        generalNotes: jobDetails.notes?.trim() ?? "",
+        generalNotes: generalNotesForSnapshot(
+          draftPayload,
+          jobDetails.notes
+        ),
       });
     }, 500);
     return () => window.clearTimeout(tmr);
@@ -751,7 +832,7 @@ export function QuickQuotePage() {
 
   const stepNav = getStepNavigation();
 
-  const shouldWarnOnLeave = step > 1 && !quoteSavedToList;
+  const shouldWarnOnLeave = step > 1 && !quoteSavedToList && !publishing;
 
   useEffect(() => {
     if (!shouldWarnOnLeave) return;
@@ -995,6 +1076,8 @@ export function QuickQuotePage() {
                   savedLabel: t("quickQuotePage.savedToListShort"),
                   onClick: handleSaveQuoteToList,
                   disabled: quoteSavedToList,
+                  busy: publishing,
+                  busyLabel: t("common.loading"),
                 }
               : undefined
           }

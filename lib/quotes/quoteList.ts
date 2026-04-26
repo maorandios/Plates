@@ -28,6 +28,8 @@ export interface QuoteListRecord {
   totalItemQty?: number;
   /** Total price including VAT (from finalize draft when present, else computed from BOM). */
   totalInclVat?: number;
+  /** Subtotal after discount, before VAT — same basis as the quote / PDF. */
+  totalNetBeforeVat?: number;
 }
 
 export const QUOTES_LIST_STORAGE_KEY = "plate_quotes_list_v1";
@@ -92,6 +94,7 @@ function normalizeRecord(r: QuoteListRecord): QuoteListRecord {
     totalAreaM2: numOrUndef(r.totalAreaM2),
     totalItemQty: numOrUndef(r.totalItemQty),
     totalInclVat: numOrUndef(r.totalInclVat),
+    totalNetBeforeVat: numOrUndef(r.totalNetBeforeVat),
     wizardSchema: r.wizardSchema === 2 ? 2 : undefined,
   };
 }
@@ -202,6 +205,7 @@ export function patchQuoteSession(
       | "totalAreaM2"
       | "totalItemQty"
       | "totalInclVat"
+      | "totalNetBeforeVat"
     >
   >
 ): void {

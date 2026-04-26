@@ -25,7 +25,10 @@ export interface QuickQuoteBottomBarProps {
     label: string;
     savedLabel: string;
     disabled: boolean;
-    onClick: () => void;
+    /** While syncing to Supabase before navigation */
+    busy?: boolean;
+    busyLabel?: string;
+    onClick: () => void | Promise<void>;
   };
 }
 
@@ -87,10 +90,12 @@ export function QuickQuoteBottomBar({
               size="default"
               variant={saveQuoteToList.disabled ? "outline" : "default"}
               className="min-w-[10rem] gap-1"
-              disabled={saveQuoteToList.disabled}
-              onClick={saveQuoteToList.onClick}
+              disabled={saveQuoteToList.disabled || saveQuoteToList.busy}
+              onClick={() => void saveQuoteToList.onClick()}
             >
-              {saveQuoteToList.disabled ? (
+              {saveQuoteToList.busy ? (
+                saveQuoteToList.busyLabel ?? saveQuoteToList.label
+              ) : saveQuoteToList.disabled ? (
                 <>
                   <Check className="h-4 w-4 shrink-0" aria-hidden />
                   {saveQuoteToList.savedLabel}

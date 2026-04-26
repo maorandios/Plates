@@ -181,13 +181,13 @@
       </div>
     </section>
 
-    <section class="quote-notes-section" aria-label="היערות">
-      <h2 class="quote-notes__title">היערות</h2>
-      <ul class="quote-notes__list">
+    <section class="quote-notes-section" aria-label="הערות">
+      <h2 class="quote-notes__title">הערות</h2>
+      <div class="quote-notes__body">
         {% for line in notes_lines %}
-        <li class="quote-notes__item">{{ line }}</li>
+        <p class="quote-notes__line">{{ line }}</p>
         {% endfor %}
-      </ul>
+      </div>
     </section>
   </div>
 </body>

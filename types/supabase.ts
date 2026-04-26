@@ -137,6 +137,7 @@ export interface Database {
           total_area_m2: number | null;
           total_item_qty: number | null;
           total_incl_vat: number | null;
+          total_net_before_vat: number | null;
           session_payload: Json | null;
         };
         Insert: {
@@ -155,6 +156,7 @@ export interface Database {
           total_area_m2?: number | null;
           total_item_qty?: number | null;
           total_incl_vat?: number | null;
+          total_net_before_vat?: number | null;
           session_payload?: Json | null;
         };
         Update: {
@@ -173,6 +175,7 @@ export interface Database {
           total_area_m2?: number | null;
           total_item_qty?: number | null;
           total_incl_vat?: number | null;
+          total_net_before_vat?: number | null;
           session_payload?: Json | null;
         };
         Relationships: [];

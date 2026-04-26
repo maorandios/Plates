@@ -14,6 +14,7 @@ import asyncio
 import base64
 import json
 import mimetypes
+import os
 import sys
 from io import BytesIO
 from datetime import date, timedelta
@@ -290,29 +291,34 @@ def _text_suggests_plate_table_present(t: str) -> bool:
 
 
 # Section <h2> in quote_template.html — must not be treated as a blank trailing page.
-_QUOTE_NOTES_SECTION_TITLE = "היערות"
+_QUOTE_NOTES_SECTION_TITLES = ("הערות", "היערות")
 
 
 def _text_suggests_quote_notes_section_present(t: str) -> bool:
     """Notes block after the plate table; short page can look 'blank' to old heuristics."""
-    return _QUOTE_NOTES_SECTION_TITLE in (t or "")
+    s = t or ""
+    return any(title in s for title in _QUOTE_NOTES_SECTION_TITLES)
 
 
 def _should_drop_trailing_page_by_text(t: str) -> bool:
     """
-    Last page is a Chromium artifact: no table body, only the synthetic print footer in the margin.
-    pypdf usually still extracts the footer strings when they are part of the content stream.
+    Disabled by default. Stripping the last page via pypdf text heuristics was removing real
+    pages: notes may continue on the final page after the "הערות" heading on an earlier page,
+    so the last page had no title in extracted text and matched "short + עמוד/מתוך" → the
+    third page (with the rest of the notes) was deleted, while footers still said 3 total.
 
-    Important: a real last page that only contains the post-table היערות block and print footer
-    used to be dropped (short text + עמוד/מתוך), which removed the notes and left a wrong page count
-    on the previous page. Never drop if the notes section title appears in the extracted text.
+    Set QUOTE_PDF_STRIP_BLANK_TRAILING_PAGE=1 to re-enable a conservative drop.
     """
+    if os.environ.get("QUOTE_PDF_STRIP_BLANK_TRAILING_PAGE", "") != "1":
+        return False
     t = (t or "").strip()
     if not t:
         return True
     if _text_suggests_plate_table_present(t):
         return False
     if _text_suggests_quote_notes_section_present(t):
+        return False
+    if len(t) > 200:
         return False
     if "עמוד" in t and "מתוך" in t and len(t) < 2500:
         return True

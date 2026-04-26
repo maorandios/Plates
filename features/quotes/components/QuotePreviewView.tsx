@@ -250,18 +250,14 @@ export function QuotePreviewView({
   const previewLineAreaM2 = pv ? pv.areaM2 * pv.qty : 0;
   const { finish: previewFinishLabel } = splitMaterialGradeAndFinish(pv?.material ?? "");
 
-  const notesBlocks = useMemo(() => {
-    const blocks: { title: string; body: string }[] = [];
-    const g = snapshot.generalNotes?.trim();
-    if (g) blocks.push({ title: t(`${QP}.notesGeneral`), body: g });
-    const quoteNotes = (draft.quote.notes ?? []).map((s) => s.trim()).filter(Boolean);
-    if (quoteNotes.length > 0) {
-      blocks.push({
-        title: t(`${QP}.notesQuote`),
-        body: quoteNotes.join("\n"),
-      });
-    }
-    return blocks;
+  /** Single block: finalize `draft.quote.notes` is canonical; fall back to legacy `generalNotes`. */
+  const notesDisplay = useMemo(() => {
+    const fromDraft = (draft.quote.notes ?? [])
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join("\n");
+    if (fromDraft) return fromDraft;
+    return snapshot.generalNotes?.trim() ?? "";
   }, [snapshot.generalNotes, draft.quote.notes]);
 
   const handleExportPdf = async () => {
@@ -627,20 +623,15 @@ export function QuotePreviewView({
             </CardContent>
           </Card>
 
-          {notesBlocks.length > 0 ? (
+          {notesDisplay ? (
             <Card dir="rtl" className="border-border bg-card/40 text-start shadow-none">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{t(`${QP}.notesTitle`)}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 text-sm leading-relaxed">
-                {notesBlocks.map((b, idx) => (
-                  <div key={`${b.title}-${idx}`} className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">{b.title}</p>
-                    <p className="whitespace-pre-wrap rounded-md border border-border bg-muted/20 px-3 py-2 text-start">
-                      {b.body}
-                    </p>
-                  </div>
-                ))}
+              <CardContent className="text-sm leading-relaxed">
+                <p className="whitespace-pre-wrap rounded-md border border-border bg-muted/20 px-3 py-2 text-start">
+                  {notesDisplay}
+                </p>
               </CardContent>
             </Card>
           ) : null}

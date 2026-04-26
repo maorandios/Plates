@@ -68,6 +68,19 @@ function createdAtSortKey(iso: string): number {
   return Number.isFinite(t) ? t : 0;
 }
 
+/** Matches quick-quote default VAT (18%) when estimating from incl.-only legacy rows. */
+const LEGACY_VAT_RATE = 0.18;
+
+function formatNetBeforeVatCell(q: QuoteListRecord): string {
+  if (q.totalNetBeforeVat != null && Number.isFinite(q.totalNetBeforeVat)) {
+    return formatDecimal(q.totalNetBeforeVat, 2);
+  }
+  if (q.totalInclVat != null && Number.isFinite(q.totalInclVat)) {
+    return formatDecimal(q.totalInclVat / (1 + LEGACY_VAT_RATE), 2);
+  }
+  return "—";
+}
+
 /** Matches {@link ClientsTable}: fixed #; text columns; numeric pairs; VAT; status; icon columns. */
 const GRID_COLS =
   "2.75rem minmax(140px, 1.15fr) minmax(120px, 1fr) minmax(110px, 1fr) minmax(150px, 1.1fr) minmax(92px, 0.85fr) minmax(92px, 0.85fr) minmax(108px, 1fr) minmax(7.25rem, 0.7fr) 3.25rem 3.25rem" as const;
@@ -230,7 +243,7 @@ export default function QuotesPage() {
                   {t("quotes.colTotalArea")}
                 </TableHead>
                 <TableHead className="flex h-full min-h-12 w-full items-center justify-start border-b border-border text-right tabular-nums font-medium text-xs sm:text-sm">
-                  {t("quotes.colTotalInclVat")}
+                  {t("quotes.colTotalNetBeforeVat")}
                 </TableHead>
                 <TableHead className="flex h-full min-h-12 w-full items-center justify-center border-b border-border font-medium text-xs sm:text-sm">
                   {t("quotes.colStatus")}
@@ -247,7 +260,6 @@ export default function QuotesPage() {
               {filteredRows.map((q, index) => {
                 const w = q.totalWeightKg;
                 const a = q.totalAreaM2;
-                const vat = q.totalInclVat;
                 return (
                   <TableRow key={q.id} className="contents border-0 group/row hover:bg-white/[0.02]">
                     <TableCell className="text-center tabular-nums text-muted-foreground border-b border-border text-sm">
@@ -278,7 +290,7 @@ export default function QuotesPage() {
                       {a != null && Number.isFinite(a) ? formatDecimal(a, 2) : "—"}
                     </TableCell>
                     <TableCell className="min-w-0 text-right tabular-nums text-sm border-b border-border">
-                      {vat != null && Number.isFinite(vat) ? formatDecimal(vat, 2) : "—"}
+                      {formatNetBeforeVatCell(q)}
                     </TableCell>
                     <TableCell className="flex h-full min-h-12 w-full items-center justify-center border-b border-border px-1">
                       <Select

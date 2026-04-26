@@ -268,7 +268,12 @@ export function buildQuotePdfRequestBody(
   const totalPrice = sumLineTotalsRounded(items);
   const totalInclVat = computeQuoteTotalInclVat(totalPrice, discountInitial, vatRate);
 
-  const notes = options?.notes ?? [];
+  /** PDF / finalize הערות — from General step free text (split lines) unless caller overrides. */
+  const notesFromJobDetails = jobDetails.notes?.trim()
+    ? jobDetails.notes.split("\n")
+    : [];
+  const notes =
+    options?.notes !== undefined ? options.notes : notesFromJobDetails;
   const terms = options?.terms && options.terms.length > 0 ? options.terms : [];
 
   const rawNotes = jobDetails.notes?.trim() ?? "";

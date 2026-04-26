@@ -1212,6 +1212,7 @@
     "colTotalWeight": "סה״כ משקל (ק״ג)",
     "colTotalArea": "סה״כ שטח (מ״ר)",
     "colTotalInclVat": "סה״כ כולל מע״מ",
+    "colTotalNetBeforeVat": "סה״כ מחיר לפני מע״מ",
     "colStatus": "סטטוס",
     "colView": "צפיה",
     "colDelete": "מחיקה",

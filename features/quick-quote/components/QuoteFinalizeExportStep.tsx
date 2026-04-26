@@ -7,7 +7,6 @@ import {
   Check,
   Copy,
   Eye,
-  FileDown,
   Hash,
   Layers,
   LayoutGrid,
@@ -55,7 +54,6 @@ import {
 } from "./partPreviewModalShared";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { formatQuickQuoteCurrencyAmount } from "../lib/quickQuoteCurrencies";
-import { exportQuotePdfFromDraft } from "../lib/exportQuotePdfFromDraft";
 import {
   computeNetBeforeVat,
   computeQuoteTotalInclVat,
@@ -236,7 +234,6 @@ export function QuoteFinalizeExportStep({
   quotePartsForPreview,
   dxfPartGeometries,
 }: QuoteFinalizeExportStepProps) {
-  const [exporting, setExporting] = useState(false);
   const [quoteDateDisplay, setQuoteDateDisplay] = useState(() =>
     formatIsoToDdMmYyyy(draft.quote.quote_date)
   );
@@ -435,57 +432,7 @@ export function QuoteFinalizeExportStep({
     );
   }
 
-  const handleExportPdf = useCallback(async () => {
-    if (draft.items.length === 0) return;
-    setExporting(true);
-    try {
-      const quoteDateIso =
-        parseDdMmYyyyToIso(quoteDateDisplay) ?? draft.quote.quote_date;
-      const validUntilIso =
-        parseDdMmYyyyToIso(validUntilDisplay) ?? draft.quote.valid_until;
-
-      /**
-       * Same code path as quote preview / {@link exportQuotePdfFromDraft} so the
-       * Python template receives an identical JSON shape and rounding.
-       * Dates: apply UI (dd/mm) values before build so the export matches preview
-       * when the user changed dates only in the form.
-       */
-      const draftForExport: QuotePdfFullPayload = {
-        ...draft,
-        quote: {
-          ...draft.quote,
-          quote_date: quoteDateIso,
-          valid_until: validUntilIso,
-        },
-      };
-
-      await exportQuotePdfFromDraft(draftForExport, materialFamilyLabel);
-
-      setDraft((d) => ({
-        ...d,
-        quote: {
-          ...d.quote,
-          quote_date: quoteDateIso,
-          valid_until: validUntilIso,
-        },
-      }));
-    } catch (e) {
-      console.error(e);
-      alert(e instanceof Error ? e.message : t(`${FP}.exportFailed`));
-    } finally {
-      setExporting(false);
-    }
-  }, [
-    draft,
-    quoteDateDisplay,
-    validUntilDisplay,
-    materialFamilyLabel,
-    setDraft,
-  ]);
-
   const notesText = draft.quote.notes.join("\n");
-
-  const exportPdfDisabled = exporting || draft.items.length === 0;
 
   const pv = previewPart;
   const previewTotalWeightLine = pv ? pv.weightKg * pv.qty : 0;
@@ -534,12 +481,9 @@ export function QuoteFinalizeExportStep({
         </div>
 
         <div className="space-y-5 p-4 sm:p-6">
-          <div
-            dir="rtl"
-            className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-8"
-          >
+          <div dir="rtl" className="w-full max-w-3xl">
             <Card
-              className="w-full border-border bg-card/40 text-start shadow-none lg:max-w-md lg:shrink-0"
+              className="w-full border-border bg-card/40 text-start shadow-none"
               dir="rtl"
             >
             <CardHeader className="space-y-0 pb-2 pt-4">
@@ -669,32 +613,6 @@ export function QuoteFinalizeExportStep({
               </div>
             </CardContent>
           </Card>
-
-            {/*
-              RTL row: pack toward main-end = physical left. Square height matches quote card (`items-stretch` on parent).
-            */}
-            <div className="flex w-full flex-1 min-w-0 justify-end self-stretch lg:min-h-0">
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={exportPdfDisabled}
-                onClick={() => void handleExportPdf()}
-                className={cn(
-                  "flex aspect-square w-[min(100%,18rem)] max-w-full shrink-0 flex-col items-center justify-center gap-3 rounded-[2.5rem] border-2 border-[#00C7A5] bg-[#D2FFEE] px-3 py-4 text-[#14765F] shadow-md transition-colors sm:rounded-[2.75rem]",
-                  "hover:bg-[#c5f5e8] hover:border-[#00b396]",
-                  "focus-visible:ring-2 focus-visible:ring-[#00C7A5]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  "disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-60 disabled:shadow-none disabled:hover:bg-muted",
-                  "sm:w-[min(100%,20rem)] sm:gap-4 sm:px-4 sm:py-5",
-                  "lg:h-full lg:max-h-[min(100%,26rem)] lg:w-auto lg:self-start",
-                  "whitespace-normal [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:!h-10 [&_svg]:!w-10 sm:[&_svg]:!h-11 sm:[&_svg]:!w-11 lg:[&_svg]:!h-12 lg:[&_svg]:!w-12"
-                )}
-              >
-                <FileDown className="stroke-[1.65]" aria-hidden />
-                <span className="max-w-[11rem] text-center text-sm font-semibold leading-snug sm:max-w-[13rem] sm:text-base lg:max-w-[14rem] lg:text-[1.05rem] lg:leading-snug">
-                  {exporting ? t(`${FP}.exporting`) : t(`${FP}.exportQuoteProduce`)}
-                </span>
-              </Button>
-            </div>
           </div>
 
           <div dir="rtl" className="space-y-3 text-start">

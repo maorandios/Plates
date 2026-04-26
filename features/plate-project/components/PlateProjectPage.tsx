@@ -45,7 +45,12 @@ import {
   type PlateProjectPhase2Mode,
   type PlateProjectSessionSnapshot,
 } from "@/lib/projects/plateProjectSnapshot";
-import { loadEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
+import {
+  loadEntityTablesForOrg,
+  syncAllEntityTablesForOrg,
+} from "@/lib/supabase/entityTableSyncBrowser";
+import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
+import { useOrgBootstrap } from "@/components/providers/OrgBootstrapProvider";
 import {
   getPlateProjectsList,
   patchPlateProjectListRecord,
@@ -72,6 +77,7 @@ function newPlateProjectSessionId(): string {
 
 export function PlateProjectPage() {
   const router = useRouter();
+  const { session } = useOrgBootstrap();
   const searchParams = useSearchParams();
   const urlId = searchParams.get("id");
   const pendingNewIdRef = useRef<string | null>(null);
@@ -109,6 +115,7 @@ export function PlateProjectPage() {
   const [phase2ResetDialogOpen, setPhase2ResetDialogOpen] = useState(false);
   /** Projects list row is created/updated only after explicit save on step 3 (like quotes). */
   const [projectSavedToList, setProjectSavedToList] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const markProjectDataDirty = useCallback(() => {
     setProjectSavedToList(false);
@@ -379,33 +386,50 @@ export function PlateProjectPage() {
     advanceTo(2);
   }, [advanceTo]);
 
-  const handleSaveProjectToList = useCallback(() => {
-    /** Synchronous — debounced effect may be cancelled; cloud row must get full `session_payload`. */
-    savePlateProjectSnapshot(projectId, {
-      jobDetails,
-      materialType,
-      manualQuoteRows,
-      excelImportQuoteRows,
-      dxfMethodGeometries,
-      bendPlateQuoteItems,
-      step,
-      highestStepReached,
-      phase2Mode,
-    });
-    const js = jobSummaryFromParts(mergedQuotePartsList);
-    upsertPlateProjectInProgress({
-      id: projectId,
-      referenceNumber: jobDetails.referenceNumber.trim(),
-      customerName: jobDetails.customerName.trim(),
-      projectName: jobDetails.projectName.trim(),
-      materialType,
-      currentStep: 3,
-      totalItemQty: js.totalQty,
-      totalWeightKg: js.totalEstWeightKg,
-      totalAreaM2: js.totalPlateAreaM2,
-    });
-    setProjectSavedToList(true);
+  const handleSaveProjectToList = useCallback(async () => {
+    setPublishing(true);
+    try {
+      /** Synchronous — debounced effect may be cancelled; cloud row must get full `session_payload`. */
+      savePlateProjectSnapshot(projectId, {
+        jobDetails,
+        materialType,
+        manualQuoteRows,
+        excelImportQuoteRows,
+        dxfMethodGeometries,
+        bendPlateQuoteItems,
+        step,
+        highestStepReached,
+        phase2Mode,
+      });
+      const js = jobSummaryFromParts(mergedQuotePartsList);
+      upsertPlateProjectInProgress({
+        id: projectId,
+        referenceNumber: jobDetails.referenceNumber.trim(),
+        customerName: jobDetails.customerName.trim(),
+        projectName: jobDetails.projectName.trim(),
+        materialType,
+        currentStep: 3,
+        totalItemQty: js.totalQty,
+        totalWeightKg: js.totalEstWeightKg,
+        totalAreaM2: js.totalPlateAreaM2,
+      });
+      setProjectSavedToList(true);
+      if (isSupabaseConfigured() && session?.ok) {
+        const sync = await syncAllEntityTablesForOrg(session.accountUserId);
+        if (!sync.ok) {
+          console.warn(
+            "[PLATE] post-save entity sync failed (navigating to list anyway):",
+            sync.error
+          );
+        }
+      }
+      router.push("/projects");
+    } finally {
+      setPublishing(false);
+    }
   }, [
+    session,
+    router,
     mergedQuotePartsList,
     projectId,
     jobDetails,
@@ -502,7 +526,7 @@ export function PlateProjectPage() {
     handleContinueFromDrawingPickerToSummary,
   ]);
 
-  const shouldWarnOnLeave = step > 1 && !projectSavedToList;
+  const shouldWarnOnLeave = step > 1 && !projectSavedToList && !publishing;
 
   useEffect(() => {
     if (!shouldWarnOnLeave) return;
@@ -674,6 +698,8 @@ export function PlateProjectPage() {
                   saved: projectSavedToList,
                   canSave: mergedQuotePartsList.length > 0,
                   onClick: handleSaveProjectToList,
+                  saving: publishing,
+                  savingLabel: t("common.loading"),
                 }
               : undefined
           }
