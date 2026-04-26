@@ -211,26 +211,61 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
     };
   }, [orgId, schedulePush]);
 
+  /** On tab background / close, run pending debounced push immediately (material settings etc.). */
+  useEffect(() => {
+    if (typeof document === "undefined" || !orgId) return;
+    const flush = () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      void pushToServer(orgId);
+    };
+    const onDocumentHide = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onDocumentHide);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onDocumentHide);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [orgId, pushToServer]);
+
   useEffect(() => {
     if (typeof document === "undefined" || !orgId) return;
     const onVis = () => {
       if (document.visibilityState !== "visible") return;
-      const now = Date.now();
-      if (now - lastVisPullAtRef.current >= VIS_PULL_THROTTLE_MS) {
-        lastVisPullAtRef.current = now;
-        void (async () => {
+      /**
+       * Push debounced work **before** pulling from the server. Otherwise a
+       * `loadRemoteOrgData` + `applyRemoteDataToLocalStorage` can overwrite
+       * local `material_config` (custom grades/finishes) with a stale copy
+       * that never had time to be upserted to `public.users`.
+       */
+      void (async () => {
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+        }
+        try {
+          await pushToServer(orgId);
+        } catch (e) {
+          console.warn("[PLATE] visibility pre-pull push failed", e);
+        }
+        const now = Date.now();
+        if (now - lastVisPullAtRef.current >= VIS_PULL_THROTTLE_MS) {
+          lastVisPullAtRef.current = now;
           try {
             await pullRemoteAndApply(orgId);
           } catch (e) {
             console.warn("[PLATE] visibility pull failed", e);
           }
-        })();
-      }
-      schedulePush();
+        }
+      })();
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [orgId, schedulePush, pullRemoteAndApply]);
+  }, [orgId, pushToServer, pullRemoteAndApply]);
 
   useEffect(() => {
     if (!orgId) return;

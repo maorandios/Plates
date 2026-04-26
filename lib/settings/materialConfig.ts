@@ -56,8 +56,13 @@ function normalizeTagListField(
 
 const STORAGE_KEY_PREFIX = "plate_material_config_";
 
-function materialStorageKey(materialType: MaterialType): string {
+/** Exported for {@link applyRemoteDataToLocalStorage} last-write-wins checks. */
+export function localMaterialConfigStorageKey(materialType: MaterialType): string {
   return `${STORAGE_KEY_PREFIX}${materialType}`;
+}
+
+function materialStorageKey(materialType: MaterialType): string {
+  return localMaterialConfigStorageKey(materialType);
 }
 
 function defaultForType(materialType: MaterialType): MaterialConfig {

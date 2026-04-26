@@ -2,7 +2,11 @@
 
 import type { MaterialConfig, MaterialType } from "@/types/materials";
 import { saveAppPreferences } from "@/lib/settings/appPreferences";
-import { saveMaterialConfig } from "@/lib/settings/materialConfig";
+import {
+  getMaterialConfig,
+  localMaterialConfigStorageKey,
+  saveMaterialConfig,
+} from "@/lib/settings/materialConfig";
 import { saveAllCuttingProfileRanges } from "@/lib/settings/cuttingProfiles";
 import type { CuttingProfileRange } from "@/types/production";
 import type { AppPreferences } from "@/types/settings";
@@ -25,6 +29,12 @@ export type UserWorkspaceHydration = {
 };
 
 const MATERIAL_TYPES: MaterialType[] = ["carbonSteel", "stainlessSteel", "aluminum"];
+
+function materialConfigTimeMs(cfg: { updatedAt?: string } | null | undefined): number {
+  if (!cfg || typeof cfg.updatedAt !== "string") return 0;
+  const t = Date.parse(cfg.updatedAt);
+  return Number.isFinite(t) ? t : 0;
+}
 
 function parseAppPreferences(raw: unknown): AppPreferences {
   if (!raw || typeof raw !== "object") return DEFAULT_APP_PREFERENCES;
@@ -62,7 +72,17 @@ export function applyRemoteDataToLocalStorage(
     for (const t of MATERIAL_TYPES) {
       const row = mc[t];
       if (row && typeof row === "object") {
-        saveMaterialConfig(row as MaterialConfig);
+        const remote = row as MaterialConfig;
+        const hasLocal = localStorage.getItem(localMaterialConfigStorageKey(t)) != null;
+        if (hasLocal) {
+          const local = getMaterialConfig(t);
+          const lt = materialConfigTimeMs(local);
+          const rt = materialConfigTimeMs(remote);
+          if (lt > rt) {
+            continue;
+          }
+        }
+        saveMaterialConfig(remote);
       }
     }
   }
