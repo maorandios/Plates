@@ -6,7 +6,7 @@ import {
   patchOrgSettings,
   upsertDomainSnapshot,
 } from "@/app/actions/orgData";
-import { createClient } from "@/lib/supabase/client";
+import { ensureAuthUserForBrowserSync } from "@/lib/supabase/ensureAuthSession";
 import { syncAllEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
 import { applyRemoteDataToLocalStorage } from "@/lib/supabase/hydrateClient";
 import {
@@ -69,6 +69,9 @@ function cuttingToJson(): Json {
 export function SupabaseSyncProvider({ children }: { children: React.ReactNode }) {
   const { loading, session } = useOrgBootstrap();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Avoid overlapping pushes (refresh-token / long JSON) that can 401 on production. */
+  const pushInFlightRef = useRef(false);
+  const pushPendingRef = useRef(false);
   const orgId = session?.ok ? session.accountUserId : null;
 
   /** Fetches public.users (material_config, etc.) + snapshots and applies to localStorage. */
@@ -87,11 +90,13 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const pushToServer = useCallback(async (oid: string) => {
+    if (pushInFlightRef.current) {
+      pushPendingRef.current = true;
+      return;
+    }
+    pushInFlightRef.current = true;
     try {
-      const supa = createClient();
-      const {
-        data: { user: authUser },
-      } = await supa.auth.getUser();
+      const authUser = await ensureAuthUserForBrowserSync();
       if (!authUser || authUser.id !== oid) {
         return;
       }
@@ -145,6 +150,12 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
       }
     } catch (e) {
       console.warn("[PLATE] Supabase pushToServer error", e);
+    } finally {
+      pushInFlightRef.current = false;
+      if (pushPendingRef.current) {
+        pushPendingRef.current = false;
+        void pushToServer(oid);
+      }
     }
   }, []);
 

@@ -28,21 +28,20 @@ import {
   applyPlateProjectSessionPayloadFromServer,
   getPlateProjectSnapshot,
 } from "@/lib/projects/plateProjectSnapshot";
+import { ensureAuthUserForBrowserSync } from "@/lib/supabase/ensureAuthSession";
 
 /**
  * Returns the current auth user id for browser-side Supabase calls.
  * Does **not** trust `window.__PLATE_ORG_ID__` without a match from `getUser()`;
- * a stale org id with an expired session caused 401 + RLS errors on rest upserts.
+ * uses `ensureAuthUserForBrowserSync` so a just-expired access token can be refreshed
+ * before rest upserts (reduces prod 401 / RLS noise).
  */
 async function getBrowserAccountId(): Promise<string | null> {
   if (!isSupabaseConfigured() || typeof window === "undefined") {
     return null;
   }
   try {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await ensureAuthUserForBrowserSync();
     if (!user) {
       if (getOrgIdFromWindow()) {
         delete window.__PLATE_ORG_ID__;
