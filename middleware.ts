@@ -5,6 +5,7 @@ import {
   safeInternalNextPath,
   safeNextPathParam,
 } from "@/lib/auth/publicPaths";
+import { requestHasPlausibleSupabaseAuthCookies } from "@/lib/auth/supabaseSessionCookie";
 
 /** Carry refreshed `Set-Cookie` (and no-store headers) when redirecting or returning 401. */
 function withMergedSessionCookies(
@@ -116,6 +117,14 @@ export async function middleware(request: NextRequest) {
       return withMergedSessionCookies(supabaseResponse, json);
     }
     if (!isPublicPath(pathname)) {
+      /**
+       * Do not send users to `/login` while Supabase session cookies are still
+       * present — a failed `getUser()` here is often a refresh race (see
+       * @supabase/ssr README: concurrent requests, single-use refresh token).
+       */
+      if (requestHasPlausibleSupabaseAuthCookies(request)) {
+        return supabaseResponse;
+      }
       const login = new URL("/login", request.url);
       const intended = pathname + (request.nextUrl.search || "");
       login.searchParams.set("next", safeInternalNextPath(intended));

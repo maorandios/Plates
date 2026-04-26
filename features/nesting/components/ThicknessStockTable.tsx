@@ -95,6 +95,7 @@ export function ThicknessStockTable({
                 These sizes come from{" "}
                 <Link
                   href="/settings/materials#purchased-sheets"
+                  prefetch={false}
                   className="underline font-medium text-foreground hover:text-primary"
                 >
                   Preferences
@@ -146,6 +147,7 @@ export function ThicknessStockTable({
               No purchased sheet sizes for this thickness in{" "}
               <Link
                 href="/settings/materials#purchased-sheets"
+                prefetch={false}
                 className="underline font-medium text-foreground hover:text-primary"
               >
                 Preferences
@@ -220,6 +222,7 @@ export function ThicknessStockTable({
                         to enter dimensions. Optional: define catalogue sizes in{" "}
                         <Link
                           href="/settings/materials#purchased-sheets"
+                          prefetch={false}
                           className="underline font-medium text-foreground hover:text-primary"
                         >
                           Preferences

@@ -85,6 +85,7 @@ export function AppTopBar() {
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 sm:gap-4">
           <Link
             href="/"
+            prefetch={false}
             className="flex shrink-0 items-center py-0.5"
             aria-label={t("brand.name")}
           >
@@ -108,6 +109,7 @@ export function AppTopBar() {
                 <Link
                   key={href}
                   href={href}
+                  prefetch={false}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     navItemBase,
@@ -155,6 +157,7 @@ export function AppTopBar() {
                   >
                     <Link
                       href={href}
+                      prefetch={false}
                       className="block w-full px-3 py-2.5 text-sm font-medium"
                     >
                       {t(labelKey)}
@@ -168,6 +171,7 @@ export function AppTopBar() {
                 >
                   <Link
                     href="/logout"
+                    prefetch={false}
                     className="block w-full px-3 py-2.5 text-sm font-medium"
                   >
                     {t("nav.logOutFromSystem")}
@@ -179,6 +183,7 @@ export function AppTopBar() {
             {trial?.kind === "ready" ? (
               <Link
                 href="/settings/bill-and-usage"
+                prefetch={false}
                 className={cn(
                   "relative z-10 order-last inline-flex min-h-9 min-w-0 max-w-[min(100%,20rem)] shrink-0 items-center justify-center rounded-full border-2 border-orange-600/45 bg-orange-100 px-2.5 py-1.5 text-center text-[10px] font-semibold leading-snug text-orange-950 shadow-sm sm:px-3 sm:text-xs",
                   "whitespace-nowrap sm:whitespace-normal sm:max-w-xs",
@@ -204,6 +209,7 @@ export function AppTopBar() {
               >
                 <Link
                   href={editQuoteHref}
+                  prefetch={false}
                   className="gap-1.5"
                   aria-label={t(editQuoteLabelKey)}
                 >
@@ -220,6 +226,7 @@ export function AppTopBar() {
             >
               <Link
                 href={topBarBack.href}
+                prefetch={false}
                 className="gap-1.5"
                 aria-label={t(topBarBack.labelKey)}
               >

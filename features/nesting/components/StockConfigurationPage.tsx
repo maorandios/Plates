@@ -193,6 +193,7 @@ export default function StockConfigurationPage() {
             Assign available stock sheets for each thickness. If you defined{" "}
             <Link
               href="/settings/materials#purchased-sheets"
+              prefetch={false}
               className="underline font-medium text-foreground hover:text-primary"
             >
               purchased sheet sizes
