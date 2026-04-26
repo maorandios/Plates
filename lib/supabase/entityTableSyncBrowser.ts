@@ -29,14 +29,14 @@ import {
   getPlateProjectSnapshot,
 } from "@/lib/projects/plateProjectSnapshot";
 
-/** Signed-in user id (single-tenant account); `window.__PLATE_ORG_ID__` is set from bootstrap. */
+/**
+ * Returns the current auth user id for browser-side Supabase calls.
+ * Does **not** trust `window.__PLATE_ORG_ID__` without a match from `getUser()`;
+ * a stale org id with an expired session caused 401 + RLS errors on rest upserts.
+ */
 async function getBrowserAccountId(): Promise<string | null> {
   if (!isSupabaseConfigured() || typeof window === "undefined") {
     return null;
-  }
-  const fromBootstrap = getOrgIdFromWindow();
-  if (fromBootstrap) {
-    return fromBootstrap;
   }
   try {
     const supabase = createClient();
@@ -44,9 +44,9 @@ async function getBrowserAccountId(): Promise<string | null> {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      console.warn(
-        "[PLATE] Supabase sync: no session — sign in so data can save to the cloud."
-      );
+      if (getOrgIdFromWindow()) {
+        delete window.__PLATE_ORG_ID__;
+      }
       return null;
     }
     return user.id;

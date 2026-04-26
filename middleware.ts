@@ -6,6 +6,21 @@ import {
   safeNextPathParam,
 } from "@/lib/auth/publicPaths";
 
+/** Carry refreshed `Set-Cookie` (and no-store headers) when redirecting or returning 401. */
+function withMergedSessionCookies(
+  from: NextResponse,
+  to: NextResponse
+): NextResponse {
+  for (const c of from.cookies.getAll()) {
+    to.cookies.set(c.name, c.value, c);
+  }
+  const cacheCtl = from.headers.get("Cache-Control");
+  if (cacheCtl) {
+    to.headers.set("Cache-Control", cacheCtl);
+  }
+  return to;
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -33,7 +48,7 @@ export async function middleware(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) =>
           request.cookies.set(name, value)
         );
@@ -43,6 +58,13 @@ export async function middleware(request: NextRequest) {
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, options)
         );
+        if (headers) {
+          for (const [k, v] of Object.entries(headers)) {
+            if (typeof v === "string") {
+              supabaseResponse.headers.set(k, v);
+            }
+          }
+        }
       },
     },
   });
@@ -57,18 +79,21 @@ export async function middleware(request: NextRequest) {
     const nextParam = safeNextPathParam(
       request.nextUrl.searchParams.get("next")
     );
-    return NextResponse.redirect(new URL(nextParam, request.url));
+    const toLogin = NextResponse.redirect(new URL(nextParam, request.url));
+    return withMergedSessionCookies(supabaseResponse, toLogin);
   }
 
   if (!user) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const json = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return withMergedSessionCookies(supabaseResponse, json);
     }
     if (!isPublicPath(pathname)) {
       const login = new URL("/login", request.url);
       const intended = pathname + (request.nextUrl.search || "");
       login.searchParams.set("next", safeInternalNextPath(intended));
-      return NextResponse.redirect(login);
+      const toLogin = NextResponse.redirect(login);
+      return withMergedSessionCookies(supabaseResponse, toLogin);
     }
   }
 

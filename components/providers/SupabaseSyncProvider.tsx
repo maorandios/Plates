@@ -6,6 +6,7 @@ import {
   patchOrgSettings,
   upsertDomainSnapshot,
 } from "@/app/actions/orgData";
+import { createClient } from "@/lib/supabase/client";
 import { syncAllEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
 import { applyRemoteDataToLocalStorage } from "@/lib/supabase/hydrateClient";
 import {
@@ -87,6 +88,13 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
 
   const pushToServer = useCallback(async (oid: string) => {
     try {
+      const supa = createClient();
+      const {
+        data: { user: authUser },
+      } = await supa.auth.getUser();
+      if (!authUser || authUser.id !== oid) {
+        return;
+      }
       const prefs = getAppPreferences() as unknown as Json;
       const mat = materialConfigsToJson();
       const cut = cuttingToJson();

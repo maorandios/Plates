@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { bootstrapSession, type BootstrapSessionResult } from "@/app/actions/organization";
+import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 
 type OrgBootstrapContextValue = {
@@ -46,6 +47,28 @@ export function OrgBootstrapProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     run();
+  }, [run]);
+
+  /** Keep server bootstrap in sync with Supabase client auth (incl. sign-out / new session). */
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const supabase = createClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        if (typeof window !== "undefined") {
+          delete window.__PLATE_ORG_ID__;
+        }
+        setSession({ ok: false, reason: "no_session" });
+        setLoading(false);
+        return;
+      }
+      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+        void run();
+      }
+    });
+    return () => subscription.unsubscribe();
   }, [run]);
 
   useEffect(() => {
