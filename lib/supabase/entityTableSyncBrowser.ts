@@ -19,7 +19,6 @@ import type { QuoteListRecord } from "@/lib/quotes/quoteList";
 import { getQuotesList } from "@/lib/quotes/quoteList";
 import type { PlateProjectListRecord } from "@/lib/projects/plateProjectList";
 import { getPlateProjectsList } from "@/lib/projects/plateProjectList";
-import type { MaterialConfig } from "@/types/materials";
 import type { Json } from "@/types/supabase";
 import {
   applyQuoteSessionPayloadFromServer,
@@ -232,55 +231,6 @@ export async function syncAllEntityTablesForOrg(
   if (!p.ok) errors.push(`projects: ${p.error}`);
   if (errors.length > 0) {
     return { ok: false, error: errors.join("; ") };
-  }
-  return { ok: true };
-}
-
-export async function syncSteelTypesFromMaterialConfigs(
-  configs: MaterialConfig[]
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!isSupabaseConfigured()) {
-    return { ok: false, error: "supabase_not_configured_in_browser" };
-  }
-  const accountId = await getBrowserAccountId();
-  if (!accountId) {
-    return { ok: false, error: "no_org_or_session" };
-  }
-  const supabase = createClient();
-  const { error: delErr } = await supabase
-    .from("steel_types")
-    .delete()
-    .eq("user_id", accountId);
-  if (delErr) {
-    return { ok: false, error: delErr.message };
-  }
-  const rows: {
-    user_id: string;
-    family: string;
-    name: string;
-    sort_order: number;
-    is_active: boolean;
-  }[] = [];
-  for (const c of configs) {
-    let i = 0;
-    for (const name of c.enabledGrades) {
-      const t = name.trim();
-      if (!t) continue;
-      rows.push({
-        user_id: accountId,
-        family: c.materialType,
-        name: t,
-        sort_order: i++,
-        is_active: true,
-      });
-    }
-  }
-  if (rows.length === 0) {
-    return { ok: true };
-  }
-  const { error: insErr } = await supabase.from("steel_types").insert(rows);
-  if (insErr) {
-    return { ok: false, error: insErr.message };
   }
   return { ok: true };
 }

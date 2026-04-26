@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sanitizeLetterheadCompanyName } from "@/features/quick-quote/lib/quotePdfPayload";
+import { createClient } from "@/lib/supabase/server";
 import type { QuotePdfMergedPayload } from "@/lib/server/quotePdf/buildQuoteTemplateContext";
 import {
   renderQuotePdfToBuffer,
@@ -108,11 +109,33 @@ function mergeCompany(
     name: sanitizeLetterheadCompanyName(fromClient.name.trim()),
     registration: empty(fromClient.registration) ?? fromEnv.registration,
     logo_path: fromEnv.logo_path,
-    email: empty(fromClient.email),
-    phone: empty(fromClient.phone),
-    website: empty(fromClient.website),
+    email: empty(fromClient.email) ?? fromEnv.email,
+    phone: empty(fromClient.phone) ?? fromEnv.phone,
+    website: empty(fromClient.website) ?? fromEnv.website,
     address: empty(fromClient.address) ?? fromEnv.address,
   };
+}
+
+/** If letterhead email is still empty, use the signed-in user's auth email. */
+async function withAuthUserEmailForPdfCompany(
+  company: ReturnType<typeof companyFromEnv>
+): Promise<ReturnType<typeof companyFromEnv>> {
+  if ((company.email ?? "").trim()) {
+    return company;
+  }
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const em = user?.email?.trim();
+    if (em) {
+      return { ...company, email: em };
+    }
+  } catch {
+    /* missing Supabase env or no session */
+  }
+  return company;
 }
 
 function pythonExecutable(): string {
@@ -149,8 +172,12 @@ export async function POST(req: Request) {
   }
 
   const { company: clientCompany, ...rest } = parsed;
+  const fromEnv = companyFromEnv();
+  const mergedCompany = await withAuthUserEmailForPdfCompany(
+    mergeCompany(clientCompany, fromEnv)
+  );
   const payload = {
-    company: mergeCompany(clientCompany, companyFromEnv()),
+    company: mergedCompany,
     ...rest,
   } satisfies QuotePdfMergedPayload;
 

@@ -6,10 +6,7 @@ import {
   patchOrgSettings,
   upsertDomainSnapshot,
 } from "@/app/actions/orgData";
-import {
-  syncAllEntityTablesForOrg,
-  syncSteelTypesFromMaterialConfigs,
-} from "@/lib/supabase/entityTableSyncBrowser";
+import { syncAllEntityTablesForOrg } from "@/lib/supabase/entityTableSyncBrowser";
 import { applyRemoteDataToLocalStorage } from "@/lib/supabase/hydrateClient";
 import {
   ALL_DOMAIN_SNAPSHOT_KEYS,
@@ -85,10 +82,6 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
       });
       if (!patch.ok) {
         console.warn("[PLATE] Supabase users row sync failed:", patch.error);
-      }
-      const steel = await syncSteelTypesFromMaterialConfigs(getAllMaterialConfigs());
-      if (!steel.ok) {
-        console.warn("[PLATE] Supabase steel_types sync failed:", steel.error);
       }
       for (const dataKey of ALL_DOMAIN_SNAPSHOT_KEYS) {
         try {

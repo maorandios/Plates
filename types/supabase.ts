@@ -231,36 +231,6 @@ export interface Database {
         };
         Relationships: [];
       };
-      steel_types: {
-        Row: {
-          id: string;
-          user_id: string;
-          family: string;
-          name: string;
-          sort_order: number;
-          is_active: boolean;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          family: string;
-          name: string;
-          sort_order?: number;
-          is_active?: boolean;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          family?: string;
-          name?: string;
-          sort_order?: number;
-          is_active?: boolean;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
