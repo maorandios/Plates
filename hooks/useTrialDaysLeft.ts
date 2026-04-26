@@ -51,7 +51,7 @@ export function useTrialDaysLeft():
           setState({ kind: "hidden" });
           return;
         }
-        let created = data.user.created_at;
+        let created: string | undefined = data.user.created_at;
         if (!created) {
           const { data: sess } = await supabase.auth.getSession();
           created = sess.session?.user?.created_at;
