@@ -2,25 +2,21 @@ import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
 /**
- * Returns the current user for browser-side Supabase calls. If `getUser()` is empty
- * (e.g. access token just expired), attempts one `refreshSession()` then re-checks.
- * Reduces prod-only 401 / RLS noise when debounced sync runs right after tab focus or
- * a long idle period.
+ * Resolves the current user for browser-side Supabase work.
+ *
+ * We intentionally do **not** call `auth.refreshSession()` here: the client already
+ * has `autoRefreshToken: true`, and an extra manual refresh can race with the
+ * background refresh, consume a single-use refresh token twice, and clear the
+ * session (SIGNED_OUT) — a common source of "sudden logouts" on production.
  */
 export async function ensureAuthUserForBrowserSync(): Promise<User | null> {
   const supabase = createClient();
-  let {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) {
-    return user;
+  const first = await supabase.auth.getUser();
+  if (first.data.user) {
+    return first.data.user;
   }
-  const { data: refreshed, error } = await supabase.auth.refreshSession();
-  if (error || !refreshed.session) {
-    return null;
-  }
-  ({
-    data: { user },
-  } = await supabase.auth.getUser());
-  return user ?? null;
+  // Let auto-refresh or other tab finish; retry once (matches Supabase's own race guidance).
+  await new Promise((r) => setTimeout(r, 200));
+  const second = await supabase.auth.getUser();
+  return second.data.user ?? null;
 }

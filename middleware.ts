@@ -69,11 +69,38 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const pathname = request.nextUrl.pathname;
+
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null;
+  let authGetUserError: Awaited<ReturnType<typeof supabase.auth.getUser>>["error"] =
+    null;
+  try {
+    const u = await supabase.auth.getUser();
+    user = u.data.user;
+    authGetUserError = u.error;
+  } catch {
+    // Network / runtime failure: do not send the user to /login; cookies may still be valid.
+    return supabaseResponse;
+  }
+
+  /**
+   * If GoTrue is temporarily down or the request failed, do not treat as "logged out"
+   * or the SPA will full-navigate to /login and look like a sudden logout.
+   */
+  if (!user && authGetUserError) {
+    const st = authGetUserError.status ?? 0;
+    const msg = (authGetUserError.message ?? "").toLowerCase();
+    const looksTransient =
+      st >= 500 ||
+      st === 0 ||
+      msg.includes("fetch") ||
+      msg.includes("network") ||
+      msg.includes("timeout") ||
+      msg.includes("econn");
+    if (looksTransient) {
+      return supabaseResponse;
+    }
+  }
 
   if (user && (pathname === "/login" || pathname.startsWith("/login/"))) {
     const nextParam = safeNextPathParam(
