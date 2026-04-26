@@ -21,6 +21,7 @@ export function clientToRow(accountUserId: string, c: Client) {
   };
 }
 
+/** Requires `public.quotes.total_net_before_vat` — see migration 20260426210000. */
 export function quoteToRow(accountUserId: string, q: QuoteListRecord) {
   return {
     id: q.id,

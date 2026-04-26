@@ -70,6 +70,21 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const orgId = session?.ok ? session.accountUserId : null;
 
+  /** Fetches public.users (material_config, etc.) + snapshots and applies to localStorage. */
+  const pullRemoteAndApply = useCallback(async (oid: string) => {
+    const remote = await loadRemoteOrgData(oid);
+    if (remote === "forbidden" || remote === "no_session") return;
+    const { settings, snapshots } = remote;
+    const notifyKeys: string[] = [];
+    for (const s of snapshots) {
+      if (SNAPSHOT_NOTIFY[s.data_key]) {
+        notifyKeys.push(s.data_key);
+      }
+    }
+    applyRemoteDataToLocalStorage(settings, snapshots);
+    notifyAfterSnapshotWrite(notifyKeys);
+  }, []);
+
   const pushToServer = useCallback(async (oid: string) => {
     try {
       const prefs = getAppPreferences() as unknown as Json;
@@ -134,28 +149,26 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
     }, SYNC_DEBOUNCE_MS);
   }, [orgId, pushToServer]);
 
+  const lastVisPullAtRef = useRef(0);
+  const VIS_PULL_THROTTLE_MS = 45_000;
+
+  /** After session is ready, pull from DB (material_config source of truth) then push so local+server stay aligned. */
   useEffect(() => {
-    if (loading || !session?.ok) return;
-    const oid = session.accountUserId;
+    if (loading || !orgId) return;
+    const oid = orgId;
     let cancelled = false;
     void (async () => {
-      const remote = await loadRemoteOrgData(oid);
+      await pullRemoteAndApply(oid);
       if (cancelled) return;
-      if (remote === "forbidden" || remote === "no_session") return;
-      const { settings, snapshots } = remote;
-      const notifyKeys: string[] = [];
-      for (const s of snapshots) {
-        if (SNAPSHOT_NOTIFY[s.data_key]) {
-          notifyKeys.push(s.data_key);
-        }
-      }
-      applyRemoteDataToLocalStorage(settings, snapshots);
-      notifyAfterSnapshotWrite(notifyKeys);
+      lastVisPullAtRef.current = Date.now();
+      // Never push before hydration (replaces the old 800ms timer that could race and overwrite
+      // the server with stale local data before `material_config` was applied).
+      schedulePush();
     })();
     return () => {
       cancelled = true;
     };
-  }, [loading, session]);
+  }, [loading, orgId, pullRemoteAndApply, schedulePush]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -179,23 +192,26 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
     };
   }, [orgId, schedulePush]);
 
-  /** When org session appears, push existing local data once (e.g. first login on this device). */
-  useEffect(() => {
-    if (!orgId) return;
-    const t = setTimeout(() => schedulePush(), 800);
-    return () => clearTimeout(t);
-  }, [orgId, schedulePush]);
-
   useEffect(() => {
     if (typeof document === "undefined" || !orgId) return;
     const onVis = () => {
-      if (document.visibilityState === "visible") {
-        schedulePush();
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastVisPullAtRef.current >= VIS_PULL_THROTTLE_MS) {
+        lastVisPullAtRef.current = now;
+        void (async () => {
+          try {
+            await pullRemoteAndApply(orgId);
+          } catch (e) {
+            console.warn("[PLATE] visibility pull failed", e);
+          }
+        })();
       }
+      schedulePush();
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [orgId, schedulePush]);
+  }, [orgId, schedulePush, pullRemoteAndApply]);
 
   useEffect(() => {
     if (!orgId) return;

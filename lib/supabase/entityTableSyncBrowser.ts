@@ -157,6 +157,9 @@ export async function syncQuotesToSupabase(
   });
   const { error } = await supabase.from("quotes").upsert(rows, { onConflict: "id" });
   if (error) {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("[PLATE] quotes Supabase upsert failed:", error.message, error);
+    }
     return { ok: false, error: error.message };
   }
   return { ok: true };

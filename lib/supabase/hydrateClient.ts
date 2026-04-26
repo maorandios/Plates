@@ -55,6 +55,8 @@ export function applyRemoteDataToLocalStorage(
     saveAppPreferences(prefs);
   }
 
+  // Material steel grades, finishes, stock sizes, etc. are stored in public.users.material_config
+  // (per-type JSON) — not a separate table. This applies the server copy to localStorage.
   if (settings?.material_config != null && typeof settings.material_config === "object") {
     const mc = settings.material_config as Record<string, unknown>;
     for (const t of MATERIAL_TYPES) {

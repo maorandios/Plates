@@ -1,5 +1,8 @@
 /**
  * Material configuration persistence and query helpers for quotation MVP.
+ * Steel grades, finishes, stock sheet sizes, and pricing are saved to localStorage and
+ * synchronized to `public.users.material_config` (JSON) by {@link SupabaseSyncProvider} via
+ * `patchOrgSettings`. On login, the server copy is re-applied here so devices stay in sync.
  */
 
 import type { MaterialConfig, MaterialType, MaterialStockSheet } from "@/types/materials";
