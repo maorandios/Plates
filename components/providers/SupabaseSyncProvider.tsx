@@ -71,7 +71,7 @@ function cuttingToJson(): Json {
 export function SupabaseSyncProvider({ children }: { children: React.ReactNode }) {
   const { loading, session } = useOrgBootstrap();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const orgId = session?.ok ? session.orgId : null;
+  const orgId = session?.ok ? session.accountUserId : null;
 
   const pushToServer = useCallback(async (oid: string) => {
     try {
@@ -143,7 +143,7 @@ export function SupabaseSyncProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     if (loading || !session?.ok) return;
-    const oid = session.orgId;
+    const oid = session.accountUserId;
     let cancelled = false;
     void (async () => {
       const remote = await loadRemoteOrgData(oid);

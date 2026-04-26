@@ -48,16 +48,14 @@ export function hasOnboardingPending(): boolean {
 }
 
 /**
- * All main app paths except full-view auth / onboarding are gated when
- * `pending` is set (after signup) until onboarding is complete.
+ * All main app paths except auth / onboarding are gated until onboarding is
+ * complete (local mode without Supabase).
  */
 export function onboardingGateShouldRedirect(
   pathname: string,
-  hasPending: boolean,
   isComplete: boolean
 ): boolean {
   if (isComplete) return false;
-  if (!hasPending) return false;
   if (pathname === "/login" || pathname.startsWith("/login/")) return false;
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
     return false;

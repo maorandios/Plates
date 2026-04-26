@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  hasOnboardingPending,
   isOnboardingComplete,
   onboardingGateShouldRedirect,
 } from "@/lib/onboardingLocal";
+import { isExemptFromOnboardingBootstrapLoading } from "@/lib/auth/publicPaths";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 import { isDevOnboardingPreviewEnabled } from "@/lib/devOnboardingPreview";
 import { useOrgBootstrap } from "@/components/providers/OrgBootstrapProvider";
@@ -43,8 +44,6 @@ export function OnboardingRouteGuard({ children }: OnboardingRouteGuardProps) {
         return;
       }
       if (
-        session.onboardingPending &&
-        !session.onboardingCompleted &&
         pathname !== "/login" &&
         !pathname.startsWith("/login/") &&
         pathname !== "/onboarding" &&
@@ -56,11 +55,26 @@ export function OnboardingRouteGuard({ children }: OnboardingRouteGuardProps) {
     }
 
     const complete = isOnboardingComplete();
-    const pending = hasOnboardingPending();
-    if (onboardingGateShouldRedirect(pathname, pending, complete)) {
+    if (onboardingGateShouldRedirect(pathname, complete)) {
       router.replace("/onboarding");
     }
   }, [pathname, router, loading, session]);
+
+  if (
+    isSupabaseConfigured() &&
+    loading &&
+    !isExemptFromOnboardingBootstrapLoading(pathname)
+  ) {
+    return (
+      <div
+        className="flex h-svh w-full min-w-0 items-center justify-center bg-background"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
+      </div>
+    );
+  }
 
   return <>{children}</>;
 }

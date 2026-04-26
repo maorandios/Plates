@@ -30,7 +30,8 @@ import {
   getPlateProjectSnapshot,
 } from "@/lib/projects/plateProjectSnapshot";
 
-async function getBrowserOrgId(): Promise<string | null> {
+/** Signed-in user id (single-tenant account); `window.__PLATE_ORG_ID__` is set from bootstrap. */
+async function getBrowserAccountId(): Promise<string | null> {
   if (!isSupabaseConfigured() || typeof window === "undefined") {
     return null;
   }
@@ -40,7 +41,6 @@ async function getBrowserOrgId(): Promise<string | null> {
   }
   try {
     const supabase = createClient();
-    await supabase.auth.getSession();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -50,18 +50,9 @@ async function getBrowserOrgId(): Promise<string | null> {
       );
       return null;
     }
-    const { data: rows, error } = await supabase
-      .from("organization_members")
-      .select("org_id")
-      .eq("user_id", user.id)
-      .limit(1);
-    if (error) {
-      console.warn("[PLATE] org lookup failed", error.message);
-      return null;
-    }
-    return rows?.[0]?.org_id ?? null;
+    return user.id;
   } catch (e) {
-    console.warn("[PLATE] getBrowserOrgId error", e);
+    console.warn("[PLATE] getBrowserAccountId error", e);
     return null;
   }
 }
@@ -80,25 +71,25 @@ function readClientsFromLocalStorage(): Client[] {
 }
 
 /**
- * @param orgIdForSync When set (e.g. org id from session / `pushToServer`), avoids relying on
+ * @param accountUserIdForSync When set (e.g. from `pushToServer`), avoids relying on
  * `window.__PLATE_ORG_ID__` being set before the first sync.
  */
 export async function syncClientsToSupabase(
   clients: Client[],
-  orgIdForSync?: string
+  accountUserIdForSync?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "supabase_not_configured_in_browser" };
   }
-  const orgId = orgIdForSync ?? (await getBrowserOrgId());
-  if (!orgId) {
+  const accountId = accountUserIdForSync ?? (await getBrowserAccountId());
+  if (!accountId) {
     return { ok: false, error: "no_org_or_session" };
   }
   const supabase = createClient();
   const { data: existing } = await supabase
     .from("clients")
     .select("id")
-    .eq("org_id", orgId);
+    .eq("user_id", accountId);
   const nextIds = new Set(clients.map((c) => c.id));
   const toDelete = (existing ?? [])
     .map((r) => r.id)
@@ -108,7 +99,7 @@ export async function syncClientsToSupabase(
       .from("clients")
       .delete()
       .eq("id", id)
-      .eq("org_id", orgId);
+      .eq("user_id", accountId);
     if (error) {
       return { ok: false, error: error.message };
     }
@@ -118,7 +109,7 @@ export async function syncClientsToSupabase(
   }
   const { error: upErr } = await supabase
     .from("clients")
-    .upsert(clients.map((c) => clientToRow(orgId, c)), { onConflict: "id" });
+    .upsert(clients.map((c) => clientToRow(accountId, c)), { onConflict: "id" });
   if (upErr) {
     return { ok: false, error: upErr.message };
   }
@@ -127,20 +118,20 @@ export async function syncClientsToSupabase(
 
 export async function syncQuotesToSupabase(
   quotes: QuoteListRecord[],
-  orgIdForSync?: string
+  accountUserIdForSync?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "supabase_not_configured_in_browser" };
   }
-  const orgId = orgIdForSync ?? (await getBrowserOrgId());
-  if (!orgId) {
+  const accountId = accountUserIdForSync ?? (await getBrowserAccountId());
+  if (!accountId) {
     return { ok: false, error: "no_org_or_session" };
   }
   const supabase = createClient();
   const { data: existing } = await supabase
     .from("quotes")
     .select("id")
-    .eq("org_id", orgId);
+    .eq("user_id", accountId);
   const nextIds = new Set(quotes.map((q) => q.id));
   for (const row of existing ?? []) {
     if (!nextIds.has(row.id)) {
@@ -148,7 +139,7 @@ export async function syncQuotesToSupabase(
         .from("quotes")
         .delete()
         .eq("id", row.id)
-        .eq("org_id", orgId);
+        .eq("user_id", accountId);
       if (error) {
         return { ok: false, error: error.message };
       }
@@ -158,7 +149,7 @@ export async function syncQuotesToSupabase(
     return { ok: true };
   }
   const rows = quotes.map((q) => {
-    const base = quoteToRow(orgId, q);
+    const base = quoteToRow(accountId, q);
     const snap = getQuoteSnapshot(q.id);
     return {
       ...base,
@@ -174,20 +165,20 @@ export async function syncQuotesToSupabase(
 
 export async function syncProjectsToSupabase(
   projects: PlateProjectListRecord[],
-  orgIdForSync?: string
+  accountUserIdForSync?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "supabase_not_configured_in_browser" };
   }
-  const orgId = orgIdForSync ?? (await getBrowserOrgId());
-  if (!orgId) {
+  const accountId = accountUserIdForSync ?? (await getBrowserAccountId());
+  if (!accountId) {
     return { ok: false, error: "no_org_or_session" };
   }
   const supabase = createClient();
   const { data: existing } = await supabase
     .from("projects")
     .select("id")
-    .eq("org_id", orgId);
+    .eq("user_id", accountId);
   const nextIds = new Set(projects.map((p) => p.id));
   for (const row of existing ?? []) {
     if (!nextIds.has(row.id)) {
@@ -195,7 +186,7 @@ export async function syncProjectsToSupabase(
         .from("projects")
         .delete()
         .eq("id", row.id)
-        .eq("org_id", orgId);
+        .eq("user_id", accountId);
       if (error) {
         return { ok: false, error: error.message };
       }
@@ -205,7 +196,7 @@ export async function syncProjectsToSupabase(
     return { ok: true };
   }
   const pRows = projects.map((p) => {
-    const base = projectToRow(orgId, p);
+    const base = projectToRow(accountId, p);
     const snap = getPlateProjectSnapshot(p.id);
     return {
       ...base,
@@ -221,20 +212,19 @@ export async function syncProjectsToSupabase(
 
 /**
  * Pushes `plate_clients`, `plate_quotes_list_v1`, and `plate_projects_list_v1` to Supabase
- * in one shot. Call with the same `orgId` as `SupabaseSyncProvider` `pushToServer` so
- * relational tables stay aligned with `org_domain_snapshots` on the live app.
+ * in one shot. Call with the same account id as `SupabaseSyncProvider` `pushToServer`.
  */
 export async function syncAllEntityTablesForOrg(
-  orgId: string
+  accountUserId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!isSupabaseConfigured() || typeof window === "undefined" || !orgId) {
+  if (!isSupabaseConfigured() || typeof window === "undefined" || !accountUserId) {
     return { ok: true };
   }
   const clients = readClientsFromLocalStorage();
   const [c, q, p] = await Promise.all([
-    syncClientsToSupabase(clients, orgId),
-    syncQuotesToSupabase(getQuotesList(), orgId),
-    syncProjectsToSupabase(getPlateProjectsList(), orgId),
+    syncClientsToSupabase(clients, accountUserId),
+    syncQuotesToSupabase(getQuotesList(), accountUserId),
+    syncProjectsToSupabase(getPlateProjectsList(), accountUserId),
   ]);
   const errors: string[] = [];
   if (!c.ok) errors.push(`clients: ${c.error}`);
@@ -252,20 +242,20 @@ export async function syncSteelTypesFromMaterialConfigs(
   if (!isSupabaseConfigured()) {
     return { ok: false, error: "supabase_not_configured_in_browser" };
   }
-  const orgId = await getBrowserOrgId();
-  if (!orgId) {
+  const accountId = await getBrowserAccountId();
+  if (!accountId) {
     return { ok: false, error: "no_org_or_session" };
   }
   const supabase = createClient();
   const { error: delErr } = await supabase
     .from("steel_types")
     .delete()
-    .eq("org_id", orgId);
+    .eq("user_id", accountId);
   if (delErr) {
     return { ok: false, error: delErr.message };
   }
   const rows: {
-    org_id: string;
+    user_id: string;
     family: string;
     name: string;
     sort_order: number;
@@ -277,7 +267,7 @@ export async function syncSteelTypesFromMaterialConfigs(
       const t = name.trim();
       if (!t) continue;
       rows.push({
-        org_id: orgId,
+        user_id: accountId,
         family: c.materialType,
         name: t,
         sort_order: i++,
@@ -297,25 +287,27 @@ export async function syncSteelTypesFromMaterialConfigs(
 
 /**
  * Load clients, quotes, and projects (browser session) for localStorage hydration.
+ * Pass `accountUserId` from {@link useOrgBootstrap} so hydration does not depend on
+ * `getBrowserAccountId()` / session timing (fixes empty lists after login in dev + strict mode).
  */
-export async function loadEntityTablesForOrg(): Promise<
-  LoadedEntityTables | { error: string }
-> {
+export async function loadEntityTablesForOrg(
+  accountUserId?: string
+): Promise<LoadedEntityTables | { error: string }> {
   if (!isSupabaseConfigured()) {
     return { error: "not_configured" };
   }
-  const orgId = await getBrowserOrgId();
-  if (!orgId) {
+  const accountId = accountUserId?.trim() || (await getBrowserAccountId());
+  if (!accountId) {
     return { error: "no_org_or_session" };
   }
   const supabase = createClient();
   const [cRes, qRes, pRes] = await Promise.all([
-    supabase.from("clients").select("*").eq("org_id", orgId).order("updated_at", { ascending: false }),
-    supabase.from("quotes").select("*").eq("org_id", orgId).order("updated_at", { ascending: false }),
+    supabase.from("clients").select("*").eq("user_id", accountId).order("updated_at", { ascending: false }),
+    supabase.from("quotes").select("*").eq("user_id", accountId).order("updated_at", { ascending: false }),
     supabase
       .from("projects")
       .select("*")
-      .eq("org_id", orgId)
+      .eq("user_id", accountId)
       .order("updated_at", { ascending: false }),
   ]);
   if (cRes.error) {

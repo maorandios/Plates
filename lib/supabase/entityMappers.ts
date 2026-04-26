@@ -2,10 +2,10 @@ import type { Client } from "@/types/clients";
 import type { QuoteListRecord } from "@/lib/quotes/quoteList";
 import type { PlateProjectListRecord } from "@/lib/projects/plateProjectList";
 
-export function clientToRow(orgId: string, c: Client) {
+export function clientToRow(accountUserId: string, c: Client) {
   return {
     id: c.id,
-    org_id: orgId,
+    user_id: accountUserId,
     full_name: c.fullName,
     short_code: c.shortCode,
     company_registration_number: c.companyRegistrationNumber ?? null,
@@ -21,10 +21,10 @@ export function clientToRow(orgId: string, c: Client) {
   };
 }
 
-export function quoteToRow(orgId: string, q: QuoteListRecord) {
+export function quoteToRow(accountUserId: string, q: QuoteListRecord) {
   return {
     id: q.id,
-    org_id: orgId,
+    user_id: accountUserId,
     reference_number: q.referenceNumber,
     customer_name: q.customerName,
     status: q.status,
@@ -41,10 +41,10 @@ export function quoteToRow(orgId: string, q: QuoteListRecord) {
   };
 }
 
-export function projectToRow(orgId: string, p: PlateProjectListRecord) {
+export function projectToRow(accountUserId: string, p: PlateProjectListRecord) {
   return {
     id: p.id,
-    org_id: orgId,
+    user_id: accountUserId,
     reference_number: p.referenceNumber,
     customer_name: p.customerName,
     project_name: p.projectName ?? null,

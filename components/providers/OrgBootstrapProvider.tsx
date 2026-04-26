@@ -15,7 +15,12 @@ type OrgBootstrapContextValue = {
   loading: boolean;
   /** Result of the last bootstrap (or null before first run / when not applicable). */
   session: BootstrapSessionResult | null;
-  refresh: () => void;
+  /**
+   * Re-fetches session from the server. Returns a Promise so callers can await
+   * (e.g. after onboarding) before navigating — otherwise React state can lag
+   * one frame and the route guard may still see incomplete onboarding.
+   */
+  refresh: () => Promise<BootstrapSessionResult>;
 };
 
 const OrgBootstrapContext = createContext<OrgBootstrapContextValue | null>(null);
@@ -24,16 +29,18 @@ export function OrgBootstrapProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(isSupabaseConfigured());
   const [session, setSession] = useState<BootstrapSessionResult | null>(null);
 
-  const run = useCallback(() => {
+  const run = useCallback((): Promise<BootstrapSessionResult> => {
     if (!isSupabaseConfigured()) {
+      const s: BootstrapSessionResult = { ok: false, reason: "supabase_misconfigured" };
       setLoading(false);
-      setSession({ ok: false, reason: "supabase_misconfigured" });
-      return;
+      setSession(s);
+      return Promise.resolve(s);
     }
     setLoading(true);
-    void bootstrapSession().then((s) => {
+    return bootstrapSession().then((s) => {
       setSession(s);
       setLoading(false);
+      return s;
     });
   }, []);
 
@@ -44,7 +51,8 @@ export function OrgBootstrapProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (session?.ok) {
-      window.__PLATE_ORG_ID__ = session.orgId;
+      // Legacy name: value is the signed-in user id (single-tenant account scope).
+      window.__PLATE_ORG_ID__ = session.accountUserId;
     } else {
       delete window.__PLATE_ORG_ID__;
     }

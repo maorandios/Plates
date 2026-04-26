@@ -9,7 +9,10 @@ export type BootstrapSessionResult =
   | { ok: false; reason: "no_session" | "supabase_misconfigured" }
   | {
       ok: true;
+      /** @deprecated use accountUserId — kept for app compatibility: equals auth user id. */
       orgId: string;
+      /** The signed-in user id; one workspace per user. */
+      accountUserId: string;
       orgName: string | null;
       onboardingCompleted: boolean;
       onboardingPending: boolean;
@@ -31,7 +34,8 @@ function parseAppPreferences(raw: unknown): AppPreferences {
 }
 
 /**
- * Load session, ensure a default org for new users, return flags for the UI.
+ * Load session, ensure a default account row in public.users, return flags for the UI.
+ * One account per auth user; orgId in the result is a legacy name for the same id.
  */
 export async function bootstrapSession(): Promise<BootstrapSessionResult> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -48,69 +52,46 @@ export async function bootstrapSession(): Promise<BootstrapSessionResult> {
     return { ok: false, reason: "no_session" };
   }
 
-  const { data: mrows } = await supabase
-    .from("organization_members")
-    .select("org_id")
+  const { data: acct, error: selErr } = await supabase
+    .from("users")
+    .select("name, onboarding_completed, onboarding_pending")
     .eq("user_id", user.id)
-    .limit(1);
+    .maybeSingle();
 
-  const existingOrgId = mrows?.[0]?.org_id ?? null;
+  if (selErr) {
+    return { ok: false, reason: "no_session" };
+  }
 
-  if (existingOrgId) {
-    const { data: org, error: orgErr } = await supabase
-      .from("organizations")
-      .select("id, name, onboarding_completed, onboarding_pending")
-      .eq("id", existingOrgId)
-      .single();
-    if (orgErr || !org) {
-      return { ok: false, reason: "no_session" };
-    }
+  if (acct) {
     return {
       ok: true,
-      orgId: org.id,
-      orgName: org.name,
-      onboardingCompleted: org.onboarding_completed,
-      onboardingPending: org.onboarding_pending,
+      orgId: user.id,
+      accountUserId: user.id,
+      orgName: acct.name,
+      onboardingCompleted: acct.onboarding_completed,
+      onboardingPending: acct.onboarding_pending,
     };
   }
 
-  const { data: org, error: insErr } = await supabase
-    .from("organizations")
-    .insert({
-      name: "Workspace",
-      onboarding_pending: true,
-      onboarding_completed: false,
-    })
-    .select("id, name, onboarding_completed, onboarding_pending")
-    .single();
-  if (insErr || !org) {
-    return { ok: false, reason: "no_session" };
-  }
-
-  const { error: memErr } = await supabase.from("organization_members").insert({
-    org_id: org.id,
+  const { error: insErr } = await supabase.from("users").insert({
     user_id: user.id,
-    role: "owner",
-  });
-  if (memErr) {
-    return { ok: false, reason: "no_session" };
-  }
-
-  const { error: stErr } = await supabase.from("users").insert({
-    org_id: org.id,
     email: user.email ?? null,
+    name: "Workspace",
+    onboarding_pending: true,
+    onboarding_completed: false,
     app_preferences: DEFAULT_APP_PREFERENCES as unknown as Json,
   });
-  if (stErr) {
+  if (insErr) {
     return { ok: false, reason: "no_session" };
   }
 
   return {
     ok: true,
-    orgId: org.id,
-    orgName: org.name,
-    onboardingCompleted: org.onboarding_completed,
-    onboardingPending: org.onboarding_pending,
+    orgId: user.id,
+    accountUserId: user.id,
+    orgName: "Workspace",
+    onboardingCompleted: false,
+    onboardingPending: true,
   };
 }
 
@@ -123,7 +104,7 @@ export type CompleteOnboardingInput = {
 };
 
 /**
- * Mark onboarding done and save company + preferences to org + public.users.
+ * Mark onboarding done and save company + preferences to public.users.
  */
 export async function completeOnboarding(
   input: CompleteOnboardingInput
@@ -136,35 +117,13 @@ export async function completeOnboarding(
     return { ok: false, error: "not_authenticated" };
   }
 
-  const { data: m } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!m) {
-    return { ok: false, error: "no_organization" };
-  }
-  const orgId = m.org_id;
-
   const name = input.companyName.trim() || "Workspace";
   const addr = input.address.trim() || undefined;
-  const { error: oErr } = await supabase
-    .from("organizations")
-    .update({
-      name,
-      onboarding_completed: true,
-      onboarding_pending: false,
-    })
-    .eq("id", orgId);
-  if (oErr) {
-    return { ok: false, error: oErr.message };
-  }
 
   const { data: existingSet } = await supabase
     .from("users")
     .select("app_preferences")
-    .eq("org_id", orgId)
+    .eq("user_id", user.id)
     .maybeSingle();
   const base = parseAppPreferences(existingSet?.app_preferences);
   const merged: AppPreferences = {
@@ -178,12 +137,15 @@ export async function completeOnboarding(
     .from("users")
     .upsert(
       {
-        org_id: orgId,
+        user_id: user.id,
+        name,
+        onboarding_completed: true,
+        onboarding_pending: false,
         email: user.email ?? null,
         app_preferences: merged as unknown as Json,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "org_id" }
+      { onConflict: "user_id" }
     );
   if (sErr) {
     return { ok: false, error: sErr.message };

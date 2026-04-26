@@ -9,89 +9,38 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string;
-          display_name: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id: string;
-          display_name?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          display_name?: string | null;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-      organizations: {
-        Row: {
-          id: string;
-          name: string | null;
-          created_by: string | null;
-          onboarding_completed: boolean;
-          onboarding_pending: boolean;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          name?: string | null;
-          created_by?: string | null;
-          onboarding_completed?: boolean;
-          onboarding_pending?: boolean;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          name?: string | null;
-          created_by?: string | null;
-          onboarding_completed?: boolean;
-          onboarding_pending?: boolean;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-      organization_members: {
-        Row: {
-          org_id: string;
-          user_id: string;
-          role: string;
-        };
-        Insert: {
-          org_id: string;
-          user_id: string;
-          role?: string;
-        };
-        Update: {
-          org_id?: string;
-          user_id?: string;
-          role?: string;
-        };
-        Relationships: [];
-      };
       users: {
         Row: {
-          org_id: string;
+          user_id: string;
           email: string | null;
+          name: string | null;
+          display_name: string | null;
+          onboarding_completed: boolean;
+          onboarding_pending: boolean;
           app_preferences: Json | null;
           material_config: Json | null;
           cutting_profiles: Json | null;
           updated_at: string;
         };
         Insert: {
-          org_id: string;
+          user_id: string;
           email?: string | null;
+          name?: string | null;
+          display_name?: string | null;
+          onboarding_completed?: boolean;
+          onboarding_pending?: boolean;
           app_preferences?: Json | null;
           material_config?: Json | null;
           cutting_profiles?: Json | null;
           updated_at?: string;
         };
         Update: {
-          org_id?: string;
+          user_id?: string;
           email?: string | null;
+          name?: string | null;
+          display_name?: string | null;
+          onboarding_completed?: boolean;
+          onboarding_pending?: boolean;
           app_preferences?: Json | null;
           material_config?: Json | null;
           cutting_profiles?: Json | null;
@@ -101,19 +50,19 @@ export interface Database {
       };
       org_domain_snapshots: {
         Row: {
-          org_id: string;
+          user_id: string;
           data_key: string;
           payload: Json;
           updated_at: string;
         };
         Insert: {
-          org_id: string;
+          user_id: string;
           data_key: string;
           payload: Json;
           updated_at?: string;
         };
         Update: {
-          org_id?: string;
+          user_id?: string;
           data_key?: string;
           payload?: Json;
           updated_at?: string;
@@ -123,7 +72,7 @@ export interface Database {
       clients: {
         Row: {
           id: string;
-          org_id: string;
+          user_id: string;
           full_name: string;
           short_code: string;
           company_registration_number: string | null;
@@ -139,7 +88,7 @@ export interface Database {
         };
         Insert: {
           id: string;
-          org_id: string;
+          user_id: string;
           full_name: string;
           short_code: string;
           company_registration_number?: string | null;
@@ -155,7 +104,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          org_id?: string;
+          user_id?: string;
           full_name?: string;
           short_code?: string;
           company_registration_number?: string | null;
@@ -174,7 +123,7 @@ export interface Database {
       quotes: {
         Row: {
           id: string;
-          org_id: string;
+          user_id: string;
           reference_number: string;
           customer_name: string;
           status: string;
@@ -192,7 +141,7 @@ export interface Database {
         };
         Insert: {
           id: string;
-          org_id: string;
+          user_id: string;
           reference_number: string;
           customer_name: string;
           status: string;
@@ -210,7 +159,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          org_id?: string;
+          user_id?: string;
           reference_number?: string;
           customer_name?: string;
           status?: string;
@@ -231,7 +180,7 @@ export interface Database {
       projects: {
         Row: {
           id: string;
-          org_id: string;
+          user_id: string;
           reference_number: string;
           customer_name: string;
           project_name: string | null;
@@ -247,7 +196,7 @@ export interface Database {
         };
         Insert: {
           id: string;
-          org_id: string;
+          user_id: string;
           reference_number: string;
           customer_name: string;
           project_name?: string | null;
@@ -263,7 +212,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          org_id?: string;
+          user_id?: string;
           reference_number?: string;
           customer_name?: string;
           project_name?: string | null;
@@ -282,7 +231,7 @@ export interface Database {
       steel_types: {
         Row: {
           id: string;
-          org_id: string;
+          user_id: string;
           family: string;
           name: string;
           sort_order: number;
@@ -291,7 +240,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          org_id: string;
+          user_id: string;
           family: string;
           name: string;
           sort_order?: number;
@@ -300,7 +249,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          org_id?: string;
+          user_id?: string;
           family?: string;
           name?: string;
           sort_order?: number;

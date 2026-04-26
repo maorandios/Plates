@@ -1155,8 +1155,11 @@
   },
   "dashboard": {
     "welcomeTitle": "ברוך הבא!",
+    "welcomeGreetingLine": "ברוך הבא. מה תרצו לייצר היום?",
     "cardNewProject": "יצירת פרויקט חדש",
+    "cardNewProjectHint": "לחץ כאן ליצירת תוכניות ביצוע",
     "cardNewQuote": "יצירת הצעת מחיר חדשה",
+    "cardNewQuoteHint": "לחץ כאן ליצירת הצעת מחיר חדשה",
     "browseNavAria": "רשימות שמורות: פרויקטים והצעות מחיר",
     "stats": {
       "totalQuotes": "סה״כ הצעות",

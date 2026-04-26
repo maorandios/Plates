@@ -16,7 +16,7 @@ import {
 } from "@/lib/supabase/storageBundles";
 
 export type UserWorkspaceHydration = {
-  org_id: string;
+  user_id: string;
   email: string | null;
   app_preferences: Json;
   material_config: Json | null;

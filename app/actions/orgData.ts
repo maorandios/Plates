@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/supabase";
 
 export type UserWorkspaceRow = {
-  org_id: string;
+  user_id: string;
   email: string | null;
   app_preferences: Json;
   material_config: Json | null;
@@ -13,9 +13,10 @@ export type UserWorkspaceRow = {
 };
 
 /**
- * Read org settings + all domain snapshot rows (used after login to hydrate the client).
+ * Read account settings + all domain snapshot rows (used after login to hydrate the client).
+ * @param accountUserId Must equal the signed-in user id (legacy callers pass session.orgId).
  */
-export async function loadRemoteOrgData(orgId: string): Promise<{
+export async function loadRemoteOrgData(accountUserId: string): Promise<{
   settings: UserWorkspaceRow | null;
   snapshots: { data_key: string; payload: Json; updated_at: string }[];
 } | "forbidden" | "no_session"> {
@@ -26,28 +27,22 @@ export async function loadRemoteOrgData(orgId: string): Promise<{
   if (!user) {
     return "no_session";
   }
-  const { data: m } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  if (!m) {
+  if (user.id !== accountUserId) {
     return "forbidden";
   }
   const { data: settings } = await supabase
     .from("users")
-    .select("org_id, email, app_preferences, material_config, cutting_profiles, updated_at")
-    .eq("org_id", orgId)
+    .select("user_id, email, app_preferences, material_config, cutting_profiles, updated_at")
+    .eq("user_id", user.id)
     .maybeSingle();
   const { data: snapshots } = await supabase
     .from("org_domain_snapshots")
     .select("data_key, payload, updated_at")
-    .eq("org_id", orgId);
+    .eq("user_id", user.id);
   return {
     settings: settings
       ? {
-          org_id: settings.org_id,
+          user_id: settings.user_id,
           email: settings.email,
           app_preferences: settings.app_preferences,
           material_config: settings.material_config,
@@ -61,9 +56,10 @@ export async function loadRemoteOrgData(orgId: string): Promise<{
 
 /**
  * Partial upsert of public.users (only provided keys are sent).
+ * @param accountUserId Must equal the signed-in user (legacy: session.orgId).
  */
 export async function patchOrgSettings(
-  orgId: string,
+  accountUserId: string,
   patch: {
     app_preferences?: Json;
     material_config?: Json | null;
@@ -77,22 +73,19 @@ export async function patchOrgSettings(
   if (!user) {
     return { ok: false, error: "not_authenticated" };
   }
-  const { data: m } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  if (!m) {
+  if (user.id !== accountUserId) {
     return { ok: false, error: "forbidden" };
   }
   const { data: cur } = await supabase
     .from("users")
-    .select("app_preferences, material_config, cutting_profiles, email")
-    .eq("org_id", orgId)
+    .select("app_preferences, material_config, cutting_profiles, email, name, onboarding_completed, onboarding_pending")
+    .eq("user_id", user.id)
     .maybeSingle();
   const next = {
-    org_id: orgId,
+    user_id: user.id,
+    name: cur?.name ?? "Workspace",
+    onboarding_completed: cur?.onboarding_completed ?? false,
+    onboarding_pending: cur?.onboarding_pending ?? true,
     email: user.email ?? cur?.email ?? null,
     app_preferences: patch.app_preferences ?? cur?.app_preferences ?? null,
     material_config:
@@ -102,7 +95,7 @@ export async function patchOrgSettings(
     updated_at: new Date().toISOString(),
   };
   const { error } = await supabase.from("users").upsert(next, {
-    onConflict: "org_id",
+    onConflict: "user_id",
   });
   if (error) {
     return { ok: false, error: error.message };
@@ -111,7 +104,7 @@ export async function patchOrgSettings(
 }
 
 export async function upsertDomainSnapshot(
-  orgId: string,
+  accountUserId: string,
   dataKey: string,
   payload: Json
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -122,23 +115,17 @@ export async function upsertDomainSnapshot(
   if (!user) {
     return { ok: false, error: "not_authenticated" };
   }
-  const { data: m } = await supabase
-    .from("organization_members")
-    .select("org_id")
-    .eq("user_id", user.id)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  if (!m) {
+  if (user.id !== accountUserId) {
     return { ok: false, error: "forbidden" };
   }
   const { error } = await supabase.from("org_domain_snapshots").upsert(
     {
-      org_id: orgId,
+      user_id: user.id,
       data_key: dataKey,
       payload,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "org_id,data_key" }
+    { onConflict: "user_id,data_key" }
   );
   if (error) {
     return { ok: false, error: error.message };

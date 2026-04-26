@@ -15,6 +15,18 @@ export function isPublicPath(pathname: string): boolean {
   return false;
 }
 
+/**
+ * While org bootstrap is loading, we avoid flashing the main app. Still allow
+ * auth and onboarding routes to render.
+ */
+export function isExemptFromOnboardingBootstrapLoading(pathname: string): boolean {
+  if (isPublicPath(pathname)) return true;
+  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
+    return true;
+  }
+  return false;
+}
+
 /** Safe internal path for ?next= (path only, no open redirects). */
 export function safeNextPathParam(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {

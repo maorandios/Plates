@@ -9,7 +9,7 @@ type PlatePublicSupabase = { url: string; key: string };
 declare global {
   interface Window {
     __PLATE_PUBLIC_SUPABASE__?: PlatePublicSupabase;
-    /** Set by {@link OrgBootstrapProvider} when session is ready */
+    /** Account scope id (signed-in user id); legacy name from org-based schema. */
     __PLATE_ORG_ID__?: string;
   }
 }

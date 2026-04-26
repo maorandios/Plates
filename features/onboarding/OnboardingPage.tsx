@@ -127,15 +127,21 @@ export function OnboardingPage() {
       if (!res.ok) {
         return;
       }
-      refresh();
+      // Await a full bootstrap so session.onboardingCompleted is true before we leave
+      // this page; then yield one macrotask so context re-renders before the route guard
+      // runs on `/` (otherwise the guard can still see stale "incomplete" for ~1s).
+      const next = await refresh();
+      if (!next.ok || !next.onboardingCompleted) {
+        return;
+      }
     }
     markOnboardingComplete();
-    router.push("/");
+    setTimeout(() => {
+      router.push("/");
+    }, 0);
   }, [data, router, refresh]);
 
   const dataIndexOnScreen = step >= 1 && step <= 4 ? step : 0;
-
-  const preview = isDevOnboardingPreviewEnabled();
 
   return (
     <div
@@ -143,15 +149,6 @@ export function OnboardingPage() {
       dir="rtl"
     >
       <div className="flex w-full max-w-lg flex-col items-center gap-8">
-        {preview ? (
-          <p
-            className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-950 dark:text-amber-100"
-            role="status"
-          >
-            Local preview: you can design this flow even with onboarding already completed.
-            Finishing the wizard still runs save actions against your org.
-          </p>
-        ) : null}
         <div className="text-center">
           <Image
             src="/icons/MAINLOGOALL.svg?v=1"
