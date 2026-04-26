@@ -12,6 +12,8 @@ import { bootstrapSession, type BootstrapSessionResult } from "@/app/actions/org
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/isConfigured";
 
+type BootstrapOptions = { /** When false, session is updated without the global app loading gate (avoids unmounting the tree e.g. quick-quote wizard). */ showLoading?: boolean };
+
 type OrgBootstrapContextValue = {
   loading: boolean;
   /** Result of the last bootstrap (or null before first run / when not applicable). */
@@ -21,7 +23,7 @@ type OrgBootstrapContextValue = {
    * (e.g. after onboarding) before navigating — otherwise React state can lag
    * one frame and the route guard may still see incomplete onboarding.
    */
-  refresh: () => Promise<BootstrapSessionResult>;
+  refresh: (options?: BootstrapOptions) => Promise<BootstrapSessionResult>;
 };
 
 const OrgBootstrapContext = createContext<OrgBootstrapContextValue | null>(null);
@@ -30,26 +32,38 @@ export function OrgBootstrapProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(isSupabaseConfigured());
   const [session, setSession] = useState<BootstrapSessionResult | null>(null);
 
-  const run = useCallback((): Promise<BootstrapSessionResult> => {
-    if (!isSupabaseConfigured()) {
-      const s: BootstrapSessionResult = { ok: false, reason: "supabase_misconfigured" };
-      setLoading(false);
-      setSession(s);
-      return Promise.resolve(s);
-    }
-    setLoading(true);
-    return bootstrapSession().then((s) => {
-      setSession(s);
-      setLoading(false);
-      return s;
-    });
-  }, []);
+  const run = useCallback(
+    (options?: BootstrapOptions): Promise<BootstrapSessionResult> => {
+      if (!isSupabaseConfigured()) {
+        const s: BootstrapSessionResult = { ok: false, reason: "supabase_misconfigured" };
+        setLoading(false);
+        setSession(s);
+        return Promise.resolve(s);
+      }
+      const showLoading = options?.showLoading !== false;
+      if (showLoading) {
+        setLoading(true);
+      }
+      return bootstrapSession().then((s) => {
+        setSession(s);
+        if (showLoading) {
+          setLoading(false);
+        }
+        return s;
+      });
+    },
+    []
+  );
 
   useEffect(() => {
-    run();
+    void run();
   }, [run]);
 
-  /** Keep server bootstrap in sync with Supabase client auth (incl. sign-out / new session). */
+  /**
+   * Re-sync server `public.users` when auth changes, without flipping `loading` — otherwise
+   * {@link OnboardingRouteGuard} unmounts the full tree (spinner) and in-progress UIs
+   * (e.g. quick quote steps) remount and reset to phase 1.
+   */
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     const supabase = createClient();
@@ -65,7 +79,7 @@ export function OrgBootstrapProvider({ children }: { children: React.ReactNode }
         return;
       }
       if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-        void run();
+        void run({ showLoading: false });
       }
     });
     return () => subscription.unsubscribe();
