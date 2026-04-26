@@ -67,6 +67,7 @@ import {
 import { formatDecimal } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
 import { parseDxfFile } from "@/lib/parsers/dxfParser";
+import { useMaterialConfigForType } from "@/hooks/useMaterialConfigForType";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import { defaultMaterialGradeForFamily } from "../lib/plateFields";
 import {
@@ -537,7 +538,8 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
     setNoExcelDefaultsBannerDismissed(true);
   }, []);
 
-  const materialConfig = useMemo(() => getMaterialConfig(materialType), [materialType]);
+  const materialConfig =
+    useMaterialConfigForType(materialType) ?? getMaterialConfig(materialType);
 
   const previewPartStats = useMemo(() => {
     if (previewUploadIndex === null) return null;

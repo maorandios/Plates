@@ -39,6 +39,7 @@ import type { QuotePartRow, ThicknessStockInput } from "../../types/quickQuote";
 import {
   displayNestingMaterialGradeKey,
   nestingMaterialGradeKey,
+  splitMaterialGradeAndFinish,
 } from "../../lib/plateFields";
 
 const QA = "quote.quantityAnalysis" as const;
@@ -62,6 +63,21 @@ function partsInNestingGroup(
       (p.corrugated === true) === corrugated &&
       nestingMaterialGradeKey(p.material) === materialGradeKey
   );
+}
+
+/** Show the exact BOM grade text (incl. custom סיווג from Settings), not only normalized key. */
+function nestingSteelGradeTableLabel(
+  parts: QuotePartRow[],
+  thicknessMm: number,
+  corrugated: boolean,
+  materialGradeKey: string
+): string {
+  const group = partsInNestingGroup(parts, thicknessMm, corrugated, materialGradeKey);
+  if (group.length === 0) {
+    return displayNestingMaterialGradeKey(materialGradeKey);
+  }
+  const g = splitMaterialGradeAndFinish(group[0].material).grade.trim();
+  return g || displayNestingMaterialGradeKey(materialGradeKey);
 }
 
 function thicknessResultForGroup(
@@ -405,7 +421,14 @@ export function NestingPreviewSection({
         });
       }
       thicknessSet.add(String(Math.round(f.thicknessMm * 100) / 100));
-      steelSet.add(displayNestingMaterialGradeKey(f.materialGradeKey));
+      steelSet.add(
+        nestingSteelGradeTableLabel(
+          parts,
+          f.thicknessMm,
+          f.corrugated,
+          f.materialGradeKey
+        )
+      );
     }
     sizes.sort((a, b) => {
       const [aw, al] = a.key.split("x").map(Number);
@@ -434,7 +457,12 @@ export function NestingPreviewSection({
       if (filterCorrugated === "yes" && !f.corrugated) return false;
       if (filterCorrugated === "no" && f.corrugated) return false;
       if (filterSteel !== "all") {
-        const label = displayNestingMaterialGradeKey(f.materialGradeKey);
+        const label = nestingSteelGradeTableLabel(
+          parts,
+          f.thicknessMm,
+          f.corrugated,
+          f.materialGradeKey
+        );
         if (label !== filterSteel) return false;
       }
       return true;
@@ -624,7 +652,7 @@ export function NestingPreviewSection({
               const thicknessMm = first.thicknessMm;
               const isCorrugated = first.corrugated;
               const gradeKey = first.materialGradeKey;
-              const groupParts = partsInNestingGroup(
+              const steelGradeLabel = nestingSteelGradeTableLabel(
                 parts,
                 thicknessMm,
                 isCorrugated,
@@ -666,11 +694,8 @@ export function NestingPreviewSection({
                     {first.totalSheetsForThickness}
                   </TableCell>
                   <TableCell className="min-w-0 overflow-hidden px-2 py-2.5 align-middle text-start text-sm leading-snug">
-                    <span
-                      className="block truncate"
-                      title={displayNestingMaterialGradeKey(gradeKey)}
-                    >
-                      {displayNestingMaterialGradeKey(gradeKey)}
+                    <span className="block truncate" title={steelGradeLabel}>
+                      {steelGradeLabel}
                     </span>
                   </TableCell>
                   <TableCell className="min-w-0 px-2 py-2.5 align-middle text-sm">

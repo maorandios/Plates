@@ -54,6 +54,7 @@ import { nanoid } from "@/lib/utils/nanoid";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { type MaterialType } from "@/types/materials";
+import { useMaterialConfigForType } from "@/hooks/useMaterialConfigForType";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import { defaultMaterialGradeForFamily } from "../lib/plateFields";
 import {
@@ -932,7 +933,8 @@ function BendPlateShapeEditor({
     setAddHoleFaceError(null);
   }, [holeViewSegmentIndex]);
 
-  const materialConfig = useMemo(() => getMaterialConfig(materialType), [materialType]);
+  const materialConfig =
+    useMaterialConfigForType(materialType) ?? getMaterialConfig(materialType);
 
   const profileSegmentLensKey = useMemo(
     () => profileSegmentDims.map((s) => s.lengthMm).join(","),

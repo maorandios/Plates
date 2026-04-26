@@ -62,6 +62,7 @@ import {
   dialogFooterActionsStartClassName,
 } from "@/components/ui/dialog";
 import type { MaterialType } from "@/types/materials";
+import { useMaterialConfigForType } from "@/hooks/useMaterialConfigForType";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
 import { formatDecimal, formatInteger } from "@/lib/formatNumbers";
 import { cn } from "@/lib/utils";
@@ -638,13 +639,11 @@ export function ExcelUploadStep({
     [quoteImportMaterialType]
   );
 
-  const quoteImportMaterialConfig = useMemo(
-    () =>
-      quoteImportMaterialType != null
-        ? getMaterialConfig(quoteImportMaterialType)
-        : null,
-    [quoteImportMaterialType]
-  );
+  const quoteImportMaterialConfig =
+    useMaterialConfigForType(quoteImportMaterialType ?? null) ??
+    (quoteImportMaterialType != null
+      ? getMaterialConfig(quoteImportMaterialType)
+      : null);
 
   const quoteImportPreviewPart = useMemo(() => {
     if (!importPreviewRowId || !parsedRows || !quoteImportMaterialType) return null;
