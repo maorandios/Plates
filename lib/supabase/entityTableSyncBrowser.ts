@@ -28,7 +28,10 @@ import {
   applyPlateProjectSessionPayloadFromServer,
   getPlateProjectSnapshot,
 } from "@/lib/projects/plateProjectSnapshot";
-import { ensureAuthUserForBrowserSync } from "@/lib/supabase/ensureAuthSession";
+import {
+  ensureAuthUserForBrowserSync,
+  prepareBrowserSessionForPostgrest,
+} from "@/lib/supabase/ensureAuthSession";
 
 /**
  * Returns the current auth user id for browser-side Supabase calls.
@@ -215,26 +218,40 @@ export async function syncProjectsToSupabase(
  * Pushes `plate_clients`, `plate_quotes_list_v1`, and `plate_projects_list_v1` to Supabase
  * in one shot. Call with the same account id as `SupabaseSyncProvider` `pushToServer`.
  */
+const AUTH_RECOVERABLE = /401|JWT|jwt|expired|PGRST|row-level security|not authenticated|permission denied|unauthorized/i;
+
 export async function syncAllEntityTablesForOrg(
   accountUserId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isSupabaseConfigured() || typeof window === "undefined" || !accountUserId) {
     return { ok: true };
   }
-  const clients = readClientsFromLocalStorage();
-  const [c, q, p] = await Promise.all([
-    syncClientsToSupabase(clients, accountUserId),
-    syncQuotesToSupabase(getQuotesList(), accountUserId),
-    syncProjectsToSupabase(getPlateProjectsList(), accountUserId),
-  ]);
-  const errors: string[] = [];
-  if (!c.ok) errors.push(`clients: ${c.error}`);
-  if (!q.ok) errors.push(`quotes: ${q.error}`);
-  if (!p.ok) errors.push(`projects: ${p.error}`);
-  if (errors.length > 0) {
-    return { ok: false, error: errors.join("; ") };
+  if (!(await prepareBrowserSessionForPostgrest(accountUserId))) {
+    return { ok: false, error: "no_org_or_session" };
   }
-  return { ok: true };
+  const clients = readClientsFromLocalStorage();
+  const run = async () => {
+    const c = await syncClientsToSupabase(clients, accountUserId);
+    const q = await syncQuotesToSupabase(getQuotesList(), accountUserId);
+    const p = await syncProjectsToSupabase(getPlateProjectsList(), accountUserId);
+    const errors: string[] = [];
+    if (!c.ok) errors.push(`clients: ${c.error}`);
+    if (!q.ok) errors.push(`quotes: ${q.error}`);
+    if (!p.ok) errors.push(`projects: ${p.error}`);
+    if (errors.length > 0) {
+      return { ok: false as const, error: errors.join("; ") };
+    }
+    return { ok: true as const };
+  };
+  let out = await run();
+  if (!out.ok && AUTH_RECOVERABLE.test(out.error)) {
+    const supabase = createClient();
+    const { error: refErr } = await supabase.auth.refreshSession();
+    if (!refErr && (await prepareBrowserSessionForPostgrest(accountUserId))) {
+      out = await run();
+    }
+  }
+  return out;
 }
 
 /**
@@ -250,6 +267,9 @@ export async function loadEntityTablesForOrg(
   }
   const accountId = accountUserId?.trim() || (await getBrowserAccountId());
   if (!accountId) {
+    return { error: "no_org_or_session" };
+  }
+  if (!(await prepareBrowserSessionForPostgrest(accountId))) {
     return { error: "no_org_or_session" };
   }
   const supabase = createClient();

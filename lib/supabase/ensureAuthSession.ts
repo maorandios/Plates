@@ -20,3 +20,29 @@ export async function ensureAuthUserForBrowserSync(): Promise<User | null> {
   const second = await supabase.auth.getUser();
   return second.data.user ?? null;
 }
+
+/**
+ * Call immediately before a batch of **browser** PostgREST calls (and after
+ * `patchOrgSettings` / other Server Actions) so the client reloads the session
+ * from `document.cookie` and applies a single in-lock refresh when the access
+ * token is inside GoTrue’s expiry margin.
+ *
+ * Parallel `from().upsert` calls on an almost-expired token can all attach the
+ * same stale JWT while `getSession` would have refreshed first — that yields
+ * **401** and RLS errors (`auth.uid()` empty).
+ */
+export async function prepareBrowserSessionForPostgrest(
+  expectedUserId: string
+): Promise<boolean> {
+  if (!expectedUserId.trim()) return false;
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    return false;
+  }
+  const s = data.session;
+  if (!s?.user || s.user.id !== expectedUserId) {
+    return false;
+  }
+  return true;
+}
