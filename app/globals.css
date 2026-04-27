@@ -127,7 +127,15 @@ html.light {
   --viewer-canvas: 220 14% 96%;
 }
 
+html {
+  /* Mobile Safari / WebView: fill viewport even when inner flex height is flaky */
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
 body {
+  min-height: 100%;
+  min-height: 100dvh;
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-noto-sans-hebrew), "Noto Sans Hebrew", sans-serif;

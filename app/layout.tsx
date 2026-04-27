@@ -96,12 +96,12 @@ export default function RootLayout({
           id="plate-theme-init"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k=${JSON.stringify(PLATE_THEME_STORAGE_KEY)};var v=localStorage.getItem(k);if(v!=="dark")document.documentElement.classList.add("light");}catch(e){}})();`,
+            __html: `(function(){try{var k=${JSON.stringify(PLATE_THEME_STORAGE_KEY)};var v=localStorage.getItem(k);if(v!=="dark")document.documentElement.classList.add("light");}catch(e){document.documentElement.classList.add("light");}})();`,
           }}
         />
         <ThemeProvider>
           <LoadingBadgeProvider>
-            <div className="flex h-svh min-h-0 flex-col overflow-hidden bg-background">
+            <div className="flex min-h-0 min-h-screen h-svh min-h-[100dvh] flex-col overflow-hidden bg-background">
               <OrgBootstrapProvider>
                 <OnboardingRouteGuard>
                   <EntityTableHydrationProvider>

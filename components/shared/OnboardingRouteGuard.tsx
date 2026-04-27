@@ -67,7 +67,7 @@ export function OnboardingRouteGuard({ children }: OnboardingRouteGuardProps) {
   ) {
     return (
       <div
-        className="flex h-svh w-full min-w-0 items-center justify-center bg-background"
+        className="flex h-svh min-h-screen min-h-[100dvh] w-full min-w-0 items-center justify-center bg-background"
         role="status"
         aria-live="polite"
       >
