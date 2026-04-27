@@ -1,7 +1,7 @@
 import type { ExcelRow } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import { normalizeName } from "@/lib/matching/matcher";
-import { defaultMaterialGradeForFamily } from "./plateFields";
+import { materialGradeFromDxfImport } from "./plateFields";
 import { normalizeFinishFromImport } from "./materialSettingsOptions";
 
 /** Row shape used while parsing DXF in {@link DxfUploadStep} before merge. */
@@ -25,13 +25,14 @@ export function mergeExcelIntoDxfUploads<T extends DxfUploadRowForMerge>(
   excelRows: ExcelRow[] | null | undefined,
   materialType: MaterialType
 ): T[] {
-  const defaultGrade = defaultMaterialGradeForFamily(materialType);
-
   return uploads.map((upload) => {
     const parsed = upload.parsed;
     if (!parsed) {
-      const grade =
-        upload.materialGrade.trim() || defaultGrade;
+      const grade = materialGradeFromDxfImport(
+        materialType,
+        upload.materialGrade.trim(),
+        ""
+      );
       return {
         ...upload,
         quantity: 1,
@@ -62,7 +63,7 @@ export function mergeExcelIntoDxfUploads<T extends DxfUploadRowForMerge>(
     }
 
     const geomGrade = (parsed.materialGrade || "").trim();
-    const fromDxf = geomGrade || defaultGrade;
+    const fromDxf = materialGradeFromDxfImport(materialType, "", geomGrade);
 
     if (best) {
       const qty = Math.max(1, Math.floor(Number(best.quantity)) || 1);

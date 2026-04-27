@@ -19,9 +19,43 @@ const notoSansHebrew = Noto_Sans_Hebrew({
   display: "swap",
 });
 
+function appMetadataBase(): URL {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) {
+    return new URL(explicit.endsWith("/") ? explicit.slice(0, -1) : explicit);
+  }
+  if (process.env.VERCEL_URL) {
+    return new URL(`https://${process.env.VERCEL_URL}`);
+  }
+  return new URL("http://localhost:3000");
+}
+
 export const metadata: Metadata = {
+  metadataBase: appMetadataBase(),
   title: messages.meta.title,
   description: messages.meta.description,
+  icons: {
+    icon: [{ url: "/FAV.png", type: "image/png" }],
+    apple: [{ url: "/FAV.png", type: "image/png" }],
+  },
+  openGraph: {
+    title: messages.meta.title,
+    description: messages.meta.description,
+    locale: "he_IL",
+    type: "website",
+    images: [
+      {
+        url: "/opengraph.png",
+        alt: messages.meta.title,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: messages.meta.title,
+    description: messages.meta.description,
+    images: ["/opengraph.png"],
+  },
   /** Tells built-in translation not to mark the app — see layout `translate="no"`. */
   other: { google: "notranslate" },
 };

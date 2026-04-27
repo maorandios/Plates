@@ -69,7 +69,10 @@ import { cn } from "@/lib/utils";
 import { parseDxfFile } from "@/lib/parsers/dxfParser";
 import { useMaterialConfigForType } from "@/hooks/useMaterialConfigForType";
 import { getMaterialConfig } from "@/lib/settings/materialConfig";
-import { defaultMaterialGradeForFamily } from "../lib/plateFields";
+import {
+  defaultMaterialGradeForFamily,
+  materialGradeFromDxfImport,
+} from "../lib/plateFields";
 import {
   normalizeFinishFromImport,
   normalizeStoredReviewFinish,
@@ -283,7 +286,11 @@ function restoredGeometriesToUploads(
       parseError: null,
       quantity: qty,
       thicknessMm: clampPositiveThicknessMm(g.reviewThicknessMm),
-      materialGrade: g.materialGrade?.trim() || defaultMaterialGradeForFamily(materialType),
+      materialGrade: materialGradeFromDxfImport(
+        materialType,
+        "",
+        g.materialGrade?.trim() ?? ""
+      ),
       finish,
       corrugated: g.reviewCorrugated === true,
     };
@@ -305,10 +312,11 @@ function parseDxfUploadsInPlace(
       );
 
       const geomGrade = result.geometry.materialGrade?.trim() ?? "";
-      const mergedGrade =
-        upload.materialGrade.trim() ||
-        geomGrade ||
-        defaultMaterialGradeForFamily(materialType);
+      const mergedGrade = materialGradeFromDxfImport(
+        materialType,
+        upload.materialGrade.trim(),
+        geomGrade
+      );
 
       return {
         ...upload,
@@ -884,7 +892,11 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       const qty = Math.max(1, Math.floor(Number(u.quantity)) || 1);
       return {
         ...p,
-        materialGrade: u.materialGrade.trim() || p.materialGrade,
+        materialGrade: materialGradeFromDxfImport(
+          materialType,
+          u.materialGrade.trim(),
+          (p.materialGrade || "").trim()
+        ),
         reviewQuantity: qty,
         reviewFinish: u.finish,
         reviewThicknessMm: clampPositiveThicknessMm(u.thicknessMm),
@@ -913,7 +925,7 @@ export const DxfUploadStep = forwardRef<DxfUploadStepHandle, DxfUploadStepProps>
       }
       onDataApproved(validGeometries);
     }
-  }, [uploadedFiles, onDataApproved]);
+  }, [uploadedFiles, materialType, onDataApproved]);
 
   const metrics = useMemo((): DxfMetrics => {
     const validParts = uploadedFiles.filter(u => u.parsed?.processedGeometry?.isValid);

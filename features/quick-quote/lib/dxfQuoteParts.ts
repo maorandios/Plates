@@ -1,7 +1,7 @@
 import type { DxfPartGeometry } from "@/types";
 import type { MaterialType } from "@/types/materials";
 import type { QuotePartRow } from "../types/quickQuote";
-import { defaultMaterialGradeForFamily, formatMaterialGradeAndFinish } from "./plateFields";
+import { formatMaterialGradeAndFinish, materialGradeFromDxfImport } from "./plateFields";
 import { normalizeStoredReviewFinish } from "./materialSettingsOptions";
 
 /** Default plate thickness (mm) when quoting from DXF area only (matches {@link DxfUploadStep}). */
@@ -24,7 +24,6 @@ export function dxfGeometriesToQuoteParts(
 ): QuotePartRow[] {
   const rho = densityKgPerM3;
   const fallbackTh = Math.max(0, defaultThicknessMm);
-  const defaultGrade = defaultMaterialGradeForFamily(materialType);
 
   return geometries
     .filter((g) => g.processedGeometry?.isValid)
@@ -43,7 +42,11 @@ export function dxfGeometriesToQuoteParts(
       const weightKg = areaM2 * tM * rho;
       const pierceCount =
         geom.preparation?.manufacturing?.cutInner?.length ?? 0;
-      const grade = (g.materialGrade || "").trim() || defaultGrade;
+      const grade = materialGradeFromDxfImport(
+        materialType,
+        "",
+        (g.materialGrade || "").trim()
+      );
       const partName = (g.guessedPartName || "").trim() || `DXF part ${index + 1}`;
       const validationStatus =
         geom.status === "error"

@@ -31,6 +31,55 @@ export function defaultMaterialGradeForFamily(materialType: MaterialType): strin
   return "S235";
 }
 
+/**
+ * True when a parsed DXF/BOM string looks like a carbon / structural steel designation.
+ * Drawings often contain S235/ST-37 text even when the quote is aluminum or stainless;
+ * those tokens should not override {@link defaultMaterialGradeForFamily} unless the user
+ * typed a grade explicitly (handled in {@link materialGradeFromDxfImport}).
+ */
+export function isCarbonStructuralSteelLikeGrade(grade: string): boolean {
+  const t = grade.trim();
+  if (!t) return false;
+  const compact = t.toUpperCase().replace(/\s+/g, "");
+  // ST-37, ST37, ST-52-3, …
+  if (/^ST-?\d{2}(-?\d)?$/i.test(compact)) return true;
+  // EN 10025-style S185…S690 with common suffixes (S355JR, S275J2, S355MC, …)
+  if (
+    /^S(185|195|235|245|275|355|390|420|460|500|550|620|690)([A-Z0-9]{0,10})?$/i.test(
+      compact
+    )
+  ) {
+    return true;
+  }
+  // Bare ASTM plate grades (A36, A572-50, …)
+  if (/^A\d{2,3}(-\d+)?$/i.test(compact)) return true;
+  if (/^ASTM\s*A\d/i.test(t)) return true;
+  return false;
+}
+
+/**
+ * Resolves סיווג for DXF flows: explicit user/BOM input wins; otherwise, for aluminum /
+ * stainless quotes, ignore carbon-steel-like text extracted from the drawing and use the
+ * family default (same idea as other quote methods).
+ */
+export function materialGradeFromDxfImport(
+  materialType: MaterialType,
+  userTypedGrade: string,
+  dxfParsedGrade: string
+): string {
+  const user = userTypedGrade.trim();
+  if (user) return user;
+  const dxf = dxfParsedGrade.trim();
+  if (!dxf) return defaultMaterialGradeForFamily(materialType);
+  if (
+    materialType !== "carbonSteel" &&
+    isCarbonStructuralSteelLikeGrade(dxf)
+  ) {
+    return defaultMaterialGradeForFamily(materialType);
+  }
+  return dxf;
+}
+
 export function plateFinishLabel(finish: PlateFinish | undefined): string {
   const f = finish ?? DEFAULT_PLATE_FINISH;
   return t(finishLabelKey(f));
